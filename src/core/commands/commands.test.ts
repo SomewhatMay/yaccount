@@ -13,12 +13,15 @@ import {
   recordSnapshot,
   updateSnapshot,
   removeSnapshot,
+  setBudgetTarget,
+  removeBudgetTarget,
   setDefaultContainer,
   unarchiveCategory,
   unarchiveContainer,
   unvoidTransaction,
 } from "@/core/commands";
 import {
+  makeBudgetTarget,
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
@@ -215,6 +218,39 @@ describe("snapshot corrections", () => {
     expect(op.type).toBe("snapshot.remove");
     if (op.type !== "snapshot.remove") throw new Error("narrow");
     expect(op.payload.id).toBe("s1");
+  });
+});
+
+describe("budget target commands (§5.3, M4)", () => {
+  it("setBudgetTarget builds a budgetTarget.set op carrying a full row", () => {
+    const op = setBudgetTarget(
+      { category_id: "groceries", amount: 30000, start_date: "2026-01-01" },
+      META,
+    );
+    expect(op.type).toBe("budgetTarget.set");
+    if (op.type !== "budgetTarget.set") throw new Error("narrow");
+    expect(op.payload.row.category_id).toBe("groceries");
+    expect(op.payload.row.amount).toBe(30000);
+    expect(op.payload.row.start_date).toBe("2026-01-01");
+  });
+
+  it("setBudgetTarget can carry an explicit id (for editing an existing row)", () => {
+    const row = makeBudgetTarget({
+      id: "bt1",
+      category_id: "groceries",
+      amount: 35000,
+      start_date: "2026-01-01",
+    });
+    const op = setBudgetTarget(row, META);
+    if (op.type !== "budgetTarget.set") throw new Error("narrow");
+    expect(op.payload.row.id).toBe("bt1");
+  });
+
+  it("removeBudgetTarget carries just the id — the removal is itself journaled", () => {
+    const op = removeBudgetTarget("bt1", META);
+    expect(op.type).toBe("budgetTarget.remove");
+    if (op.type !== "budgetTarget.remove") throw new Error("narrow");
+    expect(op.payload.id).toBe("bt1");
   });
 });
 

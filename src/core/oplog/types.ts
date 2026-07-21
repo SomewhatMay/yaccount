@@ -3,6 +3,7 @@ import type { Container } from "../model/container";
 import type { Transaction } from "../model/transaction";
 import type { ContainerSnapshot } from "../model/containerSnapshot";
 import type { Setting } from "../model/setting";
+import type { BudgetTarget } from "../model/budgetTarget";
 
 /**
  * Every mutation is an idempotent op appended to the journal AND applied to the
@@ -44,6 +45,12 @@ export type Op =
   | (OpBase & { type: "snapshot.update"; payload: { row: ContainerSnapshot } })
   | (OpBase & { type: "snapshot.remove"; payload: { id: string } })
   // Synced user preference, keyed by name (M3) — entity-LWW by `key`.
-  | (OpBase & { type: "setting.set"; payload: { row: Setting } });
+  | (OpBase & { type: "setting.set"; payload: { row: Setting } })
+  // A category's budget, effective from a date (M4, §5.3). Unique per
+  // (category_id, start_date) — `set` upserts by that natural key, same pattern
+  // as snapshot.record/update. `remove` is a hard delete: a superseded row is
+  // housekeeping, not a ledger amount (impl §3 rule of thumb).
+  | (OpBase & { type: "budgetTarget.set"; payload: { row: BudgetTarget } })
+  | (OpBase & { type: "budgetTarget.remove"; payload: { id: string } });
 
 export type OpType = Op["type"];

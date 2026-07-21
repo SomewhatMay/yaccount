@@ -1,7 +1,7 @@
 import type { Op } from "./types";
 import { MemoryTx, newMemoryState, type MemoryState, type Tx } from "./tx";
 import { STORE } from "../repo/db";
-import type { Category, Container, ContainerSnapshot } from "../model";
+import type { BudgetTarget, Category, Container, ContainerSnapshot } from "../model";
 
 /**
  * Upsert a reported value by its natural key `(container_id, date)` — at most
@@ -18,6 +18,26 @@ async function putSnapshotUpsert(tx: Tx, row: ContainerSnapshot): Promise<void> 
     }
   }
   await tx.put(STORE.containerSnapshots, row);
+}
+
+/**
+ * Upsert a budget row by its natural key `(category_id, start_date)` (§5.3) —
+ * the same pattern as `putSnapshotUpsert`: setting a budget on a date that
+ * already has a row REPLACES it rather than stacking a duplicate, and doing it
+ * in the reducer means the rule holds across a device merge too.
+ */
+async function putBudgetTargetUpsert(tx: Tx, row: BudgetTarget): Promise<void> {
+  const existing = await tx.getAll<BudgetTarget>(STORE.budgetTargets);
+  for (const b of existing) {
+    if (
+      b.id !== row.id &&
+      b.category_id === row.category_id &&
+      b.start_date === row.start_date
+    ) {
+      await tx.delete(STORE.budgetTargets, b.id);
+    }
+  }
+  await tx.put(STORE.budgetTargets, row);
 }
 
 /**
@@ -74,6 +94,18 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     // Settings are keyed by name, so `put` is a natural upsert (last writer wins).
     case "setting.set":
       await tx.put(STORE.settings, op.payload.row);
+      return;
+    // One row per (category_id, start_date) (§5.3): `put` by id, minus any
+    // other row holding the same natural key. Idempotent — re-applying leaves
+    // the same row.
+    case "budgetTarget.set":
+      await putBudgetTargetUpsert(tx, op.payload.row);
+      return;
+    // A hard delete, like snapshot.remove: a superseded budget row is
+    // housekeeping (impl §3), not a ledger amount. `delete` of a missing key is
+    // a no-op, so replay is idempotent and order-independent under the total order.
+    case "budgetTarget.remove":
+      await tx.delete(STORE.budgetTargets, op.payload.id);
       return;
     default: {
       const never: never = op;

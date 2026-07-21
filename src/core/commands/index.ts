@@ -1,4 +1,5 @@
 import {
+  makeBudgetTarget,
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
@@ -8,6 +9,7 @@ import {
   makeVoidRow,
   newId,
   SETTING,
+  type BudgetTarget,
   type Category,
   type CategoryType,
   type Container,
@@ -209,5 +211,29 @@ export function setDefaultContainer(containerId: string, m?: OpMeta): Op {
   return setSetting(SETTING.defaultContainerId, containerId, m);
 }
 
-/** Convenience re-export for callers reading the snapshot row type. */
-export type { ContainerSnapshot };
+// ── Budget targets (§5.3, M4) ─────────────────────────────────────────────
+
+/**
+ * Set a category's budget effective from a date. Upserts by the natural key
+ * `(category_id, start_date)` (§5.3) — pass an existing row's `id` to edit it
+ * in place; a new `id` (or none) creates a fresh effective-date row instead.
+ */
+export function setBudgetTarget(
+  input: { category_id: string; amount: number; start_date: string; id?: string },
+  m?: OpMeta,
+): Op {
+  return {
+    ...meta(m),
+    type: "budgetTarget.set",
+    payload: { row: makeBudgetTarget(input) },
+  };
+}
+
+/** Remove a superseded budget row. The removal is itself an op, so the journal
+ * keeps the history — a superseded target is housekeeping, not a ledger amount. */
+export function removeBudgetTarget(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "budgetTarget.remove", payload: { id } };
+}
+
+/** Convenience re-export for callers reading the row types. */
+export type { BudgetTarget, ContainerSnapshot };

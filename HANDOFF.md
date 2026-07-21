@@ -1,8 +1,16 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** after M3 + two UI-refinement rounds (incl. snapshot history/edit/delete), all committed & pushed (2026-07-21).
-> **NOTE:** this file is **gitignored (local-only)** — it lives on disk, not in git. Read it from the working tree; it won't appear in `git log`/clones.
+> **Last updated:** M4 (time-variant budget targets) implemented on branch `m4-budget-targets`, not yet committed/pushed (2026-07-21).
+> **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
+> **NOTE (environment):** this session ran on **native Windows** (`E:\GitHub\yaccount`), not the WSL environment (`/home/may/github/yaccount`) earlier sessions used. See "Key facts / gotchas" for what changed (Node version, no WSL PATH export, npm optional-deps gotcha). Both environments should work; update whichever section matches where you're actually running.
+
+> **⚠️ ALWAYS, at the start of every session and before writing any code — even if you've read them before, even if this handoff looks current — open and (re)read in full:**
+> 1. `yaccount-tech-spec-v3.md` (source of truth, the "what")
+> 2. `yaccount-implementation-details.md` (build plan/order, the "how")
+> 3. This `HANDOFF.md`
+>
+> This handoff is a summary and can drift or omit nuance; the two design docs are authoritative and win on any conflict. Do not rely on memory of a prior read within the same session — re-open the files.
 
 ---
 
@@ -52,13 +60,21 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M0–M2 DONE + merged to `main`** (PR #1, `SomewhatMay/yaccount`). `main` now exists (based on an empty root commit `chore: init main`) and is the repo's **default branch**; the old `m0-scaffold` branch was rebased onto it, so M0–M2 commit SHAs changed.
 
-**M3 (containers, transfers, balances) — DONE + committed on branch `m3-containers`** (branched off `main`, not yet PR'd). **212 vitest tests green; typecheck/lint/prettier/build clean** (build emits 5 static routes incl. `/containers`). Includes a **UI-refinement pass on the user's feedback** (see below). Outstanding: the user's manual browser walkthrough (M3's exit-criterion check) — everything automated passes.
+**M3 (containers, transfers, balances) — DONE, PR'd, and MERGED to `main`** (PR #2, `SomewhatMay/yaccount`). The `m3-containers` branch listed as "not yet PR'd" in an earlier version of this doc has since been merged — see the git log below, current as of this session's start.
 
-**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first). M8 remains blocked on their Google Cloud setup, so product milestones continue: next is **M4 (time-variant budget targets)** unless they redirect. Still WAIT for a green light between milestones.
+**M4 (time-variant budget targets) — implemented on branch `m4-budget-targets`** (off `main`), **not yet committed**. TDD followed: tests written first (confirmed red via missing modules), then implementation, then green. **234 vitest tests green (was 212 on `main`, +22 for M4); typecheck/lint/prettier/build clean.** No DB migration needed — `budget_targets` object store already existed since M1 (schema-only until now), so `DB_VERSION` stays 2. Outstanding: **no interactive browser walkthrough this session — no browser-automation tool was available**, so the UI is verified by code review + the full automated suite only, not click-tested. Do a manual pass before considering M4's exit criteria fully met (see spec's M4 "How to test": set Groceries $300 from Jan, $600 from Jun in the actual UI; confirm the Budget sheet on the category row shows the right history and "Applies today" figure).
 
-Git log (`m3-containers`):
+**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. Per the stated order (`…M3 → M4 → M6 → M5 → M7…`), the next product milestone after M4 is **M6 (recurring rules, templates, inbox)** — but WAIT for the user's green light before starting it; don't assume this session's continuation implies blanket approval for every future milestone too.
+
+Git log (`main`, as of this session's start — M4 work below is on top of this, uncommitted):
 ```
-(+ snapshot history/edit/delete + docs — see below)
+88ebfa8 Keep handoff on cloud for cross-device development
+0e007e6 Merge pull request #2 from SomewhatMay/m3-containers
+249fe34 fix: adversarial test audit — 10 real bugs, 126 -> 212 tests
+b3d060c feat: undo is first-class — unarchive, undo-delete, and the philosophy in writing
+3d44c5a fix: pre-merge M3 review — investment toggle, archive guard, unique renames
+efd1ea2 feat: one reported balance per container per day
+92aa2a4 feat: reported-balance history — view, correct, remove
 6e2e7fc feat(ui): explicit confirm/cancel on inline rename
 a040677 fix(ui): checkbox menu indicator leads like every other item icon
 5f84595 fix(ui): visible sign control, roomier dropdowns, checkbox menu item
@@ -71,6 +87,12 @@ e44ea7f M3: containers, transfers, balances
 f4bdd4e M0: scaffold Next.js static-export app + toolchain
 8d9f122 chore: init main
 ```
+
+### M4 decisions and delivered code (this session, branch `m4-budget-targets`)
+- **No new op-type ceremony beyond what §5.3/impl §3 already specced.** `budget_targets` rows are unique per `(category_id, start_date)`; a single `budgetTarget.set` op **upserts by that natural key** (deletes any other row holding the key, same pattern as `snapshot.record`/`.update` from M3) — there's no separate `.update`, because set-onto-an-existing-date already IS the edit path (matches spec's "setting a budget for a date that already has a row upserts"). `budgetTarget.remove` is a **hard delete**, same rule of thumb as a superseded snapshot (impl §3: housekeeping, not a ledger amount) — the impl doc's op taxonomy already named this exact pairing, so this wasn't a new design decision, just the first milestone that needed it.
+- **Core** (pure, unit-tested): `model/budgetTarget.ts` gained `makeBudgetTarget` (the `BudgetTargetSchema` itself already existed from M1). `oplog` — new op types `budgetTarget.set` / `budgetTarget.remove`; `apply.ts` gained `putBudgetTargetUpsert` (mirrors `putSnapshotUpsert`). `commands/` — `setBudgetTarget` (accepts an optional `id` so the same function creates a fresh row or edits an existing one in place — no separate update command needed, unlike snapshots which split `record`/`update` because snapshots don't upsert by natural key alone) and `removeBudgetTarget`. `engine/budgets.ts` — `budgetOnDate(rows, categoryId, date)`: the §5.3 resolution rule ("latest row with `start_date ≤ date`"), sorts internally so callers/device-merged data in arbitrary order still resolve correctly. New/extended tests: `model/budgetTarget.test.ts`, `engine/budgets.test.ts` (the worked example from spec/impl: Groceries $300 Jan → $600 Jun resolves correctly on both sides of the boundary, plus a one-off-elevated-month-then-reverts case), M4 blocks in `oplog/apply.test.ts` (upsert-by-natural-key, hard delete, replay convergence, added to the table-driven idempotency test) and `commands/commands.test.ts` — **212 → 234 tests**.
+- **UI**: `features/categories/BudgetSheet.tsx` — a right-hand `Sheet` per category (same shape as `containers/LogBalanceSheet.tsx`'s "Reported balances": form to set a new effective-from amount + a **History list** with `⋯` → Edit/Delete, a "Current" badge on the row currently in effect, and an inline warning when the chosen date already has a row ("saving replaces it") — reusing the exact §12.4-a pattern (history list, not a write-only form) rather than inventing a new one. `CategoriesView.tsx` — each row now shows `$X/mo budget` marginalia (via `budgetOnDate`) under the name, and a new "Budget" (`TargetIcon`) entry in the `⋯` menu opens the sheet. `store.ts` — `budgetTargetsAtom`, included in `refreshAtom`. No new route; budgets live inside `/categories`, not a standalone page (nothing in spec/impl calls for one — budgets are a per-category property, and the reporting-period-scoped comparison view is explicitly M5, not M4).
+- **Scope note:** M4 is resolution-engine-and-CRUD only, per impl §7's dependency graph ("M4 needs only M2, not containers") — the *comparison-to-budget* reporting view (spec §6.3, "Monthly Average" re-scoped to the active period) is explicitly M5 work (needs the unified reporting-period control from §6.1), not pulled forward here.
 
 ### M3 decisions (locked this session — do NOT reopen)
 - **Default Spending Container is a SYNCED setting, not device-local.** New `settings` object store (key/value, `keyPath: 'key'`, **DB_VERSION → 2**) + a `setting.set` op (entity-LWW by `key`). Keys live in `SETTING` (`src/core/model/setting.ts`); today only `default_container_id`. Chosen over `app_meta` (never synced) and over a `containers` flag (would edit spec §5.2's table). This is an 8th synced store beyond the spec's seven tables — it is preferences, not ledger data.
@@ -137,7 +159,7 @@ User asked for a modern/minimal/playful look (not the bland admin-CRUD first cut
 - **Categories redesign:** Fraunces header, branded compose bar, split **Expenses / Income** sections with color dots + hover `···` menu (Rename inline / Archive).
 - **New shadcn components:** sheet, dropdown-menu, tooltip (+ existing set).
 
-**Ops implemented so far:** `category.create/update/archive`, `container.create/update/archive` (M1), `transaction.create/update/void` (M2), `snapshot.record/update/remove` + `setting.set` (M3). (Taxonomy extended per milestone — impl §3.)
+**Ops implemented so far:** `category.create/update/archive`, `container.create/update/archive` (M1), `transaction.create/update/void` (M2), `snapshot.record/update/remove` + `setting.set` (M3), `budgetTarget.set/remove` (M4). Plus the reversibility-pass additions `category.unarchive` / `container.unarchive` (M3). (Taxonomy extended per milestone — impl §3.)
 
 ### M0 delivered
 - `git init` (repo was not one); Next.js/Node `.gitignore`.
@@ -187,48 +209,57 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M3 loose ends (clear these first):**
-- **Manual browser walkthrough** (M3 exit criteria): `npm run dev` → create a plain container + an investment one → transfer money General → the new container (both balances move; category charts/ledger in-out unaffected) → overdraw a container (renders rose) → toggle "count in overall balance" (hero figure changes) → "make default wallet" (compose bar preselects it, and it survives a reload — it's a synced op) → log a reported balance on the investment container (marginalia shows contributed + reported) → archive a container (leaves pickers, old rows still resolve).
-- Branch `m3-containers` is **pushed** (tracking `origin/m3-containers`); PR not opened yet by the user's choice.
-- Open PR for `m3-containers` → `main` when the user is happy (`gh pr create --base main`; `gh auth setup-git` is already configured for the https remote).
+**M4 loose ends (clear these first):**
+- **Commit + push `m4-budget-targets`.** Nothing from this session is committed yet — working tree has the full M4 diff on top of `main`.
+- **Manual browser walkthrough** (M4's spirit of M3's exit criteria — M4 doesn't specify one explicitly beyond the resolution-engine unit tests, but §12.4-a-style editing UI has always gotten a click-test before sign-off): `npm run dev` → open Categories → set Groceries to $300/mo starting today → set $600/mo starting next month → confirm the row's `$300/mo budget` marginalia, then bump the effective date forward and watch it read `$600/mo` → open the Budget sheet, confirm History shows both rows with the "Current" badge on the right one → edit a row's amount → delete a row → confirm the "saving replaces it" clash warning fires when two rows share a date. **No browser-automation tool was available this session**, so this hasn't been done — do it before telling the user M4 is fully verified.
+- Branch `m4-budget-targets` is local only (not yet pushed). Open a PR when the user is happy (`gh pr create --base main`).
 
-**Then AWAIT green light. Per the user's ordering, next product milestone is M4 (time-variant budget targets — needs only M2). M8 — Authentication (Google OAuth, web flow first)** (impl doc §M8). Execution order is `…M2 → M8 → M9 → M3…` (sync pulled early). M8 depends ONLY on the §6 Google Cloud track (nothing from M3–M7).
-- **BLOCKED ON THE USER:** they must first create the Google Cloud project + OAuth consent screen ("Testing" status) + a **Web SPA client ID** with the `drive.appdata` scope, and hand over the client ID (env var). **Tell them this when you reach M8.** Until then M8 can't be built end-to-end.
-- Build the `AuthProvider` seam (§3.4): a single `getAccessToken(): Promise<string>`, `src/auth/web.ts` via GIS token client (`ux_mode:'popup'`), silent re-auth (`prompt:''`) before expiry with a re-consent popup fallback scoped for all browsers. No refresh token on web (accepted asymmetry). **Exit:** `getAccessToken()` returns a valid `drive.appdata` token in a browser. No data synced yet (that's M9).
+**Then AWAIT green light. Per the user's established ordering (M3 pulled ahead of M8/M9, then continuing with product milestones), the next candidate is M6 (recurring rules, templates, inbox — needs M3, which is done).** M8 (Google OAuth) remains available too, but is **BLOCKED ON THE USER**: they must first create the Google Cloud project + OAuth consent screen ("Testing" status) + a **Web SPA client ID** with the `drive.appdata` scope, and hand over the client ID (env var). Ask which they want next rather than assuming — don't silently start M6 just because it's unblocked.
+- If M8: build the `AuthProvider` seam (§3.4): a single `getAccessToken(): Promise<string>`, `src/auth/web.ts` via GIS token client (`ux_mode:'popup'`), silent re-auth (`prompt:''`) before expiry with a re-consent popup fallback scoped for all browsers. No refresh token on web (accepted asymmetry). **Exit:** `getAccessToken()` returns a valid `drive.appdata` token in a browser. No data synced yet (that's M9).
 - Everything M0–M7 must stay demoable in a plain browser with NO auth/network — don't let M8 wiring gate the local-first app.
 
 **Milestone-ownership deferrals to remember (flagged in M1, NOT open decisions):**
 - Complex cross-field zod refinements deferred to owning milestone: recurring `frequency↔interval_config` + `amount_mode↔template_amount` → **M6**; goal `mode`/`kind` invariants → **M7**. `interval_config` is currently a preserved `z.record` object; M6 tightens to a frequency-discriminated union. TODO comments mark both spots.
 
-**Later product milestones (after M8/M9, per execution order):** M3 containers/transfers/balances (adds the container picker + `by_container_month` reads; balance engine already transfer-ready), M4 time-variant budget targets, M6 recurring/inbox, M5 reporting/charts, M7 goals/monthly-plan. Don't pull them forward.
+**Later product milestones:** M6 recurring/inbox, M5 reporting/charts (needs M4, done — this is where the budget-vs-actual comparison view and the unified reporting-period control land), M7 goals/monthly-plan. Don't pull them forward.
 
 **Deferred platform work (do NOT touch until their milestone):**
 - **M9** (Drive sync) / **M10** (Capacitor native): after M8. The impl §6 parallel non-code track (Google Cloud project, the three OAuth client IDs, privacy policy) is the **user's** to do; it gates M8–M10, not local product work.
 
 ---
 
-## Verify commands (always prefix with the WSL PATH export)
+## Verify commands
 
+**On native Windows (this session's environment, `E:\GitHub\yaccount`):**
 ```bash
-export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
-cd /home/may/github/yaccount
-npm test          # vitest — 63 passing at M2
+node -v           # must be >=20.19 or >=22.12 — vitest 4/rolldown/vite 8 refuse to start below that
+npm test          # vitest — 234 passing at M4
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
-npx prettier --check .
-npm run dev       # serves http://localhost:3000
+npx prettier --check .   # NOTE: flags nearly every file with CRLF warnings if `git config core.autocrlf=true` —
+                          # that's a working-tree checkout artifact, not real drift; git still stores LF.
+                          # Only worry about files you actually touched.
+npm run dev       # serves http://localhost:3000 (or next free port)
+```
+This machine's global Node was v20.10.0 (too old) at session start; upgraded to **v24.18.0 LTS via `winget install --id OpenJS.NodeJS.LTS`** (needed a UAC prompt the user had to click through). If `npm test` fails with `Cannot find native binding` / `@rolldown/binding-*` after a Node upgrade, that's the documented npm optional-deps bug (github.com/npm/cli/issues/4828) — fix with `rm -rf node_modules package-lock.json && npm install` (this regenerates the lockfile; expect small patch-version churn, not a real problem).
+
+**On WSL (an earlier session's environment, `/home/may/github/yaccount` — may or may not still be in use):**
+```bash
+export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
+cd /home/may/github/yaccount
+npm test && npm run typecheck && npm run lint && npm run build && npx prettier --check . && npm run dev
 ```
 
 ## Key facts / gotchas
-- Node v22.18.0 (WSL, via nvm). Platform: WSL2 on Windows.
+- **Two environments have now been used for this repo** — WSL2 (`/home/may/github/yaccount`, Node v22.18.0 via nvm) in earlier sessions, native Windows (`E:\GitHub\yaccount`, Node v24.18.0) this session. Check which one you're actually in (`pwd`, `uname -a` vs `echo $OS`) before trusting path-specific notes below.
 - `crypto.randomUUID()` for all ids — needs secure context in browser (HTTPS/localhost); fine in Node/Vitest and Capacitor WebView.
 - zod v4 API: `z.record(z.string(), z.unknown())` needs the key schema; `z.number().int().min(0)` for nonneg.
 - `tsconfig.json` has `verbatimModuleSyntax: true` → use `import type` for type-only imports.
 - Next auto-managed `tsconfig` to `jsx: "react-jsx"` and added `.next/dev/types` to include — leave as-is.
-- Memory files live at `/home/may/.claude/projects/-home-may-github-yaccount/memory/` (MEMORY.md index). Relevant: `wsl-npm-use-wsl-node`, `grilling-one-question-at-a-time`, `void-reverses-id`, `shadcn-ui-policy`.
+- Memory files live at `~/.claude/projects/<project-slug>/memory/` (MEMORY.md index) — the slug is derived from the working-directory path, so it differs between the WSL and Windows environments (they do NOT share memory automatically). Relevant memory topics from earlier sessions: `wsl-npm-use-wsl-node`, `grilling-one-question-at-a-time`, `void-reverses-id`, `shadcn-ui-policy` — re-save these on a new environment's memory store if they're missing there.
 - **State management = Jotai** (added M2, `src/features/store.ts`). Cross-component UI state → atoms; `src/core` stays React-free. Add new persisted-data atoms there and refresh them in `refreshAtom`.
-- **UI = shadcn/ui first** (added M2). Reach for a shadcn component before hand-rolling; add via `npx shadcn@latest add <name>` (WSL PATH first). Radix base, `neutral` theme in `globals.css`, `cn` from `@/lib/utils`. **Icons = Lucide** (`lucide-react`). Toasts = `sonner` (`import { toast } from "sonner"`; `<Toaster/>` in layout). Theme = next-themes (`ThemeProvider`, light/dark). Memory: `shadcn-ui-policy`. Present shadcn components: button, input, label, select, card, table, badge, separator, alert-dialog, sonner, sheet, dropdown-menu, tooltip.
+- **UI = shadcn/ui first** (added M2). Reach for a shadcn component before hand-rolling; add via `npx shadcn@latest add <name>` (WSL: PATH export first). Radix base, `neutral` theme in `globals.css`, `cn` from `@/lib/utils`. **Icons = Lucide** (`lucide-react`). Toasts = `sonner` (`import { toast } from "sonner"`; `<Toaster/>` in layout). Theme = next-themes (`ThemeProvider`, light/dark). Memory: `shadcn-ui-policy`. Present shadcn components: button, input, label, select, card, table, badge, separator, alert-dialog, sonner, sheet, dropdown-menu, tooltip.
 - **Spec §12.4-a (added M3) covers editing patterns:** inline rename = ✓/✗ never blur-commit; loggable-repeatedly records get a **history list** with `⋯` Edit/Delete, never a write-only form; money direction = visible `SignToggle`; toggle menu entries = checkbox item with a **leading** indicator. shadcn `select`/`dropdown-menu` were edited in-repo (copy-in components) for width/padding/animation — selects are `position="popper"` so they animate.
 - **Design language = "Quiet Register", LOCKED — spec §12 is law** (impl §2 build map; HANDOFF cheat-sheet in invariant #8). Fonts Fraunces/Geist/Geist Mono; iris brand + emerald-positive tokens; compose-bar/Sheet/register-row/`⋯`-menu patterns; `categoryDotColor(id)` swatches. Read §12 before building any UI; do not drift. Memory: `quiet-register-design-language`.
 - **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
