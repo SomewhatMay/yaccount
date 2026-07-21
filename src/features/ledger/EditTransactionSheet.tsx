@@ -12,7 +12,13 @@ import {
   type Container,
   type Transaction,
 } from "@/core/model";
-import { resolveAmount } from "@/features/ledger/amount";
+import {
+  defaultSign,
+  resolveAmount,
+  splitSign,
+  type Sign,
+} from "@/features/ledger/amount";
+import { SignToggle } from "@/features/ledger/SignToggle";
 import { categoryDotColor } from "@/features/category-color";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,20 +139,23 @@ function EditForm({
   const [categoryId, setCategoryId] = useState(tx.category_id ?? active[0]?.id ?? "");
   const [containerId, setContainerId] = useState(tx.container_id);
   const [amountStr, setAmountStr] = useState((Math.abs(tx.amount) / 100).toFixed(2));
+  // The row's own direction is the starting point — editing a refund keeps it.
+  const [pickedSign, setPickedSign] = useState<Sign | null>(tx.amount >= 0 ? "+" : "-");
   const [warn, setWarn] = useState<string | null>(null);
 
   const cat = categories.find((c) => c.id === categoryId);
+  const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!vendor.trim()) return toast.error("Add a payee or source.");
     if (!cat) return toast.error("Pick a category.");
 
-    const res = resolveAmount(amountStr, cat.type);
+    const res = resolveAmount(amountStr, cat.type, sign);
     if (!res.ok) return toast.error(res.error);
     if (res.unusual && warn === null) {
       setWarn(
-        `${formatCents(res.signed)} is unusual for a ${cat.type} category. Save again to confirm.`,
+        `${formatCents(res.signed)} is money ${sign === "+" ? "in" : "out"} on a ${cat.type} category. Save again to confirm.`,
       );
       return;
     }
@@ -228,16 +237,28 @@ function EditForm({
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="edit-amount">Amount</Label>
-          <Input
-            id="edit-amount"
-            value={amountStr}
-            onChange={(e) => {
-              setAmountStr(e.target.value);
-              setWarn(null);
-            }}
-            inputMode="decimal"
-            className="tnum font-mono"
-          />
+          <div className="flex items-center gap-1.5">
+            <SignToggle
+              sign={sign}
+              onChange={(next) => {
+                setPickedSign(next);
+                setWarn(null);
+              }}
+              className="border-input size-9 shrink-0 rounded-lg border"
+            />
+            <Input
+              id="edit-amount"
+              value={amountStr}
+              onChange={(e) => {
+                const { sign: typed, rest } = splitSign(e.target.value);
+                if (typed) setPickedSign(typed);
+                setAmountStr(rest);
+                setWarn(null);
+              }}
+              inputMode="decimal"
+              className="tnum font-mono"
+            />
+          </div>
           {warn && <p className="text-xs text-amber-600 dark:text-amber-500">{warn}</p>}
         </div>
       </div>

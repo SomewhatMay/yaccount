@@ -6,7 +6,13 @@ import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import { createTransaction, createTransfer } from "@/core/commands";
 import { formatCents, parseDollars } from "@/core/money";
 import type { Category, Container } from "@/core/model";
-import { resolveAmount } from "@/features/ledger/amount";
+import {
+  defaultSign,
+  resolveAmount,
+  splitSign,
+  type Sign,
+} from "@/features/ledger/amount";
+import { SignToggle } from "@/features/ledger/SignToggle";
 import { categoryDotColor } from "@/features/category-color";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,9 +61,12 @@ export function ComposeBar({
   const containerId = pickedContainerId ?? defaultContainerId;
   const [toContainerId, setToContainerId] = useState("");
   const [amountStr, setAmountStr] = useState("");
+  // Null = follow the category's usual direction; a tap (or a typed +/−) pins it.
+  const [pickedSign, setPickedSign] = useState<Sign | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
 
   const cat = categories.find((c) => c.id === categoryId);
+  const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
   const from = containers.find((c) => c.id === containerId);
   const to = containers.find((c) => c.id === toContainerId);
 
@@ -97,13 +106,13 @@ export function ComposeBar({
     if (!vendor.trim()) return toast.error("Add a payee or source.");
     if (!cat) return toast.error("Add a category first.");
 
-    const res = resolveAmount(amountStr, cat.type);
+    const res = resolveAmount(amountStr, cat.type, sign);
     if (!res.ok) return toast.error(res.error);
 
     // Inline confirm on an unusual sign — arm once, commit on the next submit.
     if (res.unusual && warn === null) {
       setWarn(
-        `${formatCents(res.signed)} is unusual for a ${cat.type} category — looks like a refund or void. Add again to confirm.`,
+        `${formatCents(res.signed)} is money ${sign === "+" ? "in" : "out"} on a ${cat.type} category — looks like a ${cat.type === "expense" ? "refund or rebate" : "clawback"}. Add again to confirm.`,
       );
       return;
     }
@@ -126,6 +135,15 @@ export function ComposeBar({
   function reset() {
     setVendor("");
     setAmountStr("");
+    setPickedSign(null);
+    setWarn(null);
+  }
+
+  // A typed leading +/− moves into the sign control so it is never a silent no-op.
+  function onAmountChange(raw: string) {
+    const { sign: typed, rest } = splitSign(raw);
+    if (typed) setPickedSign(typed);
+    setAmountStr(rest);
     setWarn(null);
   }
 
@@ -134,7 +152,7 @@ export function ComposeBar({
       onSubmit={submit}
       className="border-primary/15 bg-primary/[0.04] space-y-1.5 rounded-2xl border p-2"
     >
-      <div className="grid grid-cols-2 items-center gap-1.5 sm:grid-cols-[8rem_1fr_6.5rem_auto]">
+      <div className="grid grid-cols-[auto_1fr] items-center gap-1.5 sm:grid-cols-[8.5rem_1fr_auto_6rem_auto]">
         <Input
           type="date"
           value={date}
@@ -151,12 +169,21 @@ export function ComposeBar({
           aria-label={mode === "transfer" ? "Transfer note" : "Payee or source"}
           className="col-span-2 border-0 bg-transparent shadow-none focus-visible:ring-0 sm:col-span-1"
         />
+        {mode === "entry" ? (
+          <SignToggle
+            sign={sign}
+            onChange={(next) => {
+              setPickedSign(next);
+              setWarn(null);
+            }}
+            className="justify-self-end"
+          />
+        ) : (
+          <span aria-hidden />
+        )}
         <Input
           value={amountStr}
-          onChange={(e) => {
-            setAmountStr(e.target.value);
-            setWarn(null);
-          }}
+          onChange={(e) => onAmountChange(e.target.value)}
           placeholder="0.00"
           inputMode="decimal"
           aria-label="Amount"
@@ -185,10 +212,10 @@ export function ComposeBar({
         >
           <ToggleGroupItem
             value="entry"
-            aria-label="Log an expense or income"
+            aria-label={cat?.type === "income" ? "Log income" : "Log an expense"}
             className="data-[state=on]:bg-primary/10 data-[state=on]:text-primary h-7 rounded-full px-3 text-xs"
           >
-            Expense / income
+            {cat?.type === "income" ? "Income" : "Expense"}
           </ToggleGroupItem>
           <ToggleGroupItem
             value="transfer"
@@ -208,9 +235,8 @@ export function ComposeBar({
             }}
           >
             <SelectTrigger
-              size="sm"
               aria-label="Category"
-              className="w-auto border-0 bg-transparent shadow-none focus-visible:ring-0"
+              className="hover:bg-background/70 h-8 w-auto max-w-44 min-w-32 rounded-full border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
             >
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -279,9 +305,8 @@ function ContainerSelect({
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
-        size="sm"
         aria-label={label}
-        className="w-auto border-0 bg-transparent shadow-none focus-visible:ring-0"
+        className="hover:bg-background/70 h-8 w-auto max-w-44 min-w-32 rounded-full border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

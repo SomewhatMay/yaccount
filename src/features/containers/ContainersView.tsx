@@ -5,7 +5,6 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
   ArchiveIcon,
-  CheckIcon,
   LineChartIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -49,8 +48,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -344,12 +345,12 @@ function ContainerRow({
             <PencilIcon className="size-4" />
             Rename
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={toggleCounted}>
-            <CheckIcon className="size-4" />
-            {container.include_in_overall_balance
-              ? "Stop counting in overall balance"
-              : "Count in overall balance"}
-          </DropdownMenuItem>
+          <DropdownMenuCheckboxItem
+            checked={container.include_in_overall_balance}
+            onCheckedChange={toggleCounted}
+          >
+            Count in overall balance
+          </DropdownMenuCheckboxItem>
           {!isDefault && (
             <DropdownMenuItem onClick={makeDefault}>
               <WalletIcon className="size-4" />
@@ -362,6 +363,7 @@ function ContainerRow({
               Log reported balance
             </DropdownMenuItem>
           )}
+          {container.id !== GENERAL_CONTAINER_ID && <DropdownMenuSeparator />}
           {container.id !== GENERAL_CONTAINER_ID && (
             <DropdownMenuItem variant="destructive" onClick={onArchive}>
               <ArchiveIcon className="size-4" />
