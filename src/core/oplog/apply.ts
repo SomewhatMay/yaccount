@@ -1,7 +1,24 @@
 import type { Op } from "./types";
 import { MemoryTx, newMemoryState, type MemoryState, type Tx } from "./tx";
 import { STORE } from "../repo/db";
-import type { Category, Container } from "../model";
+import type { Category, Container, ContainerSnapshot } from "../model";
+
+/**
+ * Upsert a reported value by its natural key `(container_id, date)` — at most
+ * ONE report per container per day (§5.6). Logging or editing onto a day that
+ * already has one REPLACES it rather than stacking a second reading, and doing
+ * it in the reducer means the rule also holds across a device merge (the later
+ * op in the total order wins, so every device converges on the same row).
+ */
+async function putSnapshotUpsert(tx: Tx, row: ContainerSnapshot): Promise<void> {
+  const existing = await tx.getAll<ContainerSnapshot>(STORE.containerSnapshots);
+  for (const s of existing) {
+    if (s.id !== row.id && s.container_id === row.container_id && s.date === row.date) {
+      await tx.delete(STORE.containerSnapshots, s.id);
+    }
+  }
+  await tx.put(STORE.containerSnapshots, row);
+}
 
 /**
  * The single reducer: mutate materialized state for one op. Every branch is
@@ -37,11 +54,11 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     case "transaction.void":
       await tx.put(STORE.transactions, op.payload.row);
       return;
-    // Each snapshot is its own row (§5.6) — `put` by id is idempotent on replay
-    // and never clobbers an earlier report.
+    // One report per container per day (§5.6): `put` by id, minus any other row
+    // holding the same natural key. Idempotent — re-applying leaves the same row.
     case "snapshot.record":
     case "snapshot.update":
-      await tx.put(STORE.containerSnapshots, op.payload.row);
+      await putSnapshotUpsert(tx, op.payload.row);
       return;
     // The ONLY hard delete in the reducer, and it is deliberate: a snapshot is a
     // typed observation (housekeeping, impl §3), never a ledger amount — no

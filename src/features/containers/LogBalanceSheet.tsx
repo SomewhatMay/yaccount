@@ -101,6 +101,10 @@ function BalanceHistory({
   const [date, setDate] = useState(today());
   const [amountStr, setAmountStr] = useState("");
 
+  // One report per day (§5.6): saving onto an occupied day replaces it, so say so
+  // before the user commits rather than surprising them after.
+  const clash = history.find((s) => s.date === date && s.id !== editing?.id);
+
   function startEdit(s: ContainerSnapshot) {
     setEditing(s);
     setDate(s.date);
@@ -122,19 +126,18 @@ function BalanceHistory({
       return toast.error("Enter a valid amount.");
     }
 
+    const replaced = clash !== undefined;
     if (editing) {
       await onDispatch(updateSnapshot({ ...editing, date, reported_balance: reported }));
-      toast.success("Report corrected", {
-        description: `${container.name} · ${formatCents(reported)}`,
-      });
     } else {
       await onDispatch(
         recordSnapshot({ container_id: container.id, date, reported_balance: reported }),
       );
-      toast.success("Balance reported", {
-        description: `${container.name} · ${formatCents(reported)}`,
-      });
     }
+    toast.success(
+      replaced ? "Report replaced" : editing ? "Report corrected" : "Balance reported",
+      { description: `${date} · ${formatCents(reported)}` },
+    );
     cancelEdit();
   }
 
@@ -156,6 +159,12 @@ function BalanceHistory({
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
+          {clash && (
+            <p className="text-muted-foreground text-xs">
+              This day already reports {formatCents(clash.reported_balance)} — saving
+              replaces it.
+            </p>
+          )}
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="snapshot-amount">Reported value</Label>

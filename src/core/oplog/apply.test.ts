@@ -309,3 +309,96 @@ describe("applyOp — correcting a reported balance (snapshot.update / .remove)"
     expect(a.map((r) => r.id)).toEqual(["s2"]); // the removal wins on ts order
   });
 });
+
+describe("applyOp — one report per container per day (§5.6, upsert by natural key)", () => {
+  const record = (
+    id: string,
+    date: string,
+    bal: number,
+    ts: number,
+    container = "brokerage",
+  ): Op => ({
+    id: `op-${id}`,
+    ts: at(ts),
+    type: "snapshot.record",
+    payload: {
+      row: makeContainerSnapshot({
+        id,
+        container_id: container,
+        date,
+        reported_balance: bal,
+      }),
+    },
+  });
+
+  it("a second report for the same day replaces the first", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, record("s1", "2026-07-20", 500000, 1000));
+    await applyOp(tx, record("s2", "2026-07-20", 512300, 2000));
+    const rows = await readAll<ContainerSnapshot>(state, STORE.containerSnapshots);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reported_balance).toBe(512300);
+  });
+
+  it("keeps same-day reports for DIFFERENT containers", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, record("s1", "2026-07-20", 500000, 1000, "brokerage"));
+    await applyOp(tx, record("s2", "2026-07-20", 250000, 2000, "tfsa"));
+    const rows = await readAll<ContainerSnapshot>(state, STORE.containerSnapshots);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("editing a report onto a day that already has one collapses them", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, record("s1", "2026-07-20", 500000, 1000));
+    await applyOp(tx, record("s2", "2026-06-30", 480000, 2000));
+    await applyOp(tx, {
+      id: "op-move",
+      ts: at(3000),
+      type: "snapshot.update",
+      payload: {
+        row: makeContainerSnapshot({
+          id: "s2",
+          container_id: "brokerage",
+          date: "2026-07-20", // moved onto s1's day
+          reported_balance: 481000,
+        }),
+      },
+    });
+    const rows = await readAll<ContainerSnapshot>(state, STORE.containerSnapshots);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("s2");
+    expect(rows[0].reported_balance).toBe(481000);
+  });
+
+  it("converges regardless of arrival order — two devices logging the same day", async () => {
+    const ops: Op[] = [
+      record("s1", "2026-07-20", 500000, 1000),
+      record("s2", "2026-07-20", 512300, 2000),
+    ];
+    const a = await new MemoryTx(await replay(ops)).getAll<ContainerSnapshot>(
+      STORE.containerSnapshots,
+    );
+    const b = await new MemoryTx(
+      await replay([ops[1], ops[0]]),
+    ).getAll<ContainerSnapshot>(STORE.containerSnapshots);
+    expect(b).toEqual(a);
+    expect(a).toHaveLength(1);
+    expect(a[0].id).toBe("s2"); // the later op in the total order wins
+  });
+
+  it("re-applying the winning op is still a no-op (idempotent)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    const second = record("s2", "2026-07-20", 512300, 2000);
+    await applyOp(tx, record("s1", "2026-07-20", 500000, 1000));
+    await applyOp(tx, second);
+    await applyOp(tx, second);
+    expect(
+      await readAll<ContainerSnapshot>(state, STORE.containerSnapshots),
+    ).toHaveLength(1);
+  });
+});

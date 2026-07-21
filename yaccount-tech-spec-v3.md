@@ -224,7 +224,7 @@ Soft delete only (`is_archived = true`) — never hard-deleted, never nullified/
 |---|---|---|---|
 | id | TEXT (UUID) | PK | |
 | container_id | TEXT | FK → containers.id | Expected to be an `is_investment = true` container |
-| date | TEXT (ISO YYYY-MM-DD) | NOT NULL | |
+| date | TEXT (ISO YYYY-MM-DD) | NOT NULL | **Unique per `(container_id, date)`** — one report per container per day; a repeat upserts (see below). |
 | reported_balance | REAL | NOT NULL | Real-world value at that moment. Integer cents on disk (§ impl 1). Correctable — see the note below the formulas. |
 
 Only actual cash movement into/out of an investment container is logged as a normal Transfer (no category, doesn't touch Income/Expense graphs). Market growth is never logged as a transaction.
@@ -236,6 +236,8 @@ Unrealized Gain/Loss = Current Value − Net Contributions
 ```
 
 **Net Contributions is the general savings-progress primitive.** It is not investment-specific: it is the exact quantity a `spend_down` goal measures progress against (§5.9.3). For an `is_investment` container it additionally underlies Unrealized Gain/Loss above; for a plain spend-down goal it is simply the progress numerator, with the snapshot/market-growth machinery inert. This is why the savings system adds essentially no new accounting concept — it generalizes one that already existed here.
+
+**One report per container per day (locked, M3).** `container_snapshots` is **unique per `(container_id, date)`** — the same natural-key upsert rule as `budget_targets` (§5.3). Logging (or editing onto) a day that already has a report **replaces** it; two readings of the same account on the same day are a mistake, not history, and "Current Value = latest reported_balance" must never be ambiguous. Enforced in the reducer (`snapshot.record`/`snapshot.update` delete any other row holding that key before writing), so the rule also survives a device merge — the later op in the total order wins and every device converges on the same row. No hard IndexedDB unique index (it could throw on replay).
 
 **Snapshots are correctable observations (design decision, M3 — locked).** A snapshot is a value the *user typed after looking at their account*, not a money movement: no balance, contribution, or ledger sum depends on it, and a mistyped figure is simply wrong data. So unlike transactions (§5.4, never destructively deleted) a snapshot may be **edited in place or removed outright** — `snapshot.update` (entity-LWW) and `snapshot.remove` — and the app shows a per-container **history** of every reported value with those two actions. This does **not** weaken the never-lose-data invariant: both corrections are themselves **ops in the append-only journal (§8.2)**, so the full sequence (record → update → remove) is preserved and materialized state is just its replay under the total order — a git-style history where the working tree shows current truth and the log holds every version. (Deep history migrates into the archived `ledger_<deviceId>_YYYY-MM.json` files after an op-log collapse, §8.4.)
 
