@@ -3,9 +3,20 @@
 import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
-import { ArchiveIcon, MoreHorizontalIcon, PencilIcon, PlusIcon } from "lucide-react";
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PlusIcon,
+} from "lucide-react";
 import { categoriesAtom, dispatchAtom, readyAtom } from "@/features/store";
-import { createCategory, updateCategory, archiveCategory } from "@/core/commands";
+import {
+  createCategory,
+  updateCategory,
+  archiveCategory,
+  unarchiveCategory,
+} from "@/core/commands";
 import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
@@ -34,16 +45,20 @@ export function CategoriesView() {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
 
-  const { expenses, incomes, archivedCount } = useMemo(() => {
-    const active = categories
-      .filter((c) => !c.is_archived)
-      .sort((a, b) => a.name.localeCompare(b.name));
+  const { expenses, incomes, archived } = useMemo(() => {
+    const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
+    const active = categories.filter((c) => !c.is_archived).sort(byName);
     return {
       expenses: active.filter((c) => c.type === "expense"),
       incomes: active.filter((c) => c.type === "income"),
-      archivedCount: categories.length - active.length,
+      archived: categories.filter((c) => c.is_archived).sort(byName),
     };
   }, [categories]);
+
+  async function restore(c: Category) {
+    await dispatch(unarchiveCategory(c.id));
+    toast.success("Restored", { description: c.name });
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -114,11 +129,43 @@ export function CategoriesView() {
         onChange={dispatch}
       />
 
-      {archivedCount > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {archivedCount} archived — hidden from pickers, still resolve on old
-          transactions.
-        </p>
+      {archived.length > 0 && (
+        <section>
+          <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
+            <h2 className="text-xs font-medium tracking-[0.14em] uppercase">Archived</h2>
+            <span className="tnum font-mono text-xs">{archived.length}</span>
+          </div>
+          <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
+            {archived.map((c, i) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
+                  i > 0 && "border-t border-dashed",
+                )}
+              >
+                <span
+                  className="size-2.5 shrink-0 rounded-full opacity-50"
+                  style={{ backgroundColor: categoryDotColor(c.id) }}
+                  aria-hidden
+                />
+                <span className="text-muted-foreground flex-1 text-sm">{c.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground h-8 rounded-lg"
+                  onClick={() => restore(c)}
+                >
+                  <ArchiveRestoreIcon className="size-4" />
+                  Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="text-muted-foreground mt-2 px-1 text-xs">
+            Hidden from pickers; old transactions still show their name. Restore any time.
+          </p>
+        </section>
       )}
     </div>
   );
@@ -185,7 +232,17 @@ function CategoryRow({
 
   async function archive() {
     await onChange(archiveCategory(category.id));
-    toast.success("Archived", { description: category.name });
+    toast.success("Archived", {
+      description: category.name,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void onChange(unarchiveCategory(category.id)).then(() =>
+            toast.success("Restored", { description: category.name }),
+          );
+        },
+      },
+    });
   }
 
   return (

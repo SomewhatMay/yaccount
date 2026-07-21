@@ -22,9 +22,13 @@ export type Op =
   | (OpBase & { type: "category.create"; payload: { row: Category } })
   | (OpBase & { type: "category.update"; payload: { row: Category } })
   | (OpBase & { type: "category.archive"; payload: { id: string } })
+  // Every soft delete is reversible — undo is a first-class act in this app, not
+  // a recovery hatch (§5.5). Restoring is its own op, so the journal shows both.
+  | (OpBase & { type: "category.unarchive"; payload: { id: string } })
   | (OpBase & { type: "container.create"; payload: { row: Container } })
   | (OpBase & { type: "container.update"; payload: { row: Container } })
   | (OpBase & { type: "container.archive"; payload: { id: string } })
+  | (OpBase & { type: "container.unarchive"; payload: { id: string } })
   // Transactions (M2). create/update carry the full row (entity-LWW, idempotent).
   // void carries a reversing `amount` row (§0.3) — never a destructive delete.
   | (OpBase & { type: "transaction.create"; payload: { row: Transaction } })

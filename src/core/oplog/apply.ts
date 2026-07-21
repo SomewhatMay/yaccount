@@ -32,18 +32,22 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     case "category.update":
       await tx.put(STORE.categories, op.payload.row);
       return;
-    case "category.archive": {
+    case "category.archive":
+    case "category.unarchive": {
       const cur = await tx.get<Category>(STORE.categories, op.payload.id);
-      if (cur) await tx.put(STORE.categories, { ...cur, is_archived: true });
+      const is_archived = op.type === "category.archive";
+      if (cur) await tx.put(STORE.categories, { ...cur, is_archived });
       return;
     }
     case "container.create":
     case "container.update":
       await tx.put(STORE.containers, op.payload.row);
       return;
-    case "container.archive": {
+    case "container.archive":
+    case "container.unarchive": {
       const cur = await tx.get<Container>(STORE.containers, op.payload.id);
-      if (cur) await tx.put(STORE.containers, { ...cur, is_archived: true });
+      const is_archived = op.type === "container.archive";
+      if (cur) await tx.put(STORE.containers, { ...cur, is_archived });
       return;
     }
     // A void is a NEW reversing row keyed by its own id (§0.3) — `put` is

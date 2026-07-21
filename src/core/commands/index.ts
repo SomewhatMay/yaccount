@@ -51,6 +51,11 @@ export function archiveCategory(id: string, m?: OpMeta): Op {
   return { ...meta(m), type: "category.archive", payload: { id } };
 }
 
+/** Put it back. Undo is first-class: nothing the user can do is one-way. */
+export function unarchiveCategory(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "category.unarchive", payload: { id } };
+}
+
 // ── Transactions (§5.4) ───────────────────────────────────────────────────
 
 export function createTransaction(
@@ -90,6 +95,20 @@ export function voidTransaction(
   return { ...meta(m), type: "transaction.void", payload: { row } };
 }
 
+/**
+ * Undo a delete: append a row reversing the *reversing* row, which nets the void
+ * back out and makes the original live again (`activeRows`). Nothing is ever
+ * rewritten — the journal keeps delete and undelete as two visible events, so a
+ * ledger reads like a git history rather than a series of disappearances.
+ */
+export function unvoidTransaction(
+  voidRow: Transaction,
+  m?: OpMeta & { voidId?: string; on?: string },
+): Op {
+  const row = makeVoidRow(voidRow, { id: m?.voidId, on: m?.on });
+  return { ...meta(m), type: "transaction.void", payload: { row } };
+}
+
 // ── Containers (§5.2, §5.5) ───────────────────────────────────────────────
 
 /** New container. `include_in_overall_balance` defaults FALSE (opt-in, §5.7). */
@@ -113,6 +132,11 @@ export function updateContainer(row: Container, m?: OpMeta): Op {
 /** Soft delete only (§5.5) — an archived container stays a valid FK target. */
 export function archiveContainer(id: string, m?: OpMeta): Op {
   return { ...meta(m), type: "container.archive", payload: { id } };
+}
+
+/** Put it back (see `unarchiveCategory`). */
+export function unarchiveContainer(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "container.unarchive", payload: { id } };
 }
 
 // ── Transfers (§5.4) ──────────────────────────────────────────────────────

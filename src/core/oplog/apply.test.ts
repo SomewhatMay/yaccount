@@ -402,3 +402,67 @@ describe("applyOp — one report per container per day (§5.6, upsert by natural
     ).toHaveLength(1);
   });
 });
+
+describe("applyOp — archiving is REVERSIBLE (undo is first-class)", () => {
+  it("category.unarchive puts the row back in play", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, opCreateCategory("c1", "Groceries", 1000));
+    await applyOp(tx, {
+      id: "op-arch",
+      ts: at(2000),
+      type: "category.archive",
+      payload: { id: "c1" },
+    });
+    const unarchive: Op = {
+      id: "op-un",
+      ts: at(3000),
+      type: "category.unarchive",
+      payload: { id: "c1" },
+    };
+    await applyOp(tx, unarchive);
+    await applyOp(tx, unarchive); // replay
+    const rows = await readAll<Category>(state, STORE.categories);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].is_archived).toBe(false);
+  });
+
+  it("container.unarchive restores it, and the round trip is lossless", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    const row = makeContainer({ id: "k1", name: "Vacation" });
+    await applyOp(tx, {
+      id: "op-k1",
+      ts: at(1000),
+      type: "container.create",
+      payload: { row },
+    });
+    await applyOp(tx, {
+      id: "op-arch",
+      ts: at(2000),
+      type: "container.archive",
+      payload: { id: "k1" },
+    });
+    await applyOp(tx, {
+      id: "op-un",
+      ts: at(3000),
+      type: "container.unarchive",
+      payload: { id: "k1" },
+    });
+    const rows = await readAll<Container>(state, STORE.containers);
+    expect(rows[0]).toEqual(row); // every other field untouched
+  });
+
+  it("unarchiving something that was never archived is a no-op", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, opCreateCategory("c1", "Groceries", 1000));
+    await applyOp(tx, {
+      id: "op-un",
+      ts: at(2000),
+      type: "category.unarchive",
+      payload: { id: "c1" },
+    });
+    expect((await readAll<Category>(state, STORE.categories))[0].is_archived).toBe(false);
+  });
+});

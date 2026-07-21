@@ -14,6 +14,9 @@ import {
   updateSnapshot,
   removeSnapshot,
   setDefaultContainer,
+  unarchiveCategory,
+  unarchiveContainer,
+  unvoidTransaction,
 } from "@/core/commands";
 import {
   makeCategory,
@@ -212,5 +215,29 @@ describe("snapshot corrections", () => {
     expect(op.type).toBe("snapshot.remove");
     if (op.type !== "snapshot.remove") throw new Error("narrow");
     expect(op.payload.id).toBe("s1");
+  });
+});
+
+describe("undo commands (§0.3 — every soft delete is reversible)", () => {
+  it("unarchiveCategory / unarchiveContainer carry just the id", () => {
+    expect(unarchiveCategory("c1", META).type).toBe("category.unarchive");
+    expect(unarchiveContainer("k1", META).type).toBe("container.unarchive");
+  });
+
+  it("unvoidTransaction reverses the reversing row, restoring the original", () => {
+    const orig = makeTransaction({
+      id: "t1",
+      date: "2026-07-20",
+      amount: -1000,
+      vendor_source: "Starbucks",
+      category_id: "coffee",
+    });
+    const voidOp = voidTransaction(orig, { ...META, voidId: "v1" });
+    if (voidOp.type !== "transaction.void") throw new Error("narrow");
+    const undo = unvoidTransaction(voidOp.payload.row, { ...META, voidId: "u1" });
+    if (undo.type !== "transaction.void") throw new Error("narrow");
+    expect(undo.payload.row.id).toBe("u1");
+    expect(undo.payload.row.reverses_id).toBe("v1"); // reverses the reversal
+    expect(undo.payload.row.amount).toBe(-1000); // nets the void back out
   });
 });

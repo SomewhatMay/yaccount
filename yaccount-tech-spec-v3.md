@@ -29,6 +29,18 @@
 
 ---
 
+### 1.1 Reversibility — the core design philosophy (LOCKED, read this before designing anything)
+
+**yaccount is a git-style ledger: every action is an append-only event, and every action the user can take, they can take back.** This is not a safety net bolted onto the side — it is the product's spine, and it outranks convenience whenever the two collide.
+
+Three rules follow from it, and no feature may violate them:
+
+1. **Nothing is one-way.** If the UI offers an action, it offers its inverse. Archive ⇄ **unarchive** (categories §5.1, containers §5.2 — with a visible **Archived list and a Restore control**, not a hidden flag). Delete a transaction ⇄ **undo the delete** (§5.4: the delete appends a reversing row; the undo appends a row reversing *that*, so the original is live again). A reported balance can be **edited or removed** (§5.6). A soft delete with no way back is just a slow hard delete, and shipping one is a bug.
+2. **The undo is itself an event, never an erasure.** Undo never rewrites or removes an existing record — it appends the compensating op. State is the replay of the journal under the total order (§8.2), so *both* the delete and its undo remain visible in history, exactly like a `git revert` rather than a `git reset`. This is what makes the op-log the audit trail and lets multi-device merge stay correct: two devices replaying the same ops reach the same state whatever order they arrive in.
+3. **Reversibility is visible, not just possible.** Being able to reconstruct something from the journal in principle does not satisfy this. The user must be able to *see* what they put away and click one control to bring it back: an Archived section, a Restore button, an **Undo action in the confirmation toast**. If a user has to ask "how do I get that back?", the design failed.
+
+Consequences for the model: state-bearing flags are two-way ops (`archive`/`unarchive`), corrections are compensating rows (never in-place edits of financial history), and the only hard delete anywhere is for non-financial housekeeping (templates, a superseded budget target, a mistyped `container_snapshot` — and even those removals are journaled ops).
+
 ## 2. Platform & Framework Architecture (locked)
 
 ### 2.1 The pivot: Capacitor instead of PWA
@@ -214,10 +226,14 @@ The "`balance = SUM(amount)` trivially" phrasing holds only for the expense/inco
 
 **Void / correction (design decision, M2):** there is no destructive delete of a transaction. "Deleting" a row appends a **reversing row** — same fields, opposite-sign `amount`, `reverses_id` pointing at the original — so the pair nets to zero in `balance = SUM(amount)` while the full history is preserved and auditable. The UI hides both rows of a voided pair from the active ledger; a genuine refund (opposite-sign row with `reverses_id = NULL`) stays visible as two real events. This generalizes the signed-amount convention above (a void is just a correcting credit that also records *what* it corrects).
 
+**A void is undoable too (§1.1, locked).** "Undo delete" appends a row reversing the *reversing* row, so the pair nets back out and the original is live again; deleting once more appends another reversal. A row is therefore live iff no **still-live** row reverses it — a chain walk (`activeRows`, `src/core/engine/ledger.ts`), not a one-step check. Balances need none of this: every reversal is a real signed amount, so the arithmetic nets out on its own. The delete toast carries an **Undo** action.
+
 **Transfers are structurally distinct:** no category, they move money between owned containers and are explicitly excluded from category-based Expense/Income dashboards (nothing left the user's real-world possession). A dedicated **Container Flows** view reports net inflow/outflow per container over the active reporting period, fully decoupled from category charts. The transfer-vs-expense distinction is load-bearing for savings goals: a transfer into a goal's container is a *contribution*, whereas an expense out of it is *spending on purpose* — the two are accounted for completely differently (§5.9.3).
 
-### 5.5 Deletion policy (categories & containers)
+### 5.5 Deletion policy (categories & containers) — soft, and **reversible**
 Soft delete only (`is_archived = true`) — never hard-deleted, never nullified/orphaned. Archived rows vanish from active selection UI but remain valid FK targets so historical charts, Container Flows, and past goal cycles never break. Goals follow the same never-hard-delete principle via their own lifecycle states (§5.9.6).
+
+**Archiving is always reversible (§1.1, locked).** Every screen that can archive must also (a) **list what is archived** and (b) offer a one-click **Restore** (`category.unarchive` / `container.unarchive` — their own ops, so the journal records putting-away and bringing-back as two events), plus an **Undo action in the archive toast**. Restoring is lossless: only `is_archived` flips, every other field is untouched, and a restored container that was opted into the overall balance (§5.7) starts counting again.
 
 ### 5.6 Container investment / asset tracking
 

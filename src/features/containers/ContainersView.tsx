@@ -5,6 +5,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
   ArchiveIcon,
+  ArchiveRestoreIcon,
   LineChartIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -23,6 +24,7 @@ import {
   archiveContainer,
   createContainer,
   setDefaultContainer,
+  unarchiveContainer,
   updateContainer,
 } from "@/core/commands";
 import { containerBalance, netContributions } from "@/core/engine/balances";
@@ -94,7 +96,13 @@ export function ContainersView() {
         ),
     [containers],
   );
-  const archivedCount = containers.length - active.length;
+  const archived = useMemo(
+    () =>
+      containers
+        .filter((c) => c.is_archived)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [containers],
+  );
 
   const latestSnapshot = useMemo(() => {
     const by = new Map<string, ContainerSnapshot>();
@@ -124,7 +132,22 @@ export function ContainersView() {
   async function archive(c: Container) {
     setArchiving(null);
     await dispatch(archiveContainer(c.id));
-    toast.success("Archived", { description: c.name });
+    toast.success("Archived", {
+      description: c.name,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void restore(c);
+        },
+      },
+    });
+  }
+
+  async function restore(c: Container) {
+    await dispatch(unarchiveContainer(c.id));
+    toast.success("Restored", {
+      description: `${c.name} is back${c.include_in_overall_balance ? " and counting again" : ""}`,
+    });
   }
 
   if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
@@ -191,10 +214,48 @@ export function ContainersView() {
         ))}
       </div>
 
-      {archivedCount > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {archivedCount} archived — hidden here, still valid on past transactions.
-        </p>
+      {archived.length > 0 && (
+        <section>
+          <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
+            <h2 className="text-xs font-medium tracking-[0.14em] uppercase">Archived</h2>
+            <span className="tnum font-mono text-xs">{archived.length}</span>
+          </div>
+          <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
+            {archived.map((c, i) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
+                  i > 0 && "border-t border-dashed",
+                )}
+              >
+                <ArchiveIcon
+                  className="text-muted-foreground size-4 shrink-0 opacity-60"
+                  aria-hidden
+                />
+                <span className="text-muted-foreground flex-1 truncate text-sm">
+                  {c.name}
+                </span>
+                <span className="tnum text-muted-foreground font-mono text-sm">
+                  {formatCents(containerBalance(transactions, c.id))}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground h-8 rounded-lg"
+                  onClick={() => restore(c)}
+                >
+                  <ArchiveRestoreIcon className="size-4" />
+                  Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="text-muted-foreground mt-2 px-1 text-xs">
+            Out of your pickers and out of the overall balance, but nothing was deleted —
+            restore any time.
+          </p>
+        </section>
       )}
 
       <LogBalanceSheet

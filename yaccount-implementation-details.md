@@ -14,7 +14,7 @@ These are the invariants every milestone must respect. Violating one is a re-arc
 
 2. **The ledger is the source of truth; everything else is derived.** `transactions`, `categories`, `containers`, `budget_targets`, `container_snapshots`, `recurring_rules`, `goals` are the only persisted tables (§7). Balances, contributions, progress, dashboards, and the monthly allocation plan are **computed on demand** (§5.9.7, §6.8) — never stored, never denormalized into a mutable field. Any temptation to cache a balance *as state* is a bug.
 
-3. **Never silently lose, move, or overwrite a transaction** (§1, §5.5, §5.9.6). For *categories, containers, and goals* deletes are soft (`is_archived`); **transactions have no `is_archived` field (§5.4)** — a transaction is never destructively deleted or archived, only superseded by an explicit correcting/reversing ledger op (a void must itself be an `amount` row so `balance = SUM(amount)` stays exact and auditable). This is a testable property, not a slogan — but note only M9's How-to-test currently pins a named assertion for it; M2–M8 should each add one where they touch data.
+3. **Never silently lose, move, or overwrite a transaction — and never make an action one-way** (§1.1, §5.5, §5.9.6). **Reversibility is the product's spine (spec §1.1 — read it):** every user action ships with its inverse, the inverse is itself an appended op (never an erasure), and it is *visible* — an Archived list + Restore control + an **Undo action in the toast**, not merely reconstructible from the journal. Archive ⇄ unarchive; delete a transaction ⇄ undo the delete (a row reversing the reversing row); a reported balance can be edited or removed. For *categories, containers, and goals* deletes are soft (`is_archived`); **transactions have no `is_archived` field (§5.4)** — a transaction is never destructively deleted or archived, only superseded by an explicit correcting/reversing ledger op (a void must itself be an `amount` row so `balance = SUM(amount)` stays exact and auditable). This is a testable property, not a slogan — but note only M9's How-to-test currently pins a named assertion for it; M2–M8 should each add one where they touch data.
 
 4. **Signed-amount convention everywhere** (§5.4): negative = outflow, positive = inflow. No separate refund/credit concept. **But `balance = SUM(amount)` is a simplification, not the literal formula:** a Transfer is a *single* row keyed to the source `container_id`, so the destination is credited only via `to_container_id`, and template/pending rows are not live ledger entries. The real balance is `SUM(amount WHERE container_id = c) − SUM(amount WHERE to_container_id = c)` over `inbox_status = 'approved' AND is_template = false` rows (see spec §5.4 "Balance computation"). Every derivation — balance, `contributed`, Container Flows, Reconstructed Balance — must honor these two caveats.
 
@@ -92,6 +92,8 @@ yaccount/
 > - **Category color** — `src/features/category-color.ts` `categoryDotColor(id)`: deterministic hue dot; the only category-swatch scheme (foreshadows §5.1/§10.1 auto-palette, formal at M5).
 > - **Patterns** — create = **inline iris compose-bar** (`ComposeBar`); edit = right-hand **`Sheet`** (`EditTransactionSheet`) — NEVER a compose-area mode-swap; per-item actions = hover **`⋯` DropdownMenu**; lists = **date-grouped register rows**; feedback = **`sonner`** toasts; soft rules = **inline arm-then-confirm**, never `window.confirm`. Copy = sentence case, user-side voice (§12.6).
 >
+> **Also read spec §1.1 (reversibility) — every destructive-looking control needs a visible inverse: an Archived list, a Restore button, an Undo action in the toast.**
+>
 > **Also read spec §12.4-a (M3):** inline rename = explicit ✓/✗, never commit-on-blur; anything loggable repeatedly shows its **history** with per-row `⋯` Edit/Delete (never a write-only form); the money direction is a visible `−`/`+` control (`SignToggle`), not a typing convention; toggle menu entries are checkbox items with a **leading** indicator.
 >
 > M11 executes the finishing pass ON TOP of §12 (motion, empty/error polish, category-color override UI, responsive density) — it must not restart or contradict it.
@@ -118,16 +120,16 @@ UI intent
 - **Soft-delete and edits are ops too** — an `archive` op, an `updateTransaction` op — never a destructive IndexedDB `delete`. (Hard-delete only ever applies to the app's own housekeeping, never user financial data.)
 
 **Initial op taxonomy (decided; extended per milestone).** Every op is `{ id: uuid, ts: ISO, type, payload }`, idempotent by `id`, applied by a per-`type` reducer. Naming is `<entity>.<verb>`. Starting set:
-- `category.create` · `category.update` · `category.archive` (M2)
-- `container.create` · `container.update` · `container.archive` (M3)
+- `category.create` · `category.update` · `category.archive` · `category.unarchive` (M2/M3)
+- `container.create` · `container.update` · `container.archive` · `container.unarchive` (M3)
 - `snapshot.record` · `snapshot.update` · `snapshot.remove` — a `container_snapshots` row (M3). **Both writers upsert by the natural key `(container_id, date)`** — one report per container per day (spec §5.6), same pattern as `budgetTarget.set`; the reducer drops any other row holding that key, so the rule holds across device merges. **`remove` is a genuine hard delete and the only one in the reducer** — a snapshot is a typed *observation*, not a money movement (nothing derives a balance from it), so it is housekeeping by the rule of thumb below. The audit trail survives regardless: the removal is itself a journaled op, so record → update → remove all persist in the log and state is their replay (spec §5.6).
 - `budgetTarget.set` — **upsert** by `(category_id, start_date)` · `budgetTarget.remove` (M4)
-- `transaction.create` · `transaction.update` · `transaction.approve` (pending→approved) · `transaction.void` — creates a reversing `amount` row, never a destructive delete (M2/M6). **The reversing row carries `reverses_id` → the original's id** (nullable field added to §5.4 in M2, user-blessed — see §10 #24); the reducer just `put`s the row (idempotent), the original is never touched.
+- `transaction.create` · `transaction.update` · `transaction.approve` (pending→approved) · `transaction.void` — creates a reversing `amount` row, never a destructive delete (M2/M6). **Undo of a delete** is another `transaction.void` whose row reverses the *reversing* row (`unvoidTransaction`), so liveness is a chain walk — `activeRows` in `core/engine/ledger.ts`, never an ad-hoc "has a reverser" check in a component. **The reversing row carries `reverses_id` → the original's id** (nullable field added to §5.4 in M2, user-blessed — see §10 #24); the reducer just `put`s the row (idempotent), the original is never touched.
 - `template.create` · `template.remove` — templates are shortcuts, not ledger data, so hard-remove is allowed (M6)
 - `recurringRule.create` · `recurringRule.update` · `recurringRule.cancel` (M6)
 - `goal.create` · `goal.update` · `goal.complete` · `goal.cancel` · `goal.archive` (M7)
 
-Rule of thumb: **soft-lifecycle** (`archive`/`cancel`/`complete`) for anything financial or FK-referenced; **hard `remove`** only for non-financial housekeeping (templates, a superseded `budgetTarget`, a mistaken `container_snapshot`). Financial corrections are always additive (`transaction.void` = reversing row), keeping `balance = SUM` auditable (§0.3).
+Rule of thumb: **soft-lifecycle** (`archive`/`cancel`/`complete`) — **always paired with its inverse op and a visible restore path** (§0.3) — for anything financial or FK-referenced; **hard `remove`** only for non-financial housekeeping (templates, a superseded `budgetTarget`, a mistaken `container_snapshot`). Financial corrections are always additive (`transaction.void` = reversing row), keeping `balance = SUM` auditable (§0.3).
 
 Getting this seam right in M1 is the single highest-leverage decision in the whole plan. Everything after M1 is "add a table, add ops, add an engine derivation, add UI."
 
@@ -177,7 +179,7 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ### M2 — Categories & the Transaction Ledger (expense/income)
 **Goal:** First **user-visible** feature: add/list/edit expense & income transactions against categories. The MVP's atomic core (§7).
 **Scope:**
-- Category CRUD (create, rename, archive — soft only §5.5, uncapped §5.1), `type` expense/income, `color` left **null** (hybrid: deterministic auto-palette at render in M5, optional user override in M11 — §10.1 resolved).
+- Category CRUD (create, rename, archive **and unarchive** — soft only §5.5, uncapped §5.1; the Categories screen lists archived items with a Restore control), `type` expense/income, `color` left **null** (hybrid: deterministic auto-palette at render in M5, optional user override in M11 — §10.1 resolved).
 - Transaction create/edit for the **expense/income shape** (§5.4): `category_id` set, `to_container_id` null. All against the default `'general'` container implicitly (containers UI comes in M3). **No destructive delete** — a "delete" is a reversing/void ledger op, never a row removal (§0.3); "CRUD" here excludes hard-D.
 - Signed-amount handling + **explicit-minus display rule** (§5.4 "Starbucks: −$10"). Entry form **auto-signs by category type** (expense→negative, income→positive) and **confirms on an unusual sign** (soft rule, §10 #13) — opposite signs stay allowed for later voids/refunds.
 - Basic transaction list view + add/edit form.
@@ -190,7 +192,7 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ### M3 — Containers, Transfers & Balances
 **Goal:** The "where money lives" axis (§5.2) and the transfer shape (§5.4).
 **Scope:**
-- Container CRUD (create/rename/archive soft-only; `is_investment`, `include_in_overall_balance` flags §5.2, **both toggleable after creation**). Enforce `'general'`'s default-true opt-in. **Unique names checked on create AND rename** (`features/unique-name.ts` `nameTaken`, case-insensitive; same for categories).
+- Container CRUD (create/rename/archive **+ unarchive**, soft-only, with an Archived list + Restore; `is_investment`, `include_in_overall_balance` flags §5.2, **both toggleable after creation**). Enforce `'general'`'s default-true opt-in. **Unique names checked on create AND rename** (`features/unique-name.ts` `nameTaken`, case-insensitive; same for categories).
 - **Container snapshots (§5.6):** `container_snapshots` CRUD + a **"Reported balances" Sheet** for `is_investment` containers (without this the `is_investment` flag is inert): log a value, see the **full history**, and **edit or delete** a mistaken one (`snapshot.update` / `snapshot.remove`). **At most one report per day per container** — the form warns inline ("this day already reports $X — saving replaces it") and the reducer upserts by `(container_id, date)`. Net Contributions = Σ transfers in − Σ transfers out. *(§5.6 had no milestone in the prior draft; gain/loss + the Reconstructed Balance engine land in M5.)*
 - **Transfer** transactions (§5.4): `category_id` null, `to_container_id` set; moves money between owned containers; excluded from category dashboards.
 - Per-container balance (`SUM(amount)`, may go negative → **red UI** §5.2).

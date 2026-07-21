@@ -19,8 +19,9 @@ import {
   readyAtom,
   transactionsAtom,
 } from "@/features/store";
-import { voidTransaction } from "@/core/commands";
+import { unvoidTransaction, voidTransaction } from "@/core/commands";
 import { isLiveLedgerRow, isTransfer, overallBalance } from "@/core/engine/balances";
+import { activeRows } from "@/core/engine/ledger";
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
@@ -104,16 +105,12 @@ export function LedgerView() {
     (c) => !c.is_archived && !c.include_in_overall_balance,
   ).length;
 
-  // Void appends a reversing row linked via reverses_id; hide BOTH it and the
-  // original it cancels (§0.3). Grouped by day, newest first.
+  // Deleting appends a reversing row and undoing appends one that reverses THAT,
+  // so what is live is a chain walk (§0.3) — `activeRows` owns the rule.
   const groups = useMemo(() => {
-    const voided = new Set<string>();
-    for (const t of transactions) if (t.reverses_id) voided.add(t.reverses_id);
-    const rows = transactions
-      .filter((t) => !t.is_template && !t.reverses_id && !voided.has(t.id))
-      .sort((a, b) =>
-        a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1,
-      );
+    const rows = activeRows(transactions).sort((a, b) =>
+      a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1,
+    );
     const out: { day: string; items: Transaction[] }[] = [];
     for (const t of rows) {
       const last = out[out.length - 1];
@@ -124,10 +121,24 @@ export function LedgerView() {
   }, [transactions]);
 
   async function del(t: Transaction) {
-    await dispatch(voidTransaction(t));
+    const op = voidTransaction(t);
+    await dispatch(op);
     if (editing?.id === t.id) setEditing(null);
+    const voidRow = op.type === "transaction.void" ? op.payload.row : null;
     toast.success("Deleted", {
       description: `${t.vendor_source} · ${formatCents(t.amount)}`,
+      action: voidRow
+        ? {
+            label: "Undo",
+            onClick: () => {
+              // Undo is an op too: a row reversing the reversal, so the ledger
+              // records the delete AND the undo rather than erasing either.
+              void dispatch(unvoidTransaction(voidRow)).then(() =>
+                toast.success("Restored", { description: t.vendor_source }),
+              );
+            },
+          }
+        : undefined,
     });
   }
 
