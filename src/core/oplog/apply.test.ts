@@ -236,3 +236,76 @@ describe("applyOp — container, snapshot & setting ops (M3)", () => {
     expect(rows).toEqual([{ key: SETTING.defaultContainerId, value: "vacation" }]);
   });
 });
+
+describe("applyOp — correcting a reported balance (snapshot.update / .remove)", () => {
+  const recordOp = (id: string, date: string, bal: number, ts = 1000): Op => ({
+    id: `op-${id}`,
+    ts: at(ts),
+    type: "snapshot.record",
+    payload: {
+      row: makeContainerSnapshot({
+        id,
+        container_id: "brokerage",
+        date,
+        reported_balance: bal,
+      }),
+    },
+  });
+
+  it("snapshot.update replaces the row (entity-LWW) — a typo is fixable", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, recordOp("s1", "2026-07-20", 50000000)); // fat-fingered
+    await applyOp(tx, {
+      id: "op-fix",
+      ts: at(2000),
+      type: "snapshot.update",
+      payload: {
+        row: makeContainerSnapshot({
+          id: "s1",
+          container_id: "brokerage",
+          date: "2026-07-20",
+          reported_balance: 500000,
+        }),
+      },
+    });
+    const rows = await readAll<ContainerSnapshot>(state, STORE.containerSnapshots);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reported_balance).toBe(500000);
+  });
+
+  it("snapshot.remove drops the row from state, idempotently", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, recordOp("s1", "2026-07-20", 500000));
+    await applyOp(tx, recordOp("s2", "2026-06-30", 480000, 1500));
+    const remove: Op = {
+      id: "op-rm",
+      ts: at(3000),
+      type: "snapshot.remove",
+      payload: { id: "s1" },
+    };
+    await applyOp(tx, remove);
+    await applyOp(tx, remove); // replay
+    const rows = await readAll<ContainerSnapshot>(state, STORE.containerSnapshots);
+    expect(rows.map((r) => r.id)).toEqual(["s2"]);
+  });
+
+  it("replay converges no matter the order the ops arrive in (the delete is journaled)", async () => {
+    const ops: Op[] = [
+      recordOp("s1", "2026-07-20", 500000, 1000),
+      { id: "op-rm", ts: at(3000), type: "snapshot.remove", payload: { id: "s1" } },
+      recordOp("s2", "2026-06-30", 480000, 2000),
+    ];
+    const ordered = await replay(ops);
+    const shuffled = await replay([ops[1], ops[2], ops[0]]);
+    const a = await new MemoryTx(ordered).getAll<ContainerSnapshot>(
+      STORE.containerSnapshots,
+    );
+    const b = await new MemoryTx(shuffled).getAll<ContainerSnapshot>(
+      STORE.containerSnapshots,
+    );
+    expect(b).toEqual(a);
+    expect(a.map((r) => r.id)).toEqual(["s2"]); // the removal wins on ts order
+  });
+});

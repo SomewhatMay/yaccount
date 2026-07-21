@@ -40,7 +40,15 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     // Each snapshot is its own row (§5.6) — `put` by id is idempotent on replay
     // and never clobbers an earlier report.
     case "snapshot.record":
+    case "snapshot.update":
       await tx.put(STORE.containerSnapshots, op.payload.row);
+      return;
+    // The ONLY hard delete in the reducer, and it is deliberate: a snapshot is a
+    // typed observation (housekeeping, impl §3), never a ledger amount — no
+    // balance depends on it. `delete` of a missing key is a no-op, so replay is
+    // idempotent and order-independent under the total order.
+    case "snapshot.remove":
+      await tx.delete(STORE.containerSnapshots, op.payload.id);
       return;
     // Settings are keyed by name, so `put` is a natural upsert (last writer wins).
     case "setting.set":

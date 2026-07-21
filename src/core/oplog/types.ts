@@ -33,6 +33,12 @@ export type Op =
   // A reported real-world value for a container (M3, §5.6). Snapshots accumulate:
   // each report is its own row, so history is never overwritten.
   | (OpBase & { type: "snapshot.record"; payload: { row: ContainerSnapshot } })
+  // Corrections to a reported value. A snapshot is an observation the user typed,
+  // not a money movement, so it may be edited or removed outright — and because
+  // BOTH are ops, the journal still holds every version (§8.2): state is just the
+  // replay of record → update → remove under the total order.
+  | (OpBase & { type: "snapshot.update"; payload: { row: ContainerSnapshot } })
+  | (OpBase & { type: "snapshot.remove"; payload: { id: string } })
   // Synced user preference, keyed by name (M3) — entity-LWW by `key`.
   | (OpBase & { type: "setting.set"; payload: { row: Setting } });
 

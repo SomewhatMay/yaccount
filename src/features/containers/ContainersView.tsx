@@ -196,11 +196,9 @@ export function ContainersView() {
 
       <LogBalanceSheet
         container={logging}
+        snapshots={snapshots}
         onOpenChange={(open) => !open && setLogging(null)}
-        onSave={async (op) => {
-          await dispatch(op);
-          setLogging(null);
-        }}
+        onDispatch={dispatch}
       />
 
       <AlertDialog
@@ -354,7 +352,7 @@ function ContainerRow({
           {container.is_investment && (
             <DropdownMenuItem onClick={onLogBalance}>
               <LineChartIcon className="size-4" />
-              Log reported balance
+              Reported balances
             </DropdownMenuItem>
           )}
           {container.id !== GENERAL_CONTAINER_ID && <DropdownMenuSeparator />}

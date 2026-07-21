@@ -225,7 +225,7 @@ Soft delete only (`is_archived = true`) — never hard-deleted, never nullified/
 | id | TEXT (UUID) | PK | |
 | container_id | TEXT | FK → containers.id | Expected to be an `is_investment = true` container |
 | date | TEXT (ISO YYYY-MM-DD) | NOT NULL | |
-| reported_balance | REAL | NOT NULL | Real-world value at that moment |
+| reported_balance | REAL | NOT NULL | Real-world value at that moment. Integer cents on disk (§ impl 1). Correctable — see the note below the formulas. |
 
 Only actual cash movement into/out of an investment container is logged as a normal Transfer (no category, doesn't touch Income/Expense graphs). Market growth is never logged as a transaction.
 
@@ -236,6 +236,8 @@ Unrealized Gain/Loss = Current Value − Net Contributions
 ```
 
 **Net Contributions is the general savings-progress primitive.** It is not investment-specific: it is the exact quantity a `spend_down` goal measures progress against (§5.9.3). For an `is_investment` container it additionally underlies Unrealized Gain/Loss above; for a plain spend-down goal it is simply the progress numerator, with the snapshot/market-growth machinery inert. This is why the savings system adds essentially no new accounting concept — it generalizes one that already existed here.
+
+**Snapshots are correctable observations (design decision, M3 — locked).** A snapshot is a value the *user typed after looking at their account*, not a money movement: no balance, contribution, or ledger sum depends on it, and a mistyped figure is simply wrong data. So unlike transactions (§5.4, never destructively deleted) a snapshot may be **edited in place or removed outright** — `snapshot.update` (entity-LWW) and `snapshot.remove` — and the app shows a per-container **history** of every reported value with those two actions. This does **not** weaken the never-lose-data invariant: both corrections are themselves **ops in the append-only journal (§8.2)**, so the full sequence (record → update → remove) is preserved and materialized state is just its replay under the total order — a git-style history where the working tree shows current truth and the log holds every version. (Deep history migrates into the archived `ledger_<deviceId>_YYYY-MM.json` files after an op-log collapse, §8.4.)
 
 **Historical chart gap-filling — Reconstructed Balance Engine (locked):**
 ```
@@ -610,8 +612,14 @@ A serif in a finance app is intentional — it is the "designer's ledger" thesis
 - **Row actions hide until hover.** Per-row edit/delete/etc. live behind a single Lucide `⋯` (`MoreHorizontal`) **DropdownMenu** revealed on hover/focus — the resting state is clean.
 - **Editing opens a side `Sheet`, never a mode-swap.** Editing an existing record slides in a right-hand `Sheet` with the full form + Save + a quiet Delete. **Never** repurpose the create/compose area into an edit form in place (this was a real bug we fixed — do not reintroduce it). Rule of thumb: **create = inline; edit = Sheet; confirm-destructive = AlertDialog.**
 
+### 12.4-a Editing existing records (locked, M3)
+- **Inline rename** (a single-field edit like a category or container name) uses an explicit **✓ / ✗ pair** plus Enter/Escape — `RenameField` (`src/features/RenameField.tsx`). **Blur never commits**; leaving the field keeps the editor open, and an empty name cancels. Committing by accident is worse than one extra click.
+- **A record with history gets a history list, not a write-only form.** Anything the user can log repeatedly (reported balances today; future: budget-target history) shows its past entries in the same Sheet, each row with the `⋯` menu (Edit / Delete). Never ship a form whose past input the user can't see or fix.
+- **The direction of money is a visible control, never a typing convention.** Amount fields carry a `−`/`+` toggle (`SignToggle`) defaulting to the category's direction — muted for out, `text-positive` for in. A typed `+`/`-` moves *into* that control rather than being silently absorbed. This is what makes a refund/rebate discoverable (§5.4 soft sign rule).
+- **Toggleable menu entries use a checkbox item**, with the indicator in the **leading** icon column (same column as every other item's icon) and its space reserved so the label never shifts. Never fake it with an always-on check icon.
+
 ### 12.5 Interaction & motion
-- **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu enter/exit, and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
+- **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu/select enter/exit (`popper`-positioned so they animate — `item-aligned` suppresses motion; ~150ms fade+zoom), and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
 - **Feedback = `sonner` toasts, bottom-right,** in the interface's voice (see §12.6). Every create/update/delete confirms with a toast.
 - **Soft rules stay soft, inline.** The unusual-sign check (§5.4/§10 #13) is an **inline arm-then-confirm** ("… looks like a refund or void. Add again to confirm."), *not* a blocking `window.confirm` or a modal. Warnings guide; they never block.
 - **Quality floor (non-negotiable):** responsive to mobile, visible keyboard focus (iris ring), every icon-only control has an `aria-label`.

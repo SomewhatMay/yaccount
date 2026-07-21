@@ -92,6 +92,8 @@ yaccount/
 > - **Category color** — `src/features/category-color.ts` `categoryDotColor(id)`: deterministic hue dot; the only category-swatch scheme (foreshadows §5.1/§10.1 auto-palette, formal at M5).
 > - **Patterns** — create = **inline iris compose-bar** (`ComposeBar`); edit = right-hand **`Sheet`** (`EditTransactionSheet`) — NEVER a compose-area mode-swap; per-item actions = hover **`⋯` DropdownMenu**; lists = **date-grouped register rows**; feedback = **`sonner`** toasts; soft rules = **inline arm-then-confirm**, never `window.confirm`. Copy = sentence case, user-side voice (§12.6).
 >
+> **Also read spec §12.4-a (M3):** inline rename = explicit ✓/✗, never commit-on-blur; anything loggable repeatedly shows its **history** with per-row `⋯` Edit/Delete (never a write-only form); the money direction is a visible `−`/`+` control (`SignToggle`), not a typing convention; toggle menu entries are checkbox items with a **leading** indicator.
+>
 > M11 executes the finishing pass ON TOP of §12 (motion, empty/error polish, category-color override UI, responsive density) — it must not restart or contradict it.
 
 **Key structural rule:** `src/core/` never imports React, Next, Capacitor, or `drivestore`. It is pure TypeScript, fully unit-testable in Node with `fake-indexeddb`. This is what lets us validate all product logic before any platform/sync work.
@@ -118,14 +120,14 @@ UI intent
 **Initial op taxonomy (decided; extended per milestone).** Every op is `{ id: uuid, ts: ISO, type, payload }`, idempotent by `id`, applied by a per-`type` reducer. Naming is `<entity>.<verb>`. Starting set:
 - `category.create` · `category.update` · `category.archive` (M2)
 - `container.create` · `container.update` · `container.archive` (M3)
-- `snapshot.record` — a `container_snapshots` row (M3)
+- `snapshot.record` · `snapshot.update` · `snapshot.remove` — a `container_snapshots` row (M3). **`remove` is a genuine hard delete and the only one in the reducer** — a snapshot is a typed *observation*, not a money movement (nothing derives a balance from it), so it is housekeeping by the rule of thumb below. The audit trail survives regardless: the removal is itself a journaled op, so record → update → remove all persist in the log and state is their replay (spec §5.6).
 - `budgetTarget.set` — **upsert** by `(category_id, start_date)` · `budgetTarget.remove` (M4)
 - `transaction.create` · `transaction.update` · `transaction.approve` (pending→approved) · `transaction.void` — creates a reversing `amount` row, never a destructive delete (M2/M6). **The reversing row carries `reverses_id` → the original's id** (nullable field added to §5.4 in M2, user-blessed — see §10 #24); the reducer just `put`s the row (idempotent), the original is never touched.
 - `template.create` · `template.remove` — templates are shortcuts, not ledger data, so hard-remove is allowed (M6)
 - `recurringRule.create` · `recurringRule.update` · `recurringRule.cancel` (M6)
 - `goal.create` · `goal.update` · `goal.complete` · `goal.cancel` · `goal.archive` (M7)
 
-Rule of thumb: **soft-lifecycle** (`archive`/`cancel`/`complete`) for anything financial or FK-referenced; **hard `remove`** only for non-financial housekeeping (templates, a superseded `budgetTarget`). Financial corrections are always additive (`transaction.void` = reversing row), keeping `balance = SUM` auditable (§0.3).
+Rule of thumb: **soft-lifecycle** (`archive`/`cancel`/`complete`) for anything financial or FK-referenced; **hard `remove`** only for non-financial housekeeping (templates, a superseded `budgetTarget`, a mistaken `container_snapshot`). Financial corrections are always additive (`transaction.void` = reversing row), keeping `balance = SUM` auditable (§0.3).
 
 Getting this seam right in M1 is the single highest-leverage decision in the whole plan. Everything after M1 is "add a table, add ops, add an engine derivation, add UI."
 
@@ -189,7 +191,7 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 **Goal:** The "where money lives" axis (§5.2) and the transfer shape (§5.4).
 **Scope:**
 - Container CRUD (create/rename/archive soft-only; `is_investment`, `include_in_overall_balance` flags §5.2). Enforce `'general'`'s default-true opt-in.
-- **Container snapshots (§5.6):** `container_snapshots` CRUD + a "log reported balance" action for `is_investment` containers (without this the `is_investment` flag is inert). Net Contributions = Σ transfers in − Σ transfers out. *(§5.6 had no milestone in the prior draft; snapshot reporting/gain-loss lands in M5.)*
+- **Container snapshots (§5.6):** `container_snapshots` CRUD + a **"Reported balances" Sheet** for `is_investment` containers (without this the `is_investment` flag is inert): log a value, see the **full history**, and **edit or delete** a mistaken one (`snapshot.update` / `snapshot.remove`). Net Contributions = Σ transfers in − Σ transfers out. *(§5.6 had no milestone in the prior draft; gain/loss + the Reconstructed Balance engine land in M5.)*
 - **Transfer** transactions (§5.4): `category_id` null, `to_container_id` set; moves money between owned containers; excluded from category dashboards.
 - Per-container balance (`SUM(amount)`, may go negative → **red UI** §5.2).
 - **Current Overall Balance** metric (§5.7): `SUM(balance WHERE include_in_overall_balance)` — opt-in model, default exclude.

@@ -11,9 +11,17 @@ import {
   archiveContainer,
   createTransfer,
   recordSnapshot,
+  updateSnapshot,
+  removeSnapshot,
   setDefaultContainer,
 } from "@/core/commands";
-import { makeCategory, makeContainer, makeTransaction, SETTING } from "@/core/model";
+import {
+  makeCategory,
+  makeContainer,
+  makeContainerSnapshot,
+  makeTransaction,
+  SETTING,
+} from "@/core/model";
 
 const META = { id: "op1", ts: "2026-07-20T00:00:00.000Z" };
 
@@ -182,5 +190,27 @@ describe("snapshot + settings commands", () => {
       key: SETTING.defaultContainerId,
       value: "vacation",
     });
+  });
+});
+
+describe("snapshot corrections", () => {
+  it("updateSnapshot carries the corrected row", () => {
+    const row = makeContainerSnapshot({
+      id: "s1",
+      container_id: "brokerage",
+      date: "2026-07-20",
+      reported_balance: 500000,
+    });
+    const op = updateSnapshot(row, META);
+    expect(op.type).toBe("snapshot.update");
+    if (op.type !== "snapshot.update") throw new Error("narrow");
+    expect(op.payload.row.reported_balance).toBe(500000);
+  });
+
+  it("removeSnapshot carries just the id — the removal is itself journaled", () => {
+    const op = removeSnapshot("s1", META);
+    expect(op.type).toBe("snapshot.remove");
+    if (op.type !== "snapshot.remove") throw new Error("narrow");
+    expect(op.payload.id).toBe("s1");
   });
 });

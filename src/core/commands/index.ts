@@ -162,6 +162,17 @@ export function recordSnapshot(
   };
 }
 
+/** Correct a reported value in place (entity-LWW). */
+export function updateSnapshot(row: ContainerSnapshot, m?: OpMeta): Op {
+  return { ...meta(m), type: "snapshot.update", payload: { row } };
+}
+
+/** Remove a mistaken report. The removal is itself an op, so the journal keeps
+ * the whole history — state is the replay, the log is the audit trail. */
+export function removeSnapshot(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "snapshot.remove", payload: { id } };
+}
+
 // ── Settings (M3) ─────────────────────────────────────────────────────────
 
 /** Set any synced preference (entity-LWW by key). */
