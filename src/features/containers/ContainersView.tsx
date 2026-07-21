@@ -34,6 +34,7 @@ import {
 } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { LogBalanceSheet } from "@/features/containers/LogBalanceSheet";
+import { RenameField } from "@/features/RenameField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -248,13 +249,11 @@ function ContainerRow({
   onArchive: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(container.name);
 
-  async function rename() {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== container.name) {
-      await onDispatch(updateContainer({ ...container, name: trimmed }));
-      toast.success("Renamed", { description: trimmed });
+  async function rename(name: string) {
+    if (name !== container.name) {
+      await onDispatch(updateContainer({ ...container, name }));
+      toast.success("Renamed", { description: name });
     }
     setEditing(false);
   }
@@ -296,16 +295,11 @@ function ContainerRow({
       )}
       <div className="min-w-0 flex-1">
         {editing ? (
-          <Input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={rename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") rename();
-              if (e.key === "Escape") setEditing(false);
-            }}
-            className="h-8"
+          <RenameField
+            value={container.name}
+            label={`Rename ${container.name}`}
+            onSave={rename}
+            onCancel={() => setEditing(false)}
           />
         ) : (
           <div className="flex items-center gap-2">

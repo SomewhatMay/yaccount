@@ -9,6 +9,7 @@ import { createCategory, updateCategory, archiveCategory } from "@/core/commands
 import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
+import { RenameField } from "@/features/RenameField";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -149,13 +150,11 @@ function CategoryRow({
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(category.name);
 
-  async function save() {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== category.name) {
-      await onChange(updateCategory({ ...category, name: trimmed }));
-      toast.success("Renamed", { description: trimmed });
+  async function save(name: string) {
+    if (name !== category.name) {
+      await onChange(updateCategory({ ...category, name }));
+      toast.success("Renamed", { description: name });
     }
     setEditing(false);
   }
@@ -178,16 +177,12 @@ function CategoryRow({
         aria-hidden
       />
       {editing ? (
-        <Input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") save();
-            if (e.key === "Escape") setEditing(false);
-          }}
-          className="h-8 flex-1"
+        <RenameField
+          value={category.name}
+          label={`Rename ${category.name}`}
+          onSave={save}
+          onCancel={() => setEditing(false)}
+          className="flex-1"
         />
       ) : (
         <span className="flex-1 text-sm font-medium">{category.name}</span>
