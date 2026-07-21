@@ -29,6 +29,14 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
       if (cur) await tx.put(STORE.containers, { ...cur, is_archived: true });
       return;
     }
+    // A void is a NEW reversing row keyed by its own id (§0.3) — `put` is
+    // idempotent, and it never touches the original row. All three write the
+    // row as-is; the distinction is intent, not reducer behavior.
+    case "transaction.create":
+    case "transaction.update":
+    case "transaction.void":
+      await tx.put(STORE.transactions, op.payload.row);
+      return;
     default: {
       const never: never = op;
       throw new Error(`applyOp: unhandled op type: ${(never as { type: string }).type}`);

@@ -1,5 +1,6 @@
 import type { Category } from "../model/category";
 import type { Container } from "../model/container";
+import type { Transaction } from "../model/transaction";
 
 /**
  * Every mutation is an idempotent op appended to the journal AND applied to the
@@ -21,6 +22,11 @@ export type Op =
   | (OpBase & { type: "category.archive"; payload: { id: string } })
   | (OpBase & { type: "container.create"; payload: { row: Container } })
   | (OpBase & { type: "container.update"; payload: { row: Container } })
-  | (OpBase & { type: "container.archive"; payload: { id: string } });
+  | (OpBase & { type: "container.archive"; payload: { id: string } })
+  // Transactions (M2). create/update carry the full row (entity-LWW, idempotent).
+  // void carries a reversing `amount` row (§0.3) — never a destructive delete.
+  | (OpBase & { type: "transaction.create"; payload: { row: Transaction } })
+  | (OpBase & { type: "transaction.update"; payload: { row: Transaction } })
+  | (OpBase & { type: "transaction.void"; payload: { row: Transaction } });
 
 export type OpType = Op["type"];

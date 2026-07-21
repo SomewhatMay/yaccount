@@ -140,6 +140,7 @@ describe("TransactionSchema (§5.4)", () => {
     inbox_status: "approved" as const,
     recurring_rule_id: null,
     notes: null,
+    reverses_id: null,
     yearMonth: "2026-07",
   };
   it("accepts an expense (negative amount, category set, no destination)", () => {

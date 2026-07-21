@@ -33,6 +33,7 @@ These are the invariants every milestone must respect. Violating one is a re-arc
 | Framework | **Next.js** (latest stable), `output: 'export'` | §2.2 — static export, no SSR/API routes used today; preserves upgrade path |
 | Language | **TypeScript**, `strict: true` | Non-negotiable for financial data integrity |
 | UI runtime | React (bundled with Next) | §2.2 |
+| Client state | **Jotai** (atoms) for cross-component UI state | **Added M2.** Boilerplate-free vs. React context; client-only, so Capacitor/static-export safe and `src/core` stays pure (state lives in `src/features`). React context reserved only for genuinely tree-scoped concerns; the `Repo` (IndexedDB handle) is a module singleton, not an atom. |
 | Styling | **Tailwind CSS** + CSS variables for design tokens | §1 design tenets; tokens finalized later (§10.6) |
 | Charts | **Recharts** (React, declarative SVG) | §6.5 inventory. **Waterfall = stacked `BarChart` + transparent base series (locked M5)**; custom SVG only as fallback. Web-SVG only — *not* React Native (Capacitor/WebView) |
 | Local DB | **IndexedDB** via a thin typed wrapper (**`idb`** by Jake Archibald) | §8.2 — works in browser + Capacitor WebView |
@@ -107,7 +108,7 @@ UI intent
 - `container.create` · `container.update` · `container.archive` (M3)
 - `snapshot.record` — a `container_snapshots` row (M3)
 - `budgetTarget.set` — **upsert** by `(category_id, start_date)` · `budgetTarget.remove` (M4)
-- `transaction.create` · `transaction.update` · `transaction.approve` (pending→approved) · `transaction.void` — creates a reversing `amount` row, never a destructive delete (M2/M6)
+- `transaction.create` · `transaction.update` · `transaction.approve` (pending→approved) · `transaction.void` — creates a reversing `amount` row, never a destructive delete (M2/M6). **The reversing row carries `reverses_id` → the original's id** (nullable field added to §5.4 in M2, user-blessed — see §10 #24); the reducer just `put`s the row (idempotent), the original is never touched.
 - `template.create` · `template.remove` — templates are shortcuts, not ledger data, so hard-remove is allowed (M6)
 - `recurringRule.create` · `recurringRule.update` · `recurringRule.cancel` (M6)
 - `goal.create` · `goal.update` · `goal.complete` · `goal.cancel` · `goal.archive` (M7)
@@ -411,7 +412,7 @@ Findings from an adversarial pass against `yaccount-tech-spec-v3.md` (source of 
 
 ### Spec-attribution / accuracy
 23. **Total order "timestamp + `id` tiebreak (§8.2)"** — §8.2 says "timestamped and UUID-keyed" but never defines a tiebreak/total order or LWW. This is *our* design; don't attribute it to §8.2.
-24. **Void-as-`amount`-row correction mechanism (§0.3)** is our decision, not spec text — spec never specifies transaction correction. Fine to adopt; label as a design decision.
+24. **Void-as-`amount`-row correction mechanism (§0.3)** is our decision, not spec text — spec never specifies transaction correction. ✔ **M2: implemented + user-blessed** — the reversing row carries a nullable **`reverses_id`** FK → the original (spec §5.4 table updated). Distinguishes an intentional void (pair hidden from the ledger) from a genuine refund (both rows kept visible); the original is never mutated, so append-only (§0.3) holds and `balance = SUM(amount)` stays exact.
 25. ✔ **Silent re-auth scope — FOLDED.** Re-consent fallback scoped for all browsers (not Safari-only); updated in M8 scope.
 26. **`crypto.randomUUID` needs a secure context** (✔ noted in §1) — ensure the hosted web build is HTTPS.
 27. ✔ **Integer-cents vs `REAL` — RESOLVED (M1).** Locked: persist integer cents everywhere (stores, ops, snapshot); decimal only at input/display edges. `REAL` is display-only. Recorded in §1.
