@@ -550,7 +550,7 @@ The per-device-ledger model means a cold sync must fetch and merge N device logs
 3. ~~Bundle ID / package name finalization~~ **RESOLVED:** `com.yaccount.app` locked final (§9). Safe to register OAuth clients / store listings.
 4. **Receipts/attachments, bank-feed integration, transaction splitting/multi-category tagging** — all explicitly out of scope in the source spreadsheet; not yet discussed as potential yaccount roadmap items one way or the other (§7).
 5. **Multi-currency** — not discussed; source tool was single-currency only (§7).
-6. **Frontend visual design system** — "sleek, minimalist, modern" plus category color-coding is the directional brief; no concrete design tokens, typography, or wireframes exist yet. **Component foundation LOCKED (M2):** UI is built on **shadcn/ui** (Radix primitives) + **Tailwind CSS v4** + **Lucide** icons, themed via CSS variables (shadcn `neutral` base) with light/dark support. Policy: reach for a shadcn/ui component first; hand-roll only when none exists. The bespoke tokens/typography/identity still land in M11 — they retheme the shadcn variable layer rather than replace it. (Impl detail; does not change any product decision.)
+6. **Frontend visual design system** — the directional brief ("sleek, minimalist, modern" + category color-coding) is now **realized as a named, locked design language: "Quiet Register" — see §12.** Foundation: **shadcn/ui** (Radix) + **Tailwind v4** + **Lucide** + three locked typefaces (Fraunces / Geist / Geist Mono) + an iris-brand token palette, light/dark. M11 *polishes and extends* §12 (adds motion, empty/error states, category-color override UI, responsive density) — it must **not** restart or contradict it. This item is therefore **no longer open at the foundation level**; only M11's finishing scope remains.
 7. **Multi-account/household support** — not discussed; current auth design (§3) assumes a single Google account per install.
 8. **Savings-goal template + reminder layer** — the optional, deferrable convenience wrapper over emergent goal cycles (pre-fill last cycle's params; nudge to start the next) is speced as non-blocking but not yet designed (§5.9.6). The core goal system does not depend on it.
 9. **Sub-monthly contribution cadence UI** — contributions may be logged at any cadence but always roll up to the canonical monthly line; the UI should steer very-short cadences toward category budgets rather than surfacing "daily goals" (§5.9.4). Minor.
@@ -568,3 +568,62 @@ Compiled across three grilling sessions (per the user's `grilling` interview pat
 - **Round 3** locked the **Savings Goals** system end to end — the progress-is-contributions primitive, the `spend_down` / `reserve` kinds, the `deadline` / `fixed` / `passive` modes, `recurring_rules`-based contribution automation, and the emergent-cycle lifecycle — captured in §5.9, with the unified monthly allocation plan in §6.8 and supporting touches in §5.2, §5.4–§5.8, and §5.10.
 
 This v3 consolidation is a full rewrite of v2 for coherence and completeness; no locked decision was changed, only integrated and, in a few places, made explicit (goal-creation auto-creating its container; rejected cardinality alternatives; a reserve worked example; a derived-quantities reference). No code has been implemented yet. Continue grilling from §10 before beginning implementation.
+
+---
+
+## 12. Visual Design Language — "Quiet Register" (LOCKED, M2)
+
+> **This is law, not a mood board.** Every screen yaccount ships — today's Ledger and Categories, and every future feature (containers, budgets, goals, the monthly plan, charts) — obeys this section. If a new design instinct conflicts with what's written here, the design language wins; change *this section by explicit decision*, never drift silently in a component. M11 executes the finishing pass **on top of** this foundation (motion, empty/error states, category-color override UI, per-breakpoint density) — it does not restart it. **Read this before writing any UI.**
+
+### 12.1 The thesis
+yaccount is a **paper ledger a designer fell in love with** — the calm, exact, columnar feel of a hand-kept account book, rendered as a soft modern app. Money is **quiet and precise by default**, with exactly **one warm spark of personality** (iris) and a single **positive/emerald** accent for money coming in. It is the deliberate opposite of two clichés we reject: (a) the cold blue-grey fintech dashboard, and (b) the alarm-clock red/green spreadsheet. **Restraint is the brand.** Numbers are the hero; chrome recedes.
+
+### 12.2 Color tokens (locked — defined in `src/app/globals.css`)
+Palette is **cool-neutral base + one iris brand + emerald-for-inflow**, expressed in `oklch`. Semantic tokens, never raw hex in components:
+
+| Token | Light | Dark | Job |
+|---|---|---|---|
+| `--brand` / `--primary` / `--ring` | `oklch(0.54 0.2 280)` | `oklch(0.72 0.16 285)` | **Iris.** The single spark: primary buttons, focus rings, active nav, compose-bar tint. Used *sparingly* — a spark, not a flood. |
+| `--positive` (`text-positive`) | `oklch(0.58 0.13 162)` | `oklch(0.74 0.15 162)` | **Emerald.** Money **in** only (income amounts, "in" stat). Never used decoratively. |
+| `--destructive` | shadcn rose | shadcn rose | **Rose.** Reserved for genuine danger/negative: a **negative balance**, destructive menu items. Never the default color of an expense. |
+| neutral base (`background`/`card`/`muted`/`border`/`foreground`) | shadcn `neutral` | shadcn `neutral` | Everything else. Cool, low-chroma, calm. |
+
+**Category identity = deterministic color dots.** Each category gets a stable hue derived from its id (`src/features/category-color.ts`, golden-angle spread), rendered as a small dot beside its name and its transactions. This is the presentational foreshadow of the §5.1/§10.1 auto-palette (which formally ships at M5) — **use `categoryDotColor(id)` for any category swatch; never invent a second scheme.**
+
+**Hard rules:** expenses are **neutral** (they are the norm — the explicit minus sign carries the meaning, §5.4), only **inflow is emerald**, only **true-negative is rose**. Do not color the whole ledger green/red. Do not introduce a third accent hue without editing this table.
+
+### 12.3 Typography (locked — three roles, wired in `src/app/layout.tsx`)
+| Role | Face | CSS var / class | Where |
+|---|---|---|---|
+| **Display** | **Fraunces** (soft serif) | `--font-display` / `font-display` | The one characterful risk. Balance hero, page headings, the wordmark. **Used with restraint** — display moments only, never body copy or labels. |
+| **Body / UI** | **Geist** (sans) | `--font-sans` (default) | All labels, inputs, buttons, secondary text. |
+| **Numerals** | **Geist Mono** | `--font-mono` / `font-mono` | **Every monetary amount, everywhere**, plus counts. Pair with `.tnum` (tabular figures) so columns of money align like a register. |
+
+A serif in a finance app is intentional — it is the "designer's ledger" thesis made visible. Money always reads in mono. **Never** set an amount in the body sans, and **never** set body copy in Fraunces.
+
+### 12.4 Layout & shape language
+- **Column, not dashboard.** One centered reading column (`max-w-2xl`), generous vertical rhythm. yaccount is a focused ledger you scan top-to-bottom, not a grid of widgets. (Later multi-metric screens may widen, but the calm single-column instinct is the default.)
+- **Soft containers.** Grouped content sits in `rounded-2xl` bordered `card` surfaces; controls are `rounded-xl`/`rounded-lg`; pills (`rounded-full`) for nav and toggles. Corners are soft — no hard-edged broadsheet rules.
+- **The balance hero.** Each primary screen opens with a **big Fraunces figure + a tiny uppercase eyebrow label**, with quiet supporting marginalia (e.g. "this month · $X in · $Y out") — never a busy stat-card row. The number is the thesis.
+- **The compose bar.** Fast creation (a transaction, a category) lives in a **borderless, iris-tinted bar** (`border-primary/15 bg-primary/[0.04]`, transparent inline inputs) pinned above the list — inline and frictionless, not a walled-off form card.
+- **Register rows, date-grouped.** Lists render as **flat rows grouped by day** ("Today / Yesterday / Mon D, YYYY"), each row: `[color dot] [payee + category] ……… [mono amount] [hover ⋯]`. Quiet dividers, hover tint, right-aligned mono money.
+- **Row actions hide until hover.** Per-row edit/delete/etc. live behind a single Lucide `⋯` (`MoreHorizontal`) **DropdownMenu** revealed on hover/focus — the resting state is clean.
+- **Editing opens a side `Sheet`, never a mode-swap.** Editing an existing record slides in a right-hand `Sheet` with the full form + Save + a quiet Delete. **Never** repurpose the create/compose area into an edit form in place (this was a real bug we fixed — do not reintroduce it). Rule of thumb: **create = inline; edit = Sheet; confirm-destructive = AlertDialog.**
+
+### 12.5 Interaction & motion
+- **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu enter/exit, and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
+- **Feedback = `sonner` toasts, bottom-right,** in the interface's voice (see §12.6). Every create/update/delete confirms with a toast.
+- **Soft rules stay soft, inline.** The unusual-sign check (§5.4/§10 #13) is an **inline arm-then-confirm** ("… looks like a refund or void. Add again to confirm."), *not* a blocking `window.confirm` or a modal. Warnings guide; they never block.
+- **Quality floor (non-negotiable):** responsive to mobile, visible keyboard focus (iris ring), every icon-only control has an `aria-label`.
+
+### 12.6 Voice & copy
+Sentence case everywhere. Plain verbs. Write from the user's side of the screen, name things by what the user controls. A control says what it does and keeps that word through the flow ("Save changes" → toast "Transaction updated"). Empty states are **invitations, not mood** ("Nothing logged yet. Add your first entry above."). Errors are specific and blameless ("Add a payee or source."). No filler, no cleverness over clarity, no system vocabulary ("row", "op", "dispatch") in the UI.
+
+### 12.7 The two signature elements (spend boldness only here)
+1. **The Fraunces balance moment** — the serif hero figure is the thing the app is remembered by.
+2. **The deterministic category color dots** — the one recurring spot of playful color in an otherwise disciplined neutral field.
+
+Everything else stays quiet. Before adding any new decoration, remove one thing first (Chanel's rule). If a screen has two loud ideas, one of them is wrong.
+
+### 12.8 How to extend (for every future feature)
+Reach for a **shadcn/ui** component first (add via `npx shadcn@latest add …`); hand-roll only when none exists, and match this language when you do. Use the **semantic tokens** (`primary`, `positive`, `destructive`, `muted-foreground`) — never raw colors. Amounts in **`font-mono` + `.tnum`**. New section headers in **Fraunces**. New create flows use the **compose-bar** pattern; new edit flows use a **`Sheet`**; new per-item actions use the **`⋯` DropdownMenu**. When in doubt, make it quieter.

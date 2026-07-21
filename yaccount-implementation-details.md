@@ -84,7 +84,15 @@ yaccount/
 └─ tests/
 ```
 
-> **UI convention (M2+):** feature components live in `src/features/`; reusable primitives are **shadcn/ui** components under `src/components/ui/` (regenerate/extend via `npx shadcn@latest add <name>`). Cross-component state = **Jotai** atoms (`src/features/store.ts`). Icons = **Lucide** (`lucide-react`). Design tokens live as CSS variables in `src/app/globals.css` (shadcn `neutral` base); the bespoke identity is M11.
+> **UI convention (M2+):** feature components live in `src/features/`; reusable primitives are **shadcn/ui** components under `src/components/ui/` (regenerate/extend via `npx shadcn@latest add <name>`). Cross-component state = **Jotai** atoms (`src/features/store.ts`). Icons = **Lucide** (`lucide-react`).
+>
+> **⚠️ The visual design language is LOCKED — spec §12 "Quiet Register" is law.** Before building ANY UI, read spec §12 in full. Do not improvise palette, typography, or layout; do not drift from it component-by-component. Quick map of where the law lives in code:
+> - **Tokens** — `src/app/globals.css`: iris `--brand`/`--primary`/`--ring`, emerald `--positive` (→ `text-positive`), rose `--destructive` for true-negative only; neutral base. `.tnum` = tabular figures. Use **semantic tokens only**, never raw hex.
+> - **Type (3 roles)** — `src/app/layout.tsx`: **Fraunces** display (`font-display`) for hero figures/headings/wordmark, restraint only; **Geist** body; **Geist Mono** (`font-mono`) for **every amount**, always with `.tnum`.
+> - **Category color** — `src/features/category-color.ts` `categoryDotColor(id)`: deterministic hue dot; the only category-swatch scheme (foreshadows §5.1/§10.1 auto-palette, formal at M5).
+> - **Patterns** — create = **inline iris compose-bar** (`ComposeBar`); edit = right-hand **`Sheet`** (`EditTransactionSheet`) — NEVER a compose-area mode-swap; per-item actions = hover **`⋯` DropdownMenu**; lists = **date-grouped register rows**; feedback = **`sonner`** toasts; soft rules = **inline arm-then-confirm**, never `window.confirm`. Copy = sentence case, user-side voice (§12.6).
+>
+> M11 executes the finishing pass ON TOP of §12 (motion, empty/error polish, category-color override UI, responsive density) — it must not restart or contradict it.
 
 **Key structural rule:** `src/core/` never imports React, Next, Capacitor, or `drivestore`. It is pure TypeScript, fully unit-testable in Node with `fake-indexeddb`. This is what lets us validate all product logic before any platform/sync work.
 
@@ -305,7 +313,7 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ### M11 — Design System & Polish
 **Goal:** Realize the "sleek, minimalist, modern" brief (§1) as concrete tokens, and responsive layout per surface (§2.1).
 **Scope:**
-- Concrete design tokens, typography, spacing (built **on top of the shadcn/ui token layer** already in `globals.css` since M2 — retheme the CSS variables, don't rip out shadcn), and the **category color user-override UI** (the auto-palette default already ships in M5; here we add per-category picking — §10.1 hybrid).
+- **Execute the finishing pass on the LOCKED "Quiet Register" design language (spec §12) — extend it, never restart it.** Refine tokens/typography/spacing on top of the M2 foundation already in `globals.css` + `layout.tsx` (retheme the CSS variables; keep Fraunces/Geist/Geist Mono, iris/emerald semantics, the compose-bar / Sheet / register-row / `⋯`-menu patterns). Add what §12 explicitly defers to M11: purposeful **motion**, empty/loading/error/sync states, `DriveError` surfaces, the accessibility pass, and the **category color user-override UI** (auto-palette default ships M5; here we add per-category picking — §10.1 hybrid). Any change to the design language itself is a deliberate edit to spec §12, not silent drift.
 - Responsive layout reorganization per breakpoint/platform (nav patterns, density) — same functionality, different arrangement (§2.1).
 - Empty states, loading/sync indicators, error surfaces (esp. `DriveError` §4), accessibility pass.
 - Bundle-ID finalization is **not an M11 task** — it must precede M10's real OAuth client registration, so it belongs to the §6 parallel track (lock it by M8 planning at the latest). Listing it in the final milestone was an ordering bug; M11 only *consumes* the already-locked value.
