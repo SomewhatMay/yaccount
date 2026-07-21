@@ -37,6 +37,15 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     case "transaction.void":
       await tx.put(STORE.transactions, op.payload.row);
       return;
+    // Each snapshot is its own row (§5.6) — `put` by id is idempotent on replay
+    // and never clobbers an earlier report.
+    case "snapshot.record":
+      await tx.put(STORE.containerSnapshots, op.payload.row);
+      return;
+    // Settings are keyed by name, so `put` is a natural upsert (last writer wins).
+    case "setting.set":
+      await tx.put(STORE.settings, op.payload.row);
+      return;
     default: {
       const never: never = op;
       throw new Error(`applyOp: unhandled op type: ${(never as { type: string }).type}`);

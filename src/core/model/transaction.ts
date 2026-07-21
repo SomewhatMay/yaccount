@@ -84,3 +84,60 @@ export function makeVoidRow(
     yearMonth: yearMonthOf(date),
   });
 }
+
+/** The synthesized transfer payee (§5.4) — keeps `vendor_source` NOT NULL with
+ * no friction, and stays user-editable afterwards. */
+export function transferLabel(fromName: string, toName: string): string {
+  return `${fromName} → ${toName}`;
+}
+
+/**
+ * Build a transfer (§5.4 shape: `category_id` null, `to_container_id` set).
+ * A transfer is a SINGLE row keyed to the **source** container and stored
+ * **negative** (§10 #5); the destination is credited via `to_container_id` in the
+ * balance identity (§0.4). Callers pass a positive magnitude — signing is not
+ * theirs to get wrong. Transfers carry no category, so they never touch the
+ * expense/income dashboards; they are the contribution primitive (§5.6).
+ */
+export function makeTransfer(input: {
+  date: string;
+  amount: number; // positive magnitude in cents
+  container_id: string; // source
+  to_container_id: string; // destination
+  fromName?: string; // used to synthesize vendor_source
+  toName?: string;
+  vendor_source?: string; // explicit label wins over the synthesized one
+  id?: string;
+  inbox_status?: InboxStatus;
+  notes?: string | null;
+}): Transaction {
+  if (!Number.isInteger(input.amount) || input.amount <= 0) {
+    throw new Error("transfer amount must be a positive integer-cents magnitude");
+  }
+  if (input.container_id === input.to_container_id) {
+    throw new Error("a transfer needs two different containers");
+  }
+  const label =
+    input.vendor_source ??
+    (input.fromName && input.toName
+      ? transferLabel(input.fromName, input.toName)
+      : undefined);
+  if (!label) throw new Error("transfer needs a vendor_source or both container names");
+
+  return TransactionSchema.parse({
+    id: input.id ?? newId(),
+    date: input.date,
+    amount: -input.amount, // outflow on the source container
+    vendor_source: label,
+    category_id: null, // transfers are category-less by definition
+    container_id: input.container_id,
+    to_container_id: input.to_container_id,
+    is_template: false,
+    template_name: null,
+    inbox_status: input.inbox_status ?? "approved",
+    recurring_rule_id: null,
+    notes: input.notes ?? null,
+    reverses_id: null,
+    yearMonth: yearMonthOf(input.date),
+  });
+}

@@ -1,7 +1,15 @@
 import { atom } from "jotai";
 import { Repo } from "@/core/repo";
 import { STORE } from "@/core/repo/db";
-import type { Category, Container, Transaction } from "@/core/model";
+import {
+  GENERAL_CONTAINER_ID,
+  SETTING,
+  type Category,
+  type Container,
+  type ContainerSnapshot,
+  type Setting,
+  type Transaction,
+} from "@/core/model";
 import type { Op } from "@/core/oplog";
 
 /**
@@ -19,6 +27,18 @@ export const readyAtom = atom(false);
 export const categoriesAtom = atom<Category[]>([]);
 export const containersAtom = atom<Container[]>([]);
 export const transactionsAtom = atom<Transaction[]>([]);
+export const snapshotsAtom = atom<ContainerSnapshot[]>([]);
+export const settingsAtom = atom<Setting[]>([]);
+
+/** Default Spending Container (§5.2) — the compose bar's preselected wallet.
+ * A synced setting; falls back to the seeded 'general' wallet. */
+export const defaultContainerIdAtom = atom((get) => {
+  const setting = get(settingsAtom).find((s) => s.key === SETTING.defaultContainerId);
+  const containers = get(containersAtom);
+  const id = setting?.value;
+  if (id && containers.some((c) => c.id === id && !c.is_archived)) return id;
+  return GENERAL_CONTAINER_ID;
+});
 
 let repoPromise: Promise<Repo> | null = null;
 function getRepo(): Promise<Repo> {
@@ -29,14 +49,18 @@ function getRepo(): Promise<Repo> {
 /** Re-read the materialized tables into the atoms (local-first read path). */
 export const refreshAtom = atom(null, async (_get, set) => {
   const repo = await getRepo();
-  const [cats, conts, txns] = await Promise.all([
+  const [cats, conts, txns, snaps, settings] = await Promise.all([
     repo.getAll<Category>(STORE.categories),
     repo.getAll<Container>(STORE.containers),
     repo.getAll<Transaction>(STORE.transactions),
+    repo.getAll<ContainerSnapshot>(STORE.containerSnapshots),
+    repo.getAll<Setting>(STORE.settings),
   ]);
   set(categoriesAtom, cats);
   set(containersAtom, conts);
   set(transactionsAtom, txns);
+  set(snapshotsAtom, snaps);
+  set(settingsAtom, settings);
 });
 
 /** Append + apply one op atomically (§0.1), then refresh the caches. */

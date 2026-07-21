@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { applyOp, MemoryTx, newMemoryState, replay, type Op } from "@/core/oplog";
 import { STORE, type StoreName } from "@/core/repo/db";
-import { makeCategory, makeContainer, type Category, type Container } from "@/core/model";
+import {
+  makeCategory,
+  makeContainer,
+  makeContainerSnapshot,
+  SETTING,
+  type Category,
+  type Container,
+  type ContainerSnapshot,
+  type Setting,
+} from "@/core/model";
 
 const at = (ms: number): string => new Date(ms).toISOString();
 
@@ -137,5 +146,93 @@ describe("replay — total order (ts, id) determinism (§8.2)", () => {
     const byId = Object.fromEntries(a.map((c) => [c.id, c]));
     expect(byId["c1"].name).toBe("Food");
     expect(byId["c2"].is_archived).toBe(true);
+  });
+});
+
+describe("applyOp — container, snapshot & setting ops (M3)", () => {
+  const container = (id: string, name: string): Op => ({
+    id: `op-${id}`,
+    ts: at(1000),
+    type: "container.create",
+    payload: { row: makeContainer({ id, name }) },
+  });
+
+  it("container.archive soft-deletes, leaving the row a valid FK target (§5.5)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, container("k1", "Vacation"));
+    await applyOp(tx, {
+      id: "op-arch",
+      ts: at(2000),
+      type: "container.archive",
+      payload: { id: "k1" },
+    });
+    const rows = await readAll<Container>(state, STORE.containers);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].is_archived).toBe(true);
+  });
+
+  it("snapshot.record materializes a container_snapshots row, idempotently (§5.6)", async () => {
+    const op: Op = {
+      id: "op-s1",
+      ts: at(3000),
+      type: "snapshot.record",
+      payload: {
+        row: makeContainerSnapshot({
+          id: "s1",
+          container_id: "brokerage",
+          date: "2026-07-20",
+          reported_balance: 500000,
+        }),
+      },
+    };
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, op);
+    await applyOp(tx, op); // replay
+    const rows = await readAll<ContainerSnapshot>(state, STORE.containerSnapshots);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reported_balance).toBe(500000);
+  });
+
+  it("snapshots accumulate — a new report never overwrites the history", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    for (const [id, date, bal] of [
+      ["s1", "2026-06-30", 480000],
+      ["s2", "2026-07-31", 500000],
+    ] as const) {
+      await applyOp(tx, {
+        id: `op-${id}`,
+        ts: at(4000),
+        type: "snapshot.record",
+        payload: {
+          row: makeContainerSnapshot({
+            id,
+            container_id: "brokerage",
+            date,
+            reported_balance: bal,
+          }),
+        },
+      });
+    }
+    expect(
+      await readAll<ContainerSnapshot>(state, STORE.containerSnapshots),
+    ).toHaveLength(2);
+  });
+
+  it("setting.set upserts by key (last writer wins, synced like any op)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    const set = (value: string, ts: number): Op => ({
+      id: `op-set-${ts}`,
+      ts: at(ts),
+      type: "setting.set",
+      payload: { row: { key: SETTING.defaultContainerId, value } },
+    });
+    await applyOp(tx, set("general", 5000));
+    await applyOp(tx, set("vacation", 6000));
+    const rows = await readAll<Setting>(state, STORE.settings);
+    expect(rows).toEqual([{ key: SETTING.defaultContainerId, value: "vacation" }]);
   });
 });

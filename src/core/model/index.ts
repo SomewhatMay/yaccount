@@ -4,5 +4,6 @@ export * from "./container";
 export * from "./budgetTarget";
 export * from "./transaction";
 export * from "./containerSnapshot";
+export * from "./setting";
 export * from "./recurringRule";
 export * from "./goal";

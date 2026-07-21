@@ -1,6 +1,8 @@
 import type { Category } from "../model/category";
 import type { Container } from "../model/container";
 import type { Transaction } from "../model/transaction";
+import type { ContainerSnapshot } from "../model/containerSnapshot";
+import type { Setting } from "../model/setting";
 
 /**
  * Every mutation is an idempotent op appended to the journal AND applied to the
@@ -27,6 +29,11 @@ export type Op =
   // void carries a reversing `amount` row (§0.3) — never a destructive delete.
   | (OpBase & { type: "transaction.create"; payload: { row: Transaction } })
   | (OpBase & { type: "transaction.update"; payload: { row: Transaction } })
-  | (OpBase & { type: "transaction.void"; payload: { row: Transaction } });
+  | (OpBase & { type: "transaction.void"; payload: { row: Transaction } })
+  // A reported real-world value for a container (M3, §5.6). Snapshots accumulate:
+  // each report is its own row, so history is never overwritten.
+  | (OpBase & { type: "snapshot.record"; payload: { row: ContainerSnapshot } })
+  // Synced user preference, keyed by name (M3) — entity-LWW by `key`.
+  | (OpBase & { type: "setting.set"; payload: { row: Setting } });
 
 export type OpType = Op["type"];

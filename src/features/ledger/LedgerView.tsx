@@ -5,6 +5,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
   ArrowDownLeftIcon,
+  ArrowRightIcon,
   ArrowUpRightIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -12,14 +13,16 @@ import {
 } from "lucide-react";
 import {
   categoriesAtom,
+  containersAtom,
+  defaultContainerIdAtom,
   dispatchAtom,
   readyAtom,
   transactionsAtom,
 } from "@/features/store";
 import { voidTransaction } from "@/core/commands";
-import { isLiveLedgerRow, containerBalance } from "@/core/engine/balances";
+import { isLiveLedgerRow, isTransfer, overallBalance } from "@/core/engine/balances";
 import { formatCents } from "@/core/money";
-import { GENERAL_CONTAINER_ID, type Transaction } from "@/core/model";
+import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
 import { ComposeBar } from "@/features/ledger/ComposeBar";
@@ -52,33 +55,54 @@ function formatDay(iso: string): string {
 export function LedgerView() {
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
+  const containers = useAtomValue(containersAtom);
   const transactions = useAtomValue(transactionsAtom);
+  const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
+  // The headline is Current Overall Balance (§5.7): only containers the user
+  // opted in are counted, so money saved toward something never inflates it.
   const balance = useMemo(
-    () => containerBalance(transactions, GENERAL_CONTAINER_ID),
-    [transactions],
+    () => overallBalance(transactions, containers),
+    [transactions, containers],
   );
 
-  // This-month in/out for the general wallet — context for the balance, no chart.
+  const counted = useMemo(
+    () => containers.filter((c) => c.include_in_overall_balance),
+    [containers],
+  );
+
+  // This-month in/out across the counted containers. Transfers are excluded —
+  // moving your own money between containers is neither income nor expense.
   const { monthIn, monthOut } = useMemo(() => {
     const ym = thisMonth();
+    const ids = new Set(counted.map((c) => c.id));
     let inSum = 0;
     let outSum = 0;
     for (const t of transactions) {
-      if (!isLiveLedgerRow(t) || t.container_id !== GENERAL_CONTAINER_ID) continue;
-      if (t.yearMonth !== ym) continue;
+      if (!isLiveLedgerRow(t) || isTransfer(t)) continue;
+      if (!ids.has(t.container_id) || t.yearMonth !== ym) continue;
       if (t.amount >= 0) inSum += t.amount;
       else outSum += -t.amount;
     }
     return { monthIn: inSum, monthOut: outSum };
-  }, [transactions]);
+  }, [transactions, counted]);
 
   const nameOf = useMemo(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "Transfer");
   }, [categories]);
+
+  // Show which wallet a row moved through only once there is more than one.
+  const containerNameOf = useMemo(() => {
+    const m = new Map(containers.map((c) => [c.id, c.name]));
+    return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
+  }, [containers]);
+  const showContainer = containers.filter((c) => !c.is_archived).length > 1;
+  const uncounted = containers.filter(
+    (c) => !c.is_archived && !c.include_in_overall_balance,
+  ).length;
 
   // Void appends a reversing row linked via reverses_id; hide BOTH it and the
   // original it cancels (§0.3). Grouped by day, newest first.
@@ -113,7 +137,7 @@ export function LedgerView() {
     <div className="space-y-6">
       <section className="pt-3 pb-1">
         <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-          Balance
+          Overall balance
         </p>
         <p
           className={cn(
@@ -137,11 +161,18 @@ export function LedgerView() {
             </span>
             out
           </span>
+          {uncounted > 0 && (
+            <span className="text-muted-foreground/80">
+              {uncounted} container{uncounted === 1 ? "" : "s"} not counted
+            </span>
+          )}
         </div>
       </section>
 
       <ComposeBar
         categories={categories}
+        containers={containers}
+        defaultContainerId={defaultContainerId}
         onSubmit={async (op) => {
           await dispatch(op);
         }}
@@ -163,6 +194,8 @@ export function LedgerView() {
                   key={t.id}
                   tx={t}
                   categoryName={nameOf(t.category_id)}
+                  containerName={showContainer ? containerNameOf(t.container_id) : ""}
+                  toContainerName={containerNameOf(t.to_container_id)}
                   onEdit={() => setEditing(t)}
                   onDelete={() => del(t)}
                 />
@@ -175,6 +208,7 @@ export function LedgerView() {
       <EditTransactionSheet
         editing={editing}
         categories={categories}
+        containers={containers}
         onOpenChange={(open) => !open && setEditing(null)}
         onSave={async (op) => {
           await dispatch(op);
@@ -189,32 +223,52 @@ export function LedgerView() {
 function LedgerRow({
   tx,
   categoryName,
+  containerName,
+  toContainerName,
   onEdit,
   onDelete,
 }: {
   tx: Transaction;
   categoryName: string;
+  containerName: string;
+  toContainerName: string;
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const income = tx.amount >= 0;
+  const transfer = isTransfer(tx);
+  // Money in is emerald; a transfer is your own money moving, so it stays quiet.
+  const income = !transfer && tx.amount >= 0;
+  const sub = transfer
+    ? [containerName || "Transfer", toContainerName].filter(Boolean).join(" → ")
+    : [categoryName, containerName].filter(Boolean).join(" · ");
+
   return (
     <div className="group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors">
-      <span
-        className="size-2.5 shrink-0 rounded-full"
-        style={{
-          backgroundColor: tx.category_id ? categoryDotColor(tx.category_id) : undefined,
-        }}
-        aria-hidden
-      />
+      {transfer ? (
+        <ArrowRightIcon className="text-muted-foreground size-2.5 shrink-0" aria-hidden />
+      ) : (
+        <span
+          className="size-2.5 shrink-0 rounded-full"
+          style={{
+            backgroundColor: tx.category_id
+              ? categoryDotColor(tx.category_id)
+              : undefined,
+          }}
+          aria-hidden
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
-        <div className="text-muted-foreground truncate text-xs">{categoryName}</div>
+        <div className="text-muted-foreground truncate text-xs">{sub}</div>
       </div>
       <div
-        className={cn("tnum font-mono text-sm tracking-tight", income && "text-positive")}
+        className={cn(
+          "tnum font-mono text-sm tracking-tight",
+          income && "text-positive",
+          transfer && "text-muted-foreground",
+        )}
       >
-        {formatCents(tx.amount)}
+        {transfer ? formatCents(Math.abs(tx.amount)) : formatCents(tx.amount)}
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
