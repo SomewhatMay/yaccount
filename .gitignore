@@ -39,6 +39,3 @@ next-env.d.ts
 
 # vitest
 /.vitest
-
-# handoff notes (local only)
-HANDOFF.md
