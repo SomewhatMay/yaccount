@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zId, newId } from "./primitives";
+import { zId, newId, zName } from "./primitives";
 
 /** The default wallet, auto-seeded on first init (§5.2). Fixed id so multiple
  * fresh devices converge on one wallet instead of minting duplicates. */
@@ -8,7 +8,7 @@ export const GENERAL_CONTAINER_ID = "general";
 /** §5.2 containers */
 export const ContainerSchema = z.object({
   id: zId,
-  name: z.string().min(1),
+  name: zName,
   is_investment: z.boolean(),
   // opt-in, default exclude (§5.7) — only 'general' defaults true.
   include_in_overall_balance: z.boolean(),

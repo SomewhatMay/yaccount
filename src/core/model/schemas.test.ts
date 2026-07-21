@@ -11,6 +11,7 @@ import {
   makeContainer,
   GENERAL_CONTAINER_ID,
   makeGeneralContainer,
+  makeTransaction,
 } from "@/core/model";
 import { yearMonthOf, newId } from "@/core/model/primitives";
 
@@ -261,5 +262,92 @@ describe("GoalSchema (§5.9.2)", () => {
     expect(() => GoalSchema.parse({ ...good, mode: "someday" })).toThrow();
     expect(() => GoalSchema.parse({ ...good, status: "paused" })).toThrow();
     expect(() => GoalSchema.parse({ ...good, target_amount: -1 })).toThrow();
+  });
+});
+
+describe("schema edges the ledger depends on", () => {
+  it("ContainerSnapshotSchema allows a negative reported value (§5.6 has no ≥0 CHECK)", () => {
+    // Margin/credit accounts really do report negative — the allowance is
+    // load-bearing, so pin it before someone 'fixes' it to non-negative.
+    expect(
+      ContainerSnapshotSchema.parse({
+        id: "s1",
+        container_id: "k1",
+        date: "2026-07-20",
+        reported_balance: -125000,
+      }).reported_balance,
+    ).toBe(-125000);
+  });
+
+  it("ContainerSnapshotSchema rejects a malformed date or empty container", () => {
+    const base = {
+      id: "s1",
+      container_id: "k1",
+      date: "2026-07-20",
+      reported_balance: 1,
+    };
+    expect(() => ContainerSnapshotSchema.parse({ ...base, date: "2026-7-1" })).toThrow();
+    expect(() => ContainerSnapshotSchema.parse({ ...base, container_id: "" })).toThrow();
+  });
+
+  it("ContainerSchema rejects an empty name and carries the investment flag", () => {
+    expect(() =>
+      ContainerSchema.parse({
+        id: "k1",
+        name: "",
+        is_investment: false,
+        include_in_overall_balance: false,
+        is_archived: false,
+      }),
+    ).toThrow();
+    expect(makeContainer({ name: "Brokerage", is_investment: true }).is_investment).toBe(
+      true,
+    );
+  });
+
+  it("makers trim names, so 'Groceries ' can never shadow 'Groceries' (§5.1/§5.2 UNIQUE)", () => {
+    expect(makeCategory({ name: "  Groceries  ", type: "expense" }).name).toBe(
+      "Groceries",
+    );
+    expect(makeContainer({ name: "  Vacation " }).name).toBe("Vacation");
+    expect(() => makeCategory({ name: "   ", type: "expense" })).toThrow();
+    expect(() => makeContainer({ name: "   " })).toThrow();
+  });
+
+  it("nullable fields are required keys — an op payload may not omit them", () => {
+    // On replay an older/other device's payload missing `reverses_id` must fail
+    // loudly rather than materialize `undefined` into IndexedDB.
+    const row = makeTransaction({
+      date: "2026-07-20",
+      amount: -1000,
+      vendor_source: "Starbucks",
+      category_id: "coffee",
+    });
+    for (const key of ["reverses_id", "notes", "to_container_id", "template_name"]) {
+      const partial = { ...row } as Record<string, unknown>;
+      delete partial[key];
+      expect(() => TransactionSchema.parse(partial), key).toThrow();
+    }
+  });
+
+  it("TransactionSchema rejects a yearMonth that disagrees with its date (§8.3)", () => {
+    const row = makeTransaction({
+      date: "2026-07-20",
+      amount: -1000,
+      vendor_source: "Starbucks",
+      category_id: "coffee",
+    });
+    expect(() => TransactionSchema.parse({ ...row, yearMonth: "1999-01" })).toThrow();
+  });
+
+  it("BudgetTargetSchema rejects a malformed start_date (§5.3 resolution key)", () => {
+    expect(() =>
+      BudgetTargetSchema.parse({
+        id: "b1",
+        category_id: "c1",
+        amount: 30000,
+        start_date: "2026-1-1",
+      }),
+    ).toThrow();
   });
 });

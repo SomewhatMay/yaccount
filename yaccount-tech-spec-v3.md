@@ -29,6 +29,18 @@
 
 ---
 
+### 1.1 Reversibility — the core design philosophy (LOCKED, read this before designing anything)
+
+**yaccount is a git-style ledger: every action is an append-only event, and every action the user can take, they can take back.** This is not a safety net bolted onto the side — it is the product's spine, and it outranks convenience whenever the two collide.
+
+Three rules follow from it, and no feature may violate them:
+
+1. **Nothing is one-way.** If the UI offers an action, it offers its inverse. Archive ⇄ **unarchive** (categories §5.1, containers §5.2 — with a visible **Archived list and a Restore control**, not a hidden flag). Delete a transaction ⇄ **undo the delete** (§5.4: the delete appends a reversing row; the undo appends a row reversing *that*, so the original is live again). A reported balance can be **edited or removed** (§5.6). A soft delete with no way back is just a slow hard delete, and shipping one is a bug.
+2. **The undo is itself an event, never an erasure.** Undo never rewrites or removes an existing record — it appends the compensating op. State is the replay of the journal under the total order (§8.2), so *both* the delete and its undo remain visible in history, exactly like a `git revert` rather than a `git reset`. This is what makes the op-log the audit trail and lets multi-device merge stay correct: two devices replaying the same ops reach the same state whatever order they arrive in.
+3. **Reversibility is visible, not just possible.** Being able to reconstruct something from the journal in principle does not satisfy this. The user must be able to *see* what they put away and click one control to bring it back: an Archived section, a Restore button, an **Undo action in the confirmation toast**. If a user has to ask "how do I get that back?", the design failed.
+
+Consequences for the model: state-bearing flags are two-way ops (`archive`/`unarchive`), corrections are compensating rows (never in-place edits of financial history), and the only hard delete anywhere is for non-financial housekeeping (templates, a superseded budget target, a mistyped `container_snapshot` — and even those removals are journaled ops).
+
 ## 2. Platform & Framework Architecture (locked)
 
 ### 2.1 The pivot: Capacitor instead of PWA
@@ -160,6 +172,8 @@ These three axes are independent: a category answers "what kind of spend is this
 
 - Container balances **can go negative**; the UI renders negative-balance containers in red rather than blocking the transaction.
 - One container is the global **Default Spending Container** in settings (defaults to `'general'`) — what quick-log shortcuts use implicitly so routine spending never requires picking a container.
+- **`is_investment` is editable at any time** (M3) — a plain bucket can become an investment container later and back again; the flag only decides whether reported-value tracking (§5.6) is offered.
+- **Names are UNIQUE, checked in the UI on create *and* rename** (same for categories, §5.1), compared case-insensitively on the trimmed name. IndexedDB can't express uniqueness and a hard constraint would be wrong anyway — a merge must never throw — so a collision is prevented at the point of entry, not enforced in the reducer.
 - Containers are **archived, never hard-deleted** (`is_archived = true`). An archived container leaves active selection UI but remains a valid FK target, so historical charts, the Container Flows view (§5.4), and past goal cycles (§5.9) never break.
 - A container may exist with no goal (a plain bucket), with an active goal, or with a history of completed goals. Every goal, conversely, belongs to exactly one container (§5.9.2).
 
@@ -212,10 +226,14 @@ The "`balance = SUM(amount)` trivially" phrasing holds only for the expense/inco
 
 **Void / correction (design decision, M2):** there is no destructive delete of a transaction. "Deleting" a row appends a **reversing row** — same fields, opposite-sign `amount`, `reverses_id` pointing at the original — so the pair nets to zero in `balance = SUM(amount)` while the full history is preserved and auditable. The UI hides both rows of a voided pair from the active ledger; a genuine refund (opposite-sign row with `reverses_id = NULL`) stays visible as two real events. This generalizes the signed-amount convention above (a void is just a correcting credit that also records *what* it corrects).
 
+**A void is undoable too (§1.1, locked).** "Undo delete" appends a row reversing the *reversing* row, so the pair nets back out and the original is live again; deleting once more appends another reversal. A row is therefore live iff no **still-live** row reverses it — a chain walk (`activeRows`, `src/core/engine/ledger.ts`), not a one-step check. Balances need none of this: every reversal is a real signed amount, so the arithmetic nets out on its own. The delete toast carries an **Undo** action.
+
 **Transfers are structurally distinct:** no category, they move money between owned containers and are explicitly excluded from category-based Expense/Income dashboards (nothing left the user's real-world possession). A dedicated **Container Flows** view reports net inflow/outflow per container over the active reporting period, fully decoupled from category charts. The transfer-vs-expense distinction is load-bearing for savings goals: a transfer into a goal's container is a *contribution*, whereas an expense out of it is *spending on purpose* — the two are accounted for completely differently (§5.9.3).
 
-### 5.5 Deletion policy (categories & containers)
+### 5.5 Deletion policy (categories & containers) — soft, and **reversible**
 Soft delete only (`is_archived = true`) — never hard-deleted, never nullified/orphaned. Archived rows vanish from active selection UI but remain valid FK targets so historical charts, Container Flows, and past goal cycles never break. Goals follow the same never-hard-delete principle via their own lifecycle states (§5.9.6).
+
+**Archiving is always reversible (§1.1, locked).** Every screen that can archive must also (a) **list what is archived** and (b) offer a one-click **Restore** (`category.unarchive` / `container.unarchive` — their own ops, so the journal records putting-away and bringing-back as two events), plus an **Undo action in the archive toast**. Restoring is lossless: only `is_archived` flips, every other field is untouched, and a restored container that was opted into the overall balance (§5.7) starts counting again.
 
 ### 5.6 Container investment / asset tracking
 
@@ -224,8 +242,8 @@ Soft delete only (`is_archived = true`) — never hard-deleted, never nullified/
 |---|---|---|---|
 | id | TEXT (UUID) | PK | |
 | container_id | TEXT | FK → containers.id | Expected to be an `is_investment = true` container |
-| date | TEXT (ISO YYYY-MM-DD) | NOT NULL | |
-| reported_balance | REAL | NOT NULL | Real-world value at that moment |
+| date | TEXT (ISO YYYY-MM-DD) | NOT NULL | **Unique per `(container_id, date)`** — one report per container per day; a repeat upserts (see below). |
+| reported_balance | REAL | NOT NULL | Real-world value at that moment. Integer cents on disk (§ impl 1). Correctable — see the note below the formulas. |
 
 Only actual cash movement into/out of an investment container is logged as a normal Transfer (no category, doesn't touch Income/Expense graphs). Market growth is never logged as a transaction.
 
@@ -237,6 +255,10 @@ Unrealized Gain/Loss = Current Value − Net Contributions
 
 **Net Contributions is the general savings-progress primitive.** It is not investment-specific: it is the exact quantity a `spend_down` goal measures progress against (§5.9.3). For an `is_investment` container it additionally underlies Unrealized Gain/Loss above; for a plain spend-down goal it is simply the progress numerator, with the snapshot/market-growth machinery inert. This is why the savings system adds essentially no new accounting concept — it generalizes one that already existed here.
 
+**One report per container per day (locked, M3).** `container_snapshots` is **unique per `(container_id, date)`** — the same natural-key upsert rule as `budget_targets` (§5.3). Logging (or editing onto) a day that already has a report **replaces** it; two readings of the same account on the same day are a mistake, not history, and "Current Value = latest reported_balance" must never be ambiguous. Enforced in the reducer (`snapshot.record`/`snapshot.update` delete any other row holding that key before writing), so the rule also survives a device merge — the later op in the total order wins and every device converges on the same row. No hard IndexedDB unique index (it could throw on replay).
+
+**Snapshots are correctable observations (design decision, M3 — locked).** A snapshot is a value the *user typed after looking at their account*, not a money movement: no balance, contribution, or ledger sum depends on it, and a mistyped figure is simply wrong data. So unlike transactions (§5.4, never destructively deleted) a snapshot may be **edited in place or removed outright** — `snapshot.update` (entity-LWW) and `snapshot.remove` — and the app shows a per-container **history** of every reported value with those two actions. This does **not** weaken the never-lose-data invariant: both corrections are themselves **ops in the append-only journal (§8.2)**, so the full sequence (record → update → remove) is preserved and materialized state is just its replay under the total order — a git-style history where the working tree shows current truth and the log holds every version. (Deep history migrates into the archived `ledger_<deviceId>_YYYY-MM.json` files after an op-log collapse, §8.4.)
+
 **Historical chart gap-filling — Reconstructed Balance Engine (locked):**
 ```
 Balance(month) = Nearest known snapshot ± SUM(Transfers in the gap to target date)
@@ -246,8 +268,10 @@ Chosen over simple carry-forward, which would ignore any transfers during un-sna
 ### 5.7 "Current Overall Balance" definition (locked, opt-in model)
 
 ```
-Current Overall Balance = SUM(containers.balance WHERE include_in_overall_balance = true)
+Current Overall Balance = SUM(containers.balance WHERE include_in_overall_balance = true AND is_archived = false)
 ```
+
+**Archived containers are excluded too (locked, M3).** A container the user has put away must not sit invisibly inside the headline figure; its own balance stays queryable, and un-archiving restores it to the total. Archiving one that still holds money warns first, naming the amount.
 
 **Default is exclude, not include** — deliberately inverted from the naive "sum everything non-investment" approach. Rationale (user's own framing): most containers represent money the user is *saving up toward* something (e.g. new clothes), and should not silently inflate a headline "you have $X to spend" number. Only the default `'general'` spending container is included out of the box; any other container must be explicitly opted in by the user if they want it counted (independent of its `is_investment` flag — the two are separate concerns, since a non-investment container like a "Vacation Fund" should typically still be excluded by default). Because goal containers inherit this default, money being saved toward a goal never inflates the headline spendable balance unless the user opts it in.
 
@@ -525,6 +549,10 @@ Enables near-instant lookups via `IDBKeyRange.only([...])` without full-store sc
 
 Every local create/update/delete is appended as an event to a local write queue. On reconnect, the app fetches **all remote device ledgers**, merges them with the local queue under the total order (§8.4), and appends its own new ops **only to this device's own ledger** — an offline-logged transaction (e.g. made with no signal) is never silently discarded, even if other data changed elsewhere (e.g. categories edited on another device) in the meantime. Concurrent edits to the same entity resolve last-writer-wins by (`ts`, `id`); because each device owns its file, no append can ever clobber another's.
 
+**⚠️ Open obligation for M9 (found by an adversarial audit at M3, not yet solved).** The reducer applies whatever op it is handed, in the order it is handed them, and rows carry no version/timestamp of their own. Replay sorts (`compareOps`), so a *local* sequence is always correct — but a naive delta-merge that hands remote ops straight to `dispatch` as they arrive would let an **older** `*.update` / `setting.set` clobber a newer local edit, an older `snapshot.record` displace the winner for its day, and a stale `snapshot.update` resurrect a removed report. M9 must therefore either (a) buffer incoming remote ops and apply them under the total order (re-replaying affected entities), or (b) give rows an `updated_ts` so the reducer can enforce LWW per entity. Option (a) preserves the current model and is preferred; whichever is chosen, the "delta on top of live state" wording in §8.6 is only safe once it exists.
+
+**Related open question (M9):** the `(container_id, date)` snapshot upsert deletes any *other* row holding that key, so a merge can destroy a report the deleting device never saw (device A records day D; device B, offline, records and then removes its own report for D → replay leaves no report for D). Decide before M9 whether the natural key should instead be **derived into the row id** (`container_id + date`), which makes the collision a plain LWW `put` with nothing to delete.
+
 ### 8.6 Instant-open (local-first boot) & background reconciliation (locked, UX requirement)
 
 The per-device-ledger model means a cold sync must fetch and merge N device logs — potentially slow. That must **never** gate the UI. **Hard requirement: the app opens instantly from the local cache and never blocks boot on the network.** Logging a quick transaction or checking a balance must be usable in the first frame, never behind a multi-second sync screen.
@@ -610,8 +638,14 @@ A serif in a finance app is intentional — it is the "designer's ledger" thesis
 - **Row actions hide until hover.** Per-row edit/delete/etc. live behind a single Lucide `⋯` (`MoreHorizontal`) **DropdownMenu** revealed on hover/focus — the resting state is clean.
 - **Editing opens a side `Sheet`, never a mode-swap.** Editing an existing record slides in a right-hand `Sheet` with the full form + Save + a quiet Delete. **Never** repurpose the create/compose area into an edit form in place (this was a real bug we fixed — do not reintroduce it). Rule of thumb: **create = inline; edit = Sheet; confirm-destructive = AlertDialog.**
 
+### 12.4-a Editing existing records (locked, M3)
+- **Inline rename** (a single-field edit like a category or container name) uses an explicit **✓ / ✗ pair** plus Enter/Escape — `RenameField` (`src/features/RenameField.tsx`). **Blur never commits**; leaving the field keeps the editor open, and an empty name cancels. Committing by accident is worse than one extra click.
+- **A record with history gets a history list, not a write-only form.** Anything the user can log repeatedly (reported balances today; future: budget-target history) shows its past entries in the same Sheet, each row with the `⋯` menu (Edit / Delete). Never ship a form whose past input the user can't see or fix.
+- **The direction of money is a visible control, never a typing convention.** Amount fields carry a `−`/`+` toggle (`SignToggle`) defaulting to the category's direction — muted for out, `text-positive` for in. A typed `+`/`-` moves *into* that control rather than being silently absorbed. This is what makes a refund/rebate discoverable (§5.4 soft sign rule).
+- **Toggleable menu entries use a checkbox item**, with the indicator in the **leading** icon column (same column as every other item's icon) and its space reserved so the label never shifts. Never fake it with an always-on check icon.
+
 ### 12.5 Interaction & motion
-- **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu enter/exit, and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
+- **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu/select enter/exit (`popper`-positioned so they animate — `item-aligned` suppresses motion; ~150ms fade+zoom), and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
 - **Feedback = `sonner` toasts, bottom-right,** in the interface's voice (see §12.6). Every create/update/delete confirms with a toast.
 - **Soft rules stay soft, inline.** The unusual-sign check (§5.4/§10 #13) is an **inline arm-then-confirm** ("… looks like a refund or void. Add again to confirm."), *not* a blocking `window.confirm` or a modal. Warnings guide; they never block.
 - **Quality floor (non-negotiable):** responsive to mobile, visible keyboard focus (iris ring), every icon-only control has an `aria-label`.

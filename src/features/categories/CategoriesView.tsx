@@ -3,12 +3,25 @@
 import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
-import { ArchiveIcon, MoreHorizontalIcon, PencilIcon, PlusIcon } from "lucide-react";
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PlusIcon,
+} from "lucide-react";
 import { categoriesAtom, dispatchAtom, readyAtom } from "@/features/store";
-import { createCategory, updateCategory, archiveCategory } from "@/core/commands";
+import {
+  createCategory,
+  updateCategory,
+  archiveCategory,
+  unarchiveCategory,
+} from "@/core/commands";
 import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
+import { RenameField } from "@/features/RenameField";
+import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -32,21 +45,28 @@ export function CategoriesView() {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
 
-  const { expenses, incomes, archivedCount } = useMemo(() => {
-    const active = categories
-      .filter((c) => !c.is_archived)
-      .sort((a, b) => a.name.localeCompare(b.name));
+  const { expenses, incomes, archived } = useMemo(() => {
+    const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
+    const active = categories.filter((c) => !c.is_archived).sort(byName);
     return {
       expenses: active.filter((c) => c.type === "expense"),
       incomes: active.filter((c) => c.type === "income"),
-      archivedCount: categories.length - active.length,
+      archived: categories.filter((c) => c.is_archived).sort(byName),
     };
   }, [categories]);
+
+  async function restore(c: Category) {
+    await dispatch(unarchiveCategory(c.id));
+    toast.success("Restored", { description: c.name });
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return toast.error("Name the category.");
+    if (nameTaken(categories, trimmed)) {
+      return toast.error("You already have a category with that name.");
+    }
     await dispatch(createCategory({ name: trimmed, type }));
     toast.success("Category added", { description: `${trimmed} · ${type}` });
     setName("");
@@ -96,14 +116,56 @@ export function CategoriesView() {
         </div>
       </form>
 
-      <CategorySection title="Expenses" items={expenses} onChange={dispatch} />
-      <CategorySection title="Income" items={incomes} onChange={dispatch} />
+      <CategorySection
+        title="Expenses"
+        items={expenses}
+        siblings={categories}
+        onChange={dispatch}
+      />
+      <CategorySection
+        title="Income"
+        items={incomes}
+        siblings={categories}
+        onChange={dispatch}
+      />
 
-      {archivedCount > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {archivedCount} archived — hidden from pickers, still resolve on old
-          transactions.
-        </p>
+      {archived.length > 0 && (
+        <section>
+          <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
+            <h2 className="text-xs font-medium tracking-[0.14em] uppercase">Archived</h2>
+            <span className="tnum font-mono text-xs">{archived.length}</span>
+          </div>
+          <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
+            {archived.map((c, i) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
+                  i > 0 && "border-t border-dashed",
+                )}
+              >
+                <span
+                  className="size-2.5 shrink-0 rounded-full opacity-50"
+                  style={{ backgroundColor: categoryDotColor(c.id) }}
+                  aria-hidden
+                />
+                <span className="text-muted-foreground flex-1 text-sm">{c.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground h-8 rounded-lg"
+                  onClick={() => restore(c)}
+                >
+                  <ArchiveRestoreIcon className="size-4" />
+                  Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="text-muted-foreground mt-2 px-1 text-xs">
+            Hidden from pickers; old transactions still show their name. Restore any time.
+          </p>
+        </section>
       )}
     </div>
   );
@@ -112,10 +174,12 @@ export function CategoriesView() {
 function CategorySection({
   title,
   items,
+  siblings,
   onChange,
 }: {
   title: string;
   items: Category[];
+  siblings: Category[];
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
 }) {
   return (
@@ -131,7 +195,13 @@ function CategorySection({
           </div>
         ) : (
           items.map((c, i) => (
-            <CategoryRow key={c.id} category={c} divider={i > 0} onChange={onChange} />
+            <CategoryRow
+              key={c.id}
+              category={c}
+              siblings={siblings}
+              divider={i > 0}
+              onChange={onChange}
+            />
           ))
         )}
       </div>
@@ -141,28 +211,38 @@ function CategorySection({
 
 function CategoryRow({
   category,
+  siblings,
   divider,
   onChange,
 }: {
   category: Category;
+  siblings: Category[];
   divider: boolean;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(category.name);
 
-  async function save() {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== category.name) {
-      await onChange(updateCategory({ ...category, name: trimmed }));
-      toast.success("Renamed", { description: trimmed });
+  async function save(name: string) {
+    if (name !== category.name) {
+      await onChange(updateCategory({ ...category, name }));
+      toast.success("Renamed", { description: name });
     }
     setEditing(false);
   }
 
   async function archive() {
     await onChange(archiveCategory(category.id));
-    toast.success("Archived", { description: category.name });
+    toast.success("Archived", {
+      description: category.name,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void onChange(unarchiveCategory(category.id)).then(() =>
+            toast.success("Restored", { description: category.name }),
+          );
+        },
+      },
+    });
   }
 
   return (
@@ -178,16 +258,15 @@ function CategoryRow({
         aria-hidden
       />
       {editing ? (
-        <Input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") save();
-            if (e.key === "Escape") setEditing(false);
-          }}
-          className="h-8 flex-1"
+        <RenameField
+          value={category.name}
+          label={`Rename ${category.name}`}
+          validate={(next) =>
+            nameTaken(siblings, next, category.id) ? "That name is taken." : null
+          }
+          onSave={save}
+          onCancel={() => setEditing(false)}
+          className="flex-1"
         />
       ) : (
         <span className="flex-1 text-sm font-medium">{category.name}</span>

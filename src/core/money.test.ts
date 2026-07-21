@@ -88,3 +88,52 @@ describe("money — integer arithmetic never drifts", () => {
     }
   });
 });
+
+describe("parseDollars — hostile input never becomes a wrong amount", () => {
+  it("rejects interior separators instead of silently coercing them", () => {
+    // "12.3 4" must NOT quietly become $12.34 — a wrong amount on disk is the
+    // one failure this module exists to prevent.
+    for (const bad of ["1$2", "1 2 3", "12.3 4", "12$", "1,,2", "$1$", "1.2.3"]) {
+      expect(() => parseDollars(bad), bad).toThrow();
+    }
+  });
+
+  it("still accepts the shapes a human actually types", () => {
+    expect(parseDollars(" $1,234.50 ")).toBe(123450);
+    expect(parseDollars("-$12.34")).toBe(-1234);
+    expect(parseDollars("0.5")).toBe(50);
+  });
+
+  it("rejects half-typed and exotic input", () => {
+    for (const bad of ["", "  ", "-", "+", ".", "5.", "abc", "1e3", "−5", "NaN"]) {
+      expect(() => parseDollars(bad), bad).toThrow();
+    }
+  });
+
+  it("refuses amounts past exact integer arithmetic (§1 integer-cents rule)", () => {
+    expect(() => parseDollars("99999999999999999999.99")).toThrow();
+    expect(() => cents(1e20)).toThrow();
+    expect(cents(Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("never yields -0", () => {
+    expect(Object.is(parseDollars("-0"), 0)).toBe(true);
+    expect(Object.is(parseDollars("-0.00"), 0)).toBe(true);
+  });
+
+  it("truncates sub-cent precision rather than throwing", () => {
+    expect(parseDollars("0.0000001")).toBe(0);
+    expect(parseDollars("1.005")).toBe(101); // documented half-up rounding
+  });
+});
+
+describe("formatCents — display edges", () => {
+  it("renders -0 as a plain zero", () => {
+    expect(formatCents(-0)).toBe("$0.00");
+    expect(formatCents(0)).toBe("$0.00");
+  });
+
+  it("groups large values", () => {
+    expect(formatCents(100000000000000)).toBe("$1,000,000,000,000.00");
+  });
+});
