@@ -34,7 +34,8 @@ These are the invariants every milestone must respect. Violating one is a re-arc
 | Language | **TypeScript**, `strict: true` | Non-negotiable for financial data integrity |
 | UI runtime | React (bundled with Next) | §2.2 |
 | Client state | **Jotai** (atoms) for cross-component UI state | **Added M2.** Boilerplate-free vs. React context; client-only, so Capacitor/static-export safe and `src/core` stays pure (state lives in `src/features`). React context reserved only for genuinely tree-scoped concerns; the `Repo` (IndexedDB handle) is a module singleton, not an atom. |
-| Styling | **Tailwind CSS** + CSS variables for design tokens | §1 design tenets; tokens finalized later (§10.6) |
+| Styling | **Tailwind CSS v4** + CSS variables for design tokens | §1 design tenets; tokens finalized later (§10.6) |
+| UI components | **shadcn/ui** (Radix base, `radix-nova` style, `neutral`) + **Lucide** icons + **next-themes** + **sonner** | **Added M2.** Copy-in components under `src/components/ui/` (not a runtime dep lock-in). **Policy: always reach for a shadcn/ui component first; only hand-roll when no shadcn component/registry scaffold exists.** Prefer **Lucide** icons everywhere. All client-side → static-export + Capacitor safe; `src/core` stays UI-free. Fonts: **Fraunces** (display) / **Geist** (body) / **Geist Mono** (amounts). M2 ships a light first-pass identity ("Quiet register": iris brand + emerald positive tokens in `globals.css`); the full design system stays **M11**, which evolves these tokens rather than restarting. |
 | Charts | **Recharts** (React, declarative SVG) | §6.5 inventory. **Waterfall = stacked `BarChart` + transparent base series (locked M5)**; custom SVG only as fallback. Web-SVG only — *not* React Native (Capacitor/WebView) |
 | Local DB | **IndexedDB** via a thin typed wrapper (**`idb`** by Jake Archibald) | §8.2 — works in browser + Capacitor WebView |
 | Validation | **`zod`** — runtime schemas + refinements per table | §5 CHECK constraints; used from M0/M1 (was missing from this table) |
@@ -77,10 +78,13 @@ yaccount/
 │  │  ├─ web.ts              # §3.3-B
 │  │  └─ native.ts           # §3.3-A
 │  ├─ sync/                  # drivestore checkpointer §8.4 (added M9)
-│  ├─ features/              # UI feature modules (React)
-│  └─ ui/                    # shared components, design tokens
+│  ├─ features/              # UI feature modules (React + Jotai atoms in store.ts)
+│  ├─ components/            # ui/ = shadcn/ui copy-in components (added M2); theme-provider.tsx
+│  └─ lib/                   # utils.ts (cn helper from shadcn)
 └─ tests/
 ```
+
+> **UI convention (M2+):** feature components live in `src/features/`; reusable primitives are **shadcn/ui** components under `src/components/ui/` (regenerate/extend via `npx shadcn@latest add <name>`). Cross-component state = **Jotai** atoms (`src/features/store.ts`). Icons = **Lucide** (`lucide-react`). Design tokens live as CSS variables in `src/app/globals.css` (shadcn `neutral` base); the bespoke identity is M11.
 
 **Key structural rule:** `src/core/` never imports React, Next, Capacitor, or `drivestore`. It is pure TypeScript, fully unit-testable in Node with `fake-indexeddb`. This is what lets us validate all product logic before any platform/sync work.
 
@@ -301,7 +305,7 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ### M11 — Design System & Polish
 **Goal:** Realize the "sleek, minimalist, modern" brief (§1) as concrete tokens, and responsive layout per surface (§2.1).
 **Scope:**
-- Concrete design tokens, typography, spacing, and the **category color user-override UI** (the auto-palette default already ships in M5; here we add per-category picking — §10.1 hybrid).
+- Concrete design tokens, typography, spacing (built **on top of the shadcn/ui token layer** already in `globals.css` since M2 — retheme the CSS variables, don't rip out shadcn), and the **category color user-override UI** (the auto-palette default already ships in M5; here we add per-category picking — §10.1 hybrid).
 - Responsive layout reorganization per breakpoint/platform (nav patterns, density) — same functionality, different arrangement (§2.1).
 - Empty states, loading/sync indicators, error surfaces (esp. `DriveError` §4), accessibility pass.
 - Bundle-ID finalization is **not an M11 task** — it must precede M10's real OAuth client registration, so it belongs to the §6 parallel track (lock it by M8 planning at the latest). Listing it in the final milestone was an ordering bug; M11 only *consumes* the already-locked value.

@@ -48,7 +48,12 @@ describe("category commands", () => {
 describe("transaction commands", () => {
   it("createTransaction builds a transaction.create op with derived yearMonth", () => {
     const op = createTransaction(
-      { date: "2026-07-20", amount: -1000, vendor_source: "Starbucks", category_id: "coffee" },
+      {
+        date: "2026-07-20",
+        amount: -1000,
+        vendor_source: "Starbucks",
+        category_id: "coffee",
+      },
       META,
     );
     expect(op.type).toBe("transaction.create");

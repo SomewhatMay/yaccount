@@ -1,10 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import { toast } from "sonner";
+import { ArchiveIcon, MoreHorizontalIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { categoriesAtom, dispatchAtom, readyAtom } from "@/features/store";
 import { createCategory, updateCategory, archiveCategory } from "@/core/commands";
 import type { Category, CategoryType } from "@/core/model";
+import { cn } from "@/lib/utils";
+import { categoryDotColor } from "@/features/category-color";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function CategoriesView() {
   const ready = useAtomValue(readyAtom);
@@ -13,72 +32,120 @@ export function CategoriesView() {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
 
-  const active = categories
-    .filter((c) => !c.is_archived)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const archived = categories.filter((c) => c.is_archived);
+  const { expenses, incomes, archivedCount } = useMemo(() => {
+    const active = categories
+      .filter((c) => !c.is_archived)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      expenses: active.filter((c) => c.type === "expense"),
+      incomes: active.filter((c) => c.type === "income"),
+      archivedCount: categories.length - active.length,
+    };
+  }, [categories]);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) return toast.error("Name the category.");
     await dispatch(createCategory({ name: trimmed, type }));
+    toast.success("Category added", { description: `${trimmed} · ${type}` });
     setName("");
   }
 
-  if (!ready) return <p className="p-6 text-sm opacity-60">Loading…</p>;
+  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
 
   return (
-    <section className="mx-auto max-w-2xl p-6">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight">Categories</h2>
+    <div className="space-y-6">
+      <section className="pt-3 pb-1">
+        <h1 className="font-display text-3xl leading-none">Categories</h1>
+        <p className="text-muted-foreground mt-2 text-sm">
+          What your money does. Rename or archive anytime — old transactions keep their
+          label.
+        </p>
+      </section>
 
-      <form onSubmit={add} className="mb-6 flex flex-wrap gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Category name"
-          className="flex-1 rounded border border-black/15 px-3 py-1.5 text-sm dark:border-white/20"
-        />
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as CategoryType)}
-          className="rounded border border-black/15 px-2 py-1.5 text-sm dark:border-white/20"
-        >
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
-        <button
-          type="submit"
-          className="rounded bg-black px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-black"
-        >
-          Add
-        </button>
+      <form
+        onSubmit={add}
+        className="border-primary/15 bg-primary/[0.04] rounded-2xl border p-2"
+      >
+        <div className="grid grid-cols-2 items-center gap-1.5 sm:grid-cols-[1fr_9rem_auto]">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name a category (e.g. Groceries)"
+            aria-label="Category name"
+            className="col-span-2 border-0 bg-transparent shadow-none focus-visible:ring-0 sm:col-span-1"
+          />
+          <Select value={type} onValueChange={(v) => setType(v as CategoryType)}>
+            <SelectTrigger className="border-0 bg-transparent shadow-none focus-visible:ring-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="expense">Expense</SelectItem>
+              <SelectItem value="income">Income</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            type="submit"
+            size="icon"
+            aria-label="Add category"
+            className="justify-self-end rounded-xl"
+          >
+            <PlusIcon className="size-4" />
+          </Button>
+        </div>
       </form>
 
-      <ul className="divide-y divide-black/10 dark:divide-white/10">
-        {active.map((c) => (
-          <CategoryRow key={c.id} category={c} onChange={dispatch} />
-        ))}
-        {active.length === 0 && (
-          <li className="py-3 text-sm opacity-60">No categories yet.</li>
-        )}
-      </ul>
+      <CategorySection title="Expenses" items={expenses} onChange={dispatch} />
+      <CategorySection title="Income" items={incomes} onChange={dispatch} />
 
-      {archived.length > 0 && (
-        <p className="mt-6 text-xs opacity-50">
-          {archived.length} archived (hidden from pickers, still resolve on old
-          transactions).
+      {archivedCount > 0 && (
+        <p className="text-muted-foreground text-xs">
+          {archivedCount} archived — hidden from pickers, still resolve on old
+          transactions.
         </p>
       )}
+    </div>
+  );
+}
+
+function CategorySection({
+  title,
+  items,
+  onChange,
+}: {
+  title: string;
+  items: Category[];
+  onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
+}) {
+  return (
+    <section>
+      <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
+        <h2 className="text-xs font-medium tracking-[0.14em] uppercase">{title}</h2>
+        <span className="tnum font-mono text-xs">{items.length}</span>
+      </div>
+      <div className="bg-card overflow-hidden rounded-2xl border">
+        {items.length === 0 ? (
+          <div className="text-muted-foreground px-5 py-8 text-center text-sm">
+            No {title.toLowerCase()} categories yet.
+          </div>
+        ) : (
+          items.map((c, i) => (
+            <CategoryRow key={c.id} category={c} divider={i > 0} onChange={onChange} />
+          ))
+        )}
+      </div>
     </section>
   );
 }
 
 function CategoryRow({
   category,
+  divider,
   onChange,
 }: {
   category: Category;
+  divider: boolean;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -88,39 +155,65 @@ function CategoryRow({
     const trimmed = draft.trim();
     if (trimmed && trimmed !== category.name) {
       await onChange(updateCategory({ ...category, name: trimmed }));
+      toast.success("Renamed", { description: trimmed });
     }
     setEditing(false);
   }
 
+  async function archive() {
+    await onChange(archiveCategory(category.id));
+    toast.success("Archived", { description: category.name });
+  }
+
   return (
-    <li className="flex items-center gap-3 py-2.5 text-sm">
+    <div
+      className={cn(
+        "group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors",
+        divider && "border-t",
+      )}
+    >
+      <span
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: categoryDotColor(category.id) }}
+        aria-hidden
+      />
       {editing ? (
-        <input
+        <Input
           autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-          className="flex-1 rounded border border-black/15 px-2 py-1 dark:border-white/20"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          className="h-8 flex-1"
         />
       ) : (
-        <span className="flex-1">{category.name}</span>
+        <span className="flex-1 text-sm font-medium">{category.name}</span>
       )}
-      <span className="rounded bg-black/5 px-2 py-0.5 text-xs opacity-70 dark:bg-white/10">
-        {category.type}
-      </span>
-      <button
-        onClick={() => (editing ? save() : setEditing(true))}
-        className="text-xs underline opacity-70 hover:opacity-100"
-      >
-        {editing ? "Save" : "Rename"}
-      </button>
-      <button
-        onClick={() => onChange(archiveCategory(category.id))}
-        className="text-xs underline opacity-70 hover:opacity-100"
-      >
-        Archive
-      </button>
-    </li>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground size-8 rounded-lg opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+            aria-label="Category actions"
+          >
+            <MoreHorizontalIcon className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setEditing(true)}>
+            <PencilIcon className="size-4" />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={archive}>
+            <ArchiveIcon className="size-4" />
+            Archive
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
