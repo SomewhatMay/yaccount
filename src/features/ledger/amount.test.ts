@@ -71,3 +71,40 @@ describe("splitSign — keep the sign in the control, the magnitude in the field
     expect(splitSign("")).toEqual({ sign: null, rest: "" });
   });
 });
+
+describe("resolveAmount — garbage in, error out", () => {
+  it("rejects a sign with no number behind it", () => {
+    for (const bad of ["-", "+", ".", "   ", ""]) {
+      expect(resolveAmount(bad, "expense").ok, bad).toBe(false);
+    }
+  });
+
+  it("rejects doubled signs instead of guessing", () => {
+    // "--10" used to resolve to -$10 and "+-10" to +$10.
+    expect(resolveAmount("--10", "expense").ok).toBe(false);
+    expect(resolveAmount("+-10", "expense").ok).toBe(false);
+  });
+
+  it("errors on an unparseable body even when a sign argument is given", () => {
+    expect(resolveAmount("abc", "expense", "+").ok).toBe(false);
+  });
+
+  it("keeps the money.ts tolerances through the sign split", () => {
+    expect(resolveAmount("-.5", "expense")).toMatchObject({ signed: -50 });
+    expect(resolveAmount("-$10", "expense")).toMatchObject({ signed: -1000 });
+    expect(resolveAmount(" + 10", "expense")).toMatchObject({ signed: 1000 });
+    expect(resolveAmount("1,000", "income")).toMatchObject({ signed: 100000 });
+    expect(resolveAmount("10.005", "expense")).toMatchObject({ signed: -1001 });
+  });
+
+  it("treats every spelling of zero as zero", () => {
+    expect(resolveAmount("0.00", "expense").ok).toBe(false);
+    expect(resolveAmount("-0", "expense").ok).toBe(false);
+  });
+
+  it("splitSign returns a trimmed body either way", () => {
+    expect(splitSign("  10 ")).toEqual({ sign: null, rest: "10" });
+    expect(splitSign(" -10 ")).toEqual({ sign: "-", rest: "10" });
+    expect(splitSign("   ")).toEqual({ sign: null, rest: "" });
+  });
+});

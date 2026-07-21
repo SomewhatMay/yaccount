@@ -150,3 +150,141 @@ describe("Repo — replay equality (§3, testing strategy)", () => {
     expect(byId(liveCats)["c1"].is_archived).toBe(true);
   });
 });
+
+describe("Repo.dispatch — the single-transaction guarantee (impl §3)", () => {
+  it("does not journal an op whose apply fails (log and state never desync)", async () => {
+    const repo = await Repo.open();
+    const before = (await repo.listOps()).length;
+
+    // An op type from a newer client, arriving via sync: the reducer's `never`
+    // branch throws. The journal must not keep it, or replay would then throw
+    // forever on this device.
+    const rogue = {
+      id: "op-rogue",
+      ts: at(5000),
+      type: "definitely.unknown",
+      payload: { row: { id: "x" } },
+    } as unknown as Op;
+
+    await expect(repo.dispatch(rogue)).rejects.toThrow();
+    const ops = await repo.listOps();
+    expect(ops).toHaveLength(before);
+    expect(ops.some((o) => o.id === "op-rogue")).toBe(false);
+  });
+
+  it("keeps working after a failed dispatch", async () => {
+    const repo = await Repo.open();
+    const rogue = {
+      id: "op-rogue",
+      ts: at(5000),
+      type: "nope",
+      payload: {},
+    } as unknown as Op;
+    await expect(repo.dispatch(rogue)).rejects.toThrow();
+
+    await repo.dispatch({
+      id: "op-ok",
+      ts: at(6000),
+      type: "category.create",
+      payload: { row: makeCategory({ id: "c1", name: "Groceries", type: "expense" }) },
+    });
+    expect(await repo.get<Category>(STORE.categories, "c1")).toBeDefined();
+  });
+});
+
+describe("Repo — schema upgrades never drop local data (§8.6 local-first)", () => {
+  it("carries v1 rows across the v1 → v2 upgrade and adds the settings store", async () => {
+    // Stand up a *version 1* database by hand: the M1/M2 store set, no `settings`.
+    const V1_STORES = [
+      "categories",
+      "containers",
+      "budget_targets",
+      "transactions",
+      "container_snapshots",
+      "recurring_rules",
+      "goals",
+      "oplog",
+      "app_meta",
+    ];
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open("yaccount", 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        for (const name of V1_STORES) {
+          db.createObjectStore(name, { keyPath: name === "app_meta" ? "key" : "id" });
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction(["categories", "app_meta"], "readwrite");
+        tx.objectStore("categories").put(
+          makeCategory({ id: "c1", name: "Groceries", type: "expense" }),
+        );
+        tx.objectStore("app_meta").put({ key: "deviceId", value: "device-from-v1" });
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    const repo = await Repo.open(); // opens at DB_VERSION 2, guarded upgrade
+    const survived = await repo.get<Category>(STORE.categories, "c1");
+    expect(survived?.name).toBe("Groceries");
+    expect(await repo.getDeviceId()).toBe("device-from-v1"); // identity preserved
+    // The new store exists AND is writable — it is in ALL_STORES, so if the
+    // upgrade missed it every dispatch would throw NotFoundError.
+    await repo.dispatch({
+      id: "op-setting",
+      ts: at(7000),
+      type: "setting.set",
+      payload: { row: { key: "default_container_id", value: "general" } },
+    });
+    expect(await repo.getAll(STORE.settings)).toHaveLength(1);
+  });
+});
+
+describe("Repo — seeding is deterministic and respects the user (§8.4)", () => {
+  it("two fresh devices mint an identical seed op, payload included", async () => {
+    const a = await Repo.open("yaccount-a");
+    const b = await Repo.open("yaccount-b");
+    const seedA = (await a.listOps()).find((o) => o.id === "seed:general");
+    const seedB = (await b.listOps()).find((o) => o.id === "seed:general");
+    // Same id AND same payload — dedupe by id must not hide a divergent wallet.
+    expect(seedA).toEqual(seedB);
+  });
+
+  it("does not resurrect 'general' after the user archives it", async () => {
+    const repo = await Repo.open();
+    await repo.dispatch({
+      id: "op-arch",
+      ts: at(8000),
+      type: "container.archive",
+      payload: { id: GENERAL_CONTAINER_ID },
+    });
+    repo.close();
+
+    const reopened = await Repo.open();
+    const general = await reopened.get<Container>(STORE.containers, GENERAL_CONTAINER_ID);
+    expect(general!.is_archived).toBe(true); // the user's deliberate act stands
+    const seeds = (await reopened.listOps()).filter((o) => o.id === "seed:general");
+    expect(seeds).toHaveLength(1);
+  });
+
+  it("orders equal-ts ops by id at the repo level (§8.2 tiebreak)", async () => {
+    const repo = await Repo.open();
+    const ts = at(9000);
+    for (const id of ["op-z", "op-a"]) {
+      await repo.dispatch({
+        id,
+        ts,
+        type: "container.create",
+        payload: { row: makeContainer({ id: `k-${id}`, name: id }) },
+      });
+    }
+    const sameTs = (await repo.listOps()).filter((o) => o.ts === ts).map((o) => o.id);
+    expect(sameTs).toEqual(["op-a", "op-z"]);
+  });
+});

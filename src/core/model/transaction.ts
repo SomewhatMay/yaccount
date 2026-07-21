@@ -5,29 +5,37 @@ import { zId, zIsoDate, zYearMonth, zCents, newId, yearMonthOf } from "./primiti
 export const InboxStatusSchema = z.enum(["pending", "approved"]);
 export type InboxStatus = z.infer<typeof InboxStatusSchema>;
 
-export const TransactionSchema = z.object({
-  id: zId,
-  date: zIsoDate,
-  // Signed integer cents: negative = outflow, positive = inflow. Sign is a UI
-  // default only — NOT coupled to category type here (§5.4 / §10.13), so voids,
-  // reversals, and refunds can legitimately carry the opposite sign.
-  amount: zCents,
-  vendor_source: z.string().min(1), // for transfers: synthesized "{src} → {dest}", editable
-  category_id: zId.nullable(), // null only for transfers
-  container_id: zId, // source container / the account
-  to_container_id: zId.nullable(), // set only for transfers — destination
-  is_template: z.boolean(), // true = saved shortcut, not a live ledger entry
-  template_name: z.string().nullable(),
-  inbox_status: InboxStatusSchema, // 'pending' rows excluded from all derivations
-  recurring_rule_id: zId.nullable(),
-  notes: z.string().nullable(),
-  // Void mechanism (M2, design decision — spec §5.4 has no correction field, §10 #24):
-  // set ONLY on a reversing row → the id of the transaction it cancels. Both rows
-  // remain in the ledger (append-only §0.3), balance stays exact; "X is voided" is
-  // derived as "some row has reverses_id === X.id". Null for ordinary rows.
-  reverses_id: zId.nullable(),
-  yearMonth: zYearMonth, // STORED, derived from `date` at write time (§8.3)
-});
+export const TransactionSchema = z
+  .object({
+    id: zId,
+    date: zIsoDate,
+    // Signed integer cents: negative = outflow, positive = inflow. Sign is a UI
+    // default only — NOT coupled to category type here (§5.4 / §10.13), so voids,
+    // reversals, and refunds can legitimately carry the opposite sign.
+    amount: zCents,
+    vendor_source: z.string().min(1), // for transfers: synthesized "{src} → {dest}", editable
+    category_id: zId.nullable(), // null only for transfers
+    container_id: zId, // source container / the account
+    to_container_id: zId.nullable(), // set only for transfers — destination
+    is_template: z.boolean(), // true = saved shortcut, not a live ledger entry
+    template_name: z.string().nullable(),
+    inbox_status: InboxStatusSchema, // 'pending' rows excluded from all derivations
+    recurring_rule_id: zId.nullable(),
+    notes: z.string().nullable(),
+    // Void mechanism (M2, design decision — spec §5.4 has no correction field, §10 #24):
+    // set ONLY on a reversing row → the id of the transaction it cancels. Both rows
+    // remain in the ledger (append-only §0.3), balance stays exact; "X is voided" is
+    // derived as "some row has reverses_id === X.id". Null for ordinary rows.
+    reverses_id: zId.nullable(),
+    yearMonth: zYearMonth, // STORED, derived from `date` at write time (§8.3)
+  })
+  .refine((t) => t.yearMonth === t.date.slice(0, 7), {
+    // A derived field can drift only through a hand-built payload or a future
+    // writer — and a row whose yearMonth disagrees with its date vanishes from
+    // every month-scoped read (§8.3, §10 #15). Catch it at the edge.
+    message: "yearMonth must be derived from date",
+    path: ["yearMonth"],
+  });
 export type Transaction = z.infer<typeof TransactionSchema>;
 
 /**
@@ -49,7 +57,7 @@ export function makeTransaction(input: {
   return TransactionSchema.parse({
     id: input.id ?? newId(),
     date: input.date,
-    amount: input.amount,
+    amount: input.amount === 0 ? 0 : input.amount, // normalize -0
     vendor_source: input.vendor_source,
     category_id: input.category_id,
     container_id: input.container_id ?? "general",
@@ -74,6 +82,11 @@ export function makeVoidRow(
   original: Transaction,
   opts?: { id?: string; on?: string },
 ): Transaction {
+  // A template is a shortcut, not a ledger entry (§5.4) — there is nothing to
+  // reverse, and the "reversal" would itself be a template. Remove it instead.
+  if (original.is_template) {
+    throw new Error("a template is not a ledger entry — remove it instead of voiding");
+  }
   const date = opts?.on ?? original.date;
   return TransactionSchema.parse({
     ...original,
@@ -111,17 +124,21 @@ export function makeTransfer(input: {
   inbox_status?: InboxStatus;
   notes?: string | null;
 }): Transaction {
-  if (!Number.isInteger(input.amount) || input.amount <= 0) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
     throw new Error("transfer amount must be a positive integer-cents magnitude");
   }
   if (input.container_id === input.to_container_id) {
     throw new Error("a transfer needs two different containers");
   }
+  // A label of spaces would satisfy NOT NULL while telling the user nothing, so
+  // blank falls back to the synthesized "{src} → {dest}" (§5.4).
+  const given = input.vendor_source?.trim();
   const label =
-    input.vendor_source ??
-    (input.fromName && input.toName
-      ? transferLabel(input.fromName, input.toName)
-      : undefined);
+    given && given.length > 0
+      ? given
+      : input.fromName && input.toName
+        ? transferLabel(input.fromName, input.toName)
+        : undefined;
   if (!label) throw new Error("transfer needs a vendor_source or both container names");
 
   return TransactionSchema.parse({

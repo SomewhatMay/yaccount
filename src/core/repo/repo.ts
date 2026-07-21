@@ -69,18 +69,36 @@ export class Repo {
     }
   }
 
-  /** Append + apply one op atomically; idempotent by op id (§8.2). */
+  /**
+   * Append + apply one op atomically; idempotent by op id (§8.2).
+   *
+   * If `applyOp` throws — realistically an op type from a newer client arriving
+   * via sync — the whole transaction is ABORTED, so the journal never keeps an
+   * op the state didn't take. Without the abort the `oplog.put` would still
+   * commit and this device would carry an op it can never replay: exactly the
+   * log/state desync the single transaction exists to prevent (impl §3).
+   */
   async dispatch(op: Op): Promise<void> {
     const tx = this.db.transaction(ALL_STORES, "readwrite");
-    const oplog = tx.objectStore(STORE.oplog);
-    if (!(await oplog.get(op.id))) {
-      await oplog.put(op);
-      await applyOp(
-        new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),
-        op,
-      );
+    try {
+      const oplog = tx.objectStore(STORE.oplog);
+      if (!(await oplog.get(op.id))) {
+        await oplog.put(op);
+        await applyOp(
+          new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),
+          op,
+        );
+      }
+      await tx.done;
+    } catch (err) {
+      try {
+        tx.abort();
+      } catch {
+        // already settled — the original error is what matters
+      }
+      await tx.done.catch(() => {}); // swallow the abort rejection, not the cause
+      throw err;
     }
-    await tx.done;
   }
 
   async get<T>(store: StoreName, key: IDBValidKey): Promise<T | undefined> {

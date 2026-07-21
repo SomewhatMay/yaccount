@@ -17,10 +17,10 @@ export function defaultSign(type: CategoryType): Sign {
  * that control rather than silently doing nothing on an expense.
  */
 export function splitSign(input: string): { sign: Sign | null; rest: string } {
-  const trimmed = input.trimStart();
-  if (trimmed.startsWith("-")) return { sign: "-", rest: trimmed.slice(1) };
-  if (trimmed.startsWith("+")) return { sign: "+", rest: trimmed.slice(1) };
-  return { sign: null, rest: input };
+  const trimmed = input.trim();
+  if (trimmed.startsWith("-")) return { sign: "-", rest: trimmed.slice(1).trim() };
+  if (trimmed.startsWith("+")) return { sign: "+", rest: trimmed.slice(1).trim() };
+  return { sign: null, rest: trimmed };
 }
 
 /**
@@ -37,6 +37,8 @@ export function resolveAmount(
   sign?: Sign,
 ): AmountResolution {
   const typed = splitSign(input);
+  // One sign, at the front. "--10" used to resolve to -$10 and "+-10" to +$10.
+  if (/^[-+]/.test(typed.rest)) return { ok: false, error: "Enter a valid amount." };
   let parsed: number;
   try {
     parsed = parseDollars(typed.rest);

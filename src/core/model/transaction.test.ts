@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { makeTransaction, makeVoidRow, type Transaction } from "@/core/model";
+import {
+  makeTransaction,
+  makeTransfer,
+  makeVoidRow,
+  type Transaction,
+} from "@/core/model";
+import { containerBalance } from "@/core/engine/balances";
 
 describe("makeTransaction (§5.4 expense/income shape)", () => {
   it("derives yearMonth from date and defaults the expense/income shape", () => {
@@ -61,5 +67,77 @@ describe("makeVoidRow (§0.3 — reversing row, never a destructive delete)", ()
       category_id: "misc",
     });
     expect(Object.is(makeVoidRow(zero).amount, 0)).toBe(true);
+  });
+});
+
+describe("makeTransaction — guards at the entry edge", () => {
+  const base = {
+    date: "2026-07-20",
+    vendor_source: "Starbucks",
+    category_id: "coffee",
+  };
+
+  it("rejects a non-integer or unsafe amount (integer cents only, §1)", () => {
+    expect(() => makeTransaction({ ...base, amount: 10.5 })).toThrow();
+    expect(() => makeTransaction({ ...base, amount: 1e20 })).toThrow();
+  });
+
+  it("rejects a date that is not a real calendar day (§8.3 index key)", () => {
+    // A bogus month yields a yearMonth bucket no report will ever query.
+    expect(() =>
+      makeTransaction({ ...base, amount: -100, date: "2026-13-45" }),
+    ).toThrow();
+    expect(() =>
+      makeTransaction({ ...base, amount: -100, date: "2026-02-30" }),
+    ).toThrow();
+    expect(() => makeTransaction({ ...base, amount: -100, date: "2026-7-1" })).toThrow();
+  });
+
+  it("normalizes -0 like every other amount path", () => {
+    expect(Object.is(makeTransaction({ ...base, amount: -0 }).amount, 0)).toBe(true);
+  });
+});
+
+describe("makeVoidRow — the reversal must stay a faithful mirror", () => {
+  it("preserves to_container_id so a voided TRANSFER nets on both sides", () => {
+    const transfer = makeTransfer({
+      id: "t1",
+      date: "2026-07-20",
+      amount: 10000,
+      container_id: "general",
+      to_container_id: "vacation",
+      fromName: "General",
+      toName: "Vacation",
+    });
+    const v = makeVoidRow(transfer, { id: "v1" });
+    expect(v.to_container_id).toBe("vacation");
+    expect(v.category_id).toBeNull();
+    expect(v.amount).toBe(10000);
+    // §5.4 identity, both legs: source refunded, destination debited.
+    expect(containerBalance([transfer, v], "general")).toBe(0);
+    expect(containerBalance([transfer, v], "vacation")).toBe(0);
+  });
+
+  it("derives yearMonth across a year boundary", () => {
+    const orig = makeTransaction({
+      date: "2026-12-31",
+      amount: -1000,
+      vendor_source: "NYE",
+      category_id: "fun",
+    });
+    expect(makeVoidRow(orig, { on: "2027-01-01" }).yearMonth).toBe("2027-01");
+  });
+
+  it("refuses to void a template — a template is not a ledger entry (§5.4)", () => {
+    const tpl = {
+      ...makeTransaction({
+        date: "2026-07-20",
+        amount: -1000,
+        vendor_source: "Tims",
+        category_id: "coffee",
+      }),
+      is_template: true,
+    };
+    expect(() => makeVoidRow(tpl)).toThrow();
   });
 });

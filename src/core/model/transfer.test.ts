@@ -98,3 +98,46 @@ describe("makeContainerSnapshot — reported real-world value (§5.6)", () => {
     ).toThrow();
   });
 });
+
+describe("makeTransfer — label and magnitude hygiene", () => {
+  const base = {
+    date: "2026-07-20",
+    amount: 10000,
+    container_id: "general",
+    to_container_id: "vacation",
+    fromName: "General",
+    toName: "Vacation",
+  };
+
+  it("falls back to the synthesized label when the given one is blank", () => {
+    // NOT NULL has to mean a usable payee, not a string of spaces (§5.4).
+    expect(makeTransfer({ ...base, vendor_source: "   " }).vendor_source).toBe(
+      "General → Vacation",
+    );
+    expect(makeTransfer({ ...base, vendor_source: "" }).vendor_source).toBe(
+      "General → Vacation",
+    );
+  });
+
+  it("trims a real label", () => {
+    expect(
+      makeTransfer({ ...base, vendor_source: "  Payday sweep " }).vendor_source,
+    ).toBe("Payday sweep");
+  });
+
+  it("rejects a fractional or unsafe magnitude", () => {
+    expect(() => makeTransfer({ ...base, amount: 10.5 })).toThrow();
+    expect(() => makeTransfer({ ...base, amount: Number.NaN })).toThrow();
+    expect(() => makeTransfer({ ...base, amount: 1e20 })).toThrow();
+  });
+
+  it("rejects a date that is not a real calendar day", () => {
+    expect(() => makeTransfer({ ...base, date: "2026-02-30" })).toThrow();
+  });
+
+  it("round-trips a pending transfer (the goal auto-contribution path, §5.9.5)", () => {
+    expect(makeTransfer({ ...base, inbox_status: "pending" }).inbox_status).toBe(
+      "pending",
+    );
+  });
+});

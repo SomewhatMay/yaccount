@@ -10,6 +10,10 @@ export function nameTaken(
   candidate: string,
   selfId?: string,
 ): boolean {
-  const wanted = candidate.trim().toLowerCase();
-  return items.some((i) => i.id !== selfId && i.name.trim().toLowerCase() === wanted);
+  // NFC-normalize: "Café" typed on macOS (decomposed) and pasted from the web
+  // (composed) look identical to the user and must collide.
+  const key = (s: string) => s.trim().normalize("NFC").toLowerCase();
+  const wanted = key(candidate);
+  if (wanted.length === 0) return false; // emptiness is the caller's error
+  return items.some((i) => i.id !== selfId && key(i.name) === wanted);
 }

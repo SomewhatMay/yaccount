@@ -193,3 +193,76 @@ describe("overallBalance — archived containers stop counting", () => {
     ).toBe(25000);
   });
 });
+
+describe("balance identity under voids and undo (§0.3 × §0.4)", () => {
+  const t = transfer("general", "vacation", 30000, { id: "tr1" });
+
+  it("a voided transfer nets BOTH legs back to zero", () => {
+    const v = makeVoidRow(t, { id: "v1" });
+    expect(containerBalance([t, v], "general")).toBe(0);
+    expect(containerBalance([t, v], "vacation")).toBe(0);
+    expect(netContributions([t, v], "vacation")).toBe(0);
+  });
+
+  it("undoing that delete restores both balances and the contribution", () => {
+    const v = makeVoidRow(t, { id: "v1" });
+    const u = makeVoidRow(v, { id: "u1" });
+    expect(containerBalance([t, v, u], "general")).toBe(-30000);
+    expect(containerBalance([t, v, u], "vacation")).toBe(30000);
+    expect(netContributions([t, v, u], "vacation")).toBe(30000);
+  });
+
+  it("excludes a pending/template transfer on the DESTINATION leg too", () => {
+    const pending = transfer("general", "vacation", 99900, { inbox_status: "pending" });
+    const template = transfer("general", "vacation", 88800, { is_template: true });
+    expect(containerBalance([pending, template], "vacation")).toBe(0);
+    expect(containerBalance([pending, template], "general")).toBe(0);
+    expect(netContributions([pending, template], "vacation")).toBe(0);
+  });
+
+  it("a degenerate self-transfer moves nothing", () => {
+    // makeTransfer refuses to build one, but a row from an older or buggier
+    // writer could carry it — the identity must still balance.
+    const self = { ...t, container_id: "general", to_container_id: "general" };
+    expect(containerBalance([self], "general")).toBe(0);
+    expect(netContributions([self], "general")).toBe(0);
+  });
+
+  it("isTransfer rejects malformed shapes", () => {
+    expect(isTransfer({ ...t, to_container_id: null })).toBe(false); // neither
+    expect(isTransfer({ ...t, category_id: "coffee" })).toBe(false); // both
+  });
+});
+
+describe("overallBalance — interaction with transfers (§5.7 × §0.4)", () => {
+  const inA = makeContainer({ id: "a", name: "A", include_in_overall_balance: true });
+  const inB = makeContainer({ id: "b", name: "B", include_in_overall_balance: true });
+  const out = makeContainer({ id: "out", name: "Out" });
+
+  it("a transfer between two counted containers leaves the headline unchanged", () => {
+    const txns = [tx({ amount: 100000, container_id: "a" }), transfer("a", "b", 30000)];
+    expect(overallBalance(txns, [inA, inB])).toBe(100000);
+  });
+
+  it("a transfer out to an uncounted container reduces the headline in full", () => {
+    const txns = [tx({ amount: 100000, container_id: "a" }), transfer("a", "out", 30000)];
+    expect(overallBalance(txns, [inA, out])).toBe(70000);
+  });
+
+  it("handles empty inputs", () => {
+    expect(containerBalance([], "a")).toBe(0);
+    expect(overallBalance([tx({ amount: 100000 })], [])).toBe(0);
+  });
+});
+
+describe("netContributions — scope of the primitive (§5.6)", () => {
+  it("counts contributions into an archived container (archive is a §5.7 rule only)", () => {
+    const txns = [transfer("general", "vacation", 30000)];
+    expect(netContributions(txns, "vacation")).toBe(30000);
+  });
+
+  it("excludes a template transfer", () => {
+    const txns = [transfer("general", "vacation", 30000, { is_template: true })];
+    expect(netContributions(txns, "vacation")).toBe(0);
+  });
+});
