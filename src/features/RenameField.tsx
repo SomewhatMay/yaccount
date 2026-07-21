@@ -17,25 +17,33 @@ export function RenameField({
   onSave,
   onCancel,
   label,
+  validate,
   className,
 }: {
   value: string;
   onSave: (next: string) => void | Promise<void>;
   onCancel: () => void;
   label: string;
+  /** Return an error message to block the save (e.g. a duplicate name). */
+  validate?: (next: string) => string | null;
   className?: string;
 }) {
   const [draft, setDraft] = useState(value);
   const trimmed = draft.trim();
-  const valid = trimmed.length > 0;
+  const error = trimmed.length > 0 ? (validate?.(trimmed) ?? null) : null;
+  const valid = trimmed.length > 0 && error === null;
 
   async function commit() {
-    if (!valid) return onCancel();
+    if (trimmed.length === 0) return onCancel();
+    if (error) return;
     await onSave(trimmed);
   }
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("relative flex items-center gap-1", className)}>
+      {error && (
+        <p className="text-destructive absolute -bottom-4 left-1 text-xs">{error}</p>
+      )}
       <Input
         autoFocus
         value={draft}

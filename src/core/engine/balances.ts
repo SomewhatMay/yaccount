@@ -38,12 +38,14 @@ export function isTransfer(t: Transaction): boolean {
  *   SUM(containers.balance WHERE include_in_overall_balance = true)
  *
  * Default is EXCLUDE: money being saved toward something must not silently
- * inflate "you have $X to spend". Only `general` ships opted in.
+ * inflate "you have $X to spend". Only `general` ships opted in. Archived
+ * containers drop out too — one the user has put away must not sit invisibly in
+ * the headline figure (its own balance is still queryable via containerBalance).
  */
 export function overallBalance(txns: Transaction[], containers: Container[]): number {
   let total = 0;
   for (const c of containers) {
-    if (!c.include_in_overall_balance) continue;
+    if (!c.include_in_overall_balance || c.is_archived) continue;
     total += containerBalance(txns, c.id);
   }
   return total;

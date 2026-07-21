@@ -190,11 +190,11 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ### M3 — Containers, Transfers & Balances
 **Goal:** The "where money lives" axis (§5.2) and the transfer shape (§5.4).
 **Scope:**
-- Container CRUD (create/rename/archive soft-only; `is_investment`, `include_in_overall_balance` flags §5.2). Enforce `'general'`'s default-true opt-in.
+- Container CRUD (create/rename/archive soft-only; `is_investment`, `include_in_overall_balance` flags §5.2, **both toggleable after creation**). Enforce `'general'`'s default-true opt-in. **Unique names checked on create AND rename** (`features/unique-name.ts` `nameTaken`, case-insensitive; same for categories).
 - **Container snapshots (§5.6):** `container_snapshots` CRUD + a **"Reported balances" Sheet** for `is_investment` containers (without this the `is_investment` flag is inert): log a value, see the **full history**, and **edit or delete** a mistaken one (`snapshot.update` / `snapshot.remove`). **At most one report per day per container** — the form warns inline ("this day already reports $X — saving replaces it") and the reducer upserts by `(container_id, date)`. Net Contributions = Σ transfers in − Σ transfers out. *(§5.6 had no milestone in the prior draft; gain/loss + the Reconstructed Balance engine land in M5.)*
 - **Transfer** transactions (§5.4): `category_id` null, `to_container_id` set; moves money between owned containers; excluded from category dashboards.
 - Per-container balance (`SUM(amount)`, may go negative → **red UI** §5.2).
-- **Current Overall Balance** metric (§5.7): `SUM(balance WHERE include_in_overall_balance)` — opt-in model, default exclude.
+- **Current Overall Balance** metric (§5.7): `SUM(balance WHERE include_in_overall_balance AND NOT is_archived)` — opt-in model, default exclude; archived containers drop out (archiving one with a live balance warns first).
 - Container picker in the transaction form; **Default Spending Container** setting (§5.2, defaults `general`).
 - **Container Flows data readiness** (§5.4): transfers + the `by_container_month` index (transfers are absent from `by_container_category_month`, see M1) land here, but the **Container Flows *view* is deferred to M5** — it needs the unified reporting-period control (§6.1). M3 doesn't stand up a throwaway period selector.
 

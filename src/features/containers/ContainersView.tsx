@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { LogBalanceSheet } from "@/features/containers/LogBalanceSheet";
 import { RenameField } from "@/features/RenameField";
+import { nameTaken } from "@/features/unique-name";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +79,7 @@ export function ContainersView() {
   const [kind, setKind] = useState<Kind>("plain");
   const [logging, setLogging] = useState<Container | null>(null);
   const [archiving, setArchiving] = useState<Container | null>(null);
+  const archivingBalance = archiving ? containerBalance(transactions, archiving.id) : 0;
 
   const active = useMemo(
     () =>
@@ -107,7 +109,7 @@ export function ContainersView() {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return toast.error("Name the container.");
-    if (active.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
+    if (nameTaken(containers, trimmed)) {
       return toast.error("You already have a container with that name.");
     }
     await dispatch(
@@ -178,6 +180,7 @@ export function ContainersView() {
             container={c}
             divider={i > 0}
             balance={containerBalance(transactions, c.id)}
+            siblings={containers}
             contributed={netContributions(transactions, c.id)}
             snapshot={latestSnapshot.get(c.id)}
             isDefault={c.id === defaultId}
@@ -209,8 +212,20 @@ export function ContainersView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Archive {archiving?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              It leaves your pickers and this list. Past transactions keep it, and nothing
-              is deleted — you can still see its history.
+              {archivingBalance !== 0 ? (
+                <>
+                  It still holds{" "}
+                  <span className="tnum text-foreground font-mono">
+                    {formatCents(archivingBalance)}
+                  </span>
+                  , which stops counting toward your overall balance once it&apos;s
+                  archived. Move the money first if you want it to keep showing.
+                </>
+              ) : (
+                <>It leaves your pickers and this list.</>
+              )}{" "}
+              Past transactions keep it, and nothing is deleted — you can still see its
+              history.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -229,6 +244,7 @@ function ContainerRow({
   container,
   divider,
   balance,
+  siblings,
   contributed,
   snapshot,
   isDefault,
@@ -239,6 +255,7 @@ function ContainerRow({
   container: Container;
   divider: boolean;
   balance: number;
+  siblings: Container[];
   contributed: number;
   snapshot: ContainerSnapshot | undefined;
   isDefault: boolean;
@@ -263,6 +280,16 @@ function ContainerRow({
     );
     toast.success(counted ? "Counted in overall balance" : "No longer counted", {
       description: container.name,
+    });
+  }
+
+  async function toggleInvestment() {
+    const investment = !container.is_investment;
+    await onDispatch(updateContainer({ ...container, is_investment: investment }));
+    toast.success(investment ? "Tracked as an investment" : "No longer an investment", {
+      description: investment
+        ? `Report ${container.name}'s real-world value anytime`
+        : container.name,
     });
   }
 
@@ -296,6 +323,9 @@ function ContainerRow({
           <RenameField
             value={container.name}
             label={`Rename ${container.name}`}
+            validate={(next) =>
+              nameTaken(siblings, next, container.id) ? "That name is taken." : null
+            }
             onSave={rename}
             onCancel={() => setEditing(false)}
           />
@@ -342,6 +372,12 @@ function ContainerRow({
             onCheckedChange={toggleCounted}
           >
             Count in overall balance
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
+            checked={container.is_investment}
+            onCheckedChange={toggleInvestment}
+          >
+            Track as an investment
           </DropdownMenuCheckboxItem>
           {!isDefault && (
             <DropdownMenuItem onClick={makeDefault}>

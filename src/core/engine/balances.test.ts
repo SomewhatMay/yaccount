@@ -165,3 +165,31 @@ describe("netContributions — the savings-progress primitive (§5.6)", () => {
     expect(netContributions([tx({ amount: -1000 })], "vacation")).toBe(0);
   });
 });
+
+describe("overallBalance — archived containers stop counting", () => {
+  it("drops an archived container even if it was opted in", () => {
+    const general = makeContainer({
+      id: "general",
+      name: "General",
+      include_in_overall_balance: true,
+    });
+    const closed = makeContainer({
+      id: "closed",
+      name: "Old savings",
+      include_in_overall_balance: true,
+    });
+    const txns = [tx({ amount: 100000 }), tx({ amount: 25000, container_id: "closed" })];
+
+    expect(overallBalance(txns, [general, closed])).toBe(125000);
+    // Archived = out of sight, so it must not sit invisibly in the headline.
+    expect(overallBalance(txns, [general, { ...closed, is_archived: true }])).toBe(
+      100000,
+    );
+  });
+
+  it("still reports the archived container's own balance on demand", () => {
+    expect(
+      containerBalance([tx({ amount: 25000, container_id: "closed" })], "closed"),
+    ).toBe(25000);
+  });
+});

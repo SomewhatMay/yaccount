@@ -10,6 +10,7 @@ import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
 import { RenameField } from "@/features/RenameField";
+import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -48,6 +49,9 @@ export function CategoriesView() {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return toast.error("Name the category.");
+    if (nameTaken(categories, trimmed)) {
+      return toast.error("You already have a category with that name.");
+    }
     await dispatch(createCategory({ name: trimmed, type }));
     toast.success("Category added", { description: `${trimmed} · ${type}` });
     setName("");
@@ -97,8 +101,18 @@ export function CategoriesView() {
         </div>
       </form>
 
-      <CategorySection title="Expenses" items={expenses} onChange={dispatch} />
-      <CategorySection title="Income" items={incomes} onChange={dispatch} />
+      <CategorySection
+        title="Expenses"
+        items={expenses}
+        siblings={categories}
+        onChange={dispatch}
+      />
+      <CategorySection
+        title="Income"
+        items={incomes}
+        siblings={categories}
+        onChange={dispatch}
+      />
 
       {archivedCount > 0 && (
         <p className="text-muted-foreground text-xs">
@@ -113,10 +127,12 @@ export function CategoriesView() {
 function CategorySection({
   title,
   items,
+  siblings,
   onChange,
 }: {
   title: string;
   items: Category[];
+  siblings: Category[];
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
 }) {
   return (
@@ -132,7 +148,13 @@ function CategorySection({
           </div>
         ) : (
           items.map((c, i) => (
-            <CategoryRow key={c.id} category={c} divider={i > 0} onChange={onChange} />
+            <CategoryRow
+              key={c.id}
+              category={c}
+              siblings={siblings}
+              divider={i > 0}
+              onChange={onChange}
+            />
           ))
         )}
       </div>
@@ -142,10 +164,12 @@ function CategorySection({
 
 function CategoryRow({
   category,
+  siblings,
   divider,
   onChange,
 }: {
   category: Category;
+  siblings: Category[];
   divider: boolean;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
 }) {
@@ -180,6 +204,9 @@ function CategoryRow({
         <RenameField
           value={category.name}
           label={`Rename ${category.name}`}
+          validate={(next) =>
+            nameTaken(siblings, next, category.id) ? "That name is taken." : null
+          }
           onSave={save}
           onCancel={() => setEditing(false)}
           className="flex-1"

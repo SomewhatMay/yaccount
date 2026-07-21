@@ -160,6 +160,8 @@ These three axes are independent: a category answers "what kind of spend is this
 
 - Container balances **can go negative**; the UI renders negative-balance containers in red rather than blocking the transaction.
 - One container is the global **Default Spending Container** in settings (defaults to `'general'`) — what quick-log shortcuts use implicitly so routine spending never requires picking a container.
+- **`is_investment` is editable at any time** (M3) — a plain bucket can become an investment container later and back again; the flag only decides whether reported-value tracking (§5.6) is offered.
+- **Names are UNIQUE, checked in the UI on create *and* rename** (same for categories, §5.1), compared case-insensitively on the trimmed name. IndexedDB can't express uniqueness and a hard constraint would be wrong anyway — a merge must never throw — so a collision is prevented at the point of entry, not enforced in the reducer.
 - Containers are **archived, never hard-deleted** (`is_archived = true`). An archived container leaves active selection UI but remains a valid FK target, so historical charts, the Container Flows view (§5.4), and past goal cycles (§5.9) never break.
 - A container may exist with no goal (a plain bucket), with an active goal, or with a history of completed goals. Every goal, conversely, belongs to exactly one container (§5.9.2).
 
@@ -250,8 +252,10 @@ Chosen over simple carry-forward, which would ignore any transfers during un-sna
 ### 5.7 "Current Overall Balance" definition (locked, opt-in model)
 
 ```
-Current Overall Balance = SUM(containers.balance WHERE include_in_overall_balance = true)
+Current Overall Balance = SUM(containers.balance WHERE include_in_overall_balance = true AND is_archived = false)
 ```
+
+**Archived containers are excluded too (locked, M3).** A container the user has put away must not sit invisibly inside the headline figure; its own balance stays queryable, and un-archiving restores it to the total. Archiving one that still holds money warns first, naming the amount.
 
 **Default is exclude, not include** — deliberately inverted from the naive "sum everything non-investment" approach. Rationale (user's own framing): most containers represent money the user is *saving up toward* something (e.g. new clothes), and should not silently inflate a headline "you have $X to spend" number. Only the default `'general'` spending container is included out of the box; any other container must be explicitly opted in by the user if they want it counted (independent of its `is_investment` flag — the two are separate concerns, since a non-investment container like a "Vacation Fund" should typically still be excluded by default). Because goal containers inherit this default, money being saved toward a goal never inflates the headline spendable balance unless the user opts it in.
 
