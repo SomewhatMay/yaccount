@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/features/ui";
 
 const log = createLogger("ui");
 
@@ -164,9 +165,7 @@ export function DiagnosticsPanel() {
       <div className="bg-card overflow-hidden rounded-2xl border">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">
-              Log
-            </span>
+            <Eyebrow as="span">Log</Eyebrow>
             <span className="text-muted-foreground/70 tnum font-mono text-xs">
               {records.length}
             </span>

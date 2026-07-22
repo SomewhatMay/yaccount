@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { todayIso } from "@/features/clock";
+import { Eyebrow } from "@/features/ui";
 
 export function CategoriesView() {
   const ready = useAtomValue(readyAtom);
@@ -89,7 +90,7 @@ export function CategoriesView() {
   return (
     <div className="space-y-6">
       <section className="pt-3 pb-1">
-        <h1 className="font-display text-3xl leading-none">Categories</h1>
+        <h1 className="figure-lg">Categories</h1>
         <p className="text-muted-foreground mt-2 text-sm">
           What your money does. Rename or archive anytime — old transactions keep their
           label.
@@ -148,7 +149,7 @@ export function CategoriesView() {
       {archived.length > 0 && (
         <section>
           <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
-            <h2 className="text-xs font-medium tracking-[0.14em] uppercase">Archived</h2>
+            <Eyebrow as="h2">Archived</Eyebrow>
             <span className="tnum font-mono text-xs">{archived.length}</span>
           </div>
           <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
@@ -212,7 +213,7 @@ function CategorySection({
   return (
     <section>
       <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
-        <h2 className="text-xs font-medium tracking-[0.14em] uppercase">{title}</h2>
+        <Eyebrow as="h2">{title}</Eyebrow>
         <span className="tnum font-mono text-xs">{items.length}</span>
       </div>
       <div className="bg-card overflow-hidden rounded-2xl border">

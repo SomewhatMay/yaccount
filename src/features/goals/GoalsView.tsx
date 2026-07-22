@@ -56,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
+import { Eyebrow } from "@/features/ui";
 
 export function GoalsView() {
   const ready = useAtomValue(readyAtom);
@@ -176,10 +177,8 @@ export function GoalsView() {
     <div className="space-y-6">
       <section className="flex items-end justify-between pt-3 pb-1">
         <div>
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-            Goals
-          </p>
-          <h1 className="font-display mt-1 text-3xl leading-none">Savings goals</h1>
+          <Eyebrow>Goals</Eyebrow>
+          <h1 className="figure-lg mt-1.5">Savings goals</h1>
           <p className="text-muted-foreground mt-3 max-w-md text-sm">
             Give every pool of money a purpose and a pace. Progress tracks what you set
             aside — not what&apos;s left to spend.
@@ -221,9 +220,9 @@ export function GoalsView() {
 
       {done.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-muted-foreground px-1 text-xs font-medium tracking-[0.14em] uppercase">
+          <Eyebrow as="h2" className="px-1">
             Achieved &amp; closed
-          </h2>
+          </Eyebrow>
           <div className="grid gap-3">
             {done.map((g) => (
               <GoalCard
@@ -257,9 +256,9 @@ export function GoalsView() {
 
       {archived.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-muted-foreground px-1 text-xs font-medium tracking-[0.14em] uppercase">
+          <Eyebrow as="h2" className="px-1">
             Archived
-          </h2>
+          </Eyebrow>
           <div className="rounded-2xl border border-dashed">
             {archived.map((g, i) => (
               <div

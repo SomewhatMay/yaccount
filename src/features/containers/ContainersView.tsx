@@ -66,6 +66,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Eyebrow } from "@/features/ui";
 
 type Kind = "plain" | "investment";
 
@@ -155,7 +156,7 @@ export function ContainersView() {
   return (
     <div className="space-y-6">
       <section className="pt-3 pb-1">
-        <h1 className="font-display text-3xl leading-none">Containers</h1>
+        <h1 className="figure-lg">Containers</h1>
         <p className="text-muted-foreground mt-2 text-sm">
           Where your money lives. Only the ones you count show up in your overall balance.
         </p>
@@ -217,7 +218,7 @@ export function ContainersView() {
       {archived.length > 0 && (
         <section>
           <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
-            <h2 className="text-xs font-medium tracking-[0.14em] uppercase">Archived</h2>
+            <Eyebrow as="h2">Archived</Eyebrow>
             <span className="tnum font-mono text-xs">{archived.length}</span>
           </div>
           <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">

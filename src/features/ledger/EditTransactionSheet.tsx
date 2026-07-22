@@ -31,14 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
 
 export function EditTransactionSheet({
   editing,
@@ -57,37 +51,32 @@ export function EditTransactionSheet({
 }) {
   const transfer = editing !== null && isTransfer(editing);
   return (
-    <Sheet open={editing !== null} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">
-            {transfer ? "Edit transfer" : "Edit transaction"}
-          </SheetTitle>
-          <SheetDescription>
-            Changes are recorded as a ledger update — history is never lost.
-          </SheetDescription>
-        </SheetHeader>
-        {editing &&
-          (transfer ? (
-            <TransferForm
-              key={editing.id}
-              tx={editing}
-              containers={containers}
-              onSave={onSave}
-              onDelete={onDelete}
-            />
-          ) : (
-            <EditForm
-              key={editing.id}
-              tx={editing}
-              categories={categories}
-              containers={containers}
-              onSave={onSave}
-              onDelete={onDelete}
-            />
-          ))}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={editing !== null}
+      onOpenChange={onOpenChange}
+      title={transfer ? "Edit transfer" : "Edit transaction"}
+      description="Changes are recorded as a ledger update — history is never lost."
+    >
+      {editing &&
+        (transfer ? (
+          <TransferForm
+            key={editing.id}
+            tx={editing}
+            containers={containers}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        ) : (
+          <EditForm
+            key={editing.id}
+            tx={editing}
+            categories={categories}
+            containers={containers}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        ))}
+    </ResponsiveSheet>
   );
 }
 

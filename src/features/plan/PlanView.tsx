@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
-import { formatCents, parseDollars } from "@/core/money";
+import { parseDollars } from "@/core/money";
 import { monthlyPlan } from "@/core/engine/plan";
 import { setSetting } from "@/core/commands";
 import { categoryDotColor } from "@/features/category-color";
@@ -20,6 +20,15 @@ import {
   transactionsAtom,
 } from "@/features/store";
 import { cn } from "@/lib/utils";
+import {
+  Eyebrow,
+  FigureSkeleton,
+  LeaderRow,
+  ListSkeleton,
+  Marginalia,
+  Money,
+  RuledTotal,
+} from "@/features/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayIso } from "@/features/clock";
@@ -89,18 +98,22 @@ export function PlanView() {
     toast.success("Expected income updated");
   }
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <FigureSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={4} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
       <section className="flex items-end justify-between pt-3 pb-1">
         <div>
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-            Monthly plan
-          </p>
-          <h1 className="font-display mt-1 text-3xl leading-none">
-            Every dollar a purpose
-          </h1>
+          <Eyebrow>Monthly plan</Eyebrow>
+          <h1 className="figure-lg mt-1.5">Every dollar a purpose</h1>
           <p className="text-muted-foreground mt-3 max-w-md text-sm">
             Give the month&apos;s income a job — steady category allowances and goal
             contributions — until nothing is left unassigned.
@@ -132,14 +145,14 @@ export function PlanView() {
 
       <div className="bg-card overflow-hidden rounded-2xl border">
         {/* Income */}
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex items-center justify-between gap-3 px-5 py-4">
           <div>
-            <p className="text-sm font-medium">Income expected</p>
-            <p className="text-muted-foreground text-xs">
+            <Eyebrow as="h2">Income expected</Eyebrow>
+            <Marginalia className="mt-1">
               {plan.incomeFromRules
-                ? "From your recurring income"
-                : "Entered for this month"}
-            </p>
+                ? "from your recurring income"
+                : "entered for this month"}
+            </Marginalia>
           </div>
           {editingIncome ? (
             <div className="flex items-center gap-1.5">
@@ -161,9 +174,7 @@ export function PlanView() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-positive tnum font-mono">
-                {formatCents(plan.income)}
-              </span>
+              <Money cents={plan.income} tone="in" className="figure-md" />
               {!plan.incomeFromRules && (
                 <Button
                   size="icon"
@@ -184,110 +195,91 @@ export function PlanView() {
 
         {/* Allowances */}
         <Section
-          title="Category allowances"
-          subtitle="Steady monthly spend"
+          title="Allowances"
+          totalLabel="Total allowances"
           total={plan.totalAllowances}
           empty="No budgets set for this month."
         >
           {plan.allowances.map((a) => (
-            <Row
+            <LeaderRow
               key={a.categoryId}
               dot={categoryDotColor(a.categoryId)}
               label={a.name}
-              amount={a.amount}
-            />
+            >
+              <Money cents={a.amount} tone="quiet" />
+            </LeaderRow>
           ))}
         </Section>
 
         {/* Goal asks */}
         <Section
-          title="Goal contributions"
-          subtitle="Saving toward a target"
+          title="Goal asks"
+          totalLabel="Total asks"
           total={plan.totalAsks}
           empty="No active goals asking for a contribution."
         >
           {plan.asks.map((a) => (
-            <Row key={a.goalId} label={a.name} amount={a.amount} />
+            <LeaderRow key={a.goalId} dot="var(--muted-foreground)" label={a.name}>
+              <Money cents={a.amount} tone="quiet" />
+            </LeaderRow>
           ))}
         </Section>
 
-        {/* Unallocated */}
+        {/* What is left. The double rule is the accounting mark for a line
+            nothing further is added to — this is the end of the sum. */}
         <div
           className={cn(
-            "flex items-center justify-between px-5 py-4",
-            plan.overAllocated ? "bg-destructive/8" : "bg-muted/40",
+            "px-5 pt-2 pb-5",
+            plan.overAllocated ? "bg-destructive/8" : "bg-surface-sunken",
           )}
         >
-          <div>
-            <p className="text-sm font-medium">
-              {plan.overAllocated ? "Over-committed" : "Unallocated"}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {plan.overAllocated
-                ? "You've committed more than you expect to earn."
-                : "Give it a job, or leave it for later."}
-            </p>
-          </div>
-          <span
-            className={cn(
-              "tnum font-mono text-lg",
-              plan.overAllocated ? "text-destructive" : "",
-            )}
-          >
-            {formatCents(plan.unallocated)}
-          </span>
+          <RuledTotal
+            label={plan.overAllocated ? "Over-committed" : "Unallocated"}
+            cents={plan.unallocated}
+            tone={plan.overAllocated ? "alert" : "neutral"}
+            emphasis="grand"
+          />
+          <Marginalia className="mt-1.5">
+            {plan.overAllocated
+              ? "you've committed more than you expect to earn"
+              : "give it a job, or leave it for later"}
+          </Marginalia>
         </div>
       </div>
     </div>
   );
 }
 
+/**
+ * A named block of the plan: its rows, then the rule, then its total. The total
+ * sits UNDER the rows it sums — a figure printed above its own addends is a
+ * heading, not a total.
+ */
 function Section({
   title,
-  subtitle,
   total,
+  totalLabel,
   empty,
   children,
 }: {
   title: string;
-  subtitle: string;
   total: number;
+  totalLabel: string;
   empty: string;
   children: React.ReactNode;
 }) {
   const hasItems = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
-    <div className="border-t">
-      <div className="flex items-center justify-between px-5 pt-4 pb-1">
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-muted-foreground text-xs">{subtitle}</p>
-        </div>
-        <span className="text-muted-foreground tnum font-mono">
-          − {formatCents(total)}
-        </span>
-      </div>
+    <div className="border-t px-5 py-4">
+      <Eyebrow as="h2">{title}</Eyebrow>
       {hasItems ? (
-        <div className="px-5 pb-2">{children}</div>
+        <>
+          <div className="mt-2.5">{children}</div>
+          <RuledTotal label={totalLabel} cents={total} />
+        </>
       ) : (
-        <p className="text-muted-foreground px-5 pb-4 text-xs">{empty}</p>
+        <p className="text-muted-foreground mt-2 text-xs">{empty}</p>
       )}
-    </div>
-  );
-}
-
-function Row({ dot, label, amount }: { dot?: string; label: string; amount: number }) {
-  return (
-    <div className="flex items-center gap-2.5 py-1.5">
-      <span
-        className="size-2 shrink-0 rounded-full"
-        style={{ backgroundColor: dot ?? "var(--muted-foreground)" }}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-      <span className="tnum text-muted-foreground font-mono text-sm">
-        {formatCents(amount)}
-      </span>
     </div>
   );
 }

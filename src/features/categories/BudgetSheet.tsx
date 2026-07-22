@@ -28,15 +28,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
 import { todayIso } from "@/features/clock";
+import { Eyebrow } from "@/features/ui";
 
 /**
  * A category's budget over time (§5.3) — no end_date, just "effective from."
@@ -56,25 +51,21 @@ export function BudgetSheet({
   onDispatch: (op: Op) => Promise<void>;
 }) {
   return (
-    <Sheet open={category !== null} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">Budget</SheetTitle>
-          <SheetDescription>
-            What {category?.name ?? "this category"} allows each month. Set a new amount
-            whenever it changes — old months keep the amount that applied then.
-          </SheetDescription>
-        </SheetHeader>
-        {category && (
-          <BudgetHistory
-            key={category.id}
-            category={category}
-            budgetTargets={budgetTargets}
-            onDispatch={onDispatch}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={category !== null}
+      onOpenChange={onOpenChange}
+      title="Budget"
+      description={`What ${category?.name ?? "this category"} allows each month. Set a new amount whenever it changes — old months keep the amount that applied then.`}
+    >
+      {category && (
+        <BudgetHistory
+          key={category.id}
+          category={category}
+          budgetTargets={budgetTargets}
+          onDispatch={onDispatch}
+        />
+      )}
+    </ResponsiveSheet>
   );
 }
 
@@ -203,9 +194,9 @@ function BudgetHistory({
       </form>
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <h3 className="text-muted-foreground mb-2 px-1 text-xs font-medium tracking-[0.14em] uppercase">
+        <Eyebrow as="h3" className="mb-2 px-1">
           History
-        </h3>
+        </Eyebrow>
         <div className="bg-card overflow-hidden rounded-2xl border">
           {history.length === 0 ? (
             <p className="text-muted-foreground px-4 py-8 text-center text-sm">

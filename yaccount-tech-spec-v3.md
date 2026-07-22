@@ -599,42 +599,70 @@ This v3 consolidation is a full rewrite of v2 for coherence and completeness; no
 
 ---
 
-## 12. Visual Design Language — "Quiet Register" (LOCKED, M2)
+## 12. Visual Design Language — "The Standing Register" (LOCKED, M2; extended M11)
 
-> **This is law, not a mood board.** Every screen yaccount ships — today's Ledger and Categories, and every future feature (containers, budgets, goals, the monthly plan, charts) — obeys this section. If a new design instinct conflicts with what's written here, the design language wins; change *this section by explicit decision*, never drift silently in a component. M11 executes the finishing pass **on top of** this foundation (motion, empty/error states, category-color override UI, per-breakpoint density) — it does not restart it. **Read this before writing any UI.**
+> **This is law, not a mood board.** Every screen yaccount ships — today's Ledger and Categories, and every future feature (containers, budgets, goals, the monthly plan, charts) — obeys this section. If a new design instinct conflicts with what's written here, the design language wins; change *this section by explicit decision*, never drift silently in a component. **Read this before writing any UI.**
+>
+> **M11 edited this section deliberately (2026-07-22, direction A "The Standing Register", chosen by the user from three illustrated options).** This is the explicit-decision path invariant #8 requires, not drift. The thesis, the three typefaces and the iris/emerald semantics are **unchanged**; M11 extends the language with a tinted neutral ramp, a figure scale, three new structural devices (the rule, dot leaders, the carried day header) and a motion budget. Sections carrying M11 content are marked **(M11)**. Everything M2 locked and M11 did not touch stands as written.
 
 ### 12.1 The thesis
 yaccount is a **paper ledger a designer fell in love with** — the calm, exact, columnar feel of a hand-kept account book, rendered as a soft modern app. Money is **quiet and precise by default**, with exactly **one warm spark of personality** (iris) and a single **positive/emerald** accent for money coming in. It is the deliberate opposite of two clichés we reject: (a) the cold blue-grey fintech dashboard, and (b) the alarm-clock red/green spreadsheet. **Restraint is the brand.** Numbers are the hero; chrome recedes.
 
+**(M11) Where the boldness goes.** A louder re-cut was considered and rejected: a new display face, a second accent hue, filled accent cards and big radii — bolder in volume, weaker in identity, and exactly the generic fintech card-stack §12.1 was written to reject. The language spends its boldness on **three things no other budgeting app does**, and stays quiet everywhere else:
+
+1. **Paper and ink tinted with the brand hue.** The neutral field is not neutral — every grey carries a trace of iris, so the app stops reading as default shadcn grey. Iris itself moves from 4% washes sprinkled everywhere to **full strength, used rarely**.
+2. **The figure standing on its own history.** The hero balance sits on a faint area curve of its own trailing series. The number has literal ground under it (extends §12.7 signature #1).
+3. **The carried balance.** Sticky day headers in the register print the running overall balance as of that day, the way a paper check register carries a balance down the page. Information, not decoration.
+
 ### 12.2 Color tokens (locked — defined in `src/app/globals.css`)
-Palette is **cool-neutral base + one iris brand + emerald-for-inflow**, expressed in `oklch`. Semantic tokens, never raw hex in components:
+Palette is **tinted paper & ink + one iris brand + emerald-for-inflow**, expressed in `oklch`. Semantic tokens, never raw hex in components:
 
 | Token | Light | Dark | Job |
 |---|---|---|---|
-| `--brand` / `--primary` / `--ring` | `oklch(0.54 0.2 280)` | `oklch(0.72 0.16 285)` | **Iris.** The single spark: primary buttons, focus rings, active nav, compose-bar tint. Used *sparingly* — a spark, not a flood. |
-| `--positive` (`text-positive`) | `oklch(0.58 0.13 162)` | `oklch(0.74 0.15 162)` | **Emerald.** Money **in** only (income amounts, "in" stat). Never used decoratively. |
-| `--destructive` | shadcn rose | shadcn rose | **Rose.** Reserved for genuine danger/negative: a **negative balance**, destructive menu items. Never the default color of an expense. |
-| neutral base (`background`/`card`/`muted`/`border`/`foreground`) | shadcn `neutral` | shadcn `neutral` | Everything else. Cool, low-chroma, calm. |
+| `--brand` / `--primary` / `--ring` | `oklch(0.52 0.21 285)` | `oklch(0.735 0.17 285)` | **Iris, at full strength.** The single spark: the quick-add FAB, the active tab, focus rings, primary buttons. **(M11)** Rare by design — if iris is everywhere it is nowhere. Do **not** re-introduce low-opacity iris washes as a general surface treatment. |
+| `--positive` (`text-positive`) | `oklch(0.53 0.14 162)` | `oklch(0.76 0.145 162)` | **Emerald.** Money **in** only (income amounts, "in" stat). Never used decoratively. |
+| `--destructive` | `oklch(0.545 0.215 27.5)` | `oklch(0.704 0.191 22.216)` | **Rose.** Reserved for genuine danger/negative: a **negative balance**, destructive menu items. Never the default color of an expense. |
+| neutral base (`background`/`card`/`muted`/`border`/`foreground`) | tinted paper, h≈285 | tinted ink, h≈285 | **(M11)** Everything else. Every neutral carries chroma at the brand hue — `--background` `oklch(0.988 0.003 285)` on paper, `oklch(0.155 0.012 285)` in the dark (ink, not black). |
+| `--surface-sunken` | `oklch(0.945 0.007 285)` | `oklch(0.122 0.01 285)` | **(M11)** A recessed plane: day headers, filter rails, a totals footer — anything set *into* the page rather than laid on it. |
+| `--rule` | `oklch(0.76 0.014 285)` | `oklch(0.42 0.02 285)` | **(M11)** The hairline above a total, and the dots of a leader. Reads harder than `--border` on purpose: a rule is punctuation, not a divider. |
+
+**(M11) Legibility is enforced, not eyeballed.** Every pair a user reads must clear **WCAG AA (4.5:1)** in *both* themes, and the focus ring must clear 3:1. `src/features/ui/theme.test.ts` parses `globals.css`, converts oklch → sRGB and asserts it — change a token and the test tells you what it costs. It also asserts the ramp is *tinted*, so an untinted grey can't creep back in.
 
 **Category identity = deterministic color dots.** Each category gets a stable hue derived from its id (`src/features/category-color.ts`, golden-angle spread), rendered as a small dot beside its name and its transactions. This is the presentational foreshadow of the §5.1/§10.1 auto-palette (which formally ships at M5) — **use `categoryDotColor(id)` for any category swatch; never invent a second scheme.**
 
-**Hard rules:** expenses are **neutral** (they are the norm — the explicit minus sign carries the meaning, §5.4), only **inflow is emerald**, only **true-negative is rose**. Do not color the whole ledger green/red. Do not introduce a third accent hue without editing this table.
+**Hard rules:** expenses are **neutral** (they are the norm — the explicit minus sign carries the meaning, §5.4), only **inflow is emerald**, only **true-negative is rose**. Do not color the whole ledger green/red. Do not introduce a third accent hue without editing this table. **(M11)** Tone is always chosen by the caller, never inferred from a number's sign — a positive figure can be a refund, a transfer leg or a balance, and colouring those emerald turns the one meaningful accent into decoration (`Money`'s `tone` prop exists for exactly this).
 
 ### 12.3 Typography (locked — three roles, wired in `src/app/layout.tsx`)
 | Role | Face | CSS var / class | Where |
 |---|---|---|---|
-| **Display** | **Fraunces** (soft serif) | `--font-display` / `font-display` | The one characterful risk. Balance hero, page headings, the wordmark. **Used with restraint** — display moments only, never body copy or labels. |
+| **Display** | **Fraunces** (soft serif, **(M11)** variable: `opsz` / `SOFT` / `WONK`, plus italic) | `--font-display` / `font-display` | The one characterful risk. Balance hero, page headings, the wordmark. **Used with restraint** — display moments only, never body copy or labels. |
 | **Body / UI** | **Geist** (sans) | `--font-sans` (default) | All labels, inputs, buttons, secondary text. |
 | **Numerals** | **Geist Mono** | `--font-mono` / `font-mono` | **Every monetary amount, everywhere**, plus counts. Pair with `.tnum` (tabular figures) so columns of money align like a register. |
 
 A serif in a finance app is intentional — it is the "designer's ledger" thesis made visible. Money always reads in mono. **Never** set an amount in the body sans, and **never** set body copy in Fraunces.
 
+**(M11) The figure scale.** Fraunces is *cut for size*, not merely scaled: each step sets its own optical size, softness and letter-spacing, and the quirky `WONK` alternates are allowed only at hero size, where they read as character rather than noise. All three are fluid (`clamp`) and tabular.
+
+| Class | Size | Where |
+|---|---|---|
+| `.figure-hero` | `clamp(2.75rem, 12vw, 4.5rem)`, `opsz` 120 / `SOFT` 45 / `WONK` 1 | The one balance moment per screen. Never two on a screen. |
+| `.figure-lg` | `clamp(1.75rem, 6vw, 2.5rem)`, `opsz` 48 / `WONK` 0 | Page titles, a secondary figure. |
+| `.figure-md` | `clamp(1.25rem, 4vw, 1.5rem)`, `opsz` 24 / `WONK` 0 | A total, a card headline. |
+
+**(M11) `.marginalia` — the accountant's pencil note.** Fraunces **italic**, between light guillemets `‹ … ›`. It is a short aside about the figure it sits under, saying something the figure cannot say about itself ("up $312 on last month", "on pace · $412 left"). It is **never a label**, never a heading, and never holds a value you need to read precisely — if a screen has more than two, they have become labels and one of them is wrong.
+
+**(M11) `.eyebrow` — the one label style.** Uppercase, `0.6875rem`, `0.18em` tracking, muted. It names a figure without competing with it. One tracking everywhere: an eyebrow that varies per screen is noise wearing a label's clothes.
+
 ### 12.4 Layout & shape language
 - **Column, not dashboard.** One centered reading column (`max-w-2xl`), generous vertical rhythm. yaccount is a focused ledger you scan top-to-bottom, not a grid of widgets. (Later multi-metric screens may widen, but the calm single-column instinct is the default.)
 - **Soft containers.** Grouped content sits in `rounded-2xl` bordered `card` surfaces; controls are `rounded-xl`/`rounded-lg`; pills (`rounded-full`) for nav and toggles. Corners are soft — no hard-edged broadsheet rules.
 - **The balance hero.** Each primary screen opens with a **big Fraunces figure + a tiny uppercase eyebrow label**, with quiet supporting marginalia (e.g. "this month · $X in · $Y out") — never a busy stat-card row. The number is the thesis.
-- **The compose bar.** Fast creation (a transaction, a category) lives in a **borderless, iris-tinted bar** (`border-primary/15 bg-primary/[0.04]`, transparent inline inputs) pinned above the list — inline and frictionless, not a walled-off form card.
+- **The compose bar.** Fast creation (a transaction, a category) lives in a **borderless, iris-tinted bar** (`border-primary/15 bg-primary/[0.04]`, transparent inline inputs) pinned above the list — inline and frictionless, not a walled-off form card. **(M11)** This is the *one* sanctioned iris wash and it survives §12.2's "no washes" rule as a named pattern, not a general surface treatment — it marks the place where you write. Do not copy the recipe onto anything else.
 - **Register rows, date-grouped.** Lists render as **flat rows grouped by day** ("Today / Yesterday / Mon D, YYYY"), each row: `[color dot] [payee + category] ……… [mono amount] [hover ⋯]`. Quiet dividers, hover tint, right-aligned mono money.
+- **(M11) The day header carries the balance.** The day header is an eyebrow on `--surface-sunken`, **sticky**, printing the running overall balance as of that day — the paper check register's carried balance. **Hide the carried figure whenever a filter is active:** a filtered list's rows no longer explain the number, and a balance you cannot reconcile against what you're looking at is worse than no balance.
+- **(M11) The rule — punctuation, not decoration.** A hairline (`.rule`, `--rule`) is drawn **only immediately above a total**, where it means *"this sums the above"*. A **double rule** (`.rule-double`) marks a terminal total — the accounting convention for a line nothing further is added to. Never use either as a divider; a rule that sometimes means addition and sometimes means nothing teaches the reader to ignore it. A total is printed **under** the rows it sums; a figure above its own addends is a heading, not a total.
+- **(M11) Dot leaders (`.leaders`) — the eye's rail** from a name to its amount. **Sparse summary lists only** (the monthly plan, a totals block). Never in the dense register: every row becoming a ruled line is a page of noise.
+- **(M11) Responsive density.** One reading column at every width. Below `sm` a sheet **rises from the bottom** (thumb reach); from `sm` up it **slides in from the right** (beside the list you were reading) — same component, one rule, `ResponsiveSheet`. Tables collapse to card rows below `sm`; no horizontal page scroll ever.
 - **Row actions hide until hover.** Per-row edit/delete/etc. live behind a single Lucide `⋯` (`MoreHorizontal`) **DropdownMenu** revealed on hover/focus — the resting state is clean.
 - **Editing opens a side `Sheet`, never a mode-swap.** Editing an existing record slides in a right-hand `Sheet` with the full form + Save + a quiet Delete. **Never** repurpose the create/compose area into an edit form in place (this was a real bug we fixed — do not reintroduce it). Rule of thumb: **create = inline; edit = Sheet; confirm-destructive = AlertDialog.**
 
@@ -646,6 +674,9 @@ A serif in a finance app is intentional — it is the "designer's ledger" thesis
 
 ### 12.5 Interaction & motion
 - **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu/select enter/exit (`popper`-positioned so they animate — `item-aligned` suppresses motion; ~150ms fade+zoom), and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
+- **(M11) The motion budget: three durations, one curve.** `--dur-1` 120ms (a colour changing under the pointer) · `--dur-2` 200ms (a row landing, a value ticking over) · `--dur-3` 260ms (a surface arriving). All on `--ease-register` `cubic-bezier(0.32, 0.72, 0, 1)` — a register **settles**; it does not bounce, so the curve leaves fast, lands slow, and never overshoots. Anything that needs a fourth duration or a second curve is asking for motion the language doesn't have.
+- **(M11) Exactly ONE orchestrated moment, and it is quick-add:** tap **+** → the sheet rises (`--dur-3`) → you log → the new row lands in the register with a single iris wash (`--dur-2`). That sequence is the app's one piece of choreography; everywhere else motion stays a whisper. A second orchestrated moment would make both of them ordinary.
+- **(M11) Reduced motion is a kill switch, not a suggestion.** `prefers-reduced-motion: reduce` zeroes every transition and animation globally in `globals.css`. Nothing in yaccount needs to move to be usable, so nothing has to be exempted.
 - **Feedback = `sonner` toasts, bottom-right,** in the interface's voice (see §12.6). Every create/update/delete confirms with a toast.
 - **Soft rules stay soft, inline.** The unusual-sign check (§5.4/§10 #13) is an **inline arm-then-confirm** ("… looks like a refund or void. Add again to confirm."), *not* a blocking `window.confirm` or a modal. Warnings guide; they never block.
 - **Quality floor (non-negotiable):** responsive to mobile, visible keyboard focus (iris ring), every icon-only control has an `aria-label`.
@@ -653,11 +684,14 @@ A serif in a finance app is intentional — it is the "designer's ledger" thesis
 ### 12.6 Voice & copy
 Sentence case everywhere. Plain verbs. Write from the user's side of the screen, name things by what the user controls. A control says what it does and keeps that word through the flow ("Save changes" → toast "Transaction updated"). Empty states are **invitations, not mood** ("Nothing logged yet. Add your first entry above."). Errors are specific and blameless ("Add a payee or source."). No filler, no cleverness over clarity, no system vocabulary ("row", "op", "dispatch") in the UI.
 
-### 12.7 The two signature elements (spend boldness only here)
-1. **The Fraunces balance moment** — the serif hero figure is the thing the app is remembered by.
+### 12.7 The signature elements (spend boldness only here)
+1. **The Fraunces balance moment** — the serif hero figure is the thing the app is remembered by. **(M11)** It now stands on a faint area curve of its own trailing series: a balance is the end of a story, and the curve is that story.
 2. **The deterministic category color dots** — the one recurring spot of playful color in an otherwise disciplined neutral field.
+3. **(M11) The carried balance in the day header** — the register carries its running total down the page, like the paper book it descends from (§12.4).
 
 Everything else stays quiet. Before adding any new decoration, remove one thing first (Chanel's rule). If a screen has two loud ideas, one of them is wrong.
 
 ### 12.8 How to extend (for every future feature)
 Reach for a **shadcn/ui** component first (add via `npx shadcn@latest add …`); hand-roll only when none exists, and match this language when you do. Use the **semantic tokens** (`primary`, `positive`, `destructive`, `muted-foreground`) — never raw colors. Amounts in **`font-mono` + `.tnum`**. New section headers in **Fraunces**. New create flows use the **compose-bar** pattern; new edit flows use a **`Sheet`**; new per-item actions use the **`⋯` DropdownMenu**. When in doubt, make it quieter.
+
+**(M11) Compose the language; don't re-derive it.** Every device above exists as a primitive in **`src/features/ui/`** — `Figure`, `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`, `ListSkeleton`. If you find yourself hand-rolling an eyebrow, a total or a money span out of Tailwind classes, the primitive already exists and you are forking the language. Extending the system means adding a primitive **and** the sentence in this section that says what it is for.

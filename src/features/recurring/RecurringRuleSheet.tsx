@@ -30,14 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { todayIso } from "@/features/clock";
 
@@ -68,28 +62,22 @@ export function RecurringRuleSheet({
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">
-            {rule ? "Edit recurring" : "New recurring transaction"}
-          </SheetTitle>
-          <SheetDescription>
-            It generates one pending transaction each time it comes due — you approve
-            every occurrence in the inbox.
-          </SheetDescription>
-        </SheetHeader>
-        {open && (
-          <RuleForm
-            key={rule?.id ?? "new"}
-            rule={rule}
-            categories={categories}
-            containers={containers}
-            onSubmit={onSubmit}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={rule ? "Edit recurring" : "New recurring transaction"}
+      description="It generates one pending transaction each time it comes due — you approve every occurrence in the inbox."
+    >
+      {open && (
+        <RuleForm
+          key={rule?.id ?? "new"}
+          rule={rule}
+          categories={categories}
+          containers={containers}
+          onSubmit={onSubmit}
+        />
+      )}
+    </ResponsiveSheet>
   );
 }
 

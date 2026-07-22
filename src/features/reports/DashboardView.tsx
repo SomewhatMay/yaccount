@@ -53,6 +53,7 @@ import {
 } from "./widgets";
 
 import { todayIso } from "@/features/clock";
+import { Eyebrow } from "@/features/ui";
 
 /** Last calendar day of a "YYYY-MM" key, as an ISO date. */
 function monthEnd(key: string): string {
@@ -212,9 +213,7 @@ function ReportColumn({
     <div className="space-y-6">
       {/* Hero — the period's net savings, the number as thesis (§12.4). */}
       <section className="bg-card rounded-2xl border p-5">
-        <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-          Saved this period
-        </p>
+        <Eyebrow>Saved this period</Eyebrow>
         <p
           className={cn(
             "font-display tnum mt-1 text-4xl leading-none sm:text-5xl",

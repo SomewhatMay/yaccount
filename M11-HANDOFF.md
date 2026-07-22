@@ -1,9 +1,10 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 3 commits ahead of `main`).
-> **Status:** Phases 1 and 2 of 10 are DONE, user-tested, committed and pushed. **Phase 3 is next.**
-> **Last updated:** 2026-07-22, after Phase 2.
+> **Branch:** `m11-design-polish` (pushed to origin, 4 commits ahead of `main`).
+> **Status:** Phases 1, 1.5 and 2 are DONE and user-tested. **Phase 3 is built and committed, awaiting
+> the user's browser test.** Phase 4 is next — do not start it until they say go.
+> **Last updated:** 2026-07-22, after Phase 3.
 
 ---
 
@@ -69,7 +70,7 @@ Plus **the rule** (a hairline used ONLY above a total — it encodes "this sums 
  dark  bg    oklch(0.145 0    0  )       oklch(0.155 0.012 285)   ink, not black
  dark  card  oklch(0.205 0    0  )       oklch(0.195 0.014 285)
  brand       oklch(0.54  0.20 280)       oklch(0.520 0.210 285)   ← full strength, RARE
- positive    oklch(0.58  0.13 162)       oklch(0.550 0.140 162)
+ positive    oklch(0.58  0.13 162)       oklch(0.550 0.140 162)   ← shipped 0.530: 0.550 was 4.27:1
 
  + type      .figure-hero  Fraunces opsz/SOFT/WONK, clamp(2.75rem,12vw,4.5rem)
              .marginalia   Fraunces ITALIC
@@ -245,8 +246,8 @@ does. Keep that discipline.
 | 1 | Entry timestamps + ledger ordering | ✅ **DONE** — `02d72a5`, user-tested PASS |
 | 1.5 | Editable entry time (user follow-up) | ✅ **DONE** — `96be47a`, user-tested PASS |
 | 2 | Logging, error boundaries, diagnostics | ✅ **DONE** — `97228ca`, user-tested PASS |
-| 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ⬜ **NEXT** |
-| 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ⬜ |
+| 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ✅ **DONE** — awaiting user browser test |
+| 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ⬜ **NEXT** |
 | 5 | Ledger v2 (history curve, carried balance, filters/sort) | ⬜ |
 | 6 | Filters + mobile density on the other 5 list views | ⬜ |
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ⬜ |
@@ -345,27 +346,67 @@ would downgrade Next to 9.x. Left alone deliberately.
 
 ---
 
-## 5. Phase 3 — what to do next
+### Phase 3 — "design system v2: tinted paper, the figure scale, the rule"
 
-From `M11-PLAN.md` §4. **This is the phase that edits the locked spec.**
+- **`globals.css`** — the whole ramp retinted to h≈285 in both themes (light + dark restated in full: the
+  yaccount blocks come *later* at equal specificity, so `.dark` must repeat every token `:root` sets or
+  the light value wins in dark mode). New `--surface-sunken`, `--rule`, `--dur-1/2/3`,
+  `--ease-register`. Devices in `@layer components` (so a Tailwind utility at the call site still wins):
+  `.figure-hero/-lg/-md`, `.marginalia`, `.eyebrow`, `.rule`, `.rule-double`, `.leaders`, `.tnum`.
+  Global `prefers-reduced-motion` kill switch.
+- **Two token values differ from the direction's table, both for contrast, both computed not guessed:**
+  `--positive` light `0.550 → 0.530` (the proposed value scored **4.27:1**, under AA) and
+  `--muted-foreground` light `0.525` (so it clears AA on `--surface-sunken` too). Everything else is the
+  approved table.
+- **`theme.test.ts` is the guard.** It parses `globals.css`, resolves `var()` indirection, converts
+  oklch → sRGB (pure `contrast.ts`) and fails on: any read pair below AA in either theme, a focus ring
+  below 3:1, an untinted neutral, a missing device class, a missing motion token, or a `--rule` that
+  doesn't read harder than `--border`. **Change a token and this test tells you what it costs.**
+- **`layout.tsx`** — Fraunces now loads `style: ["normal","italic"]` + `axes: ["SOFT","WONK","opsz"]`.
+  The build accepted the axes and emits both faces; no fallback needed.
+- **`src/features/ui/`** — `Figure`, `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`, `LeaderRow`,
+  `Sparkline`, `ResponsiveSheet`, `EmptyState`, `ListSkeleton`/`FigureSkeleton`, plus pure
+  `geometry.ts` (`sparklinePath`) and `contrast.ts`, and `useMediaQuery` (`useSyncExternalStore` —
+  the repo forbids setState-in-effect). Barrel at `@/features/ui`.
+- **Adopted, not just shipped:** ledger hero → `Figure`; all 17 hand-rolled eyebrows → `Eyebrow`;
+  page titles → `.figure-lg`; ledger day header → sunken eyebrow strip; ledger amounts → `Money`;
+  Plan rebuilt onto `LeaderRow` + `RuledTotal` (totals moved **under** the rows they sum, double rule on
+  Unallocated); `Loading…` → skeletons on Ledger + Plan; all **five** edit sheets → `ResponsiveSheet`
+  (bottom on mobile, right on `sm+`).
+- **Real bug found and fixed:** an unlayered `body { font-family: system-ui }` left over from the shadcn
+  scaffold outranked every layered rule — **body copy had never been rendering in Geist**, despite
+  §12.3 and `font-sans` on `<body>`. Unlayered CSS beats all `@layer` CSS; don't add rules outside a layer.
+- **Spec §12 edited deliberately** (invariant #8's explicit-decision path), retitled "The Standing
+  Register", changed passages marked **(M11)** in place: §12.1 (the three moves + why the louder cut was
+  rejected), §12.2 (token table, the "no washes" rule, the AA guarantee, caller-chosen tone), §12.3
+  (figure scale table, marginalia, eyebrow), §12.4 (carried day header, the rule, leaders, responsive
+  density), §12.5 (motion budget, the one orchestrated moment, reduced motion), §12.7 (third signature),
+  §12.8 (compose the primitives). Mirrored in impl §4 M11.
+- **Not done here, on purpose:** the hero history curve and the carried balance need engine series
+  (`overallBalanceSeries`) — **Phase 5**. `Money` was adopted only where files were already being
+  touched; the remaining ~60 `formatCents` call sites convert as later phases rewrite those screens.
+- Tests **494 → 573** (+79: 9 geometry, 15 contrast, 55 theme). Typecheck/lint/build/prettier clean.
 
-- **`src/app/globals.css`** — retheme every semantic token to the tinted paper/ink ramp above (light +
-  dark); add `--rule`, `--surface-sunken`, motion tokens (`--ease-register`, `--dur-1/2/3`); add
-  `.figure-hero` / `.figure-lg` / `.figure-md` (Fraunces, fluid `clamp()`, optical sizing, tight
-  tracking, tnum), `.marginalia` (Fraunces italic), `.eyebrow`, `.rule`, `.leaders`. Global
-  `prefers-reduced-motion` kill-switch.
-  Note the file already has TWO `@theme inline` blocks — the shadcn one and the yaccount one appended
-  in M2. Extend the second; don't restructure the first.
-- **`src/app/layout.tsx`** — Fraunces gains `style: ["normal","italic"]` and the `SOFT`/`WONK`/`opsz`
-  variable axes. **`next/font/google` fetches at build time**, so the build needs network once; if the
-  axes are rejected, fall back to plain Fraunces rather than fighting it.
-- **`src/features/ui/`** (new shared primitives): `Figure` (hero amount + optional history curve),
-  `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet` (bottom
-  on mobile, right on `sm+`), `EmptyState`, `ListSkeleton`.
-- **Edit spec §12 in place** — §12.2 (token ramp), §12.3 (figure scale + italic marginalia role), §12.4
-  (the rule, leaders, sticky carried header, responsive density), §12.5 (motion budget: the single
-  orchestrated quick-add sequence), §12.7 (signatures restated). Mirror in impl §4 M11. **This is a
-  deliberate edit, not drift — say so in the section text.**
+---
+
+## 5. Phase 4 — what to do next
+
+From `M11-PLAN.md` §5. **Do not start it until the user has browser-tested Phase 3 and said go.**
+
+- shadcn adds: `popover`, `command`, `tabs`, `switch`, `collapsible`, `scroll-area` (`skeleton` already
+  landed in Phase 3).
+- **`AppShell.tsx`** — `< lg`: compact top bar (wordmark + sync + theme) + **bottom tab bar**
+  (**Home · Ledger · Inbox · More**, badge on Inbox) + safe-area padding. `≥ lg`: slim left sidebar rail
+  with all 8 destinations + Settings. Content stays a centred column (`max-w-2xl`, dashboard `max-w-5xl`).
+- **`shell/QuickAddFab.tsx`** — iris FAB (full-strength brand, §12.2), bottom-right, above the tab bar,
+  on every screen.
+- **`shell/QuickAddSheet.tsx`** — the shortcuts strip **moves here off the ledger** (the declutter ask),
+  then Expense/Income/Transfer over the existing `ComposeBar` field logic, extracted so bar and sheet
+  share one implementation and one `resolveAmount` rule. This is where §12.5's **one orchestrated
+  motion moment** gets built: sheet rises `--dur-3`, the logged row lands with an iris wash `--dur-2`.
+- **`shell/MoreSheet.tsx`** (Plan/Goals/Recurring/Containers/Categories/Settings) and
+  **`shell/CommandPalette.tsx`** (⌘K).
+- Use `ResponsiveSheet` for anything sheet-shaped; it already exists.
 
 **Phase 3 is user-testable as:** every screen re-skins coherently, light and dark both hold up,
 contrast is AA, nothing is broken, and `prefers-reduced-motion: reduce` kills motion.
@@ -390,7 +431,7 @@ npx prettier --check src
 npm run dev       # a dev server may ALREADY be running on :3000 — check before starting another
 ```
 
-- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → **494 (P2)**.
+- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → **573 (P3)**.
 - **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
   "%{http_code}" http://localhost:3000/ledger` to check before launching a second one.
 - **Pre-existing prettier drift** on `src/components/ui/checkbox.tsx`, `progress.tsx`,

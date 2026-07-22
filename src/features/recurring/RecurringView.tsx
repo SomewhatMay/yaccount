@@ -50,6 +50,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
+import { Eyebrow } from "@/features/ui";
 
 export function RecurringView() {
   const ready = useAtomValue(readyAtom);
@@ -86,12 +87,8 @@ export function RecurringView() {
     <div className="space-y-6">
       <section className="flex items-end justify-between pt-3 pb-1">
         <div>
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-            Recurring
-          </p>
-          <h1 className="font-display mt-1 text-3xl leading-none">
-            Scheduled transactions
-          </h1>
+          <Eyebrow>Recurring</Eyebrow>
+          <h1 className="figure-lg mt-1.5">Scheduled transactions</h1>
           <p className="text-muted-foreground mt-3 max-w-md text-sm">
             Each rule drops one transaction into your inbox as it comes due — you always
             approve before anything is logged.
@@ -136,9 +133,9 @@ export function RecurringView() {
 
       {cancelled.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-muted-foreground px-1 text-xs font-medium tracking-[0.14em] uppercase">
+          <Eyebrow as="h2" className="px-1">
             Paused
-          </h2>
+          </Eyebrow>
           <div className="rounded-2xl border border-dashed">
             {cancelled.map((r, i) => (
               <div

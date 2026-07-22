@@ -33,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Eyebrow } from "@/features/ui";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -138,10 +139,8 @@ export function InboxView() {
   return (
     <div className="space-y-6">
       <section className="pt-3 pb-1">
-        <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-          Inbox
-        </p>
-        <h1 className="font-display mt-1 text-3xl leading-none">
+        <Eyebrow>Inbox</Eyebrow>
+        <h1 className="figure-lg mt-1.5">
           {pending.length === 0 ? "All clear" : `${pending.length} to review`}
         </h1>
         <p className="text-muted-foreground mt-3 text-sm">

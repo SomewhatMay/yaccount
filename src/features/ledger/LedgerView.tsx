@@ -41,6 +41,15 @@ import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
+import {
+  EmptyState,
+  Eyebrow,
+  Figure,
+  FigureSkeleton,
+  ListSkeleton,
+  Marginalia,
+  Money,
+} from "@/features/ui";
 import { ComposeBar } from "@/features/ledger/ComposeBar";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
 import { Button } from "@/components/ui/button";
@@ -210,49 +219,42 @@ export function LedgerView() {
     });
   }
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <FigureSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
-      <section className="pt-3 pb-1">
-        <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-          Overall balance
-        </p>
-        <p
-          className={cn(
-            "font-display tnum mt-1 text-5xl leading-none sm:text-6xl",
-            balance < 0 && "text-destructive",
-          )}
-        >
-          {formatCents(balance)}
-        </p>
+      <Figure label="Overall balance" cents={balance}>
         <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
           <span className="text-foreground/70 font-medium">This month</span>
           <span className="inline-flex items-center gap-1.5">
             <ArrowDownLeftIcon className="text-positive size-4" />
-            <span className="tnum text-foreground font-mono">{formatCents(monthIn)}</span>
+            <Money cents={monthIn} className="text-foreground" />
             in
           </span>
           <span className="inline-flex items-center gap-1.5">
             <ArrowUpRightIcon className="size-4" />
-            <span className="tnum text-foreground font-mono">
-              {formatCents(monthOut)}
-            </span>
+            <Money cents={monthOut} className="text-foreground" />
             out
           </span>
-          {uncounted > 0 && (
-            <span className="text-muted-foreground/80">
-              {uncounted} container{uncounted === 1 ? "" : "s"} not counted
-            </span>
-          )}
         </div>
-      </section>
+        {uncounted > 0 && (
+          <Marginalia className="mt-2">
+            {uncounted} container{uncounted === 1 ? "" : "s"} not counted
+          </Marginalia>
+        )}
+      </Figure>
 
       {templates.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">
-            Shortcuts
-          </span>
+          <Eyebrow as="span">Shortcuts</Eyebrow>
           {templates.map((t) => (
             <div
               key={t.id}
@@ -265,9 +267,12 @@ export function LedgerView() {
               >
                 <BookmarkIcon className="text-muted-foreground size-3" aria-hidden />
                 <span className="font-medium">{t.template_name}</span>
-                <span className="tnum text-muted-foreground font-mono text-xs">
-                  {formatCents(t.to_container_id ? Math.abs(t.amount) : t.amount)}
-                </span>
+                <Money
+                  cents={t.amount}
+                  absolute={t.to_container_id !== null}
+                  tone="quiet"
+                  className="text-xs"
+                />
               </button>
               <button
                 type="button"
@@ -293,15 +298,18 @@ export function LedgerView() {
 
       <div className="bg-card overflow-hidden rounded-2xl border">
         {groups.length === 0 ? (
-          <div className="text-muted-foreground px-5 py-14 text-center text-sm">
-            Nothing logged yet. Add your first entry above.
-          </div>
+          <EmptyState title="Nothing logged yet">
+            Every entry you add lands here, newest first. Start with what you spent today.
+          </EmptyState>
         ) : (
           groups.map((g, gi) => (
             <div key={g.day} className={cn(gi > 0 && "border-t")}>
-              <div className="text-muted-foreground bg-muted/30 px-5 py-1.5 text-xs font-medium">
+              <Eyebrow
+                as="h2"
+                className="bg-surface-sunken border-b px-5 py-2 text-[0.625rem]"
+              >
                 {formatDay(g.day)}
-              </div>
+              </Eyebrow>
               {g.items.map((t) => (
                 <LedgerRow
                   key={t.id}
@@ -385,15 +393,12 @@ function LedgerRow({
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
         <div className="text-muted-foreground truncate text-xs">{sub}</div>
       </div>
-      <div
-        className={cn(
-          "tnum font-mono text-sm tracking-tight",
-          income && "text-positive",
-          transfer && "text-muted-foreground",
-        )}
-      >
-        {transfer ? formatCents(Math.abs(tx.amount)) : formatCents(tx.amount)}
-      </div>
+      <Money
+        cents={tx.amount}
+        absolute={transfer}
+        tone={transfer ? "quiet" : income ? "in" : "neutral"}
+        className="text-sm tracking-tight"
+      />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
