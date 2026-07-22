@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSetAtom } from "jotai";
 import { toast } from "sonner";
 import { LogInIcon, LogOutIcon, CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getAuthProvider } from "@/auth/web";
+import { syncAtom, syncStatusAtom } from "@/features/store";
 
 /**
  * The sign-in control (§3.3-B, §12 "Quiet Register" — a calm header affordance,
@@ -27,6 +29,8 @@ export function AuthButton() {
   // signed-out control for a frame on every load before the grant is read.
   const [connected, setConnected] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+  const sync = useSetAtom(syncAtom);
+  const setSyncStatus = useSetAtom(syncStatusAtom);
 
   // Restore the durable connection on mount — no popup, no network. The token is
   // renewed silently later, on demand, while the user's Google session is alive.
@@ -51,8 +55,9 @@ export function AuthButton() {
       await auth.getAccessToken();
       setConnected(auth.isConnected());
       toast.success("Connected to Google", {
-        description: "You'll stay connected. Drive sync arrives next.",
+        description: "Your data now syncs to your Drive across devices.",
       });
+      void sync(); // pull anything already on Drive + push this device's ops (§8.4)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign-in failed";
       toast.error("Couldn't sign in", { description: message });
@@ -64,7 +69,10 @@ export function AuthButton() {
   function signOut() {
     getAuthProvider().signOut();
     setConnected(false);
-    toast("Disconnected from Google");
+    setSyncStatus("idle"); // stop showing the sync affordance — nothing to sync now
+    toast("Disconnected from Google", {
+      description: "Your data stays on this device until you reconnect.",
+    });
   }
 
   // Unknown state (pre-restore): a same-size, invisible placeholder so the

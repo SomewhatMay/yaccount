@@ -1,9 +1,12 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 export const DB_NAME = "yaccount";
-export const DB_VERSION = 2;
+// v3 (M9): adds the device-local `outbox` store — op-ids this device authored but
+// hasn't yet flushed to its own Drive ledger (§8.4). Guarded upgrade, so a
+// populated v2 cache carries over untouched.
+export const DB_VERSION = 3;
 
-/** Object-store registry. Seven materialized tables (§7) + two infra stores. */
+/** Object-store registry. Seven materialized tables (§7) + infra stores. */
 export const STORE = {
   categories: "categories",
   containers: "containers",
@@ -15,6 +18,7 @@ export const STORE = {
   settings: "settings", // synced user preferences (M3) — key/value, keyPath 'key'
   oplog: "oplog", // append-only journal (§8.2)
   appMeta: "app_meta", // device-local metadata (deviceId, …) — never synced (§8.4)
+  outbox: "outbox", // device-local: op-ids authored here, pending push (M9, §8.4)
 } as const;
 
 export type StoreName = (typeof STORE)[keyof typeof STORE];
@@ -31,8 +35,15 @@ export const STATE_STORES: StoreName[] = [
   STORE.settings,
 ];
 
-/** Every store — the transaction scope for a dispatch (append + apply, §3). */
-export const ALL_STORES: StoreName[] = [...STATE_STORES, STORE.oplog, STORE.appMeta];
+/** Every store — the transaction scope for a dispatch (append + apply, §3).
+ * Includes `outbox` so a local dispatch enqueues its op for push in the SAME
+ * atomic transaction (§8.4 — a crash can't leave an authored op un-queued). */
+export const ALL_STORES: StoreName[] = [
+  ...STATE_STORES,
+  STORE.oplog,
+  STORE.appMeta,
+  STORE.outbox,
+];
 
 export const INDEX = {
   // §8.3 — excludes transfers (their category_id is null → IndexedDB drops the record).
@@ -77,6 +88,13 @@ export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
       if (oplog) oplog.createIndex(INDEX.oplogByTs, ["ts", "id"]);
 
       store(STORE.appMeta, "key");
+      store(STORE.outbox); // added in DB v3 (M9); keyPath 'id' = the op id
+    },
+    // A newer client (higher DB_VERSION) has our store set already — never a data
+    // hazard, but the browser blocks the downgrade-open. Nothing to do here; the
+    // guarded upgrade above only ever *adds* stores.
+    blocked() {
+      /* another tab holds an older connection — it will close and retry */
     },
   });
 }

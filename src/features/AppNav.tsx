@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { pendingCountAtom } from "@/features/store";
 import { AuthButton } from "@/features/auth/AuthButton";
+import { SyncIndicator } from "@/features/SyncIndicator";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -62,6 +63,7 @@ export function AppNav() {
         })}
       </nav>
       <div className="ml-auto flex items-center gap-1.5">
+        <SyncIndicator />
         <AuthButton />
         <ThemeToggle />
       </div>
