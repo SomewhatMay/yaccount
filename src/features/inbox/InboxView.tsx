@@ -99,25 +99,39 @@ export function InboxView() {
     toast.success(ids.length === 1 ? "Approved" : `Approved ${ids.length}`);
   }
 
-  async function dismiss(t: Transaction) {
-    const op = voidTransaction(t);
-    await dispatch(op);
-    if (editing?.id === t.id) setEditing(null);
-    const voidRow = op.type === "transaction.void" ? op.payload.row : null;
-    toast.success("Dismissed", {
-      description: `${t.vendor_source} · ${formatCents(t.amount)}`,
-      action: voidRow
-        ? {
-            label: "Undo",
-            onClick: () => {
-              void dispatch(unvoidTransaction(voidRow)).then(() =>
-                toast.success("Back in the inbox", { description: t.vendor_source }),
-              );
-            },
-          }
-        : undefined,
+  // Dismiss one or many pending rows (each a void, undoable). Undo un-dismisses
+  // every row in the batch, restoring them to the inbox.
+  async function dismissMany(rows: Transaction[]) {
+    if (rows.length === 0) return;
+    const voidRows: Transaction[] = [];
+    for (const t of rows) {
+      const op = voidTransaction(t);
+      await dispatch(op);
+      if (op.type === "transaction.void") voidRows.push(op.payload.row);
+    }
+    if (rows.some((t) => t.id === editing?.id)) setEditing(null);
+    setSelected(new Set());
+    toast.success(rows.length === 1 ? "Dismissed" : `Dismissed ${rows.length}`, {
+      description:
+        rows.length === 1
+          ? `${rows[0].vendor_source} · ${formatCents(rows[0].amount)}`
+          : undefined,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void Promise.all(voidRows.map((v) => dispatch(unvoidTransaction(v)))).then(() =>
+            toast.success(
+              voidRows.length === 1
+                ? "Back in the inbox"
+                : `${voidRows.length} back in the inbox`,
+            ),
+          );
+        },
+      },
     });
   }
+
+  const dismiss = (t: Transaction) => dismissMany([t]);
 
   if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
 
@@ -146,6 +160,15 @@ export function InboxView() {
           >
             <CheckIcon className="size-4" />
             Approve selected
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-destructive rounded-full"
+            onClick={() => dismissMany(pending.filter((t) => liveSelection.has(t.id)))}
+          >
+            <Trash2Icon className="size-4" />
+            Dismiss
           </Button>
           <Button
             size="sm"
