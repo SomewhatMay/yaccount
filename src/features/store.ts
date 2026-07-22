@@ -86,6 +86,45 @@ export const defaultContainerIdAtom = atom((get) => {
 });
 
 /**
+ * ── The shell's two pieces of shared UI state (M11) ────────────────────────
+ *
+ * The quick-add sheet is opened from three places — the FAB, the ⌘K palette and
+ * a keyboard shortcut — so which kind of entry it opens on is state, not a prop
+ * threaded through the shell. `null` = closed.
+ */
+export type QuickAddKind = "expense" | "income" | "transfer";
+export const quickAddAtom = atom<QuickAddKind | null>(null);
+
+/** The ⌘K palette. Opened by the shortcut, by the top bar's search affordance,
+ * and from the More sheet — so, likewise, state rather than a prop. */
+export const commandPaletteAtom = atom(false);
+
+/**
+ * The row the register should mark, and whether to bring it into view.
+ *
+ * Two callers, one device: a row just logged lands with a single iris wash
+ * (§12.5's one orchestrated moment — it is already at the top, so no scrolling),
+ * and a row chosen from the ⌘K palette is somewhere down the page, so that one
+ * scrolls. The mark is held for a moment and then released, which is why it
+ * expires here rather than in a component that may have unmounted by then.
+ */
+export type FlashedRow = { id: string; scroll: boolean };
+export const flashedRowAtom = atom<FlashedRow | null>(null);
+const FLASH_MS = 1400;
+let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const flashRowAtom = atom(
+  null,
+  (_get, set, row: { id: string; scroll?: boolean } | null) => {
+    if (flashTimer) clearTimeout(flashTimer);
+    set(flashedRowAtom, row ? { id: row.id, scroll: row.scroll ?? false } : null);
+    if (row) {
+      flashTimer = setTimeout(() => set(flashedRowAtom, null), FLASH_MS);
+    }
+  },
+);
+
+/**
  * The unified global reporting-period control (§6.1). One period drives every
  * dashboard widget (per-widget override is deferred to M11). `comparePeriodAtom`
  * holds the optional second range for two-range compare (§6.2); null = compare

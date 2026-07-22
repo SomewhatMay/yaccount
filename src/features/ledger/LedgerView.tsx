@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
@@ -11,20 +11,19 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   Trash2Icon,
-  XIcon,
 } from "lucide-react";
 import {
   categoriesAtom,
   containersAtom,
   defaultContainerIdAtom,
   dispatchAtom,
+  flashedRowAtom,
   readyAtom,
-  templatesAtom,
   transactionsAtom,
+  type FlashedRow,
 } from "@/features/store";
 import {
   createTemplate,
-  logTemplate,
   removeTemplate,
   unvoidTransaction,
   voidTransaction,
@@ -83,8 +82,8 @@ export function LedgerView() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const transactions = useAtomValue(transactionsAtom);
-  const templates = useAtomValue(templatesAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
+  const flashed = useAtomValue(flashedRowAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
@@ -167,36 +166,6 @@ export function LedgerView() {
     });
   }
 
-  async function quickLog(template: Transaction) {
-    await dispatch(logTemplate(template, { date: todayIso() }));
-    toast.success("Logged", {
-      description: `${template.vendor_source} · ${formatCents(template.amount)}`,
-    });
-  }
-
-  async function removeShortcut(template: Transaction) {
-    await dispatch(removeTemplate(template.id));
-    const transfer = template.to_container_id !== null;
-    toast.success("Shortcut removed", {
-      description: template.vendor_source,
-      action: {
-        label: "Undo",
-        onClick: () =>
-          void dispatch(
-            createTemplate({
-              id: template.id,
-              template_name: template.template_name ?? template.vendor_source,
-              amount: template.amount,
-              vendor_source: template.vendor_source,
-              container_id: template.container_id,
-              category_id: transfer ? null : template.category_id,
-              to_container_id: transfer ? template.to_container_id : null,
-            }),
-          ),
-      },
-    });
-  }
-
   async function del(t: Transaction) {
     const op = voidTransaction(t);
     await dispatch(op);
@@ -252,48 +221,12 @@ export function LedgerView() {
         )}
       </Figure>
 
-      {templates.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Eyebrow as="span">Shortcuts</Eyebrow>
-          {templates.map((t) => (
-            <div
-              key={t.id}
-              className="border-input bg-card hover:border-primary/30 group inline-flex items-center rounded-full border text-sm transition-colors"
-            >
-              <button
-                type="button"
-                onClick={() => quickLog(t)}
-                className="flex items-center gap-1.5 py-1 pr-1 pl-3"
-              >
-                <BookmarkIcon className="text-muted-foreground size-3" aria-hidden />
-                <span className="font-medium">{t.template_name}</span>
-                <Money
-                  cents={t.amount}
-                  absolute={t.to_container_id !== null}
-                  tone="quiet"
-                  className="text-xs"
-                />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeShortcut(t)}
-                aria-label={`Remove ${t.template_name} shortcut`}
-                className="text-muted-foreground hover:text-destructive mr-1 rounded-full p-1"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
+      {/* Shortcuts moved into the quick-add sheet (M11): they belong where you
+          are about to write, not on the screen you read. */}
       <ComposeBar
         categories={categories}
         containers={containers}
         defaultContainerId={defaultContainerId}
-        onSubmit={async (op) => {
-          await dispatch(op);
-        }}
       />
 
       <div className="bg-card overflow-hidden rounded-2xl border">
@@ -314,6 +247,7 @@ export function LedgerView() {
                 <LedgerRow
                   key={t.id}
                   tx={t}
+                  flashed={flashed?.id === t.id ? flashed : null}
                   time={showsTime(g.day) ? formatEnteredTime(t.entered_at) : null}
                   categoryName={nameOf(t.category_id)}
                   containerName={showContainer ? containerNameOf(t.container_id) : ""}
@@ -345,6 +279,7 @@ export function LedgerView() {
 
 function LedgerRow({
   tx,
+  flashed,
   time,
   categoryName,
   containerName,
@@ -354,6 +289,8 @@ function LedgerRow({
   onSaveShortcut,
 }: {
   tx: Transaction;
+  /** Set while this row is the one being pointed at (§12.5). */
+  flashed: FlashedRow | null;
   time: string | null;
   categoryName: string;
   containerName: string;
@@ -363,6 +300,17 @@ function LedgerRow({
   onSaveShortcut: () => void;
 }) {
   const transfer = isTransfer(tx);
+  const row = useRef<HTMLDivElement>(null);
+  const bringIntoView = flashed?.scroll ?? false;
+
+  // Only a row found through the ⌘K palette scrolls: a row you just logged is
+  // already at the top of the register, and yanking the page to centre it would
+  // be motion in place of an answer. `scroll-behavior` is zeroed globally under
+  // `prefers-reduced-motion` (§12.5), so this obeys that with no special case.
+  useEffect(() => {
+    if (bringIntoView)
+      row.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [bringIntoView]);
   // Money in is emerald; a transfer is your own money moving, so it stays quiet.
   const income = !transfer && tx.amount >= 0;
   const sub = [
@@ -375,7 +323,18 @@ function LedgerRow({
     .join(" · ");
 
   return (
-    <div className="group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors">
+    <div
+      ref={row}
+      className={cn(
+        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        // The end of §12.5's one orchestrated moment: the row lands carrying a
+        // single iris wash, which then settles. Everywhere else on this row,
+        // motion is a colour under the pointer.
+        flashed
+          ? "bg-primary/15 duration-[var(--dur-2)]"
+          : "hover:bg-muted/40 duration-[var(--dur-1)]",
+      )}
+    >
       {transfer ? (
         <ArrowRightIcon className="text-muted-foreground size-2.5 shrink-0" aria-hidden />
       ) : (

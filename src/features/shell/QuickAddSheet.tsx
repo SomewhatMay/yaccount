@@ -1,0 +1,335 @@
+"use client";
+
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { toast } from "sonner";
+import { ArrowRightIcon, BookmarkIcon, XIcon } from "lucide-react";
+import { createTemplate, logTemplate, removeTemplate } from "@/core/commands";
+import { formatCents } from "@/core/money";
+import type { Container, Transaction } from "@/core/model";
+import { todayIso } from "@/features/clock";
+import {
+  categoriesAtom,
+  containersAtom,
+  defaultContainerIdAtom,
+  dispatchAtom,
+  flashRowAtom,
+  quickAddAtom,
+  templatesAtom,
+} from "@/features/store";
+import { categoryDotColor } from "@/features/category-color";
+import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
+import { SignToggle } from "@/features/ledger/SignToggle";
+import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+const KINDS: { value: ComposeKind; label: string }[] = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+  { value: "transfer", label: "Transfer" },
+];
+
+/**
+ * Quick-add — the sheet the FAB raises, and the front half of §12.5's one
+ * orchestrated moment: it rises on `--dur-3`, you log, and the row lands in the
+ * register with a single iris wash on `--dur-2`.
+ *
+ * The **shortcuts strip lives here now**, off the ledger (the declutter this
+ * milestone was asked for): a saved shortcut is something you reach for when you
+ * are about to write an entry, not furniture on the screen you read.
+ *
+ * The form is mounted only while the sheet is open, so every visit starts on the
+ * kind that asked for it (the FAB opens on Expense, the ⌘K palette on whatever
+ * you picked) with an empty amount and the clock rolled forward.
+ */
+export function QuickAddSheet() {
+  const [openKind, setOpenKind] = useAtom(quickAddAtom);
+
+  return (
+    <ResponsiveSheet
+      open={openKind !== null}
+      onOpenChange={(next) => !next && setOpenKind(null)}
+      title="Add an entry"
+      description="Log an expense, income, or a move between containers."
+    >
+      {openKind !== null && (
+        <QuickAddForm initialKind={openKind} onDone={() => setOpenKind(null)} />
+      )}
+    </ResponsiveSheet>
+  );
+}
+
+function QuickAddForm({
+  initialKind,
+  onDone,
+}: {
+  initialKind: ComposeKind;
+  onDone: () => void;
+}) {
+  const categories = useAtomValue(categoriesAtom);
+  const containers = useAtomValue(containersAtom);
+  const templates = useAtomValue(templatesAtom);
+  const defaultContainerId = useAtomValue(defaultContainerIdAtom);
+  const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
+
+  const f = useComposeFields({
+    categories,
+    containers,
+    defaultContainerId,
+    initialKind,
+    onLogged: onDone,
+  });
+
+  async function quickLog(template: Transaction) {
+    const op = logTemplate(template, { date: todayIso() });
+    try {
+      await dispatch(op);
+    } catch {
+      return; // already logged and toasted by `dispatchAtom`
+    }
+    toast.success("Logged", {
+      description: `${template.vendor_source} · ${formatCents(shortcutAmount(template))}`,
+    });
+    if (op.type === "transaction.create") flashRow({ id: op.payload.row.id });
+    onDone();
+  }
+
+  async function removeShortcut(template: Transaction) {
+    const transfer = template.to_container_id !== null;
+    const name = template.template_name ?? template.vendor_source;
+    await dispatch(removeTemplate(template.id));
+    toast.success("Shortcut removed", {
+      description: name,
+      action: {
+        label: "Undo",
+        onClick: () =>
+          void dispatch(
+            createTemplate({
+              id: template.id,
+              template_name: name,
+              amount: template.amount,
+              vendor_source: template.vendor_source,
+              container_id: template.container_id,
+              category_id: transfer ? null : template.category_id,
+              to_container_id: transfer ? template.to_container_id : null,
+            }),
+          ),
+      },
+    });
+  }
+
+  const submitLabel =
+    f.kind === "transfer"
+      ? "Move money"
+      : f.kind === "income"
+        ? "Log income"
+        : "Log expense";
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void f.submit();
+      }}
+      className="space-y-5 px-5 pt-1 pb-7"
+    >
+      {templates.length > 0 && (
+        <div className="space-y-2">
+          <Eyebrow as="h3">Shortcuts</Eyebrow>
+          <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+            {templates.map((t) => (
+              <div
+                key={t.id}
+                className="border-input bg-card hover:border-primary/30 inline-flex shrink-0 items-center rounded-full border text-sm transition-colors duration-[var(--dur-1)]"
+              >
+                <button
+                  type="button"
+                  onClick={() => void quickLog(t)}
+                  className="flex items-center gap-1.5 py-1.5 pr-1 pl-3"
+                >
+                  <BookmarkIcon className="text-muted-foreground size-3" aria-hidden />
+                  <span className="font-medium whitespace-nowrap">{t.template_name}</span>
+                  <Money
+                    cents={t.amount}
+                    absolute={t.to_container_id !== null}
+                    tone="quiet"
+                    className="text-xs"
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removeShortcut(t)}
+                  aria-label={`Remove ${t.template_name} shortcut`}
+                  className="text-muted-foreground hover:text-destructive mr-1 rounded-full p-1"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ToggleGroup
+        type="single"
+        value={f.kind}
+        onValueChange={(v) => v && f.setKind(v as ComposeKind)}
+        className="bg-muted/60 w-full rounded-full p-0.5"
+      >
+        {KINDS.map((k) => (
+          <ToggleGroupItem
+            key={k.value}
+            value={k.value}
+            className="data-[state=on]:bg-background data-[state=on]:text-primary h-8 flex-1 rounded-full text-xs"
+          >
+            {k.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+
+      {/* The figure you are writing: mono and tabular like every amount in the
+          app (§12.3), and big enough to be the only thing you look at. */}
+      <div className="flex items-center justify-center gap-1 py-1">
+        {f.kind !== "transfer" && (
+          <SignToggle sign={f.sign} onChange={f.setSign} className="size-10 text-xl" />
+        )}
+        <span className="text-muted-foreground tnum font-mono text-3xl" aria-hidden>
+          $
+        </span>
+        <Input
+          value={f.amountStr}
+          onChange={(e) => f.onAmountChange(e.target.value)}
+          placeholder="0.00"
+          inputMode="decimal"
+          autoFocus
+          aria-label="Amount"
+          className="tnum h-14 w-40 border-0 bg-transparent p-0 font-mono text-4xl shadow-none focus-visible:ring-0 md:text-4xl"
+        />
+      </div>
+
+      <div className="grid grid-cols-[5.5rem_1fr] items-center gap-x-3 gap-y-2">
+        <FieldLabel>{f.kind === "transfer" ? "Note" : "What was it?"}</FieldLabel>
+        <Input
+          value={f.vendor}
+          onChange={(e) => f.setVendor(e.target.value)}
+          placeholder={f.kind === "transfer" ? "Optional" : "e.g. Blue Bottle"}
+          aria-label={f.kind === "transfer" ? "Transfer note" : "Payee or source"}
+          className="h-9"
+        />
+
+        {f.kind !== "transfer" && (
+          <>
+            <FieldLabel>Category</FieldLabel>
+            <Select value={f.categoryId} onValueChange={f.setCategoryId}>
+              <SelectTrigger aria-label="Category" className="h-9 w-full">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                {f.categoriesOfKind.length === 0 && (
+                  <SelectItem value="none" disabled>
+                    No {f.kind} categories yet
+                  </SelectItem>
+                )}
+                {f.categoriesOfKind.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    <span
+                      className="mr-0.5 size-2 rounded-full"
+                      style={{ backgroundColor: categoryDotColor(c.id) }}
+                    />
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+
+        <FieldLabel>{f.kind === "transfer" ? "From" : "Container"}</FieldLabel>
+        <ContainerSelect
+          value={f.containerId}
+          onChange={f.setPickedContainerId}
+          containers={f.activeContainers}
+          label={f.kind === "transfer" ? "From container" : "Container"}
+        />
+
+        {f.kind === "transfer" && (
+          <>
+            <FieldLabel>
+              <ArrowRightIcon className="mr-1 inline size-3" aria-hidden />
+              To
+            </FieldLabel>
+            <ContainerSelect
+              value={f.toContainerId}
+              onChange={f.setToContainerId}
+              containers={f.activeContainers.filter((c) => c.id !== f.containerId)}
+              label="To container"
+              placeholder="To…"
+            />
+          </>
+        )}
+
+        <FieldLabel>When</FieldLabel>
+        <Input
+          type="datetime-local"
+          value={f.when}
+          onChange={(e) => f.setWhen(e.target.value)}
+          aria-label="Date and time"
+          className="tnum h-9"
+        />
+      </div>
+
+      {f.warn && <p className="text-xs text-amber-600 dark:text-amber-500">{f.warn}</p>}
+
+      <Button type="submit" className="h-11 w-full rounded-xl text-sm">
+        {submitLabel}
+      </Button>
+    </form>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <span className="text-muted-foreground text-sm">{children}</span>;
+}
+
+function ContainerSelect({
+  value,
+  onChange,
+  containers,
+  label,
+  placeholder = "Container",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  containers: Container[];
+  label: string;
+  placeholder?: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger aria-label={label} className="h-9 w-full">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {containers.map((c) => (
+          <SelectItem key={c.id} value={c.id}>
+            {c.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** A transfer has no direction to print — the arrow carries it (§12.2). */
+function shortcutAmount(t: Transaction): number {
+  return t.to_container_id !== null ? Math.abs(t.amount) : t.amount;
+}

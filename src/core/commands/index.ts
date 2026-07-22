@@ -26,7 +26,7 @@ import {
   type RecurringRule,
   type Transaction,
 } from "../model";
-import type { Op } from "../oplog";
+import type { Op, TransactionCreateOp } from "../oplog";
 
 /**
  * Commands (impl §3): pure builders that turn a UI intent into exactly one Op
@@ -82,7 +82,7 @@ export function createTransaction(
     entered_at?: string | null; // when the entry happened; defaults to the op's ts
   },
   m?: OpMeta,
-): Op {
+): TransactionCreateOp {
   const op = meta(m);
   // The op already holds an authoritative instant (it is the total order's sort
   // key, §8.2), so it is the DEFAULT — "recorded now" — with no second clock read
@@ -182,7 +182,7 @@ export function createTransfer(
     entered_at?: string | null;
   },
   m?: OpMeta,
-): Op {
+): TransactionCreateOp {
   const op = meta(m);
   return {
     ...op,
@@ -300,7 +300,7 @@ export function logTemplate(
   template: Transaction,
   input: { date: string; id?: string },
   m?: OpMeta,
-): Op {
+): TransactionCreateOp {
   if (template.to_container_id !== null) {
     return createTransfer(
       {

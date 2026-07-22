@@ -3,6 +3,7 @@ import {
   activeRows,
   isVoided,
   pendingRows,
+  searchTransactions,
   sortForRegister,
   templateRows,
 } from "./ledger";
@@ -239,5 +240,56 @@ describe("sortForRegister — newest first, and the clock breaks the day's tie (
     const before = rows.map((r) => r.id);
     sortForRegister(rows);
     expect(rows.map((r) => r.id)).toEqual(before);
+  });
+});
+
+describe("searchTransactions — what the ⌘K palette looks through (M11)", () => {
+  const row = (id: string, vendor: string): Transaction =>
+    makeTransaction({
+      id,
+      date: "2026-07-20",
+      amount: -450,
+      vendor_source: vendor,
+      category_id: "coffee",
+    });
+
+  const rows = [
+    row("a", "Blue Bottle"),
+    row("b", "Blue Apron"),
+    row("c", "Metro card"),
+    row("d", "blue bottle again"),
+  ];
+
+  it("finds nothing for a blank query — the palette shows destinations instead", () => {
+    expect(searchTransactions(rows, "")).toEqual([]);
+    expect(searchTransactions(rows, "   ")).toEqual([]);
+  });
+
+  it("matches on any part of the payee, ignoring case", () => {
+    expect(searchTransactions(rows, "bottle").map((r) => r.id)).toEqual(["a", "d"]);
+    expect(searchTransactions(rows, "BLUE").map((r) => r.id)).toEqual(["a", "b", "d"]);
+  });
+
+  it("narrows with every word typed, in any order", () => {
+    expect(searchTransactions(rows, "blue bottle").map((r) => r.id)).toEqual(["a", "d"]);
+    expect(searchTransactions(rows, "bottle blue").map((r) => r.id)).toEqual(["a", "d"]);
+    expect(searchTransactions(rows, "blue metro")).toEqual([]);
+  });
+
+  it("also looks through whatever else the caller can name the row by", () => {
+    // The engine has no idea what a category is called — the view does, so it
+    // passes the label in rather than the engine growing a lookup table.
+    const found = searchTransactions(rows, "coffee", {
+      label: (t) => (t.category_id === "coffee" ? "Coffee" : ""),
+    });
+    expect(found.map((r) => r.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("keeps the caller's order and stops at the limit", () => {
+    // The caller sorts (register order); the palette shows a handful.
+    expect(searchTransactions(rows, "blue", { limit: 2 }).map((r) => r.id)).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });

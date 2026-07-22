@@ -120,6 +120,35 @@ export function templateRows(txns: Transaction[]): Transaction[] {
 }
 
 /**
+ * Free-text lookup over the register — what the ⌘K palette searches (M11).
+ *
+ * Every word must match somewhere, in any order, ignoring case: typing more
+ * narrows rather than widens, which is how a person expects a search box to
+ * behave. The engine knows nothing about what a category or a wallet is called,
+ * so a caller that does can pass those in through `label` instead of the engine
+ * growing a lookup table it would have to keep in sync.
+ *
+ * Order is the caller's (pass rows already in register order); `limit` caps what
+ * a palette has room to show.
+ */
+export function searchTransactions(
+  txns: Transaction[],
+  query: string,
+  opts: { limit?: number; label?: (t: Transaction) => string } = {},
+): Transaction[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return []; // nothing typed is not "everything"
+  const limit = opts.limit ?? 8;
+  const found: Transaction[] = [];
+  for (const t of txns) {
+    if (found.length >= limit) break;
+    const hay = `${t.vendor_source} ${opts.label?.(t) ?? ""}`.toLowerCase();
+    if (terms.every((term) => hay.includes(term))) found.push(t);
+  }
+  return found;
+}
+
+/**
  * Register order: newest first (§12.4 date-grouped rows).
  *
  * `date` alone can't do this. It is the calendar day the money moved — the user

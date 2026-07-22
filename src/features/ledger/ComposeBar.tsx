@@ -1,17 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { ArrowRightIcon, PlusIcon } from "lucide-react";
-import { createTransaction, createTransfer } from "@/core/commands";
-import { formatCents, parseDollars } from "@/core/money";
 import type { Category, Container } from "@/core/model";
-import {
-  defaultSign,
-  resolveAmount,
-  splitSign,
-  type Sign,
-} from "@/features/ledger/amount";
+import { useComposeFields } from "@/features/ledger/useComposeFields";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { categoryDotColor } from "@/features/category-color";
 import { Button } from "@/components/ui/button";
@@ -24,181 +15,58 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
 
-type Mode = "entry" | "transfer";
-
+/**
+ * The compose bar (§12.4): a borderless, iris-tinted line pinned above the
+ * register where you write. The one sanctioned iris wash in the language — it
+ * marks the place you write, and the recipe is not copied onto anything else.
+ *
+ * The fields and the rules behind them are `useComposeFields`, shared with the
+ * quick-add sheet, so the two surfaces cannot drift apart.
+ */
 export function ComposeBar({
   categories,
   containers,
   defaultContainerId,
-  onSubmit,
 }: {
   categories: Category[];
   containers: Container[];
   defaultContainerId: string;
-  onSubmit: (op: ReturnType<typeof createTransaction>) => Promise<void>;
 }) {
-  const activeCategories = useMemo(
-    () =>
-      categories
-        .filter((c) => !c.is_archived)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [categories],
-  );
-  const activeContainers = useMemo(
-    () => containers.filter((c) => !c.is_archived),
-    [containers],
-  );
-
-  const [mode, setMode] = useState<Mode>("entry");
-  // One control for "when" — date and time together. Untouched, the row takes the
-  // op's timestamp (full precision, so a burst of entries never ties); once the
-  // user picks a time, theirs wins.
-  const [when, setWhen] = useState(() => nowDateTimeInput());
-  const [whenPicked, setWhenPicked] = useState(false);
-  const { date, time } = splitDateTime(when);
-  const enteredAtNow = (): string | undefined =>
-    whenPicked ? (instantFromNow(date, time) ?? undefined) : undefined;
-  const [vendor, setVendor] = useState("");
-  const [categoryId, setCategoryId] = useState(activeCategories[0]?.id ?? "");
-  // Null = "follow the Default Spending Container" (§5.2); a pick overrides it.
-  const [pickedContainerId, setPickedContainerId] = useState<string | null>(null);
-  const containerId = pickedContainerId ?? defaultContainerId;
-  const [toContainerId, setToContainerId] = useState("");
-  const [amountStr, setAmountStr] = useState("");
-  // Null = follow the category's usual direction; a tap (or a typed +/−) pins it.
-  const [pickedSign, setPickedSign] = useState<Sign | null>(null);
-  const [warn, setWarn] = useState<string | null>(null);
-
-  const cat = categories.find((c) => c.id === categoryId);
-  const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
-  const from = containers.find((c) => c.id === containerId);
-  const to = containers.find((c) => c.id === toContainerId);
-
-  async function submitTransfer() {
-    if (!from || !to) return toast.error("Pick where the money goes.");
-    if (from.id === to.id) return toast.error("Pick two different containers.");
-    let magnitude: number;
-    try {
-      magnitude = Math.abs(parseDollars(amountStr));
-    } catch {
-      return toast.error("Enter a valid amount.");
-    }
-    if (magnitude === 0) return toast.error("Amount can't be zero.");
-
-    await onSubmit(
-      createTransfer({
-        date,
-        entered_at: enteredAtNow(),
-        amount: magnitude,
-        container_id: from.id,
-        to_container_id: to.id,
-        fromName: from.name,
-        toName: to.name,
-        vendor_source: vendor.trim() || undefined,
-      }),
-    );
-    toast.success("Moved", {
-      description: `${formatCents(magnitude)} · ${from.name} → ${to.name}`,
-    });
-    reset();
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!from) return toast.error("Pick a container.");
-    if (mode === "transfer") return submitTransfer();
-
-    if (!vendor.trim()) return toast.error("Add a payee or source.");
-    if (!cat) return toast.error("Add a category first.");
-
-    const res = resolveAmount(amountStr, cat.type, sign);
-    if (!res.ok) return toast.error(res.error);
-
-    // Inline confirm on an unusual sign — arm once, commit on the next submit.
-    if (res.unusual && warn === null) {
-      setWarn(
-        `${formatCents(res.signed)} is money ${sign === "+" ? "in" : "out"} on a ${cat.type} category — looks like a ${cat.type === "expense" ? "refund or rebate" : "clawback"}. Add again to confirm.`,
-      );
-      return;
-    }
-
-    await onSubmit(
-      createTransaction({
-        date,
-        entered_at: enteredAtNow(),
-        amount: res.signed,
-        vendor_source: vendor.trim(),
-        category_id: categoryId,
-        container_id: from.id,
-      }),
-    );
-    toast.success("Logged", {
-      description: `${vendor.trim()} · ${formatCents(res.signed)} · ${from.name}`,
-    });
-    reset();
-  }
-
-  function reset() {
-    setVendor("");
-    setAmountStr("");
-    setPickedSign(null);
-    setWarn(null);
-    // Roll "when" forward to now for the next entry, unless the user deliberately
-    // set one — logging several things for the same past evening shouldn't make
-    // them re-pick it every time.
-    if (!whenPicked) setWhen(nowDateTimeInput());
-  }
-
-  // A typed leading +/− moves into the sign control so it is never a silent no-op.
-  function onAmountChange(raw: string) {
-    const { sign: typed, rest } = splitSign(raw);
-    if (typed) setPickedSign(typed);
-    setAmountStr(rest);
-    setWarn(null);
-  }
+  const f = useComposeFields({ categories, containers, defaultContainerId });
+  const transfer = f.kind === "transfer";
 
   return (
     <form
-      onSubmit={submit}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void f.submit();
+      }}
       className="border-primary/15 bg-primary/[0.04] space-y-1.5 rounded-2xl border p-2"
     >
       <div className="grid grid-cols-[auto_1fr] items-center gap-1.5 sm:grid-cols-[13rem_1fr_auto_6rem_auto]">
         <Input
           type="datetime-local"
-          value={when}
-          onChange={(e) => {
-            setWhen(e.target.value);
-            setWhenPicked(true);
-          }}
+          value={f.when}
+          onChange={(e) => f.setWhen(e.target.value)}
           aria-label="Date and time"
           className="tnum border-0 bg-transparent shadow-none focus-visible:ring-0"
         />
         <Input
-          value={vendor}
-          onChange={(e) => setVendor(e.target.value)}
-          placeholder={
-            mode === "transfer" ? "Note (optional)" : "What was it? (e.g. Blue Bottle)"
-          }
-          aria-label={mode === "transfer" ? "Transfer note" : "Payee or source"}
+          value={f.vendor}
+          onChange={(e) => f.setVendor(e.target.value)}
+          placeholder={transfer ? "Note (optional)" : "What was it? (e.g. Blue Bottle)"}
+          aria-label={transfer ? "Transfer note" : "Payee or source"}
           className="col-span-2 border-0 bg-transparent shadow-none focus-visible:ring-0 sm:col-span-1"
         />
-        {mode === "entry" ? (
-          <SignToggle
-            sign={sign}
-            onChange={(next) => {
-              setPickedSign(next);
-              setWarn(null);
-            }}
-            className="justify-self-end"
-          />
-        ) : (
+        {transfer ? (
           <span aria-hidden />
+        ) : (
+          <SignToggle sign={f.sign} onChange={f.setSign} className="justify-self-end" />
         )}
         <Input
-          value={amountStr}
-          onChange={(e) => onAmountChange(e.target.value)}
+          value={f.amountStr}
+          onChange={(e) => f.onAmountChange(e.target.value)}
           placeholder="0.00"
           inputMode="decimal"
           aria-label="Amount"
@@ -207,7 +75,7 @@ export function ComposeBar({
         <Button
           type="submit"
           size="icon"
-          aria-label={mode === "transfer" ? "Move money" : "Log transaction"}
+          aria-label={transfer ? "Move money" : "Log transaction"}
           className="justify-self-end rounded-xl"
         >
           <PlusIcon className="size-4" />
@@ -217,20 +85,21 @@ export function ComposeBar({
       <div className="flex flex-wrap items-center gap-1.5">
         <ToggleGroup
           type="single"
-          value={mode}
+          value={transfer ? "transfer" : "entry"}
           onValueChange={(v) => {
             if (!v) return;
-            setMode(v as Mode);
-            setWarn(null);
+            // "Entry" means whatever the chosen category already is: the kind is
+            // not a mode you set here, it is what you filed the row under.
+            f.setKind(v === "transfer" ? "transfer" : (f.category?.type ?? "expense"));
           }}
           className="bg-background/60 rounded-full border-0 p-0.5"
         >
           <ToggleGroupItem
             value="entry"
-            aria-label={cat?.type === "income" ? "Log income" : "Log an expense"}
+            aria-label={f.kind === "income" ? "Log income" : "Log an expense"}
             className="data-[state=on]:bg-primary/10 data-[state=on]:text-primary h-7 rounded-full px-3 text-xs"
           >
-            {cat?.type === "income" ? "Income" : "Expense"}
+            {f.kind === "income" ? "Income" : "Expense"}
           </ToggleGroupItem>
           <ToggleGroupItem
             value="transfer"
@@ -241,14 +110,8 @@ export function ComposeBar({
           </ToggleGroupItem>
         </ToggleGroup>
 
-        {mode === "entry" && (
-          <Select
-            value={categoryId}
-            onValueChange={(v) => {
-              setCategoryId(v);
-              setWarn(null);
-            }}
-          >
+        {!transfer && (
+          <Select value={f.categoryId} onValueChange={f.setCategoryId}>
             <SelectTrigger
               aria-label="Category"
               className="hover:bg-background/70 h-8 w-auto max-w-44 min-w-32 rounded-full border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
@@ -256,12 +119,12 @@ export function ComposeBar({
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
-              {activeCategories.length === 0 && (
+              {f.activeCategories.length === 0 && (
                 <SelectItem value="none" disabled>
                   No categories
                 </SelectItem>
               )}
-              {activeCategories.map((c) => (
+              {f.activeCategories.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span
                     className="mr-0.5 size-2 rounded-full"
@@ -275,19 +138,19 @@ export function ComposeBar({
         )}
 
         <ContainerSelect
-          value={containerId}
-          onChange={setPickedContainerId}
-          containers={activeContainers}
-          label={mode === "transfer" ? "From container" : "Container"}
+          value={f.containerId}
+          onChange={f.setPickedContainerId}
+          containers={f.activeContainers}
+          label={transfer ? "From container" : "Container"}
         />
 
-        {mode === "transfer" && (
+        {transfer && (
           <>
             <ArrowRightIcon className="text-muted-foreground size-3.5" aria-hidden />
             <ContainerSelect
-              value={toContainerId}
-              onChange={setToContainerId}
-              containers={activeContainers.filter((c) => c.id !== containerId)}
+              value={f.toContainerId}
+              onChange={f.setToContainerId}
+              containers={f.activeContainers.filter((c) => c.id !== f.containerId)}
               label="To container"
               placeholder="To…"
             />
@@ -295,9 +158,9 @@ export function ComposeBar({
         )}
       </div>
 
-      {warn && (
+      {f.warn && (
         <p className="px-2 pt-1 pb-0.5 text-xs text-amber-600 dark:text-amber-500">
-          {warn}
+          {f.warn}
         </p>
       )}
     </form>

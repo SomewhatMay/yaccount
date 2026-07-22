@@ -83,3 +83,11 @@ export type Op =
   | (OpBase & { type: "goal.unarchive"; payload: { id: string } });
 
 export type OpType = Op["type"];
+
+/**
+ * The op every creation path emits — an expense, an income, a transfer, a
+ * quick-logged shortcut, a generated occurrence. Naming it lets a caller read
+ * the row it just wrote (to mark it in the register, say) without narrowing the
+ * whole union at the call site.
+ */
+export type TransactionCreateOp = Extract<Op, { type: "transaction.create" }>;
