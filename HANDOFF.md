@@ -1,8 +1,9 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M7 (Savings Goals & the Monthly Allocation Plan) CODE-COMPLETE on branch `m7-goals` — NOT yet browser-verified, NOT merged.** Two commits: `1fb14c3` (core) + `1ab215f` (UI). Typecheck/lint/build/prettier clean; **367 vitest tests green** (was 312 at M6, +55 for M7). **No `DB_VERSION` bump** — `goals` store existed since M1 (DB_VERSION stays 2). **⚠️ NEXT ACTION: user browser-verifies the M7 flows** (create each goal kind×mode, progress = contributions not balance, deadline self-correcting ask, reserve re-opens on withdrawal, auto-contribution → inbox, monthly plan reconciles, over-allocation red, container auto-create/reuse, absorb leftover, lifecycle complete/cancel/archive + undo). Then fix feedback → open PR → merge. **This is the LAST feature milestone — completing it = v1 feature-complete** (v1-shippable once M8/M9 sync land, still blocked on Google Cloud).
-> **Prior:** **M6 (Recurring Rules, Templates & the Inbox) DONE — merged to `main` via PR #5** (merge commit `0e9416e`, 2026-07-21), user browser-verified. 312 tests.
+> **Last updated:** **M7 (Savings Goals & the Monthly Allocation Plan) DONE — merged to `main` via PR #6** (merge commit `2c97a1f`, 2026-07-22). **User browser-verified** the full flow (each goal kind×mode, progress = contributions not balance, deadline self-correcting ask, reserve re-opens on withdrawal, auto-contribution → inbox, monthly plan reconciles, over-allocation red, container auto-create/reuse, absorb leftover, lifecycle complete/cancel/archive + undo). Typecheck/lint/build/prettier clean; **367 vitest tests green** (was 312 at M6, +55 for M7). **No `DB_VERSION` bump** — `goals` store existed since M1 (DB_VERSION stays 2). **🎉 M7 was the LAST FEATURE MILESTONE — the product is now feature-complete** (all seven tables, all ops, every §5/§6 surface built). What remains is PLATFORM work: **M8 auth → M9 sync → M10 native → M11 design polish.**
+> **⚠️ Next up: M8 (Google OAuth, web flow first).** **BLOCKED on the user's Google Cloud setup** (the §6 parallel track: a Google Cloud project + OAuth consent screen in "Testing" + a Web SPA client ID + `drive.appdata` scope). **Do NOT start M8 coding until the user confirms those exist and hands over the Web client ID** — and, as always, confirm the milestone choice with them first (they re-order; M9/M10/M11 are all valid picks too). See "Next Steps".
+> **Prior:** **M6 DONE — merged via PR #5** (`0e9416e`), browser-verified, 312 tests. M5 via PR #4; M4 via PR #3; M3 via PR #2; M0–M2 via PR #1.
 > **Prior:** M5 (Reporting & Dashboard) DONE — merged via PR #4; M4 via PR #3; M3 via PR #2; M0–M2 via PR #1.
 > **NOTE:** M4 was merged to `main` via **PR #3** (`c2f7804`) since the last handoff — the "not pushed/PR'd" note for M4 below is stale; `main` has M4.
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
@@ -69,26 +70,20 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
-**M7 (Savings Goals & the Monthly Allocation Plan) — CODE-COMPLETE, branch `m7-goals`, NOT merged, awaiting browser-verify.** Core-first TDD: **312 → 367 tests** (+55). Typecheck/lint/build/prettier clean. **No DB/schema change** (`goals` store existed since M1, DB_VERSION stays 2). See "M7 decisions and delivered code" below.
+**M7 (Savings Goals & the Monthly Allocation Plan) — DONE, merged to `main` via PR #6 (`2c97a1f`), browser-verified.** Core-first TDD: **312 → 367 tests** (+55). Typecheck/lint/build/prettier clean. **No DB/schema change** (`goals` store existed since M1, DB_VERSION stays 2). See "M7 decisions and delivered code" below. **This completes the product feature set — M8+ is platform work.**
 
 **M6 (Recurring Rules, Templates & the Inbox) — DONE, merged to `main` via PR #5 (`0e9416e`).** Core-first: **266 → 312 tests** (+46). Typecheck/lint/build/prettier clean. **User browser-verified** all flows (incl. the three post-verify fix rounds + bulk dismiss below). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). See "M6 decisions and delivered code" below.
 
 **Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`; the user swapped it to `…M4 → M5 → M6 → M7…` (did M5 before M6), then confirmed **M6 next after M5** when asked. **Both M5 and M6 are now done**, so the sequencing is moot going forward — **M7 is the only remaining feature milestone** and needs both (both merged). The lesson stands: **the user picks the next milestone explicitly — ask, don't assume** the impl doc's default order. (M8 auth stays blocked on the user's Google Cloud setup.)
 
-Git log (`main`, current — M0–M6 merged):
+Git log (`main`, current — M0–M7 merged):
 ```
+2c97a1f Merge pull request #6 from SomewhatMay/m7-goals      (M7)
+48ddd24 docs: M7 code-complete, handoff for browser-verify
+1ab215f M7 UI: goals + monthly allocation plan (auto-create/reuse container, absorb, auto-contribution, plan view)
+1fb14c3 M7 core: goals model+ops+commands, derivation engine, monthly plan, goal_derived generation
 0e9416e Merge pull request #5 from SomewhatMay/m6-recurring   (M6)
-46e6f21 docs: note bulk dismiss
-e288265 M6: bulk dismiss in the inbox (mirrors bulk approve; undo restores all)
-9dd3d3c docs: note M6 post-verify fixes + test count 312
-c593d47 M6 fixes from browser-verify feedback
-9ec74b0 docs: M6 code-complete, handoff for browser-verify + M7
-da944a5 M6: recurring rules, templates & the inbox
-d5536ce docs: reconcile stale M4 PR status in handoff body
-f9fccae Merge pull request #4 from SomewhatMay/m5-reporting   (M5)
-36164fe docs: M5 browser-verified, merged via PR #4
-c0b2a4e M5 UI: reporting dashboard + charts, period control, dashboard is home
-… (M4 PR #3, M3 PR #2, M0–M2 PR #1 below — see prior handoff history)
+… (M5 PR #4, M4 PR #3, M3 PR #2, M0–M2 PR #1 below — see prior handoff history)
 ```
 
 ### M7 decisions and delivered code (this session, branch `m7-goals`)
@@ -275,15 +270,26 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M7 is CODE-COMPLETE on branch `m7-goals` (commits `1fb14c3` core + `1ab215f` UI) — NOT browser-verified, NOT merged.** `main` still has M0–M6.
+**M7 is DONE and merged to `main` (PR #6, `2c97a1f`), browser-verified.** No open actions on the feature side — **the product is feature-complete.** `main` now has M0–M7; 367 tests green.
 
-### ⚠️ NEXT ACTION: user browser-verifies M7, then fix → PR → merge
-Run `npm run dev` (WSL: `export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"` first) and walk the flows:
-- **Goals (`/goals`):** create a `spend_down`+`deadline` goal (auto-creates its container); contribute via a transfer on the ledger (or approve an auto-contribution) → progress tracks **contributed, not balance** (spend from the container → progress unchanged); miss a month → ask rises; overshoot → ask $0 + "Achieved". Create a `reserve`+`deadline` goal → fund to 100%, then spend from it → progress drops and the ask re-opens. Try `fixed` (with + without target = "Open-ended") and `passive`. Auto-contribution opt-in → a pending transfer lands in the **Inbox**. Reuse an existing container name (blocks if it has an active goal); absorb-leftover head-start. Cancel (money stays, Undo toast) / Archive / Restore.
-- **Monthly plan (`/plan`):** income (from an income recurring rule if present, else the inline manual figure) − category allowances − goal asks = Unallocated; over-commit → red "Over-committed". Step months.
-Then: address feedback, `gh pr create` → merge. **Completing M7 = v1 feature-complete.**
+### Up next: **M8 — Authentication (Google OAuth, web flow first)** — CONFIRM with the user, and it is GATED on their Google Cloud setup
+**This is the first PLATFORM milestone.** The remaining roadmap is `M8 (auth) → M9 (Drive sync) → M10 (Capacitor native) → M11 (design polish)` — see impl §7. Per impl §9 Q7, **cloud sync (M9) is MANDATORY for v1**, and M9 rides on M8 + the M1 op-log (nothing from M3–M7). But the user picks the next milestone explicitly — **ask, don't assume** (M11 design polish is also a defensible "do it now while the feature set is fresh" pick, and needs no external setup).
 
-**M7 is done (see "M7 decisions and delivered code" above for the full record).** Every M7 op/engine/UI piece is built; 367 tests green.
+**⚠️ M8 is BLOCKED on a user-owned prerequisite (the impl §6 parallel non-code track).** Before ANY M8 code, the user must have done, in Google Cloud Console (free, no approval wait, keep in "Testing" status):
+1. Created a Google Cloud project + configured the OAuth **consent screen** ("Testing" status; add their own email as a test user).
+2. Created a **Web application** OAuth **client ID** (a public client — NO secret; §3.1) and can hand it to us.
+3. Confirmed the **`drive.appdata`** scope is added (non-sensitive → basic verification only, §3.2 — no CASA/demo-video review needed).
+Privacy policy + verified domain are NOT needed for "Testing" (only to publish later, §6 item 4). **Do not scaffold M8 against a guessed/placeholder client ID — wait for the real one.** Ask the user: "Is the Google Cloud project + Web OAuth client ID ready, and what's the client ID?" (one question, per the grilling rule).
+
+**M8 scope (impl §4 "M8" + spec §3, READ BOTH IN FULL before coding):**
+- `src/auth/AuthProvider.ts` — the single seam: `getAccessToken(): Promise<string>` (§3.4). This is the ONE function handed to `createDriveStore({ accessToken: getAccessToken })` at M9; drivestore never learns which platform/flow produced the token.
+- `src/auth/web.ts` — the **web flow** (§3.3-B): Google Identity Services JS token client (`google.accounts.oauth2.initTokenClient`, `ux_mode:'popup'`); short-lived access token straight to client JS, **no secret, no refresh token** on web. **Silent re-auth** (`prompt:''`) before expiry, with a quick re-consent popup fallback — **scope the fallback for ALL browsers, not just Safari** (Chromium's third-party-storage/cookie phase-out hits it too, §10 #25).
+- Loading the GIS script (`https://accounts.google.com/gsi/client`) is a client-only concern — keep it out of `src/core` (the ESLint boundary forbids core importing platform glue). The `auth/` folder spans M8 (web) → M10 (`native.ts`); §3.3-A native is M10, not now.
+- **Env/config:** the Web client ID is public, so it can live in a `NEXT_PUBLIC_*` env var (e.g. `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`) baked into the static export. Confirm with the user where they want it.
+
+**M8 How-to-test / exit (impl §M8):** sign in with a test-user Google account in a desktop browser → obtain a real `drive.appdata`-scoped access token; it auto-renews silently; expiry handled. **No data synced yet — that's M9.** Because this is real OAuth against Google (not a pure `core` unit), it can't be Vitest-covered like the engine — it's a manual browser check (like every UI milestone). Keep the `AuthProvider` interface pure/mockable so M9's sync code can be tested against a fake token provider.
+
+**M8 gotchas to remember (from spec §3 / impl §10):** `crypto.randomUUID()` (used for ids) needs a **secure context** → the hosted web build must be HTTPS (localhost is fine for dev, §10 #26). The GIS popup needs a real origin registered as an "Authorized JavaScript origin" on the Web client — `http://localhost:3000` (or whatever `npm run dev` serves) must be added there by the user. Google blocks embedded webviews for OAuth (matters at M10, not M8's popup).
 
 **Deferred niceties surfaced during M5 (not blockers):**
 - **Period atoms aren't persisted** — `reportingPeriodAtom`/`comparePeriodAtom` reset on refresh. Fine for now; if wanted, persist to the synced `settings` store or localStorage (localStorage is device-local, which is arguably correct for a view preference). M11 polish candidate.
@@ -293,9 +299,12 @@ Then: address feedback, `gh pr create` → merge. **Completing M7 = v1 feature-c
 **Milestone-ownership deferrals to remember (flagged in M1, NOT open decisions):**
 - Recurring `frequency↔interval_config` + `amount_mode↔template_amount` refinements — ✔ **DONE in M6**. Goal `mode`/`kind` invariants — ✔ **DONE in M7** (`GoalSchema` now has 5 `.refine`s + `makeGoal`; the `model/goal.ts` NOTE is resolved). **All model refinements are now closed.**
 
-**Deferred platform work (do NOT touch until their milestone):**
-- **M8** (Google OAuth) — blocked on the user creating the Google Cloud project + OAuth consent screen + Web SPA client ID; ask before assuming they want to switch to it.
-- **M9** (Drive sync) / **M10** (Capacitor native): after M8. The impl §6 parallel non-code track (Google Cloud project, the three OAuth client IDs, privacy policy) is the **user's** to do; it gates M8–M10, not local product work.
+**Remaining platform milestones (M8 is the active target — see "Up next" above for its full scope/prereqs):**
+- **M8** (Google OAuth, web flow) — NEXT, but gated on the user's Google Cloud project + Web OAuth client ID (impl §6 track). Ask for the client ID before coding.
+- **M9** (Drive sync) — after M8; **mandatory for v1** (§9 Q7). Rides on M8 + the M1 op-log. Two known merge-path obligations to close here: buffer/sort remote ops under the total order (§8.5 / impl §10 #33) and decide the snapshot natural-key-in-row-id question (§8.5 / #34).
+- **M10** (Capacitor native) — after M9; needs iOS/Android OAuth client IDs + secure token storage.
+- **M11** (design polish) — the finishing pass ON TOP of the locked §12 "Quiet Register" language (motion, empty/error/sync states, category-color override UI, responsive density, Playwright e2e). Needs no external setup, so it's a valid "do now" pick if the user wants to defer M8 until Google Cloud is ready.
+- The impl §6 parallel non-code track (Google Cloud project, the three OAuth client IDs, privacy policy) is the **user's** to do; it gates M8–M10, not local product work.
 
 ---
 
@@ -304,7 +313,7 @@ Then: address feedback, `gh pr create` → merge. **Completing M7 = v1 feature-c
 **On native Windows (this session's environment, `E:\GitHub\yaccount`):**
 ```bash
 node -v           # must be >=20.19 or >=22.12 — vitest 4/rolldown/vite 8 refuse to start below that
-npm test          # vitest — 312 passing at M6
+npm test          # vitest — 367 passing at M7
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
