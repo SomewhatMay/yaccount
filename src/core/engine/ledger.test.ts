@@ -150,16 +150,25 @@ describe("pendingRows / templateRows — the Inbox and shortcuts (§5.8)", () =>
 
   it("lists pending, non-template rows and excludes approved ones", () => {
     const approved = expense("a", -100);
-    expect(pendingRows([approved, pending("p1"), pending("p2")]).map((r) => r.id)).toEqual([
-      "p1",
-      "p2",
-    ]);
+    expect(
+      pendingRows([approved, pending("p1"), pending("p2")]).map((r) => r.id),
+    ).toEqual(["p1", "p2"]);
   });
 
   it("a dismissed (voided) pending row drops out of the queue", () => {
     const p = pending("p1");
     const dismiss = makeVoidRow(p, { id: "v1" }); // reverses_id → p, stays pending
     expect(pendingRows([p, dismiss]).map((r) => r.id)).toEqual([]);
+  });
+
+  it("undoing a dismiss brings the row back (chain walk, not a flat check)", () => {
+    const p = pending("p1");
+    const dismiss = makeVoidRow(p, { id: "v1" }); // dismiss
+    const undo = makeVoidRow(dismiss, { id: "u1" }); // reverses the dismissal
+    expect(pendingRows([p, dismiss, undo]).map((r) => r.id)).toEqual(["p1"]);
+    // …and dismissing again removes it once more.
+    const redo = makeVoidRow(p, { id: "v2" });
+    expect(pendingRows([p, dismiss, undo, redo]).map((r) => r.id)).toEqual([]);
   });
 
   it("templateRows returns only shortcuts", () => {

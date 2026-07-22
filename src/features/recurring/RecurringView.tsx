@@ -28,12 +28,14 @@ import {
   type IntervalConfig,
   type RecurringRule,
 } from "@/core/model";
+import { firstOccurrenceOnOrAfter } from "@/core/engine/recurring";
 import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
   readyAtom,
   recurringRulesAtom,
+  runRecurringGenerationAtom,
 } from "@/features/store";
 import { describeRule } from "@/features/recurring/describe";
 import { RecurringRuleSheet } from "@/features/recurring/RecurringRuleSheet";
@@ -48,12 +50,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const today = (): string => new Date().toISOString().slice(0, 10);
+
 export function RecurringView() {
   const ready = useAtomValue(readyAtom);
   const rules = useAtomValue(recurringRulesAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const generate = useSetAtom(runRecurringGenerationAtom);
 
   // `null` = sheet closed; `"new"` = create; a rule = edit.
   const [sheet, setSheet] = useState<RecurringRule | "new" | null>(null);
@@ -174,14 +179,21 @@ export function RecurringView() {
         onOpenChange={(open) => !open && setSheet(null)}
         onSubmit={async (input, editingId) => {
           if (editingId) {
-            // Preserve the cursor + status; only the editable fields change.
+            // Editing is forward-looking: keep the status, but RESET the cursor to
+            // the next occurrence on/after today under the new schedule. Preserving
+            // the old cursor could mass-backfill on a frequency change; anchoring to
+            // today keeps edits predictable. Already-generated rows are independent
+            // proposals — the user edits or dismisses those in the inbox.
             const prev = rules.find((r) => r.id === editingId)!;
-            const next = makeRecurringRule({
+            const draft = makeRecurringRule({
               ...input,
               id: editingId,
-              next_generation_date: prev.next_generation_date,
               status: prev.status,
             });
+            const next = {
+              ...draft,
+              next_generation_date: firstOccurrenceOnOrAfter(draft, today()),
+            };
             await dispatch(updateRecurringRule(next));
             toast.success("Recurring updated", {
               description: input.template_vendor_source,
@@ -193,6 +205,9 @@ export function RecurringView() {
             });
           }
           setSheet(null);
+          // Generate right away so due/backfilled occurrences hit the inbox now,
+          // not only on the next app open (§8.6 background reconcile).
+          await generate();
         }}
       />
     </div>

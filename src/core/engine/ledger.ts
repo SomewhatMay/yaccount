@@ -17,13 +17,17 @@ import { isLiveLedgerRow } from "./balances";
  * Balance never depends on this — every reversal is a real signed amount, so the
  * arithmetic nets out on its own (§0.4). This is presentation only.
  */
-function liveIds(txns: Transaction[]): Set<string> {
-  // Only a reversal that actually moves money can cancel anything: a pending or
-  // template "void" is not a live ledger row (§10 #2/#3), so hiding its target
-  // would take a row off screen whose amount the balance still counts.
+function liveIds(
+  txns: Transaction[],
+  // Which rows may act as reversers. For the ledger, only a live (approved,
+  // non-template) reversal can cancel anything — a pending/template "void" is not
+  // a live ledger row (§10 #2/#3). The Inbox passes its own predicate so that a
+  // pending dismissal (and its undo) resolve within the pending world.
+  isReverser: (t: Transaction) => boolean = isLiveLedgerRow,
+): Set<string> {
   const reversers = new Map<string, Transaction[]>();
   for (const t of txns) {
-    if (!t.reverses_id || !isLiveLedgerRow(t)) continue;
+    if (!t.reverses_id || !isReverser(t)) continue;
     const list = reversers.get(t.reverses_id) ?? [];
     list.push(t);
     reversers.set(t.reverses_id, list);
@@ -96,21 +100,17 @@ export function activeRows(txns: Transaction[]): Transaction[] {
 
 /**
  * The Inbox queue (§5.8): pending, non-template rows the user hasn't acted on.
- * A dismissed occurrence is voided (a reversing row points at it), so any row
- * carrying a reversal is excluded — the proposal has been withdrawn. Approving a
- * row moves it out of this list (its `inbox_status` becomes 'approved') and into
- * the register.
+ * A dismissal appends a pending reversing row; undoing it appends a row reversing
+ * THAT (dismiss → undo → redo), so liveness is a chain walk, not a one-step "is
+ * reversed" check (§0.3) — otherwise an undone dismiss would never reappear.
+ * Pending reversals are what count here (a dismiss copies the occurrence's
+ * pending status). Approving a row moves it out of this list.
  */
 export function pendingRows(txns: Transaction[]): Transaction[] {
-  const reversed = new Set(
-    txns.filter((t) => t.reverses_id).map((t) => t.reverses_id as string),
-  );
+  const live = liveIds(txns, (t) => t.inbox_status === "pending");
   return txns.filter(
     (t) =>
-      t.inbox_status === "pending" &&
-      !t.is_template &&
-      !t.reverses_id &&
-      !reversed.has(t.id),
+      t.inbox_status === "pending" && !t.is_template && !t.reverses_id && live.has(t.id),
   );
 }
 
