@@ -1,7 +1,8 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M5 (Reporting & Dashboard Engine + Charts) DONE — merged to `main` via PR #4** (2026-07-21). **User manually browser-verified the full dashboard** (period presets/custom/compare, both doughnut variants + monthly-avg, monthly bars + stepped budget overlay, waterfall, category drill-down vs. time-variant budget, container flows, investment gain/loss + reconstructed sparkline, budget comparison, light/dark, void/undo) against a hand-computed fixture — all numbers correct. Typecheck/lint/build/prettier clean; **266 vitest tests green** (was 234 at M4, +32 for M5). Next up: **M6** (recurring/inbox) then M7 — but confirm with the user, they have re-ordered before (see "Next Steps").
+> **Last updated:** **M6 (Recurring Rules, Templates & the Inbox) CODE-COMPLETE on branch `m6-recurring`** (2026-07-21) — committed (`da944a5`), **NOT yet PR'd/merged, awaiting the user's browser-verify** (UI can't be auto-tested pre-Playwright/M11). Typecheck/lint/build/prettier clean; **311 vitest tests green** (was 266 at M5, +45 for M6). Dev server smoke: `/inbox` + `/recurring` serve 200, nav + client shell render, no runtime errors. **No `DB_VERSION` bump** — `recurring_rules` store existed since M1. Next up: **M7** (savings goals + monthly allocation plan) — the LAST feature milestone; M7 needs BOTH M5+M6 (now both done). But confirm with the user (they re-order; see "Next Steps").
+> **Prior:** M5 (Reporting & Dashboard) DONE — merged to `main` via PR #4 (2026-07-21), user browser-verified against a hand-computed fixture.
 > **NOTE:** M4 was merged to `main` via **PR #3** (`c2f7804`) since the last handoff — the "not pushed/PR'd" note for M4 below is stale; `main` has M4.
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
 > **NOTE (environment):** the M5 session ran back on **WSL2** (`/home/may/github/yaccount`, Node v22.18.0 via nvm — remember the `export PATH=…` prefix for every npm/npx call). The M4 session was native Windows. Both environments work; update whichever section matches where you're actually running.
@@ -67,6 +68,8 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
+**M6 (Recurring Rules, Templates & the Inbox) — CODE-COMPLETE on branch `m6-recurring`, committed `da944a5`, NOT yet PR'd/merged.** Core-first: **266 → 311 tests** (+45). Typecheck/lint/build/prettier clean; dev-server smoke passed (routes 200, no runtime errors). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). Remaining: **user browser-verify**, then PR + merge. See "M6 decisions and delivered code" below.
+
 **Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`, but **the user explicitly picked M5 next over M6** after M4 shipped — a deliberate re-ordering, not an oversight. **Do NOT silently "correct" this back to M6** — the dependency graph permits it either way (M5 needs M4+M3, both done; M6 needs only M3), so there's no technical reason to override the user's stated choice. If a future session is unsure which is next, ask rather than assume the impl doc's default order still holds.
 
 Git log (`m4-budget-targets`, current):
@@ -91,6 +94,26 @@ e44ea7f M3: containers, transfers, balances
 f4bdd4e M0: scaffold Next.js static-export app + toolchain
 8d9f122 chore: init main
 ```
+
+### M6 decisions and delivered code (this session, branch `m6-recurring`)
+- **No new object store, no `DB_VERSION` bump.** `recurring_rules` (and `goals`) already existed from M1 (schema-only until now). Templates are just `transactions` rows (`is_template=true`), so they need no store either.
+- **Locked decisions made this session (with the user):**
+  - **Cancelling a recurring rule is a SOFT, reversible action** (user's explicit pick over hard-delete): a new `status: active|cancelled` field on `recurring_rules` + paired ops `recurringRule.cancel`/`.uncancel` (share a reducer branch, op-type driven — same shape as category/container archive/unarchive). A "Paused" section on `/recurring` with a Resume control + an Undo toast satisfies §1.1's visible-inverse rule. **`status` is NOT in the spec §5.8 table** — it's a documented §1.1-reversibility extension (same class of deviation as the M3 `settings` store), defaults to `active` so pre-M6 fixtures still parse. Not a change to any locked decision.
+- **`interval_config` tightened from M1's loose `z.record` to a frequency-DISCRIMINATED union** (impl §4/§10 obligation): `daily {}` · `weekly {day_of_week 0–6}` · `biweekly {days_of_month:[a,b]}` (twice-a-month anchors, ascending/distinct — NOT every-14-days, §5.8) · `monthly {day_of_month 1–31}` · `annually {month,day}` · `custom {every≥1, unit}`. Built as `z.discriminatedUnion("frequency", …)` over a shared `ruleBase`, plus two `.refine`s: fixed ⇒ `template_amount` set; a rule must be an expense/income (category) OR a transfer (destination). Existing `schemas.test.ts` fixtures still pass (status defaults).
+- **Generation is pure + idempotent.** `engine/recurring.ts`:
+  - `firstOccurrenceOnOrAfter(rule, from)` + `nextOccurrence(rule, date)` — occurrence math per frequency. Monthly/annually **anchor on the config day and clamp per-month** (Jan 31 → Feb 28 → recovers Mar 31; Feb 29 → Feb 28 non-leap) rather than chaining clamped dates. `next_generation_date` is only a **lower-bound cursor** — the engine snaps it onto the grid, so a start date that isn't itself an occurrence still generates right.
+  - `generateDueOccurrences(rule, today)` → `{ rows, rule }` (advanced cursor). **Backfill by mode (§5.8 locked):** `fixed` = every missed occurrence oldest-first, each at its own due date; `goal_derived` = a SINGLE row dated today (M7 recomputes `required_monthly`; **amount stubbed to `template_amount`** for now, as impl §4 M6 says "goal_derived plumbing stubbed for M7"). **Occurrence row id is deterministic `${rule.id}:${dueDate}`** → regen never duplicates (idempotent `put`), even before the advanced cursor persists.
+- **Ops added:** `template.create`/`.remove` (a template is a `transactions` row; `remove` is a hard delete — a shortcut is housekeeping, impl §3), `recurringRule.create`/`.update`/`.cancel`/`.uncancel`, `transaction.approve` (RMW pending→approved, idempotent). Generated occurrences persist via ordinary `transaction.create` (the row carries its own pending status + `recurring_rule_id`) — no new op type needed.
+- **`activeRows` now also excludes `inbox_status='pending'`** — pending rows live in the Inbox only, never the register or any derivation (balances/reporting already excluded them via `isLiveLedgerRow`; this fixes the register display). New engine helpers `pendingRows` (the Inbox queue; a dismissed = voided occurrence drops out) and `templateRows`.
+- **Commands:** `createTemplate`/`removeTemplate`/`logTemplate` (1-tap: template → real dated row, transfer-aware), `createRecurringRule`/`updateRecurringRule`/`cancelRecurringRule`/`uncancelRecurringRule`, `approveTransaction`, `recordGeneratedOccurrence`.
+- **Core tests (+45, all `src/core`):** `model/recurringRule.test.ts` (union validation, cross-field refines, defaults), `engine/recurring.test.ts` (occurrence math per frequency incl. clamping, fixed backfill oldest-first, deterministic-id regen, end_date bound, goal_derived single-row, transfer generation, cancelled inert), M6 blocks in `oplog/apply.test.ts` (template create/remove, approve, cancel/uncancel lossless + table-driven idempotency extended to o18–o24), `engine/ledger.test.ts` (pending excluded, pendingRows/templateRows), `commands/commands.test.ts`.
+- **UI** (`src/features/`, `"use client"`):
+  - **`/inbox`** (`inbox/InboxView.tsx`) — pending queue with shadcn **`checkbox`** (added this session) for multi-select + a sticky **bulk-approve** bar, per-row 1-tap Approve, `⋯` → Edit-before-approving (reuses `EditTransactionSheet` — `updateTransaction` keeps pending) / Dismiss (a void, Undo toast).
+  - **`/recurring`** (`recurring/RecurringView.tsx` + `RecurringRuleSheet.tsx` + `describe.ts`) — active list (cadence summary via `describeRule`, next-date badge) + a **Paused section w/ Resume** (dashed card, §1.1). "New" opens a **frequency-aware Sheet** (create+edit): Expense/income ↔ Transfer toggle, category/container pickers, `SignToggle`, per-frequency config inputs, start/optional-end dates. UI only creates **`fixed`** rules (goal_derived is created by goals in M7).
+  - **Templates on the ledger** — a **Shortcuts chip strip** above the compose bar (1-tap `quickLog`, hover ✕ to remove w/ Undo) + **"Save as shortcut"** in each ledger row's `⋯` menu (shape-preserving; Undo toast).
+  - **Nav** (`AppNav.tsx`) — added **Inbox** (with a live **pending-count badge** via `pendingCountAtom`) + **Recurring** links.
+  - **Store** — `recurringRulesAtom` (+ in `refreshAtom`), derived `templatesAtom`/`pendingCountAtom`, and **`runRecurringGenerationAtom`** run on bootstrap (after ready, §8.6 background) — generates due occurrences for active rules, dispatches create + cursor-advance ops.
+- **Scope note / deferred to M7 (as specced):** `amount_mode='goal_derived'` amount is stubbed to `template_amount` (M7 wires `required_monthly` from the linked goal, §5.9.5); `linked_goal_id` is carried but nothing sets it yet (goals are M7). Nothing from the M6 spec scope was cut.
 
 ### M5 decisions and delivered code (this session, branch `m5-reporting`)
 - **No new ops, no schema/DB change.** M5 is a pure derived-view layer over the existing tables — every number is computed on demand (spec §7: only the core tables persist; dashboards are re-derivable views). `DB_VERSION` stays 2.
@@ -184,7 +207,7 @@ User asked for a modern/minimal/playful look (not the bland admin-CRUD first cut
 - **Categories redesign:** Fraunces header, branded compose bar, split **Expenses / Income** sections with color dots + hover `···` menu (Rename inline / Archive).
 - **New shadcn components:** sheet, dropdown-menu, tooltip (+ existing set).
 
-**Ops implemented so far:** `category.create/update/archive`, `container.create/update/archive` (M1), `transaction.create/update/void` (M2), `snapshot.record/update/remove` + `setting.set` (M3), `budgetTarget.set/remove` (M4). Plus the reversibility-pass additions `category.unarchive` / `container.unarchive` (M3). (Taxonomy extended per milestone — impl §3.)
+**Ops implemented so far:** `category.create/update/archive`, `container.create/update/archive` (M1), `transaction.create/update/void` (M2), `snapshot.record/update/remove` + `setting.set` (M3), `budgetTarget.set/remove` (M4), `template.create/remove` + `recurringRule.create/update/cancel/uncancel` + `transaction.approve` (M6). Plus the reversibility-pass additions `category.unarchive` / `container.unarchive` (M3). (Taxonomy extended per milestone — impl §3.) **Remaining for M7:** `goal.create/update/complete/cancel/archive`.
 
 ### M0 delivered
 - `git init` (repo was not one); Next.js/Node `.gitignore`.
@@ -234,12 +257,14 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M5 is DONE and merged to `main` (PR #4), browser-verified.** No open actions.
+**M6 is CODE-COMPLETE on branch `m6-recurring` (committed `da944a5`), NOT yet PR'd/merged.** Open actions, in order:
+1. **User browser-verifies M6** (UI can't be auto-tested pre-Playwright/M11). Suggested walk-through: create recurring rules of each frequency (daily/weekly/twice-a-month/monthly/yearly/custom) → confirm `/inbox` fills with pending rows (backfill of past-dated rules), pending excluded from dashboard/ledger balances; 1-tap approve + multi-select bulk approve → approved rows appear in the ledger and count; edit-before-approve; dismiss + undo; pause a rule (Paused section) + Resume; save a ledger row as a shortcut → 1-tap re-log from the chip strip → remove shortcut; refresh persists; light/dark. Verify a transfer rule generates a category-less pending transfer.
+2. Then **PR + merge `m6-recurring` → `main`** (via `gh`).
 
-### Up next: **M6 — Recurring Rules, Templates & the Inbox** (CONFIRM with the user first)
-The impl §7 execution order is `…M4 → M6 → M5 → M7…`; the user swapped M6/M5 (did M5 first). So **M6 is the remaining milestone before M7**, and **M7 needs BOTH M5 and M6** (impl §7 dependency graph). M6 needs only M3 (done). But the user has re-ordered before and picks the next milestone explicitly — **ask, don't assume.** (M8 auth stays blocked on the user's Google Cloud setup, unchanged.)
+### Up next after M6 merges: **M7 — Savings Goals & the Monthly Allocation Plan** (CONFIRM with the user first)
+**This is the LAST feature milestone** — completing it means v1 is feature-complete (and, since sync M9 is deferred/blocked on Google Cloud, v1-shippable once M8/M9 land). **M7 needs BOTH M5 and M6** (impl §7 dependency graph) — both now done. But the user re-orders and picks the next milestone explicitly — **ask, don't assume.** (M8 auth stays blocked on the user's Google Cloud setup, unchanged.)
 
-**M6 scope (impl §4 "M6", read it in full before coding):** `recurring_rules` CRUD + the `interval_config` frequency-discriminated union (M1 left it a loose `z.record` with a TODO — tighten it here), one-at-a-time pending generation with by-mode backfill (§5.8), templates (`template.create`/`.remove` — hard-remove allowed, they're shortcuts not ledger data), and the **Pending/Inbox** queue with 1-tap + bulk approve (`transaction.approve`). New ops named in impl §3: `template.create`/`remove`, `recurringRule.create`/`update`/`cancel`, `transaction.approve`.
+**M7 scope (impl §4 "M7" + spec §5.9/§6.8, read in full before coding):** `goals` table CRUD (kind spend_down/reserve, mode deadline/fixed/passive, ≤1 active per container app-level, auto-create-or-reuse container on name collision); the derivation engine (`contributed`/`progress`/`required_monthly` per mode+kind, the §5.9 worked examples become tests); **goal-derived recurring contributions** — this is where M6's `amount_mode='goal_derived'` gets its real `required_monthly` computation + `linked_goal_id` wiring (currently stubbed to `template_amount`); lifecycle (complete/oscillate/cancel-never-moves-money/leftover-absorb); and the **Monthly Allocation Plan** view. New ops: `goal.create/update/complete/cancel/archive`. **Tighten the goal cross-field zod refinements** (M1 left them for M7 — see `model/goal.ts` NOTE).
 
 **Deferred niceties surfaced during M5 (not blockers):**
 - **Period atoms aren't persisted** — `reportingPeriodAtom`/`comparePeriodAtom` reset on refresh. Fine for now; if wanted, persist to the synced `settings` store or localStorage (localStorage is device-local, which is arguably correct for a view preference). M11 polish candidate.
@@ -247,7 +272,7 @@ The impl §7 execution order is `…M4 → M6 → M5 → M7…`; the user swappe
 - **Per-widget period override (§6.1)** and **category-color user-override UI (§10.1/§5.1)** both deferred to M11 as speced.
 
 **Milestone-ownership deferrals to remember (flagged in M1, NOT open decisions):**
-- Complex cross-field zod refinements deferred to owning milestone: recurring `frequency↔interval_config` + `amount_mode↔template_amount` → **M6**; goal `mode`/`kind` invariants → **M7**. `interval_config` is currently a preserved `z.record` object; M6 tightens to a frequency-discriminated union. TODO comments mark both spots.
+- Recurring `frequency↔interval_config` + `amount_mode↔template_amount` refinements — ✔ **DONE in M6** (`interval_config` is now a frequency-discriminated union; two `.refine`s cover amount_mode + shape). **Still open: goal `mode`/`kind` invariants → M7** (`model/goal.ts` NOTE marks the spot).
 
 **Deferred platform work (do NOT touch until their milestone):**
 - **M8** (Google OAuth) — blocked on the user creating the Google Cloud project + OAuth consent screen + Web SPA client ID; ask before assuming they want to switch to it.
@@ -260,7 +285,7 @@ The impl §7 execution order is `…M4 → M6 → M5 → M7…`; the user swappe
 **On native Windows (this session's environment, `E:\GitHub\yaccount`):**
 ```bash
 node -v           # must be >=20.19 or >=22.12 — vitest 4/rolldown/vite 8 refuse to start below that
-npm test          # vitest — 234 passing at M4
+npm test          # vitest — 311 passing at M6
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
