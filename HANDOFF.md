@@ -1,9 +1,23 @@
 # yaccount — Handoff
 
 > ## 🚧 **M11 IS IN PROGRESS — READ [`M11-HANDOFF.md`](M11-HANDOFF.md) FIRST.**
-> Branch `m11-design-polish` (pushed). Phases 1–2 of 10 are done, user-tested and committed; **Phase 3
-> is next**. The approved design direction, the phase table, per-phase decisions and the working
-> protocol all live in that file. The approved plan is [`M11-PLAN.md`](M11-PLAN.md).
+> Branch `m11-design-polish` (pushed). Phases 1, 1.5, 2 and 3 of 10 are done, user browser-tested and
+> committed; **Phase 4 (mobile shell) is next**. The approved design direction, the phase table,
+> per-phase decisions and the working protocol all live in that file. The approved plan is
+> [`M11-PLAN.md`](M11-PLAN.md). Test count is **573** (was 407 at M9).
+>
+> **⚠️ Two things below are now STALE because Phase 3 changed them — `M11-HANDOFF.md` and spec §12 win:**
+> 1. **The design language is no longer the M2 shadcn-neutral ramp.** Spec §12 was **edited
+>    deliberately** (invariant #8's explicit-decision path, user-chosen direction A) and retitled
+>    **"The Standing Register"**: every neutral is now tinted with the brand hue, iris is full-strength
+>    and rare, and there is a figure scale, a marginalia/eyebrow/rule/leaders device set and a motion
+>    budget. The §12 cheat-sheet in "Non-negotiable invariants" below still describes the M2 state.
+>    **Read spec §12 itself — the passages marked (M11) are the current law.**
+> 2. **New UI code composes `src/features/ui/` primitives** (`Figure`, `Money`, `Eyebrow`,
+>    `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`,
+>    `ListSkeleton`) rather than hand-rolling Tailwind classes. `theme.test.ts` holds the token ramp to
+>    WCAG AA in both themes — if you change a colour token, that test tells you what it costs.
+>
 > This file below is the milestone-level history through M9 — still authoritative for invariants,
 > environment and prior-milestone context, but it does NOT know about M11 progress.
 

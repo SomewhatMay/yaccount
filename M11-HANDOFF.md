@@ -1,10 +1,10 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 4 commits ahead of `main`).
-> **Status:** Phases 1, 1.5 and 2 are DONE and user-tested. **Phase 3 is built and committed, awaiting
-> the user's browser test.** Phase 4 is next — do not start it until they say go.
-> **Last updated:** 2026-07-22, after Phase 3.
+> **Branch:** `m11-design-polish` (pushed to origin, 7 commits ahead of `main`).
+> **Status:** Phases 1, 1.5, 2 and 3 of 10 are DONE, **user browser-tested and passed**, committed and
+> pushed. **Phase 4 is next.**
+> **Last updated:** 2026-07-22, after Phase 3 passed its browser test.
 
 ---
 
@@ -246,7 +246,7 @@ does. Keep that discipline.
 | 1 | Entry timestamps + ledger ordering | ✅ **DONE** — `02d72a5`, user-tested PASS |
 | 1.5 | Editable entry time (user follow-up) | ✅ **DONE** — `96be47a`, user-tested PASS |
 | 2 | Logging, error boundaries, diagnostics | ✅ **DONE** — `97228ca`, user-tested PASS |
-| 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ✅ **DONE** — awaiting user browser test |
+| 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ✅ **DONE** — `7b5a4c2`, user-tested PASS |
 | 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ⬜ **NEXT** |
 | 5 | Ledger v2 (history curve, carried balance, filters/sort) | ⬜ |
 | 6 | Filters + mobile density on the other 5 list views | ⬜ |
@@ -346,7 +346,10 @@ would downgrade Next to 9.x. Left alone deliberately.
 
 ---
 
-### Phase 3 — "design system v2: tinted paper, the figure scale, the rule"
+### Phase 3 — `7b5a4c2` "design system v2: tinted paper, the figure scale, the rule"
+
+**User browser-tested and passed** ("looks much better"). No follow-up complaints — unlike Phase 1,
+this one needed no fix round.
 
 - **`globals.css`** — the whole ramp retinted to h≈285 in both themes (light + dark restated in full: the
   yaccount blocks come *later* at equal specificity, so `.dark` must repeat every token `:root` sets or
