@@ -165,6 +165,25 @@ export function categoryMonthlySpend(
   }));
 }
 
+/**
+ * The total expense-budget allowance in effect on a date (§6.5 monthly-bar
+ * overlay): the sum of every expense category's time-variant budget resolved at
+ * that date (`budgetOnDate`, §5.3), a null budget counting as 0. Drives the
+ * budget reference line on the monthly income/expense/savings chart.
+ */
+export function totalExpenseBudgetOnDate(
+  budgetTargets: BudgetTarget[],
+  categories: Category[],
+  date: string,
+): number {
+  let sum = 0;
+  for (const c of categories) {
+    if (c.type !== "expense") continue;
+    sum += budgetOnDate(budgetTargets, c.id, date) ?? 0;
+  }
+  return sum;
+}
+
 /** Collapse a monthly series into the Income → Expenses → Savings waterfall
  * totals (§6.5). The chart draws these three as a stacked bar with a transparent
  * base (impl §10 #28) — no second chart library. */

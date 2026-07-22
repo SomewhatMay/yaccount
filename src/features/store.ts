@@ -12,6 +12,7 @@ import {
   type Transaction,
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
+import type { ReportingPeriod } from "@/core/engine/period";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -41,6 +42,19 @@ export const defaultContainerIdAtom = atom((get) => {
   if (id && containers.some((c) => c.id === id && !c.is_archived)) return id;
   return GENERAL_CONTAINER_ID;
 });
+
+/**
+ * The unified global reporting-period control (§6.1). One period drives every
+ * dashboard widget (per-widget override is deferred to M11). `comparePeriodAtom`
+ * holds the optional second range for two-range compare (§6.2); null = compare
+ * off. These carry only the period *descriptor* — resolution to a concrete range
+ * needs `today`, which the view supplies, keeping the atoms free of clock state.
+ */
+export const reportingPeriodAtom = atom<ReportingPeriod>({
+  kind: "preset",
+  preset: "last-3-months",
+});
+export const comparePeriodAtom = atom<ReportingPeriod | null>(null);
 
 let repoPromise: Promise<Repo> | null = null;
 function getRepo(): Promise<Repo> {

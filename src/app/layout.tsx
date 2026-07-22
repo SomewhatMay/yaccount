@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { RepoBootstrap } from "@/features/RepoBootstrap";
-import { AppNav } from "@/features/AppNav";
+import { AppShell } from "@/features/AppShell";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
@@ -34,10 +34,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <RepoBootstrap>
-            <div className="mx-auto max-w-2xl px-5 pb-24">
-              <AppNav />
-              <main className="pt-4">{children}</main>
-            </div>
+            <AppShell>{children}</AppShell>
             <Toaster position="bottom-right" />
           </RepoBootstrap>
         </ThemeProvider>

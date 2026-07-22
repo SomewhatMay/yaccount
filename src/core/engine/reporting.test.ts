@@ -10,6 +10,7 @@ import {
   categoryMonthlySpend,
   waterfallData,
   budgetComparison,
+  totalExpenseBudgetOnDate,
 } from "./reporting";
 import { resolvePeriod } from "./period";
 
@@ -135,6 +136,21 @@ describe("waterfallData — Income → Expenses → Savings", () => {
       expenses: 45000,
       savings: 1455000,
     });
+  });
+});
+
+describe("totalExpenseBudgetOnDate — monthly-bar budget overlay", () => {
+  it("sums every expense category's budget in effect, income cats ignored", () => {
+    const bts = [
+      makeBudgetTarget({ category_id: "groc", amount: 10000, start_date: "2026-01-01" }),
+      makeBudgetTarget({
+        category_id: "dining",
+        amount: 20000,
+        start_date: "2026-03-01",
+      }),
+    ];
+    expect(totalExpenseBudgetOnDate(bts, categories, "2026-02-15")).toBe(10000); // dining not yet in effect
+    expect(totalExpenseBudgetOnDate(bts, categories, "2026-05-01")).toBe(30000);
   });
 });
 

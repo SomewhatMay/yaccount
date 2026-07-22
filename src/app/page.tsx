@@ -1,5 +1,5 @@
-import { LedgerView } from "@/features/ledger/LedgerView";
+import { DashboardView } from "@/features/reports/DashboardView";
 
 export default function Home() {
-  return <LedgerView />;
+  return <DashboardView />;
 }
