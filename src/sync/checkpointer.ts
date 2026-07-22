@@ -43,7 +43,6 @@ export interface SyncDeps {
 }
 
 export interface SyncResult {
-  pulled: number;
   pushed: number;
   collapsed: boolean;
 }
@@ -56,10 +55,14 @@ function dedupSort(ops: Op[]): Op[] {
   return [...byId.values()].sort(compareOps);
 }
 
-/** The snapshot's op set, or `[]` if no snapshot exists yet (fresh store). */
+/** The snapshot's op set, or `[]` if no snapshot exists yet (a 404 read on a
+ * fresh store). One round-trip — the parse path already tolerates junk. */
 async function readSnapshot(fs: DriveFS): Promise<Op[]> {
-  if (!(await fs.exists(SNAPSHOT_PATH))) return [];
-  return parseSnapshot(await fs.read(SNAPSHOT_PATH));
+  try {
+    return parseSnapshot(await fs.read(SNAPSHOT_PATH));
+  } catch {
+    return []; // no snapshot yet
+  }
 }
 
 /** The current live-ledger file names (archives excluded — their ops are already
@@ -76,18 +79,15 @@ async function listLiveLedgerNames(fs: DriveFS): Promise<string[]> {
     .map((e) => e.name);
 }
 
-/** All ops across every device's live ledger. */
+/** All ops across every device's live ledger. Reads run in parallel — independent
+ * round-trips, and a ledger that vanished between list and read just degrades to
+ * `[]` (re-seen next pull). */
 async function readLedgers(fs: DriveFS): Promise<Op[]> {
   const names = await listLiveLedgerNames(fs);
-  const ledgerOps: Op[] = [];
-  for (const name of names) {
-    try {
-      ledgerOps.push(...parseOps(await fs.read(name)));
-    } catch {
-      // a ledger vanished between list and read — skip; re-seen next pull
-    }
-  }
-  return ledgerOps;
+  const perLedger = await Promise.all(
+    names.map((name) => fs.read(name).then(parseOps, () => [] as Op[])),
+  );
+  return perLedger.flat();
 }
 
 /**
@@ -154,9 +154,8 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
     collapseThreshold = DEFAULT_COLLAPSE_THRESHOLD,
   } = deps;
 
-  // 1 — PULL snapshot + every live device ledger.
-  const snapshotOps = await readSnapshot(fs);
-  const ledgerOps = await readLedgers(fs);
+  // 1 — PULL snapshot + every live device ledger (independent — fetch together).
+  const [snapshotOps, ledgerOps] = await Promise.all([readSnapshot(fs), readLedgers(fs)]);
 
   // 2 — MERGE into local state (idempotent, LWW under the total order).
   await applyRemoteOps([...snapshotOps, ...ledgerOps]);
@@ -183,9 +182,5 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   // 5 — TRUNCATE this device's ledger to ops not already in the snapshot.
   await truncateOwnLedger(fs, deviceId, foldedIds);
 
-  return {
-    pulled: snapshotOps.length + ledgerOps.length,
-    pushed: outbox.length,
-    collapsed,
-  };
+  return { pushed: outbox.length, collapsed };
 }

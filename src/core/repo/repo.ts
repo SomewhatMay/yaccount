@@ -2,6 +2,7 @@ import type { IDBPDatabase, IDBPTransaction } from "idb";
 import { openDb, STORE, ALL_STORES, STATE_STORES, type StoreName } from "./db";
 import {
   applyOp,
+  applyInOrder,
   compareOps,
   MemoryTx,
   newMemoryState,
@@ -154,12 +155,21 @@ export class Repo {
    * ships that op type.
    */
   async applyRemoteOps(remoteOps: Op[]): Promise<void> {
-    // Pre-validate OUTSIDE the IndexedDB transaction (probing against a scratch
-    // in-memory state involves no idb request, and awaiting non-idb work inside a
-    // live idb tx would auto-close it). This only filters unknown op types — our
-    // own payloads are trusted.
+    // Which pulled ops are genuinely new? A steady-state sync re-sees only ops
+    // already journaled, so this is empty and we skip the rebuild entirely — the
+    // common tick costs one oplog read, not a full clear+replay. Done OUTSIDE the
+    // idb transaction (the validation probe below awaits non-idb work, which would
+    // auto-close a live tx); a concurrent local `dispatch` only ADDS this device's
+    // own already-applied op, so deciding "new" here can't miss a remote change.
+    const existing = new Set((await this.listOps()).map((o) => o.id));
+    const candidates = remoteOps.filter((o) => !existing.has(o.id));
+    if (candidates.length === 0) return;
+
+    // Drop ops this client can't apply (a newer client's op type), so one
+    // futuristic op can't wedge sync. Only the NEW candidates are probed —
+    // trivial in steady state. Our own payloads are trusted, so this filters type.
     const applicable: Op[] = [];
-    for (const op of remoteOps) {
+    for (const op of candidates) {
       try {
         await applyOp(new MemoryTx(newMemoryState()), op);
         applicable.push(op);
@@ -175,13 +185,13 @@ export class Repo {
       for (const op of applicable) {
         if (!(await oplog.get(op.id))) await oplog.put(op);
       }
-      // Rebuild from the full post-merge journal under the canonical order. A
+      // Rebuild from the full post-merge journal under the total order. A
       // concurrent local `dispatch` serializes with this tx (overlapping stores),
       // so its op is already in `getAll` and joins the replay — never lost.
-      const all = ((await oplog.getAll()) as Op[]).sort(compareOps);
+      const all = (await oplog.getAll()) as Op[];
       const itx = new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">);
       for (const store of STATE_STORES) await tx.objectStore(store).clear();
-      for (const op of all) await applyOp(itx, op);
+      await applyInOrder(itx, all);
       await tx.done;
     } catch (err) {
       try {
@@ -202,9 +212,12 @@ export class Repo {
    */
   async getOutboxOps(): Promise<Op[]> {
     const entries = (await this.db.getAll(STORE.outbox)) as { id: string }[];
-    const ids = new Set(entries.map((e) => e.id));
-    const ops = (await this.db.getAll(STORE.oplog)) as Op[];
-    return ops.filter((o) => ids.has(o.id)).sort(compareOps);
+    // Fetch each queued op by id (the outbox is a handful of ops) rather than
+    // materializing the whole journal to filter it.
+    const ops = await Promise.all(
+      entries.map((e) => this.db.get(STORE.oplog, e.id) as Promise<Op | undefined>),
+    );
+    return ops.filter((o): o is Op => o !== undefined).sort(compareOps);
   }
 
   /** Drop the given ids from the outbox after a successful ledger flush. Ids not

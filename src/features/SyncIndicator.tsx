@@ -64,7 +64,7 @@ export function SyncIndicator() {
     ? "Syncing with Google Drive…"
     : error
       ? `Couldn't reach Drive — tap to retry${lastError ? ` · ${lastError}` : ""}`
-      : `Synced ${relativeTime(lastSyncedAt)}`.trim();
+      : `Synced ${relativeTime(lastSyncedAt)}`;
 
   return (
     <TooltipProvider>

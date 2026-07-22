@@ -15,7 +15,7 @@ import {
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
 import { runSync } from "@/sync";
-import { getDriveFS } from "@/sync/drive";
+import { getDriveFS, describeSyncError } from "@/sync/drive";
 import { getAuthProvider } from "@/auth/web";
 import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
@@ -137,23 +137,9 @@ export type SyncStatus = "idle" | "syncing" | "synced" | "disconnected" | "error
 export const syncStatusAtom = atom<SyncStatus>("idle");
 export const lastSyncedAtAtom = atom<number | null>(null);
 /** Human-readable detail of the last sync failure (DriveError status+body when
- * available) — shown in the indicator tooltip so a failure is diagnosable, not a
- * mystery. */
+ * available, formatted by the sync seam) — shown in the indicator tooltip so a
+ * failure is diagnosable, not a mystery. */
 export const lastSyncErrorAtom = atom<string | null>(null);
-
-/** Best-effort human summary of a thrown error — surfaces drivestore's
- * `DriveError.status`/`.body` (§4) so a 403/401/CORS is legible at a glance. */
-function describeSyncError(err: unknown): string {
-  if (err && typeof err === "object") {
-    const e = err as { status?: number; body?: string; message?: string };
-    if (typeof e.status === "number") {
-      const detail = (e.body ?? e.message ?? "").toString().slice(0, 300);
-      return `Drive ${e.status}${detail ? `: ${detail}` : ""}`;
-    }
-    if (typeof e.message === "string") return e.message;
-  }
-  return String(err);
-}
 
 // Guard against overlapping cycles (the boot kick, the interval, and the
 // post-edit debounce can all fire close together). A skipped run is fine — the
@@ -180,25 +166,28 @@ function scheduleSync(set: Setter): void {
  */
 export const syncAtom = atom(null, async (_get, set) => {
   if (syncing) return;
-  const auth = getAuthProvider();
-  if (!auth.isConnected()) {
-    set(syncStatusAtom, "idle"); // signed out — the sign-in control drives onboarding
-    return;
-  }
-  let token: string | null = null;
-  try {
-    token = await auth.getAccessTokenSilent();
-  } catch {
-    token = null;
-  }
-  if (!token) {
-    set(syncStatusAtom, "disconnected");
-    return;
-  }
-
+  // Claim the guard SYNCHRONOUSLY, before any await, so near-simultaneous
+  // triggers (a tab refocus fires both `visibilitychange` and `focus`) can't both
+  // slip past into overlapping cycles.
   syncing = true;
-  set(syncStatusAtom, "syncing");
   try {
+    const auth = getAuthProvider();
+    if (!auth.isConnected()) {
+      set(syncStatusAtom, "idle"); // signed out — the sign-in control drives onboarding
+      return;
+    }
+    let token: string | null = null;
+    try {
+      token = await auth.getAccessTokenSilent();
+    } catch {
+      token = null;
+    }
+    if (!token) {
+      set(syncStatusAtom, "disconnected");
+      return;
+    }
+
+    set(syncStatusAtom, "syncing");
     const repo = await getRepo();
     const deviceId = await repo.getDeviceId();
     const yearMonth = new Date().toISOString().slice(0, 7);

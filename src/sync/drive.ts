@@ -10,9 +10,23 @@
  * UI. An interactive re-consent only ever fires from the user-gesture reconnect
  * path (§3.3-B), never from a background request.
  */
-import { createDriveStore } from "drivestore";
+import { createDriveStore, DriveError } from "drivestore";
 import { getAuthProvider } from "@/auth/web";
 import type { DriveFS } from "./checkpointer";
+
+/**
+ * A human-readable summary of a sync failure. drivestore's `DriveError` shape
+ * (`.status`/`.body`, §4) is known ONLY here — the seam's whole point — so a
+ * 403/401/CORS is legible in the UI without any layer above importing drivestore.
+ */
+export function describeSyncError(err: unknown): string {
+  if (err instanceof DriveError) {
+    const detail = (err.body || err.message || "").slice(0, 300);
+    return `Drive ${err.status}${detail ? `: ${detail}` : ""}`;
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
 
 let fsSingleton: DriveFS | null = null;
 
