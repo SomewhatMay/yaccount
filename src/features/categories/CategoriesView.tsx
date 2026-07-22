@@ -9,17 +9,26 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  TargetIcon,
 } from "lucide-react";
-import { categoriesAtom, dispatchAtom, readyAtom } from "@/features/store";
+import {
+  budgetTargetsAtom,
+  categoriesAtom,
+  dispatchAtom,
+  readyAtom,
+} from "@/features/store";
 import {
   createCategory,
   updateCategory,
   archiveCategory,
   unarchiveCategory,
 } from "@/core/commands";
-import type { Category, CategoryType } from "@/core/model";
+import { budgetOnDate } from "@/core/engine/budgets";
+import { formatCents } from "@/core/money";
+import type { BudgetTarget, Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
+import { BudgetSheet } from "@/features/categories/BudgetSheet";
 import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
@@ -38,12 +47,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const today = (): string => new Date().toISOString().slice(0, 10);
+
 export function CategoriesView() {
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
+  const budgetTargets = useAtomValue(budgetTargetsAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
+  const [budgeting, setBudgeting] = useState<Category | null>(null);
 
   const { expenses, incomes, archived } = useMemo(() => {
     const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
@@ -120,13 +133,17 @@ export function CategoriesView() {
         title="Expenses"
         items={expenses}
         siblings={categories}
+        budgetTargets={budgetTargets}
         onChange={dispatch}
+        onBudget={setBudgeting}
       />
       <CategorySection
         title="Income"
         items={incomes}
         siblings={categories}
+        budgetTargets={budgetTargets}
         onChange={dispatch}
+        onBudget={setBudgeting}
       />
 
       {archived.length > 0 && (
@@ -167,6 +184,13 @@ export function CategoriesView() {
           </p>
         </section>
       )}
+
+      <BudgetSheet
+        category={budgeting}
+        budgetTargets={budgetTargets}
+        onOpenChange={(open) => !open && setBudgeting(null)}
+        onDispatch={dispatch}
+      />
     </div>
   );
 }
@@ -175,12 +199,16 @@ function CategorySection({
   title,
   items,
   siblings,
+  budgetTargets,
   onChange,
+  onBudget,
 }: {
   title: string;
   items: Category[];
   siblings: Category[];
+  budgetTargets: BudgetTarget[];
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
+  onBudget: (c: Category) => void;
 }) {
   return (
     <section>
@@ -200,7 +228,9 @@ function CategorySection({
               category={c}
               siblings={siblings}
               divider={i > 0}
+              budget={budgetOnDate(budgetTargets, c.id, today())}
               onChange={onChange}
+              onBudget={() => onBudget(c)}
             />
           ))
         )}
@@ -213,12 +243,16 @@ function CategoryRow({
   category,
   siblings,
   divider,
+  budget,
   onChange,
+  onBudget,
 }: {
   category: Category;
   siblings: Category[];
   divider: boolean;
+  budget: number | null;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
+  onBudget: () => void;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -257,20 +291,26 @@ function CategoryRow({
         style={{ backgroundColor: categoryDotColor(category.id) }}
         aria-hidden
       />
-      {editing ? (
-        <RenameField
-          value={category.name}
-          label={`Rename ${category.name}`}
-          validate={(next) =>
-            nameTaken(siblings, next, category.id) ? "That name is taken." : null
-          }
-          onSave={save}
-          onCancel={() => setEditing(false)}
-          className="flex-1"
-        />
-      ) : (
-        <span className="flex-1 text-sm font-medium">{category.name}</span>
-      )}
+      <div className="min-w-0 flex-1">
+        {editing ? (
+          <RenameField
+            value={category.name}
+            label={`Rename ${category.name}`}
+            validate={(next) =>
+              nameTaken(siblings, next, category.id) ? "That name is taken." : null
+            }
+            onSave={save}
+            onCancel={() => setEditing(false)}
+          />
+        ) : (
+          <span className="truncate text-sm font-medium">{category.name}</span>
+        )}
+        {budget !== null && (
+          <div className="text-muted-foreground truncate text-xs">
+            {formatCents(budget)}/mo budget
+          </div>
+        )}
+      </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -286,6 +326,10 @@ function CategoryRow({
           <DropdownMenuItem onClick={() => setEditing(true)}>
             <PencilIcon className="size-4" />
             Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onBudget}>
+            <TargetIcon className="size-4" />
+            Budget
           </DropdownMenuItem>
           <DropdownMenuItem onClick={archive}>
             <ArchiveIcon className="size-4" />

@@ -4,12 +4,14 @@ import { STORE, STATE_STORES, type StoreName } from "@/core/repo/db";
 
 const ALL_STATE_STORES: StoreName[] = STATE_STORES;
 import {
+  makeBudgetTarget,
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
   makeTransaction,
   makeVoidRow,
   SETTING,
+  type BudgetTarget,
   type Category,
   type Container,
   type ContainerSnapshot,
@@ -408,6 +410,101 @@ describe("applyOp — one report per container per day (§5.6, upsert by natural
   });
 });
 
+describe("applyOp — budget target ops (§5.3, M4)", () => {
+  const set = (
+    id: string,
+    categoryId: string,
+    startDate: string,
+    amount: number,
+    ts: number,
+  ): Op => ({
+    id: `op-${id}`,
+    ts: at(ts),
+    type: "budgetTarget.set",
+    payload: {
+      row: makeBudgetTarget({
+        id,
+        category_id: categoryId,
+        amount,
+        start_date: startDate,
+      }),
+    },
+  });
+
+  it("budgetTarget.set materializes the row, idempotently", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    const op = set("b1", "groceries", "2026-01-01", 30000, 1000);
+    await applyOp(tx, op);
+    await applyOp(tx, op); // replay
+    const rows = await readAll<BudgetTarget>(state, STORE.budgetTargets);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amount).toBe(30000);
+  });
+
+  it("different start_dates for the same category accumulate (time-variant history)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, set("b1", "groceries", "2026-01-01", 30000, 1000));
+    await applyOp(tx, set("b2", "groceries", "2026-06-01", 60000, 2000));
+    const rows = await readAll<BudgetTarget>(state, STORE.budgetTargets);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("a second set for the same (category_id, start_date) replaces the first (natural-key upsert, §5.3)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, set("b1", "groceries", "2026-01-01", 30000, 1000));
+    await applyOp(tx, set("b2", "groceries", "2026-01-01", 35000, 2000));
+    const rows = await readAll<BudgetTarget>(state, STORE.budgetTargets);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("b2");
+    expect(rows[0].amount).toBe(35000);
+  });
+
+  it("keeps same-date rows for DIFFERENT categories", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, set("b1", "groceries", "2026-01-01", 30000, 1000));
+    await applyOp(tx, set("b2", "rent", "2026-01-01", 200000, 2000));
+    const rows = await readAll<BudgetTarget>(state, STORE.budgetTargets);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("converges regardless of arrival order — two devices setting the same date", async () => {
+    const ops: Op[] = [
+      set("b1", "groceries", "2026-01-01", 30000, 1000),
+      set("b2", "groceries", "2026-01-01", 35000, 2000),
+    ];
+    const a = await new MemoryTx(await replay(ops)).getAll<BudgetTarget>(
+      STORE.budgetTargets,
+    );
+    const b = await new MemoryTx(await replay([ops[1], ops[0]])).getAll<BudgetTarget>(
+      STORE.budgetTargets,
+    );
+    expect(b).toEqual(a);
+    expect(a).toHaveLength(1);
+    expect(a[0].id).toBe("b2"); // the later op in the total order wins
+  });
+
+  it("budgetTarget.remove drops the row, idempotently — the only hard delete besides snapshots", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, set("b1", "groceries", "2026-01-01", 30000, 1000));
+    await applyOp(tx, set("b2", "groceries", "2026-06-01", 60000, 2000));
+    const remove: Op = {
+      id: "op-rm",
+      ts: at(3000),
+      type: "budgetTarget.remove",
+      payload: { id: "b1" },
+    };
+    await applyOp(tx, remove);
+    await applyOp(tx, remove); // replay
+    const rows = await readAll<BudgetTarget>(state, STORE.budgetTargets);
+    expect(rows.map((r) => r.id)).toEqual(["b2"]);
+  });
+});
+
 describe("applyOp — archiving is REVERSIBLE (undo is first-class)", () => {
   it("category.unarchive puts the row back in play", async () => {
     const state = newMemoryState();
@@ -540,12 +637,19 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     date: "2026-07-20",
     reported_balance: 500000,
   });
+  const budget = makeBudgetTarget({
+    id: "bt1",
+    category_id: "c1",
+    amount: 30000,
+    start_date: "2026-01-01",
+  });
 
   const seed: Op[] = [
     { id: "seed-c", ts: at(1), type: "category.create", payload: { row: category } },
     { id: "seed-k", ts: at(2), type: "container.create", payload: { row: container } },
     { id: "seed-t", ts: at(3), type: "transaction.create", payload: { row: txRow } },
     { id: "seed-s", ts: at(4), type: "snapshot.record", payload: { row: snap } },
+    { id: "seed-bt", ts: at(5), type: "budgetTarget.set", payload: { row: budget } },
   ];
 
   const cases: Op[] = [
@@ -574,6 +678,8 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
       type: "setting.set",
       payload: { row: { key: SETTING.defaultContainerId, value: "k1" } },
     },
+    { id: "o16", ts: at(25), type: "budgetTarget.set", payload: { row: budget } },
+    { id: "o17", ts: at(26), type: "budgetTarget.remove", payload: { id: "bt1" } },
   ];
 
   it.each(cases.map((op) => [op.type, op] as const))(

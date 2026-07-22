@@ -4,6 +4,7 @@ import { STORE } from "@/core/repo/db";
 import {
   GENERAL_CONTAINER_ID,
   SETTING,
+  type BudgetTarget,
   type Category,
   type Container,
   type ContainerSnapshot,
@@ -29,6 +30,7 @@ export const containersAtom = atom<Container[]>([]);
 export const transactionsAtom = atom<Transaction[]>([]);
 export const snapshotsAtom = atom<ContainerSnapshot[]>([]);
 export const settingsAtom = atom<Setting[]>([]);
+export const budgetTargetsAtom = atom<BudgetTarget[]>([]);
 
 /** Default Spending Container (§5.2) — the compose bar's preselected wallet.
  * A synced setting; falls back to the seeded 'general' wallet. */
@@ -49,18 +51,20 @@ function getRepo(): Promise<Repo> {
 /** Re-read the materialized tables into the atoms (local-first read path). */
 export const refreshAtom = atom(null, async (_get, set) => {
   const repo = await getRepo();
-  const [cats, conts, txns, snaps, settings] = await Promise.all([
+  const [cats, conts, txns, snaps, settings, budgetTargets] = await Promise.all([
     repo.getAll<Category>(STORE.categories),
     repo.getAll<Container>(STORE.containers),
     repo.getAll<Transaction>(STORE.transactions),
     repo.getAll<ContainerSnapshot>(STORE.containerSnapshots),
     repo.getAll<Setting>(STORE.settings),
+    repo.getAll<BudgetTarget>(STORE.budgetTargets),
   ]);
   set(categoriesAtom, cats);
   set(containersAtom, conts);
   set(transactionsAtom, txns);
   set(snapshotsAtom, snaps);
   set(settingsAtom, settings);
+  set(budgetTargetsAtom, budgetTargets);
 });
 
 /** Append + apply one op atomically (§0.1), then refresh the caches. */
