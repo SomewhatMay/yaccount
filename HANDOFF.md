@@ -1,8 +1,8 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M6 (Recurring Rules, Templates & the Inbox) CODE-COMPLETE on branch `m6-recurring`** (2026-07-21) — committed (`da944a5`), **NOT yet PR'd/merged, awaiting the user's browser-verify** (UI can't be auto-tested pre-Playwright/M11). Typecheck/lint/build/prettier clean; **312 vitest tests green** (was 266 at M5, +45 for M6). Dev server smoke: `/inbox` + `/recurring` serve 200, nav + client shell render, no runtime errors. **No `DB_VERSION` bump** — `recurring_rules` store existed since M1. Next up: **M7** (savings goals + monthly allocation plan) — the LAST feature milestone; M7 needs BOTH M5+M6 (now both done). But confirm with the user (they re-order; see "Next Steps").
-> **Prior:** M5 (Reporting & Dashboard) DONE — merged to `main` via PR #4 (2026-07-21), user browser-verified against a hand-computed fixture.
+> **Last updated:** **M6 (Recurring Rules, Templates & the Inbox) DONE — merged to `main` via PR #5** (merge commit `0e9416e`, 2026-07-21). **User browser-verified** the full flow (create rules of each frequency, backfill into inbox, 1-tap + bulk approve, bulk dismiss + undo, edit-before-approve, pause/resume, templates/shortcuts, forward-looking schedule edits). Typecheck/lint/build/prettier clean; **312 vitest tests green** (was 266 at M5, +46 for M6). **No `DB_VERSION` bump** — `recurring_rules` store existed since M1 (DB_VERSION stays 2). **Next up: M7** (Savings Goals + Monthly Allocation Plan) — the **LAST feature milestone**; M7 needs BOTH M5+M6, now both merged. But confirm milestone choice with the user first (they re-order; see "Next Steps").
+> **Prior:** M5 (Reporting & Dashboard) DONE — merged via PR #4; M4 via PR #3; M3 via PR #2; M0–M2 via PR #1.
 > **NOTE:** M4 was merged to `main` via **PR #3** (`c2f7804`) since the last handoff — the "not pushed/PR'd" note for M4 below is stale; `main` has M4.
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
 > **NOTE (environment):** the M5 session ran back on **WSL2** (`/home/may/github/yaccount`, Node v22.18.0 via nvm — remember the `export PATH=…` prefix for every npm/npx call). The M4 session was native Windows. Both environments work; update whichever section matches where you're actually running.
@@ -68,31 +68,24 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
-**M6 (Recurring Rules, Templates & the Inbox) — CODE-COMPLETE on branch `m6-recurring`, committed `da944a5`, NOT yet PR'd/merged.** Core-first: **266 → 312 tests** (+45). Typecheck/lint/build/prettier clean; dev-server smoke passed (routes 200, no runtime errors). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). Remaining: **user browser-verify**, then PR + merge. See "M6 decisions and delivered code" below.
+**M6 (Recurring Rules, Templates & the Inbox) — DONE, merged to `main` via PR #5 (`0e9416e`).** Core-first: **266 → 312 tests** (+46). Typecheck/lint/build/prettier clean. **User browser-verified** all flows (incl. the three post-verify fix rounds + bulk dismiss below). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). See "M6 decisions and delivered code" below.
 
-**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`, but **the user explicitly picked M5 next over M6** after M4 shipped — a deliberate re-ordering, not an oversight. **Do NOT silently "correct" this back to M6** — the dependency graph permits it either way (M5 needs M4+M3, both done; M6 needs only M3), so there's no technical reason to override the user's stated choice. If a future session is unsure which is next, ask rather than assume the impl doc's default order still holds.
+**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`; the user swapped it to `…M4 → M5 → M6 → M7…` (did M5 before M6), then confirmed **M6 next after M5** when asked. **Both M5 and M6 are now done**, so the sequencing is moot going forward — **M7 is the only remaining feature milestone** and needs both (both merged). The lesson stands: **the user picks the next milestone explicitly — ask, don't assume** the impl doc's default order. (M8 auth stays blocked on the user's Google Cloud setup.)
 
-Git log (`m4-budget-targets`, current):
+Git log (`main`, current — M0–M6 merged):
 ```
-4e11529 M4: time-variant budget targets
-88ebfa8 Keep handoff on cloud for cross-device development
-0e007e6 Merge pull request #2 from SomewhatMay/m3-containers
-249fe34 fix: adversarial test audit — 10 real bugs, 126 -> 212 tests
-b3d060c feat: undo is first-class — unarchive, undo-delete, and the philosophy in writing
-3d44c5a fix: pre-merge M3 review — investment toggle, archive guard, unique renames
-efd1ea2 feat: one reported balance per container per day
-92aa2a4 feat: reported-balance history — view, correct, remove
-6e2e7fc feat(ui): explicit confirm/cancel on inline rename
-a040677 fix(ui): checkbox menu indicator leads like every other item icon
-5f84595 fix(ui): visible sign control, roomier dropdowns, checkbox menu item
-e44ea7f M3: containers, transfers, balances
-042e6cd Merge pull request #1 from SomewhatMay/m0-scaffold
-417114b docs: codify "Quiet Register" design language as law
-3b7a00b refactor(ui): adopt shadcn/ui across M2 screens and docs
-96ebac9 M2: categories + transaction ledger (expense/income)
-7c8e7fb M1: core data layer — model, money, op-log, IndexedDB repo (test-only)
-f4bdd4e M0: scaffold Next.js static-export app + toolchain
-8d9f122 chore: init main
+0e9416e Merge pull request #5 from SomewhatMay/m6-recurring   (M6)
+46e6f21 docs: note bulk dismiss
+e288265 M6: bulk dismiss in the inbox (mirrors bulk approve; undo restores all)
+9dd3d3c docs: note M6 post-verify fixes + test count 312
+c593d47 M6 fixes from browser-verify feedback
+9ec74b0 docs: M6 code-complete, handoff for browser-verify + M7
+da944a5 M6: recurring rules, templates & the inbox
+d5536ce docs: reconcile stale M4 PR status in handoff body
+f9fccae Merge pull request #4 from SomewhatMay/m5-reporting   (M5)
+36164fe docs: M5 browser-verified, merged via PR #4
+c0b2a4e M5 UI: reporting dashboard + charts, period control, dashboard is home
+… (M4 PR #3, M3 PR #2, M0–M2 PR #1 below — see prior handoff history)
 ```
 
 ### M6 decisions and delivered code (this session, branch `m6-recurring`)
@@ -261,11 +254,9 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M6 is CODE-COMPLETE on branch `m6-recurring` (committed `da944a5`), NOT yet PR'd/merged.** Open actions, in order:
-1. **User browser-verifies M6** (UI can't be auto-tested pre-Playwright/M11). Suggested walk-through: create recurring rules of each frequency (daily/weekly/twice-a-month/monthly/yearly/custom) → confirm `/inbox` fills with pending rows (backfill of past-dated rules), pending excluded from dashboard/ledger balances; 1-tap approve + multi-select bulk approve → approved rows appear in the ledger and count; edit-before-approve; dismiss + undo; pause a rule (Paused section) + Resume; save a ledger row as a shortcut → 1-tap re-log from the chip strip → remove shortcut; refresh persists; light/dark. Verify a transfer rule generates a category-less pending transfer.
-2. Then **PR + merge `m6-recurring` → `main`** (via `gh`).
+**M6 is DONE and merged to `main` (PR #5, `0e9416e`), browser-verified.** No open actions. `main` now has M0–M6.
 
-### Up next after M6 merges: **M7 — Savings Goals & the Monthly Allocation Plan** (CONFIRM with the user first)
+### Up next: **M7 — Savings Goals & the Monthly Allocation Plan** (CONFIRM with the user first)
 **This is the LAST feature milestone** — completing it means v1 is feature-complete (and, since sync M9 is deferred/blocked on Google Cloud, v1-shippable once M8/M9 land). **M7 needs BOTH M5 and M6** (impl §7 dependency graph) — both now done. But the user re-orders and picks the next milestone explicitly — **ask, don't assume.** (M8 auth stays blocked on the user's Google Cloud setup, unchanged.)
 
 **M7 scope (impl §4 "M7" + spec §5.9/§6.8, read in full before coding):** `goals` table CRUD (kind spend_down/reserve, mode deadline/fixed/passive, ≤1 active per container app-level, auto-create-or-reuse container on name collision); the derivation engine (`contributed`/`progress`/`required_monthly` per mode+kind, the §5.9 worked examples become tests); **goal-derived recurring contributions** — this is where M6's `amount_mode='goal_derived'` gets its real `required_monthly` computation + `linked_goal_id` wiring (currently stubbed to `template_amount`); lifecycle (complete/oscillate/cancel-never-moves-money/leftover-absorb); and the **Monthly Allocation Plan** view. New ops: `goal.create/update/complete/cancel/archive`. **Tighten the goal cross-field zod refinements** (M1 left them for M7 — see `model/goal.ts` NOTE).
