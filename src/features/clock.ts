@@ -34,6 +34,76 @@ export function thisMonthIso(now: Date = new Date()): string {
   return todayIso(now).slice(0, 7);
 }
 
+const pad = (n: number): string => String(n).padStart(2, "0");
+
+/**
+ * ── The entry's time, as an editable field ────────────────────────────────
+ * `date` is the calendar day the entry is filed under; `entered_at` is the
+ * instant within it. To the user those are one thing — "when did this happen" —
+ * so the two move together: re-dating an entry carries its time of day onto the
+ * new day, and setting a time pins it within the day already chosen.
+ */
+
+/** A stored instant as the local `HH:mm` an `<input type="time">` expects.
+ * Empty when the row carries no instant, so the field simply shows blank. */
+export function timeInputValue(enteredAt: string | null | undefined): string {
+  if (!enteredAt) return "";
+  const d = new Date(enteredAt);
+  return Number.isNaN(d.getTime()) ? "" : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** A picked date + time, as an instant — read in the USER's zone, since that is
+ * the clock they typed against. Null when either half is missing or unparseable,
+ * which is how a row with no instant stays that way rather than inventing one. */
+export function instantFrom(date: string, time: string): string | null {
+  if (!date || !time) return null;
+  const d = new Date(`${date}T${time}`); // no offset ⇒ local, per the JS spec
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/**
+ * The picked date and time, carrying the live clock's seconds.
+ *
+ * A time input is minute-resolution, so pinning one and then logging three
+ * receipts would give all three the same instant — a tie, and the register would
+ * fall back to the random-UUID order this whole field exists to replace. The
+ * minute is what the user chose; the seconds are the genuine order they wrote
+ * them in, which is exactly what a paper register records. Creation only — an
+ * edit is deliberate and stays exact.
+ */
+export function instantFromNow(
+  date: string,
+  time: string,
+  now: Date = new Date(),
+): string | null {
+  const base = instantFrom(date, time);
+  if (base === null) return null;
+  const d = new Date(base);
+  d.setSeconds(now.getSeconds(), now.getMilliseconds());
+  return d.toISOString();
+}
+
+/** Both halves as the single value an `<input type="datetime-local">` takes. */
+export function dateTimeInputValue(
+  date: string,
+  enteredAt: string | null | undefined,
+): string {
+  if (!date) return "";
+  return `${date}T${timeInputValue(enteredAt) || "00:00"}`;
+}
+
+/** Now, as a `datetime-local` value — what the compose bar starts from. */
+export function nowDateTimeInput(now: Date = new Date()): string {
+  return `${toIsoDate(now)}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+/** Split a `datetime-local` value back into the two things a row stores.
+ * Trims any seconds a browser appends — the field is minute-resolution. */
+export function splitDateTime(value: string): { date: string; time: string } {
+  const [date = "", time = ""] = value.split("T");
+  return { date, time: time.slice(0, 5) };
+}
+
 const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",

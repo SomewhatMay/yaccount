@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { todayIso } from "@/features/clock";
+import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
 
 type Mode = "entry" | "transfer";
 
@@ -52,7 +52,14 @@ export function ComposeBar({
   );
 
   const [mode, setMode] = useState<Mode>("entry");
-  const [date, setDate] = useState(todayIso());
+  // One control for "when" — date and time together. Untouched, the row takes the
+  // op's timestamp (full precision, so a burst of entries never ties); once the
+  // user picks a time, theirs wins.
+  const [when, setWhen] = useState(() => nowDateTimeInput());
+  const [whenPicked, setWhenPicked] = useState(false);
+  const { date, time } = splitDateTime(when);
+  const enteredAtNow = (): string | undefined =>
+    whenPicked ? (instantFromNow(date, time) ?? undefined) : undefined;
   const [vendor, setVendor] = useState("");
   const [categoryId, setCategoryId] = useState(activeCategories[0]?.id ?? "");
   // Null = "follow the Default Spending Container" (§5.2); a pick overrides it.
@@ -83,6 +90,7 @@ export function ComposeBar({
     await onSubmit(
       createTransfer({
         date,
+        entered_at: enteredAtNow(),
         amount: magnitude,
         container_id: from.id,
         to_container_id: to.id,
@@ -119,6 +127,7 @@ export function ComposeBar({
     await onSubmit(
       createTransaction({
         date,
+        entered_at: enteredAtNow(),
         amount: res.signed,
         vendor_source: vendor.trim(),
         category_id: categoryId,
@@ -136,6 +145,10 @@ export function ComposeBar({
     setAmountStr("");
     setPickedSign(null);
     setWarn(null);
+    // Roll "when" forward to now for the next entry, unless the user deliberately
+    // set one — logging several things for the same past evening shouldn't make
+    // them re-pick it every time.
+    if (!whenPicked) setWhen(nowDateTimeInput());
   }
 
   // A typed leading +/− moves into the sign control so it is never a silent no-op.
@@ -151,13 +164,16 @@ export function ComposeBar({
       onSubmit={submit}
       className="border-primary/15 bg-primary/[0.04] space-y-1.5 rounded-2xl border p-2"
     >
-      <div className="grid grid-cols-[auto_1fr] items-center gap-1.5 sm:grid-cols-[8.5rem_1fr_auto_6rem_auto]">
+      <div className="grid grid-cols-[auto_1fr] items-center gap-1.5 sm:grid-cols-[13rem_1fr_auto_6rem_auto]">
         <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          aria-label="Date"
-          className="border-0 bg-transparent shadow-none focus-visible:ring-0"
+          type="datetime-local"
+          value={when}
+          onChange={(e) => {
+            setWhen(e.target.value);
+            setWhenPicked(true);
+          }}
+          aria-label="Date and time"
+          className="tnum border-0 bg-transparent shadow-none focus-visible:ring-0"
         />
         <Input
           value={vendor}

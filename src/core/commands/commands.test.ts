@@ -173,6 +173,39 @@ describe("entered_at is stamped from the op timestamp (M11)", () => {
     expect(template.payload.row.entered_at).toBe(META.ts);
   });
 
+  it("a caller-chosen instant wins over the op ts — the user can set the time", () => {
+    // The op ts is only a DEFAULT ("recorded now"). Once the entry time is an
+    // editable field, what the user picked has to survive to the row.
+    const chosen = "2026-07-15T17:41:00.000Z";
+    const create = createTransaction(
+      {
+        date: "2026-07-15",
+        amount: -1000,
+        vendor_source: "Starbucks",
+        category_id: "coffee",
+        entered_at: chosen,
+      },
+      META,
+    );
+    if (create.type !== "transaction.create") throw new Error("narrow");
+    expect(create.payload.row.entered_at).toBe(chosen);
+
+    const transfer = createTransfer(
+      {
+        date: "2026-07-15",
+        amount: 10000,
+        container_id: "general",
+        to_container_id: "vacation",
+        fromName: "General",
+        toName: "Vacation",
+        entered_at: chosen,
+      },
+      META,
+    );
+    if (transfer.type !== "transaction.create") throw new Error("narrow");
+    expect(transfer.payload.row.entered_at).toBe(chosen);
+  });
+
   it("a void stamps its OWN op ts, not the original's instant", () => {
     const orig = makeTransaction({
       id: "t1",

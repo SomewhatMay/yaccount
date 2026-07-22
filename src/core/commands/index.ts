@@ -79,17 +79,21 @@ export function createTransaction(
     id?: string;
     container_id?: string;
     notes?: string | null;
+    entered_at?: string | null; // when the entry happened; defaults to the op's ts
   },
   m?: OpMeta,
 ): Op {
   const op = meta(m);
-  // The op already holds the authoritative instant (it is the total order's sort
-  // key, §8.2). Reusing it for the row keeps state and journal in agreement and
-  // keeps commands deterministic when tests inject `meta` — no second clock read.
+  // The op already holds an authoritative instant (it is the total order's sort
+  // key, §8.2), so it is the DEFAULT — "recorded now" — with no second clock read
+  // and deterministic when tests inject `meta`. A caller-chosen time wins: the
+  // entry time is an editable field, not an immutable audit stamp.
   return {
     ...op,
     type: "transaction.create",
-    payload: { row: makeTransaction({ ...input, entered_at: op.ts }) },
+    payload: {
+      row: makeTransaction({ ...input, entered_at: input.entered_at ?? op.ts }),
+    },
   };
 }
 
@@ -175,6 +179,7 @@ export function createTransfer(
     vendor_source?: string;
     id?: string;
     notes?: string | null;
+    entered_at?: string | null;
   },
   m?: OpMeta,
 ): Op {
@@ -182,7 +187,7 @@ export function createTransfer(
   return {
     ...op,
     type: "transaction.create",
-    payload: { row: makeTransfer({ ...input, entered_at: op.ts }) },
+    payload: { row: makeTransfer({ ...input, entered_at: input.entered_at ?? op.ts }) },
   };
 }
 
