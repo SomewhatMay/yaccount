@@ -167,9 +167,9 @@ describe("fixed mode — the ask is sacred, the date flexes (§5.9.4)", () => {
       planned_monthly: 5000,
       created_date: "2026-01-01",
     });
-    expect(requiredMonthly(open, [contribute(99999, "2026-02-01", "c1")], "2026-07-01")).toBe(
-      5000,
-    );
+    expect(
+      requiredMonthly(open, [contribute(99999, "2026-02-01", "c1")], "2026-07-01"),
+    ).toBe(5000);
     expect(goalProgress(open, [])).toBeNull();
     expect(projectedCompletion(open, [], "2026-07-01")).toBeNull();
   });
@@ -190,10 +190,12 @@ describe("passive mode — tracked, claims nothing (§5.9.4)", () => {
       target_amount: 20000,
       created_date: "2026-01-01",
     });
-    expect(requiredMonthly(withTarget, [contribute(5000, "2026-02-01", "c")], "2026-07-01")).toBe(
-      0,
+    expect(
+      requiredMonthly(withTarget, [contribute(5000, "2026-02-01", "c")], "2026-07-01"),
+    ).toBe(0);
+    expect(goalProgress(withTarget, [contribute(5000, "2026-02-01", "c")])).toBeCloseTo(
+      0.25,
     );
-    expect(goalProgress(withTarget, [contribute(5000, "2026-02-01", "c")])).toBeCloseTo(0.25);
 
     const loose = makeGoal({
       container_id: CLOTHING,
@@ -242,7 +244,9 @@ describe("reserve goal — progress is balance; a withdrawal re-opens the ask (�
       created_date: "2026-01-01",
     });
     expect(requiredMonthly(g, [], "2026-07-01")).toBe(50000);
-    expect(requiredMonthly(g, [contribute(1000000, "2026-02-01", "c1")], "2026-07-01")).toBe(0);
+    expect(
+      requiredMonthly(g, [contribute(1000000, "2026-02-01", "c1")], "2026-07-01"),
+    ).toBe(0);
   });
 });
 

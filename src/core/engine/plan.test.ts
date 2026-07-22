@@ -104,7 +104,11 @@ describe("expectedIncomeFromRules (§6.8)", () => {
 
 describe("monthlyPlan — every dollar a purpose (§6.8)", () => {
   const budgetTargets = [
-    makeBudgetTarget({ category_id: "groceries", amount: 50000, start_date: "2026-01-01" }),
+    makeBudgetTarget({
+      category_id: "groceries",
+      amount: 50000,
+      start_date: "2026-01-01",
+    }),
     makeBudgetTarget({ category_id: "gas", amount: 20000, start_date: "2026-01-01" }),
   ];
   const goal = makeGoal({

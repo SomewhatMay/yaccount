@@ -1,10 +1,4 @@
-import type {
-  BudgetTarget,
-  Category,
-  Goal,
-  RecurringRule,
-  Transaction,
-} from "../model";
+import type { BudgetTarget, Category, Goal, RecurringRule, Transaction } from "../model";
 import { isTransferRule } from "../model";
 import { budgetOnDate } from "./budgets";
 import { requiredMonthly } from "./goals";
@@ -77,7 +71,8 @@ export function expectedIncomeFromRules(
   let covered = false;
   for (const rule of rules) {
     if (rule.status !== "active" || isTransferRule(rule)) continue;
-    if (!rule.template_category_id || !incomeCats.has(rule.template_category_id)) continue;
+    if (!rule.template_category_id || !incomeCats.has(rule.template_category_id))
+      continue;
     const n = occurrencesInMonth(rule, yearMonth);
     if (n === 0) continue;
     covered = true;
