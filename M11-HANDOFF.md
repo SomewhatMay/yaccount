@@ -1,10 +1,10 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 7 commits ahead of `main`).
-> **Status:** Phases 1, 1.5, 2 and 3 of 10 are DONE, **user browser-tested and passed**, committed and
-> pushed. **Phase 4 is next.**
-> **Last updated:** 2026-07-22, after Phase 3 passed its browser test.
+> **Branch:** `m11-design-polish` (pushed to origin, 8 commits ahead of `main`).
+> **Status:** Phases 1, 1.5, 2, 3 and 4 of 10 are DONE, **user browser-tested and passed**, committed
+> and pushed. **Phase 5 is next.**
+> **Last updated:** 2026-07-22, after Phase 4 passed its browser test.
 
 ---
 
@@ -247,8 +247,8 @@ does. Keep that discipline.
 | 1.5 | Editable entry time (user follow-up) | ✅ **DONE** — `96be47a`, user-tested PASS |
 | 2 | Logging, error boundaries, diagnostics | ✅ **DONE** — `97228ca`, user-tested PASS |
 | 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ✅ **DONE** — `7b5a4c2`, user-tested PASS |
-| 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ⬜ **NEXT** |
-| 5 | Ledger v2 (history curve, carried balance, filters/sort) | ⬜ |
+| 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ✅ **DONE** — `2e4d6cc`, user-tested PASS |
+| 5 | Ledger v2 (history curve, carried balance, filters/sort) | ⬜ **NEXT** |
 | 6 | Filters + mobile density on the other 5 list views | ⬜ |
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ⬜ |
 | 8 | Category colours, empty/loading/error states, a11y | ⬜ |
@@ -390,32 +390,101 @@ this one needed no fix round.
   touched; the remaining ~60 `formatCents` call sites convert as later phases rewrite those screens.
 - Tests **494 → 573** (+79: 9 geometry, 15 contrast, 55 theme). Typecheck/lint/build/prettier clean.
 
+### Phase 4 — `2e4d6cc` "mobile shell: tab bar, sidebar rail, quick-add FAB, ⌘K"
+
+**User browser-tested and passed** ("looks good"). No fix round needed.
+
+- **`src/features/shell/nav.ts`** — ONE destination registry (href/label/icon/hint) read by all four
+  navigation surfaces: the tab bar, the desktop rail, the More sheet and the palette. `nav.test.ts`
+  holds the locked slots, that the badge is on Inbox, and that **tabs ∪ More = every destination** —
+  a screen present on one surface and forgotten on another is unreachable there, and on a phone that
+  means unreachable full stop.
+- **`AppShell.tsx` rebuilt.** `< lg`: sticky compact top bar (wordmark · sync · theme) + `BottomTabBar`
+  (Home · Ledger · Inbox · More, pending badge on Inbox, `env(safe-area-inset-bottom)`), `main` padded
+  `calc(7rem + safe-area)` so the last register row is never under the bar. `≥ lg`: fixed 14rem
+  `SidebarRail` (all 8 destinations + Settings + the account control in its footer), tab bar gone,
+  content offset by `lg:pl-56`. The reading column is unchanged (`max-w-2xl`, dashboard `max-w-5xl`).
+  **`AppNav.tsx` is deleted** — its pieces are `shell/TopBar.tsx` + `shell/SidebarRail.tsx`.
+- **Active state = full-strength iris on the icon and label, and nothing else.** No pill, no tinted
+  plate: the old `bg-primary/10` nav pill was exactly the 4%-iris-everywhere habit §12.2 (M11) removed.
+- **`shell/QuickAddFab.tsx`** — iris FAB, `size-14`, above the tab bar on a phone
+  (`bottom-[calc(4.25rem_+_env(safe-area-inset-bottom))]` — note the underscores; `calc(4.25rem+…)`
+  without whitespace is invalid CSS and the rule is dropped silently), corner-anchored from `lg`.
+- **`shell/QuickAddSheet.tsx`** — the shortcuts strip **moved here off the ledger** (the declutter ask).
+  Expense/Income/Transfer segmented control, big mono amount with the `SignToggle`, then payee /
+  category / container / when. The form is mounted only while open, so each visit starts on the kind
+  that asked for it with an empty amount and the clock rolled forward.
+- **§12.5's one orchestrated moment is built:** tap **+** → sheet rises (`--dur-3`) → log → the row
+  lands in the register carrying a single iris wash (`bg-primary/15`) that settles on `--dur-2`. The
+  hold is *state*, not motion (`flashRowAtom`, 1400ms), so no fourth duration was invented.
+  **`src/components/ui/sheet.tsx` now uses the budget tokens** (`--dur-3` content, `--dur-2` scrim,
+  `--ease-register`), so all five edit sheets obey §12.5 too.
+- **`ledger/compose.ts` (pure, tested) + `ledger/useComposeFields.ts` (state).** The bar and the sheet
+  were about to become two implementations of the soft sign rule (§5.4) — and the one that drifted
+  would be the one writing to the journal. Now: one pure `composeOp` (error / confirm / ready), one
+  hook, two layouts. `ComposeBar` lost its `onSubmit` prop; the hook dispatches, toasts, flashes the
+  landed row and resets.
+- **`shell/CommandPalette.tsx`** (⌘K / Ctrl-K) — go to any screen, log expense/income/transfer, sync
+  now, toggle theme, and **search the register** via the new pure `searchTransactions` in
+  `core/engine/ledger.ts` (every word must match, in any order; caller supplies the extra label text so
+  the engine keeps no category lookup). Selecting a row lands on `/ledger` with it flashed *and*
+  scrolled into view. Filtering is ours (`shouldFilter={false}`), not cmdk's, so one rule covers all
+  three groups. The rows memo is gated on `open` — the palette lives in the shell and would otherwise
+  re-sort the register on every write, on every screen.
+- **`shell/MoreSheet.tsx`** — Plan/Goals/Recurring/Containers/Categories/Settings, each with its hint,
+  plus the account control, search and the theme toggle. A sheet, not a route, so it is never a dead
+  end. **Settings therefore left the header**: rail footer on desktop, More sheet on a phone.
+- **Two real bugs fixed on the way:** shadcn's `command.tsx` renders its `DialogTitle` *outside*
+  `DialogContent`, which leaves the palette unnamed to a screen reader and logs an a11y error — moved
+  inside. And `createTransaction`/`createTransfer`/`logTemplate` now return the named
+  **`TransactionCreateOp`** (`core/oplog/types.ts`) so a caller can read the row it just wrote without
+  narrowing the whole `Op` union at the call site.
+- **New dep: `cmdk`** (pulled by `npx shadcn add command`, which also copied in `dialog`, `input-group`
+  and `textarea` — all three are `command.tsx`'s own imports). `tabs.tsx` was pulled and then
+  **deleted deliberately**: the kind selector uses the existing `ToggleGroup`, which is the same recipe
+  the compose bar already ships and is semantically a radio group, not a set of tab panels.
+  **`globals.css` was NOT touched by the CLI** — check that every time you run `shadcn add`.
+- Tests **573 → 608** (+35: 12 nav, 18 compose, 5 searchTransactions). Typecheck/lint/build/prettier clean.
+
 ---
 
-## 5. Phase 4 — what to do next
+## 5. Phase 5 — what to do next
 
-From `M11-PLAN.md` §5. **Do not start it until the user has browser-tested Phase 3 and said go.**
+From `M11-PLAN.md` §6 (plus the engine slice in §2 that it consumes). **Re-ground it in the code before
+you start; do not work from this summary.**
 
-- shadcn adds: `popover`, `command`, `tabs`, `switch`, `collapsible`, `scroll-area` (`skeleton` already
-  landed in Phase 3).
-- **`AppShell.tsx`** — `< lg`: compact top bar (wordmark + sync + theme) + **bottom tab bar**
-  (**Home · Ledger · Inbox · More**, badge on Inbox) + safe-area padding. `≥ lg`: slim left sidebar rail
-  with all 8 destinations + Settings. Content stays a centred column (`max-w-2xl`, dashboard `max-w-5xl`).
-- **`shell/QuickAddFab.tsx`** — iris FAB (full-strength brand, §12.2), bottom-right, above the tab bar,
-  on every screen.
-- **`shell/QuickAddSheet.tsx`** — the shortcuts strip **moves here off the ledger** (the declutter ask),
-  then Expense/Income/Transfer over the existing `ComposeBar` field logic, extracted so bar and sheet
-  share one implementation and one `resolveAmount` rule. This is where §12.5's **one orchestrated
-  motion moment** gets built: sheet rises `--dur-3`, the logged row lands with an iris wash `--dur-2`.
-- **`shell/MoreSheet.tsx`** (Plan/Goals/Recurring/Containers/Categories/Settings) and
-  **`shell/CommandPalette.tsx`** (⌘K).
-- Use `ResponsiveSheet` for anything sheet-shaped; it already exists.
+- **The hero curve.** `Figure` (`src/features/ui/Figure.tsx`) **already takes a `series` prop** and
+  renders the area curve under the number — Phase 5 supplies the data, it does not build the component.
+  Needs new pure engine functions in `core/engine/balances.ts`: `overallBalanceAsOf(txns, containers,
+  iso)` and `overallBalanceSeries(txns, containers, days[])` (one ordered pass), reusing the §5.7
+  counted-container rule already in `overallBalance`. **Neither exists yet.**
+- **The carried balance** (§12.4, M11): the sticky day header prints the running overall balance as of
+  that day, with dot leaders. **Hidden whenever a filter is active** — a filtered list's rows no longer
+  explain the number, and a balance you can't reconcile is worse than none. The day header is already
+  an `Eyebrow` on `--surface-sunken`; it is not sticky yet.
+- **`core/engine/filter.ts` (new, pure, TDD):** `TransactionFilter` + `matchesFilter` / `applyFilter`
+  (text, category ids, container ids, kind expense|income|transfer, date range, amount range) so every
+  list view in Phase 6 shares one predicate. `searchTransactions` (Phase 4) is the text half of this —
+  fold it in rather than growing a second matcher.
+- **`src/features/FilterBar.tsx`:** search field + h-scrolling chip filters (Popover + checkbox
+  multi-select) + sort control + active count + Clear. **Filters are NOT persisted** (a hidden active
+  filter is a trap); the sort preference IS. Sort: newest / oldest / largest / smallest.
+- shadcn adds likely needed: `popover` (`checkbox` and `scroll-area`-free alternatives already exist —
+  `checkbox.tsx` is present). Run `npx shadcn add` with `yes n |` piped in so it declines overwriting
+  `button.tsx`/`input.tsx`, and check `git status` afterwards for an unwanted `globals.css` rewrite.
+- Row press states / `active:` scale on touch. The just-logged iris wash **already shipped in Phase 4**
+  (`flashRowAtom` + `LedgerRow`'s `flashed` prop) — don't rebuild it.
 
-**Phase 3 is user-testable as:** every screen re-skins coherently, light and dark both hold up,
-contrast is AA, nothing is broken, and `prefers-reduced-motion: reduce` kills motion.
+**Phase 4 is user-testable as:** the tab bar at 390×844, More sheet, FAB → quick-add → the row landing
+with its wash, shortcuts only in the sheet now, the rail at ≥1024px, ⌘K.
 
-Phases 4–10 are specified in `M11-PLAN.md`; don't re-plan them, but do re-ground each in the code
+Phases 5–10 are specified in `M11-PLAN.md`; don't re-plan them, but do re-ground each in the code
 before starting it.
+
+**Owed to Phase 10 (docs), noted so it isn't lost:** §12.4 has no paragraph on the navigation shell
+(bottom tabs vs. rail, the More sheet, iris-marks-the-active-tab). Phase 4 followed §12.2/§12.5 as
+written and invented no new device, so nothing is out of compliance — but the shell itself should be
+described in §12.4 when the docs phase runs.
 
 ---
 
@@ -434,7 +503,7 @@ npx prettier --check src
 npm run dev       # a dev server may ALREADY be running on :3000 — check before starting another
 ```
 
-- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → **573 (P3)**.
+- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → 573 (P3) → **608 (P4)**.
 - **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
   "%{http_code}" http://localhost:3000/ledger` to check before launching a second one.
 - **Pre-existing prettier drift** on `src/components/ui/checkbox.tsx`, `progress.tsx`,
@@ -462,6 +531,15 @@ npm run dev       # a dev server may ALREADY be running on :3000 — check befor
 - **Dashboard widgets: fixed order + collapsible sections** for M11 (2026-07-22). Collapse state
   persists (localStorage, keyed by widget id).
 
+**Settled inside Phase 4 (not user decisions, but don't silently undo them):**
+
+- **Settings is no longer a header gear.** Desktop: the rail's footer. Phone: the More sheet. The
+  phone header carries identity and status only — there is no room for a fourth control.
+- **Shortcuts live only in the quick-add sheet.** That was the declutter ask; do not put the strip back
+  on the ledger in Phase 5.
+- **The FAB is on every breakpoint,** not just mobile — the dashboard has no compose bar, and ⌘K's
+  "log an expense" needs a visible home.
+
 **Nothing is currently open.** If something genuinely needs a decision, ask ONE question at a time —
 never batch them (a standing user preference).
 
@@ -480,6 +558,15 @@ never batch them (a standing user preference).
 
 - **shadcn/ui first**, Lucide icons, semantic tokens only, amounts `font-mono` + `.tnum`, headers
   Fraunces. Add components with `npx shadcn@latest add <name>` (PATH prefix first).
+- **`shadcn add` prompts and will hang on a non-TTY** when a component it depends on already exists
+  ("overwrite button.tsx?"). Pipe answers in: `yes n | npx shadcn@latest add <name>`. Then check
+  `git status` — the CLI can rewrite `globals.css`, and the M11 token ramp lives there.
+- **Tailwind arbitrary values: `calc()` needs whitespace around `+`/`-`, written as underscores** —
+  `bottom-[calc(4.25rem_+_env(safe-area-inset-bottom))]`. Without them the declaration is invalid and
+  is dropped silently, so the element just loses that property (this bit the FAB in Phase 4).
+- **`Input` carries `text-base md:text-sm`.** `tailwind-merge` drops the conflicting `text-base` when
+  you pass a size, but `md:text-sm` is a different variant group and survives — pass both
+  (`text-4xl md:text-4xl`) or the field shrinks on a desktop.
 - **`src/core/` is pure TS** — ESLint blocks React/Next/Capacitor/drivestore imports there. All new
   derivations go in `src/core/engine/` as pure functions taking `today` as an argument.
 - **`react-hooks/set-state-in-effect` is enforced.** Use lazy `useState` initializers,
@@ -500,6 +587,12 @@ never batch them (a standing user preference).
 ```
 branch: m11-design-polish  (pushed, tracking origin/m11-design-polish)
 
+2e4d6cc feat: mobile shell — tab bar, sidebar rail, quick-add FAB, ⌘K    (Phase 4)
+6fb7df0 docs: Phase 3 passed its browser test; flag the stale §12 cheat-sheet
+7b5a4c2 feat: design system v2 — tinted paper, the figure scale, the rule (Phase 3)
+22770b4 docs: close the last two open questions; note the post-M11 widget system
+c43bd66 docs: lock the bottom-tab slots — Inbox replaces Plan
+bc6d26a docs: M11 live handoff for a fresh context window
 97228ca feat: surface and log failures instead of swallowing them        (Phase 2)
 96be47a feat: make an entry's time editable, not just its date           (Phase 1.5)
 02d72a5 fix: order the ledger by when entries were written, not by a random UUID  (Phase 1)

@@ -1,12 +1,12 @@
 # yaccount — Handoff
 
 > ## 🚧 **M11 IS IN PROGRESS — READ [`M11-HANDOFF.md`](M11-HANDOFF.md) FIRST.**
-> Branch `m11-design-polish` (pushed). Phases 1, 1.5, 2 and 3 of 10 are done, user browser-tested and
-> committed; **Phase 4 (mobile shell) is next**. The approved design direction, the phase table,
-> per-phase decisions and the working protocol all live in that file. The approved plan is
-> [`M11-PLAN.md`](M11-PLAN.md). Test count is **573** (was 407 at M9).
+> Branch `m11-design-polish` (pushed). Phases 1, 1.5, 2, 3 and 4 of 10 are done, user browser-tested and
+> committed; **Phase 5 (ledger v2 — history curve, carried balance, filters) is next**. The approved
+> design direction, the phase table, per-phase decisions and the working protocol all live in that
+> file. The approved plan is [`M11-PLAN.md`](M11-PLAN.md). Test count is **608** (was 407 at M9).
 >
-> **⚠️ Two things below are now STALE because Phase 3 changed them — `M11-HANDOFF.md` and spec §12 win:**
+> **⚠️ Three things below are now STALE — `M11-HANDOFF.md` and spec §12 win:**
 > 1. **The design language is no longer the M2 shadcn-neutral ramp.** Spec §12 was **edited
 >    deliberately** (invariant #8's explicit-decision path, user-chosen direction A) and retitled
 >    **"The Standing Register"**: every neutral is now tinted with the brand hue, iris is full-strength
@@ -17,6 +17,10 @@
 >    `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`,
 >    `ListSkeleton`) rather than hand-rolling Tailwind classes. `theme.test.ts` holds the token ramp to
 >    WCAG AA in both themes — if you change a colour token, that test tells you what it costs.
+> 3. **`AppNav.tsx` is gone (Phase 4).** Navigation is now `src/features/shell/` — one destination
+>    registry (`nav.ts`) behind a bottom tab bar (Home · Ledger · Inbox · More) below `lg`, a sidebar
+>    rail from `lg`, a More sheet, a quick-add FAB + sheet, and a ⌘K palette. Writing a transaction
+>    goes through `ledger/compose.ts` + `useComposeFields`, shared by the compose bar and the sheet.
 >
 > This file below is the milestone-level history through M9 — still authoritative for invariants,
 > environment and prior-milestone context, but it does NOT know about M11 progress.
