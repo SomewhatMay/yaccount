@@ -27,6 +27,13 @@ import {
   cancelRecurringRule,
   uncancelRecurringRule,
   approveTransaction,
+  createGoal,
+  updateGoal,
+  completeGoal,
+  cancelGoal,
+  uncancelGoal,
+  archiveGoal,
+  unarchiveGoal,
 } from "@/core/commands";
 import {
   makeBudgetTarget,
@@ -383,5 +390,56 @@ describe("template & recurring commands (M6, §5.8)", () => {
     );
     if (rule.type !== "recurringRule.create") throw new Error("narrow");
     expect(updateRecurringRule(rule.payload.row, META).type).toBe("recurringRule.update");
+  });
+});
+
+describe("goal commands (§5.9, M7)", () => {
+  it("createGoal builds a goal.create op with a validated row", () => {
+    const op = createGoal(
+      {
+        container_id: "clothing",
+        kind: "spend_down",
+        mode: "deadline",
+        target_amount: 20000,
+        deadline: "2026-11-30",
+        created_date: "2026-01-01",
+        id: "g1",
+      },
+      META,
+    );
+    expect(op.type).toBe("goal.create");
+    if (op.type !== "goal.create") throw new Error("narrow");
+    expect(op.payload.row.status).toBe("active");
+    expect(op.payload.row.target_amount).toBe(20000);
+  });
+
+  it("completeGoal carries the id + completed date", () => {
+    const op = completeGoal("g1", "2026-06-15", META);
+    expect(op.type).toBe("goal.complete");
+    if (op.type !== "goal.complete") throw new Error("narrow");
+    expect(op.payload).toEqual({ id: "g1", date: "2026-06-15" });
+  });
+
+  it("cancel/uncancel/archive/unarchive build the right op types", () => {
+    expect(cancelGoal("g1", META).type).toBe("goal.cancel");
+    expect(uncancelGoal("g1", META).type).toBe("goal.uncancel");
+    expect(archiveGoal("g1", META).type).toBe("goal.archive");
+    expect(unarchiveGoal("g1", META).type).toBe("goal.unarchive");
+  });
+
+  it("updateGoal passes the whole edited row (entity-LWW)", () => {
+    const created = createGoal({
+      container_id: "clothing",
+      kind: "spend_down",
+      mode: "fixed",
+      planned_monthly: 5000,
+      created_date: "2026-01-01",
+      id: "g2",
+    });
+    if (created.type !== "goal.create") throw new Error("narrow");
+    const op = updateGoal({ ...created.payload.row, name: "Renamed" }, META);
+    expect(op.type).toBe("goal.update");
+    if (op.type !== "goal.update") throw new Error("narrow");
+    expect(op.payload.row.name).toBe("Renamed");
   });
 });

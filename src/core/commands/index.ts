@@ -3,6 +3,7 @@ import {
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
+  makeGoal,
   makeRecurringRule,
   makeSetting,
   makeTemplate,
@@ -18,6 +19,9 @@ import {
   type Container,
   type ContainerSnapshot,
   type Frequency,
+  type Goal,
+  type GoalKind,
+  type GoalMode,
   type IntervalConfig,
   type RecurringRule,
   type Transaction,
@@ -364,5 +368,67 @@ export function recordGeneratedOccurrence(row: Transaction, m?: OpMeta): Op {
   return { ...meta(m), type: "transaction.create", payload: { row } };
 }
 
+// ── Goals (§5.9, M7) ──────────────────────────────────────────────────────
+
+/**
+ * Create a goal — a purpose+plan layered onto a container (§5.9). The model
+ * factory validates the mode/kind cross-field rules, so an incoherent goal never
+ * reaches the journal. Auto-creating/reusing the container and enforcing the
+ * ≤1-active-goal rule (§5.9.2) are app-level concerns handled by the caller.
+ */
+export function createGoal(
+  input: {
+    container_id: string;
+    kind: GoalKind;
+    mode: GoalMode;
+    created_date: string;
+    id?: string;
+    name?: string | null;
+    target_amount?: number | null;
+    deadline?: string | null;
+    planned_monthly?: number | null;
+    opening_contributed?: number;
+  },
+  m?: OpMeta,
+): Op {
+  return { ...meta(m), type: "goal.create", payload: { row: makeGoal(input) } };
+}
+
+/** Edit a goal (entity-LWW) — the caller passes the whole edited row. Also the
+ * reopen path for a completed goal (set status active, completed_date null). */
+export function updateGoal(row: Goal, m?: OpMeta): Op {
+  return { ...meta(m), type: "goal.update", payload: { row } };
+}
+
+/**
+ * Mark a goal achieved (§5.9.6) — spend_down completes-and-closes once
+ * `contributed ≥ target`. Latches status + `completed_date`; the goal stays
+ * visible as achieved until archived. Cancelling the linked recurring rule is a
+ * separate op the caller dispatches.
+ */
+export function completeGoal(id: string, date: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "goal.complete", payload: { id, date } };
+}
+
+/** End a goal (§5.9.6) — stops the ask, never moves money. Reversible (§1.1). */
+export function cancelGoal(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "goal.cancel", payload: { id } };
+}
+
+/** Undo a cancellation — put the goal back to work. */
+export function uncancelGoal(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "goal.uncancel", payload: { id } };
+}
+
+/** Soft-hide an achieved/abandoned goal (§5.9.2) — never a hard delete. */
+export function archiveGoal(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "goal.archive", payload: { id } };
+}
+
+/** Put an archived goal back into the active list. */
+export function unarchiveGoal(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "goal.unarchive", payload: { id } };
+}
+
 /** Convenience re-export for callers reading the row types. */
-export type { BudgetTarget, ContainerSnapshot, RecurringRule };
+export type { BudgetTarget, ContainerSnapshot, Goal, RecurringRule };

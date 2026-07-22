@@ -5,6 +5,7 @@ import type { ContainerSnapshot } from "../model/containerSnapshot";
 import type { Setting } from "../model/setting";
 import type { BudgetTarget } from "../model/budgetTarget";
 import type { RecurringRule } from "../model/recurringRule";
+import type { Goal } from "../model/goal";
 
 /**
  * Every mutation is an idempotent op appended to the journal AND applied to the
@@ -67,6 +68,18 @@ export type Op =
   | (OpBase & { type: "recurringRule.uncancel"; payload: { id: string } })
   // Approve a pending (inbox) row → it becomes a live ledger entry (§5.8). RMW on
   // inbox_status, so it is idempotent and needs only the row id.
-  | (OpBase & { type: "transaction.approve"; payload: { id: string } });
+  | (OpBase & { type: "transaction.approve"; payload: { id: string } })
+  // Goals (M7, §5.9). create/update carry the full row (entity-LWW). complete
+  // latches status→completed + completed_date (RMW; reopen via an ordinary
+  // update, §1.1); cancel/uncancel and archive/unarchive are reversible flips —
+  // a goal is soft-ended, never hard-deleted (§5.9.6). All RMW ops no-op on a
+  // missing goal, so replay stays idempotent and order-independent.
+  | (OpBase & { type: "goal.create"; payload: { row: Goal } })
+  | (OpBase & { type: "goal.update"; payload: { row: Goal } })
+  | (OpBase & { type: "goal.complete"; payload: { id: string; date: string } })
+  | (OpBase & { type: "goal.cancel"; payload: { id: string } })
+  | (OpBase & { type: "goal.uncancel"; payload: { id: string } })
+  | (OpBase & { type: "goal.archive"; payload: { id: string } })
+  | (OpBase & { type: "goal.unarchive"; payload: { id: string } });
 
 export type OpType = Op["type"];

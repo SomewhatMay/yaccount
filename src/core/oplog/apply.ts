@@ -6,6 +6,7 @@ import type {
   Category,
   Container,
   ContainerSnapshot,
+  Goal,
   RecurringRule,
   Transaction,
 } from "../model";
@@ -143,6 +144,40 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     case "transaction.approve": {
       const cur = await tx.get<Transaction>(STORE.transactions, op.payload.id);
       if (cur) await tx.put(STORE.transactions, { ...cur, inbox_status: "approved" });
+      return;
+    }
+    // Goals (M7). create/update `put` the full row (entity-LWW).
+    case "goal.create":
+    case "goal.update":
+      await tx.put(STORE.goals, op.payload.row);
+      return;
+    // complete latches status + completed_date (RMW). A goal is never hard-deleted
+    // (§5.9.6); reopening is an ordinary update. Missing goal → no-op.
+    case "goal.complete": {
+      const cur = await tx.get<Goal>(STORE.goals, op.payload.id);
+      if (cur)
+        await tx.put(STORE.goals, {
+          ...cur,
+          status: "completed",
+          completed_date: op.payload.date,
+        });
+      return;
+    }
+    // cancel/uncancel and archive/unarchive flip one field in place (reversible,
+    // §1.1) — same op-type-driven shape as category/container/recurringRule. Each
+    // no-ops on a missing goal, so replay stays idempotent + order-independent.
+    case "goal.cancel":
+    case "goal.uncancel": {
+      const cur = await tx.get<Goal>(STORE.goals, op.payload.id);
+      const status = op.type === "goal.cancel" ? "cancelled" : "active";
+      if (cur) await tx.put(STORE.goals, { ...cur, status });
+      return;
+    }
+    case "goal.archive":
+    case "goal.unarchive": {
+      const cur = await tx.get<Goal>(STORE.goals, op.payload.id);
+      const is_archived = op.type === "goal.archive";
+      if (cur) await tx.put(STORE.goals, { ...cur, is_archived });
       return;
     }
     default: {

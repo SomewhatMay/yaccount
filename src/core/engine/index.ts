@@ -5,3 +5,5 @@ export * from "./period";
 export * from "./reporting";
 export * from "./flows";
 export * from "./recurring";
+export * from "./goals";
+export * from "./plan";
