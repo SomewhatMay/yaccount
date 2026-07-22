@@ -1,0 +1,443 @@
+# M11 — Design System & Polish — LIVE HANDOFF
+
+> **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
+> **Branch:** `m11-design-polish` (pushed to origin, 3 commits ahead of `main`).
+> **Status:** Phases 1 and 2 of 10 are DONE, user-tested, committed and pushed. **Phase 3 is next.**
+> **Last updated:** 2026-07-22, after Phase 2.
+
+---
+
+## 0. Read these, in this order, before writing any code
+
+1. **This file** — where M11 actually is.
+2. **`M11-PLAN.md`** — the approved plan for all 10 phases (in-repo copy; the original lives at
+   `/home/may/.claude/plans/atomic-snacking-kurzweil.md`).
+3. **`yaccount-tech-spec-v3.md`** — SOURCE OF TRUTH. **§12 is the design language and it is law.**
+4. **`yaccount-implementation-details.md`** — build plan. §4 "M11" is this milestone.
+5. **`HANDOFF.md`** — the milestone-level handoff for M0–M9 (history, invariants, gotchas).
+
+`HANDOFF.md` §"Non-negotiable invariants" gates every milestone — op-log write path, integer cents,
+the balance identity, reversibility, local-first instant open, per-device ledgers, the `src/core/`
+purity boundary, and §12 compliance. None of that changes in M11.
+
+---
+
+## 1. What M11 is
+
+The user's brief, verbatim in intent:
+
+1. **Bug fixes** — ledger ordering (entries stored only a date, so recent entries didn't surface).
+2. **Mobile-first UX overhaul** — the app is desktop-centred and awkward even on desktop. Floating
+   quick-actions button, declutter Shortcuts, filtering within each tab.
+3. **Visual identity & character** — "real boldness and character. We started this in M2; go further."
+   Research mobile UX, then improvise something distinctly yaccount. Stand out without hurting UX.
+4. **Dashboard & charts** — more widgets; research YNAB/Monarch/Copilot baselines and build on them.
+5. **Error handling & logging** — errors weren't surfaced or logged; make issues easy to diagnose.
+
+Plus M11's own spec scope (impl §4): motion, empty/loading/error/sync states, `DriveError` surfaces,
+category-colour override UI, a11y pass, responsive density, Playwright e2e.
+
+---
+
+## 2. THE APPROVED DESIGN DIRECTION — "The Standing Register"
+
+The user was shown three directions and **chose A**. This is settled; do not re-litigate it.
+It is a **deliberate, documented extension of the LOCKED §12 "Quiet Register"** — same thesis, same
+three typefaces, same iris/emerald semantics. Editing §12 in the spec is part of Phase 3's job
+(invariant #8 permits it *by explicit decision*, which this was).
+
+### Three new moves
+
+1. **Paper & ink tinted with the brand hue.** The neutral field carries a trace of iris (h≈285) so it
+   stops reading as default shadcn grey. Iris itself moves from timid 4% washes everywhere to **full
+   strength, used rarely** (the FAB, the active tab, the focus ring).
+2. **The figure standing on its own history.** The hero balance sits on a faint area curve of the
+   trailing 90-day overall balance — the number has literal ground under it. Extends §12.7 signature #1.
+3. **The carried balance.** Sticky day headers in the register print the running overall balance as of
+   that day, like a paper check register. New structural device; information, not decoration.
+
+Plus **the rule** (a hairline used ONLY above a total — it encodes "this sums the above") and
+**Fraunces italic marginalia** (the accountant's pencil note).
+
+### Token deltas (Phase 3 implements these)
+
+```
+             NOW (shadcn neutral)        A (paper & ink, hue 285)
+ light bg    oklch(1     0    0  )       oklch(0.988 0.003 285)   rag paper
+ light ink   oklch(0.145 0    0  )       oklch(0.180 0.015 285)   iris-cool ink
+ light bord  oklch(0.922 0    0  )       oklch(0.900 0.006 285)
+ dark  bg    oklch(0.145 0    0  )       oklch(0.155 0.012 285)   ink, not black
+ dark  card  oklch(0.205 0    0  )       oklch(0.195 0.014 285)
+ brand       oklch(0.54  0.20 280)       oklch(0.520 0.210 285)   ← full strength, RARE
+ positive    oklch(0.58  0.13 162)       oklch(0.550 0.140 162)
+
+ + type      .figure-hero  Fraunces opsz/SOFT/WONK, clamp(2.75rem,12vw,4.5rem)
+             .marginalia   Fraunces ITALIC
+             .rule         hairline, ONLY above a total
+             .leaders      dot leaders (Plan + summary tables only, NOT the dense register)
+```
+
+**Check contrast on the new ramp** — it must stay WCAG AA in both themes.
+
+### Target screens (approved ASCII, build to these)
+
+**Mobile — Ledger**
+
+```
+┌──────────────────────────────────────────────┐
+│  ●  yaccount                        ☁   ☾    │
+├──────────────────────────────────────────────┤
+│  OVERALL BALANCE                             │
+│                                              │
+│   $4,182.40                                  │  Fraunces, fluid
+│  ▁▂▃▃▄▅▄▆▇▇█▇▆▇█▇▆▅▆▇█                       │  ← 90-day balance
+│                                              │     curve = its GROUND
+│  This month   ↙ $2,140 in   ↗ $1,905 out     │
+│  ‹ up $312 on last month ›                   │  ← Fraunces italic
+├──────────────────────────────────────────────┤
+│ ⌕ Search   [Category ▾][Wallet ▾][Type ▾][⇅] │  ← filter rail,
+├──────────────────────────────────────────────┤     h-scrolls
+│ TODAY ····························· $4,182.40│  ← STICKY. carries
+│  ● Blue Bottle                               │     the running
+│    Coffee · Wallet · 2:04 PM        −$4.50   │     balance, like a
+│  ● Rent                                      │     check register
+│    Housing · Wallet             −$1,850.00   │
+├──────────────────────────────────────────────┤
+│ YESTERDAY ························· $6,036.90│
+│  ● Paycheck                                  │
+│    Salary · Wallet              +$2,140.00   │  ← emerald
+│  → Wallet → Emergency fund         $300.00   │  ← transfer, muted
+└──────────────────────────────────────────────┘
+                                     ╭───────╮
+                                     │   +   │   ← iris FAB, bottom-right,
+                                     ╰───────╯      floats above the bar
+┌──────────────────────────────────────────────┐
+│  ▣ Home     ≡ Ledger     ◈ Plan     ⋯ More ③ │
+└──────────────────────────────────────────────┘
+```
+
+**Mobile — quick-add (the ONE orchestrated motion moment)**
+
+```
+tap +  →  sheet rises 260ms  →  log  →  row lands with a 200ms iris wash
+┌──────────────────────────────────────────────┐
+│                    ────                      │
+│  SHORTCUTS                                   │  ← moved OFF the ledger
+│  ⌘ Blue Bottle $4.50  ⌘ Metro $3.25  ⌘ Rent  │     (the declutter ask)
+│                                              │
+│  ┌ Expense ┐ ┌ Income ┐ ┌ Transfer ┐         │
+│                                              │
+│            −  $ 4 . 5 0                      │  ← big mono, decimal
+│                                              │     keypad focused
+│  What was it?   [ Blue Bottle           ]    │
+│  Category       [ ● Coffee            ▾ ]    │
+│  Wallet         [ Wallet              ▾ ]    │
+│  Date           [ Today               ▾ ]    │
+│                                              │
+│  [             Log expense              ]    │  ← iris, full strength
+└──────────────────────────────────────────────┘
+```
+
+**Mobile — Dashboard**
+
+```
+┌──────────────────────────────────────────────┐
+│  Dashboard        [Last 3 months ▾]  [⚖]     │
+├──────────────────────────────────────────────┤
+│  SAVED THIS PERIOD                           │
+│   $2,412.18                    ▲ 18%         │
+│  ▁▂▄▃▅▇▆█                    vs prev period  │
+├──────────────────────────────────────────────┤
+│ ┌──────────┐┌──────────┐┌──────────┐┌────────│ ← KPI strip,
+│ │ IN       ││ OUT      ││ RATE     ││ NET WO │   h-scroll
+│ │ $8,420   ││ $6,008   ││ 28.6%    ││ $41,20 │
+│ │ ▲ 4%     ││ ▼ 9%     ││ ▲ 6pt    ││ ▲ 2.1% │
+│ └──────────┘└──────────┘└──────────┘└────────│
+├──────────────────────────────────────────────┤
+│  BUDGET PACE — July                          │
+│  spent   ██████████████░░░░░░  71%           │  ← the YNAB-ish
+│  month   ████████████████░░░░  74%           │     insight nobody
+│  ‹ on pace · $412 left ›                     │     else derives
+├──────────────────────────────────────────────┤
+│  MONEY FLOW                                  │  ← recharts Sankey
+│   Salary   ══╗                 ╔══ Housing   │     (recharts 3.10
+│   Freelance ═╬═══ $8,420 ══════╬══ Food      │      exports Sankey —
+│              ╝                 ╠══ Transport │      NO new dep)
+│                                ╚══ Saved     │
+├──────────────────────────────────────────────┤
+│  SPENDING CALENDAR            Jun · Jul      │
+│   M  T  W  T  F  S  S                        │
+│   ░  ▒  ░  █  ▓  ▒  ░                        │  ← day heatmap
+│   ▒  ░  ▓  ░  █  █  ▒     ▪ light  ▪▪▪ heavy │
+├──────────────────────────────────────────────┤
+│  WHERE IT WENT                               │
+│      ╭─────╮   ● Housing    38%   $2,280 ▂▃▅ │  ← per-row
+│     │ $6.0k │  ● Food       21%   $1,262 ▅▃▂ │     sparkline
+│      ╰─────╯   ● Transport  12%     $721 ▂▂▃ │
+├──────────────────────────────────────────────┤
+│  TOP PAYEES        │  COMING UP (30 days)    │
+│  Rent    $1,850    │  Jul 25  Rent   $1,850  │
+│  Costco    $412    │  Aug 01  Gym       $45  │
+│  Uber      $188    │  Aug 03  Netflix   $18  │
+└──────────────────────────────────────────────┘
+```
+
+**Plan — where "the rule" and dot leaders earn their keep**
+
+```
+  INCOME EXPECTED                            $8,420.00
+  ‹ from 2 recurring rules ›
+
+  ALLOWANCES
+   ● Groceries  ···························     600.00
+   ● Housing  ·····························   1,850.00
+   ● Transport  ···························     240.00
+                                            ──────────   ← the rule
+     Total allowances                          2,690.00
+
+  GOAL ASKS
+   ◎ Emergency fund  ······················     400.00
+   ◎ Japan trip  ··························     250.00
+                                            ──────────
+     Total asks                                  650.00
+                                            ══════════
+     UNALLOCATED                              5,080.00
+```
+
+**Desktop**
+
+```
+┌─────────┬──────────────────────────────────────────────────────────┐
+│ ● yacct │  Ledger                          ⌕ ⌘K    ☁   ☾    ⋯      │
+│         ├──────────────────────────────────────────────────────────┤
+│ ▣ Home  │   OVERALL BALANCE                                        │
+│ ≡ Ledger│    $4,182.40        ▁▂▃▃▄▅▄▆▇▇█▇▆▇█▇▆▅▆▇█                │
+│ ✉ Inbox③│    this month · $2,140 in · $1,905 out                   │
+│ ◈ Plan  │  ┌────────────────────────────────────────────────────┐  │
+│ ◎ Goals │  │ 📅 today   What was it?    −  $0.00   ● Coffee   + │  │
+│ ↻ Recur │  └────────────────────────────────────────────────────┘  │
+│ ▤ Wallet│   ⌕ Search  [Category ▾][Wallet ▾][Type ▾][⇅ Newest]     │
+│ ⬢ Categ │  ────────────────────────────────────────────────────    │
+│         │   TODAY ···································· $4,182.40   │
+│ ⚙ Setng │    ● Blue Bottle   Coffee · Wallet · 2:04pm  −$4.50   ⋯  │
+└─────────┴──────────────────────────────────────────────────────────┘
+   sidebar ≥1024px          bottom tab bar + FAB below that
+```
+
+**Why A and not something bolder:** the rejected "bolder re-cut" (new display face, second accent hue,
+filled accent cards, big radii) is exactly the generic fintech card-stack §12.1 was written to reject —
+bolder in volume, weaker in identity. A spends its boldness on three things no other budgeting app
+does. Keep that discipline.
+
+---
+
+## 3. Phase table — where we are
+
+| # | Phase | Status |
+|---|---|---|
+| 1 | Entry timestamps + ledger ordering | ✅ **DONE** — `02d72a5`, user-tested PASS |
+| 1.5 | Editable entry time (user follow-up) | ✅ **DONE** — `96be47a`, user-tested PASS |
+| 2 | Logging, error boundaries, diagnostics | ✅ **DONE** — `97228ca`, user-tested PASS |
+| 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ⬜ **NEXT** |
+| 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ⬜ |
+| 5 | Ledger v2 (history curve, carried balance, filters/sort) | ⬜ |
+| 6 | Filters + mobile density on the other 5 list views | ⬜ |
+| 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ⬜ |
+| 8 | Category colours, empty/loading/error states, a11y | ⬜ |
+| 9 | Playwright e2e | ⬜ |
+| 10 | Docs (spec §12, impl §4, HANDOFF) | ⬜ |
+
+**Working protocol the user asked for and has been enforcing:**
+- **One phase at a time.** Build it, verify it, commit it, then **STOP** and hand back for browser testing.
+  Do not start the next phase until they say so. "No jumping the gun, no overdoing, no mistakes."
+- **Ground every change in the code**, not in memory or in this document. Re-read the files you touch.
+- **TDD**: write failing tests, confirm they're red for the right reason, then implement.
+- Each phase must be **browser-testable by the user**. Pure-engine work folds into the phase that
+  consumes it — an engine-only commit can't be verified.
+- End each turn with what to test, and any open questions (concise).
+
+---
+
+## 4. What Phases 1–2 actually delivered
+
+### Phase 1 — `02d72a5` "order the ledger by when entries were written"
+
+**The bug:** rows carried a calendar date but no clock. Everything logged in one afternoon shared a
+`date`, so `LedgerView` tie-broke on `id` — a random UUID.
+
+- **`transactions.entered_at`** — zoned ISO instant, `zIsoDateTime.nullable()`, a **required key**
+  (matches this repo's explicit stance in `schemas.test.ts` "nullable fields are required keys").
+  `date` stays the backdatable calendar day: widening it would have broken `yearMonthOf`,
+  `budgetOnDate`, `inRange` and the occurrence math, with no sane value for a backdated row.
+- **Commands stamp `entered_at` from the op's own `ts`** (already the total order's sort key) — one
+  clock read, journal and state agree, deterministic under injected `OpMeta`.
+- **`applyOp` fills it from `op.ts`** when a payload lacks one (older client, recurring generator).
+  Pure in the op, so replay stays deterministic and the `state == replay(listOps())` invariant holds.
+- **`makeVoidRow` never inherits the original's instant** — a reversal is its own event.
+- **`sortForRegister`** in `core/engine/ledger.ts`: date desc, `entered_at` desc, `id` last; rows with
+  no instant sink within their day.
+- **One-shot backfill in `Repo.init()`** stamps pre-M11 rows from their earliest op, guarded by an
+  `app_meta` marker (`migration:entered_at`), retried on next open if it fails.
+  **⚠ NO `DB_VERSION` BUMP — deliberate.** IndexedDB records are schemaless; a new field needs no
+  upgrade, and bumping would trip `blocked()` in other tabs and lock out older builds for nothing.
+  `DB_VERSION` is still **3**.
+- **Also fixed a UTC-date bug in the same family.** 13 views derived "today" from
+  `new Date().toISOString()` — the *UTC* day. The user's machine is **UTC-4**, so after 8pm every entry
+  was filed on tomorrow's date, under the wrong day header, in the wrong reporting month at a boundary.
+  New **`src/features/clock.ts`** reads the local calendar; `yesterdayIso` is calendar arithmetic so it
+  survives the 23-hour DST day. **Use `todayIso()` / `thisMonthIso()` from `@/features/clock` — never
+  `toISOString().slice()` — in any new UI code.** (`syncAtom`'s archive `yearMonth` stays UTC on
+  purpose: it names Drive files across devices.)
+
+### Phase 1.5 — `96be47a` "make an entry's time editable"
+
+User feedback after testing Phase 1: *"I can adjust/edit the date, but not the time. Fix that."*
+
+- Edit sheet: `Date` + `Time` side by side (`WhenFields`), on **both** the expense/income and transfer
+  forms. Re-dating carries the time of day onto the new day.
+- Compose bar: date input became **`datetime-local`** (grid widened to `13rem`).
+- `createTransaction`/`createTransfer` take optional `entered_at`; op `ts` is the default, caller wins.
+- **Two precision traps closed** (both would have reintroduced the very tie the field exists to remove):
+  - `resolveEnteredAt` leaves the instant untouched unless date/time actually changed — a time input is
+    minute-resolution, so rebuilding on every save would round seconds off rows logged seconds apart.
+  - `instantFromNow` keeps the user's chosen minute but takes **seconds from the clock**, so pinning a
+    time and logging three receipts doesn't give all three one instant.
+
+### Phase 2 — `97228ca` "surface and log failures instead of swallowing them"
+
+- **`src/lib/log-buffer.ts`** — 300-record ring, **redacts on the way IN** (ya29 tokens, JWTs,
+  `*_token` fields, `Bearer` headers, emails) so a secret is never held in memory. Device id is
+  deliberately **kept** — sync bugs need it.
+- **`src/lib/errors.ts`** — `describeError` normalizes Error / DriveError-shaped / string / undefined
+  into one legible line, reading `.status`/`.body` **structurally** so `src/lib` never imports the sync
+  seam. `markHandled`/`isHandled` (shared symbol, non-enumerable) tag an error already shown to the user.
+- **`src/lib/logger.ts`** — named loggers over `loglevel`. **The buffer is fed BEFORE loglevel gets a
+  say**: loglevel no-ops methods below the active level, so the obvious `methodFactory` hook would have
+  captured nothing exactly when the console was quiet. Full trail in memory, calm console.
+  Log level is exposed as a subscribable store (`subscribeLogLevel` + `SSR_LOG_LEVEL`) so the UI reads
+  it with `useSyncExternalStore` — **this repo's ESLint forbids `setState` inside an effect**
+  (`react-hooks/set-state-in-effect`); do not work around it with a lint disable.
+- **`src/features/ErrorBoundary.tsx`** — per-SECTION boundary (a bad chart costs you the chart, not the
+  ledger), names what broke, `resetKeys`, plus a shared `CopyButton`.
+- **`src/app/error.tsx`** (screen) and **`src/app/global-error.tsx`** (self-contained: plain elements +
+  inline styles, because the thing that failed may be the stylesheet or provider it would otherwise use).
+- **`RepoBootstrap`** installs `window.onerror` + `unhandledrejection`, throttled 4s, skipping handled.
+- **`dispatchAtom`** logs + toasts once, then **rethrows marked handled** — the caller skips its success
+  path, so a form keeps what was typed and no false "Logged" toast fires. This covers ~40 call sites.
+- **`bootstrapAtom`** separates fatal (DB open → `bootErrorAtom`) from optional (recurring generation,
+  goal maintenance now fail independently instead of taking boot down).
+- **`AppShell`** renders a real boot-failure screen naming the likely cause (was: 8 screens stuck on
+  "Loading…" forever).
+- **`/settings`** (new route, gear icon in the header's right cluster — deliberately NOT in the nav row)
+  holds `DiagnosticsPanel`: install facts, live log, level control, **Copy diagnostics**, and a
+  **dev-only self-test** with three buttons hitting the three distinct failure mechanisms.
+
+**New deps:** `loglevel`, `react-error-boundary`. `npm audit` reports 6 **pre-existing** vulns from
+`shadcn`'s CLI and Next's transitive deps — neither new package contributes, and `audit fix --force`
+would downgrade Next to 9.x. Left alone deliberately.
+
+---
+
+## 5. Phase 3 — what to do next
+
+From `M11-PLAN.md` §4. **This is the phase that edits the locked spec.**
+
+- **`src/app/globals.css`** — retheme every semantic token to the tinted paper/ink ramp above (light +
+  dark); add `--rule`, `--surface-sunken`, motion tokens (`--ease-register`, `--dur-1/2/3`); add
+  `.figure-hero` / `.figure-lg` / `.figure-md` (Fraunces, fluid `clamp()`, optical sizing, tight
+  tracking, tnum), `.marginalia` (Fraunces italic), `.eyebrow`, `.rule`, `.leaders`. Global
+  `prefers-reduced-motion` kill-switch.
+  Note the file already has TWO `@theme inline` blocks — the shadcn one and the yaccount one appended
+  in M2. Extend the second; don't restructure the first.
+- **`src/app/layout.tsx`** — Fraunces gains `style: ["normal","italic"]` and the `SOFT`/`WONK`/`opsz`
+  variable axes. **`next/font/google` fetches at build time**, so the build needs network once; if the
+  axes are rejected, fall back to plain Fraunces rather than fighting it.
+- **`src/features/ui/`** (new shared primitives): `Figure` (hero amount + optional history curve),
+  `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet` (bottom
+  on mobile, right on `sm+`), `EmptyState`, `ListSkeleton`.
+- **Edit spec §12 in place** — §12.2 (token ramp), §12.3 (figure scale + italic marginalia role), §12.4
+  (the rule, leaders, sticky carried header, responsive density), §12.5 (motion budget: the single
+  orchestrated quick-add sequence), §12.7 (signatures restated). Mirror in impl §4 M11. **This is a
+  deliberate edit, not drift — say so in the section text.**
+
+**Phase 3 is user-testable as:** every screen re-skins coherently, light and dark both hold up,
+contrast is AA, nothing is broken, and `prefers-reduced-motion: reduce` kills motion.
+
+Phases 4–10 are specified in `M11-PLAN.md`; don't re-plan them, but do re-ground each in the code
+before starting it.
+
+---
+
+## 6. Environment & verify
+
+**WSL2, `/home/may/github/yaccount`. Node v22.18.0 via nvm — PREFIX EVERY npm/npx CALL:**
+
+```bash
+export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
+cd /home/may/github/yaccount
+npm test          # vitest — 494 passing at end of Phase 2
+npm run typecheck # tsc --noEmit
+npm run lint      # eslint .
+npm run build     # next build → static out/
+npx prettier --check src
+npm run dev       # a dev server may ALREADY be running on :3000 — check before starting another
+```
+
+- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → **494 (P2)**.
+- **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
+  "%{http_code}" http://localhost:3000/ledger` to check before launching a second one.
+- **Pre-existing prettier drift** on `src/components/ui/checkbox.tsx`, `progress.tsx`,
+  `src/core/engine/recurring.test.ts`, `src/core/model/goal.test.ts`,
+  `src/core/model/recurringRule.test.ts`. It predates M11 — **verified on `main`**. Don't reformat them
+  as part of an unrelated commit; it pollutes the diff. Run
+  `npx prettier --write` only on paths you actually touched.
+- Timezone of this machine is **EDT (UTC-4)**; several date bugs only show up after 20:00 local.
+
+---
+
+## 7. Open questions for the user (asked twice, still unanswered — not blocking)
+
+1. Bottom tabs = **Home · Ledger · Plan · More** with Inbox badged under More — or swap Plan out for
+   Inbox? (Shapes Phase 4. Current assumption: Home · Ledger · Plan · More.)
+2. Routes stay `/` = dashboard, `/ledger` = ledger. On mobile, should the app open to Ledger instead?
+   (Current assumption: no, keep routes stable.)
+3. Dashboard widget show/hide + reorder preference — worth it, or fixed order?
+   (Current assumption: fixed order, maybe collapsible sections.)
+
+Answered already: entry time is **stored, displayed AND user-editable** (Phase 1.5); the three new deps
+were fine.
+
+---
+
+## 8. Conventions that bit us — don't relearn these the hard way
+
+- **shadcn/ui first**, Lucide icons, semantic tokens only, amounts `font-mono` + `.tnum`, headers
+  Fraunces. Add components with `npx shadcn@latest add <name>` (PATH prefix first).
+- **`src/core/` is pure TS** — ESLint blocks React/Next/Capacitor/drivestore imports there. All new
+  derivations go in `src/core/engine/` as pure functions taking `today` as an argument.
+- **`react-hooks/set-state-in-effect` is enforced.** Use lazy `useState` initializers,
+  `useSyncExternalStore`, or an async/deferred callback — never a sync `setState` in an effect body.
+- **`verbatimModuleSyntax: true`** → `import type` for type-only imports.
+- Adding a required field to a zod table schema breaks literal fixtures — grep for them
+  (`schemas.test.ts` is usually the only one; everything else builds via model factories).
+- **Never** run `npx prettier --write` across the whole repo; it rewrites pre-existing drift into your
+  diff. (Happened once in Phase 1; reverted.)
+- `crypto.randomUUID()` and IndexedDB are browser-only — UI is manual-verify until Playwright (Phase 9).
+- Commit messages: extremely concise in style but explain the WHY. **No co-author / Claude mentions.**
+- Use the `gh` CLI for GitHub.
+
+---
+
+## 9. Git state
+
+```
+branch: m11-design-polish  (pushed, tracking origin/m11-design-polish)
+
+97228ca feat: surface and log failures instead of swallowing them        (Phase 2)
+96be47a feat: make an entry's time editable, not just its date           (Phase 1.5)
+02d72a5 fix: order the ledger by when entries were written, not by a random UUID  (Phase 1)
+381d34c docs: M9 merged (PR #8), handoff prepped for M11 (M10 skipped)   ← main
+```
+
+No PR opened yet — the user has been merging at milestone boundaries via `gh`. Open one when M11 is
+complete (Phase 10), not per phase.

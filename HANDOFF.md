@@ -1,5 +1,12 @@
 # yaccount — Handoff
 
+> ## 🚧 **M11 IS IN PROGRESS — READ [`M11-HANDOFF.md`](M11-HANDOFF.md) FIRST.**
+> Branch `m11-design-polish` (pushed). Phases 1–2 of 10 are done, user-tested and committed; **Phase 3
+> is next**. The approved design direction, the phase table, per-phase decisions and the working
+> protocol all live in that file. The approved plan is [`M11-PLAN.md`](M11-PLAN.md).
+> This file below is the milestone-level history through M9 — still authoritative for invariants,
+> environment and prior-milestone context, but it does NOT know about M11 progress.
+
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
 > **Last updated:** **M9 (Google Drive Sync — the Checkpointer) DONE — merged to `main` via PR #8** (merge commit `a7a4c65`, 2026-07-22). **User browser-verified** the real 2-profile Drive round-trip (sign in → log on A → appears on B; ledger files land in Drive AppData). Core-first TDD: **380 → 407 vitest tests green** (+27: 9 repo-merge/outbox + 18 pure two-client checkpointer over an in-memory fake Drive). Typecheck/lint/build/prettier clean. **`DB_VERSION` 2 → 3** (adds a device-local `outbox` store; guarded upgrade, no data drop). Followed by a 4-agent `/simplify` cleanup pass (commit `e099fad`). **Both merge-path obligations resolved:** #33 buffer/sort remote ops under the total order — DONE via `Repo.applyRemoteOps` (union + full re-replay, early-return when nothing new). #34 snapshot natural-key — **user chose to KEEP the delete-by-key upsert as-is** (merge is deterministic under the total order via #33; the rare erase-unseen-report edge is accepted). **One real bug found & fixed during verify:** drivestore's `fetch` needs binding — pass `globalThis.fetch.bind(globalThis)` (else "Illegal invocation"). **Also:** the Google Cloud project needs the **Drive API enabled** (separate from OAuth setup) — user did this. See "M9 decisions and delivered code".
 > **⚠️ Next up: M11 (Design System & Polish).** **User chose to SKIP M10 (Capacitor native) for now** — do M11 next. M11 is the finishing pass ON TOP of the LOCKED §12 "Quiet Register" language (motion, empty/loading/error/**sync** states, `DriveError` surfaces, category-color override UI, responsive density, Playwright e2e) — **extend §12, never restart it.** Needs no external setup. Confirm the milestone with the user first — ask, don't assume (M10 is still a valid pick if they change their mind). See "Next Steps".
