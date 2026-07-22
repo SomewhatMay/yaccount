@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useAtomValue } from "jotai";
-import { MoonIcon, SunIcon } from "lucide-react";
+import { MoonIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { pendingCountAtom } from "@/features/store";
@@ -65,6 +65,21 @@ export function AppNav() {
       <div className="ml-auto flex items-center gap-1.5">
         <SyncIndicator />
         <AuthButton />
+        {/* Deliberately not in the nav row above — settings is a destination you
+            reach when something needs attention, not one of the ledger's screens. */}
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "rounded-full",
+            pathname === "/settings" ? "text-primary" : "text-muted-foreground",
+          )}
+        >
+          <Link href="/settings" aria-label="Settings and diagnostics">
+            <SettingsIcon className="size-4" />
+          </Link>
+        </Button>
         <ThemeToggle />
       </div>
     </header>

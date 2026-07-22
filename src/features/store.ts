@@ -14,7 +14,10 @@ import {
   type Transaction,
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
+import { toast } from "sonner";
 import { todayIso } from "@/features/clock";
+import { markHandled } from "@/lib/errors";
+import { createLogger } from "@/lib/logger";
 import { runSync } from "@/sync";
 import { getDriveFS, describeSyncError } from "@/sync/drive";
 import { getAuthProvider } from "@/auth/web";
@@ -40,7 +43,17 @@ import {
  * so it is a module-level singleton, not an atom or a context.
  */
 
+const log = createLogger("store");
+
 export const readyAtom = atom(false);
+/**
+ * Why the app could not start. Boot opens IndexedDB, and that genuinely fails —
+ * private browsing, a disabled storage setting, a corrupt database, another tab
+ * holding an incompatible version. Before this the failure was invisible: every
+ * screen sat on "Loading…" forever with no way to tell a slow disk from a dead
+ * one. `AppShell` renders this instead of the shell when it is set.
+ */
+export const bootErrorAtom = atom<string | null>(null);
 export const categoriesAtom = atom<Category[]>([]);
 export const containersAtom = atom<Container[]>([]);
 export const transactionsAtom = atom<Transaction[]>([]);
@@ -115,15 +128,31 @@ export const refreshAtom = atom(null, async (_get, set) => {
   set(goalsAtom, goals);
 });
 
-/** Append + apply one op atomically (§0.1), then refresh the caches. The op is
+/**
+ * Append + apply one op atomically (§0.1), then refresh the caches. The op is
  * now queued in the repo outbox, so we also nudge a debounced background sync to
  * push it to Drive promptly (§8.6 — never blocking; the write already landed
- * locally). */
+ * locally).
+ *
+ * Failure is reported HERE, once, rather than at ~40 call sites: a write can fail
+ * for reasons the user can act on (storage full, private-browsing quota, a tab
+ * holding an old DB version) and silently swallowing it would leave them
+ * believing a transaction was recorded. It then RETHROWS, marked as handled, so
+ * the caller skips its success path — the form keeps what was typed instead of
+ * clearing it, and no "Logged" toast fires — while the global handler stays
+ * quiet about an error the user has already been shown.
+ */
 export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
-  const repo = await getRepo();
-  await repo.dispatch(op);
-  await set(refreshAtom);
-  scheduleSync(set);
+  try {
+    const repo = await getRepo();
+    await repo.dispatch(op);
+    await set(refreshAtom);
+    scheduleSync(set);
+  } catch (err) {
+    const summary = log.capture(`dispatch ${op.type} failed`, err);
+    toast.error("Couldn't save that change.", { description: summary });
+    throw markHandled(err);
+  }
 });
 
 /**
@@ -206,9 +235,10 @@ export const syncAtom = atom(null, async (_get, set) => {
     set(lastSyncErrorAtom, null);
     set(syncStatusAtom, "synced");
   } catch (err) {
-    // DriveError / offline — stay usable, surface honestly (§8.6). Log the raw
-    // error (it carries .status/.body) so a failing sync is diagnosable.
-    console.error("[yaccount] Drive sync failed:", err);
+    // DriveError / offline — stay usable, surface honestly (§8.6). The sync seam
+    // knows drivestore's error shape, so it writes the user-facing line; the log
+    // keeps the full stack for whoever has to diagnose it.
+    log.capture("Drive sync failed", err);
     set(lastSyncErrorAtom, describeSyncError(err));
     set(syncStatusAtom, "error");
   } finally {
@@ -295,11 +325,31 @@ export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
  * then backfill due recurring occurrences + settle achieved goals in the
  * background (§8.6 instant-open). */
 export const bootstrapAtom = atom(null, async (_get, set) => {
-  await getRepo();
-  await set(refreshAtom);
-  set(readyAtom, true);
-  await set(runRecurringGenerationAtom);
-  await set(runGoalMaintenanceAtom);
+  // Opening the DB and loading it is the ONLY part that can leave the app
+  // unusable, so it is the only part that sets bootError.
+  try {
+    await getRepo();
+    await set(refreshAtom);
+    set(readyAtom, true);
+    log.info("repo ready");
+  } catch (err) {
+    set(bootErrorAtom, log.capture("could not open the local database", err));
+    return;
+  }
+
+  // The two background passes are conveniences. A bug in either used to take the
+  // whole boot down with it; now each fails on its own and the ledger still opens.
+  for (const [what, task] of [
+    ["recurring generation", runRecurringGenerationAtom],
+    ["goal maintenance", runGoalMaintenanceAtom],
+  ] as const) {
+    try {
+      await set(task);
+    } catch (err) {
+      log.capture(`${what} failed`, err);
+    }
+  }
+
   // Kick the first Drive sync in the background — never awaited on the boot path,
   // so the network can't gate the already-rendered UI (§8.6). No-ops if signed out.
   void set(syncAtom);
