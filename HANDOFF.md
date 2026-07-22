@@ -1,9 +1,10 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** M4 (time-variant budget targets) DONE — committed on `m4-budget-targets`, user manually browser-tested and confirmed working (2026-07-21). Not pushed/PR'd yet. Next up: **M5**, by the user's explicit direction (see "Next Steps").
+> **Last updated:** **M5 (Reporting & Dashboard Engine + Charts) DONE — code-complete on branch `m5-reporting`** (off `main`, 2 commits: `725b812` core, `c0b2a4e` UI). Typecheck/lint/build/prettier clean; **266 vitest tests green** (was 234 at M4, +32 for M5). **NOT yet browser-verified by the user** — that is the pending step before this milestone is truly closed (UI has no auto-tests until Playwright/M11). Not pushed/PR'd yet. Next up: **M6** (recurring/inbox) then M7 — but confirm with the user, they have re-ordered before (see "Next Steps").
+> **NOTE:** M4 was merged to `main` via **PR #3** (`c2f7804`) since the last handoff — the "not pushed/PR'd" note for M4 below is stale; `main` has M4.
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
-> **NOTE (environment):** this session ran on **native Windows** (`E:\GitHub\yaccount`), not the WSL environment (`/home/may/github/yaccount`) earlier sessions used. See "Key facts / gotchas" for what changed (Node version, no WSL PATH export, npm optional-deps gotcha). Both environments should work; update whichever section matches where you're actually running.
+> **NOTE (environment):** the M5 session ran back on **WSL2** (`/home/may/github/yaccount`, Node v22.18.0 via nvm — remember the `export PATH=…` prefix for every npm/npx call). The M4 session was native Windows. Both environments work; update whichever section matches where you're actually running.
 
 > **⚠️ ALWAYS, at the start of every session and before writing any code — even if you've read them before, even if this handoff looks current — open and (re)read in full:**
 > 1. `yaccount-tech-spec-v3.md` (source of truth, the "what")
@@ -64,6 +65,8 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M4 (time-variant budget targets) — DONE, committed on branch `m4-budget-targets`** (off `main`, commit `4e11529`; not yet pushed/PR'd). TDD followed: tests written first (confirmed red via missing modules), then implementation, then green. **234 vitest tests green (was 212 on `main`, +22 for M4); typecheck/lint/prettier/build clean.** No DB migration needed — `budget_targets` object store already existed since M1 (schema-only until now), so `DB_VERSION` stays 2. **User manually walked through the browser UI and confirmed it works** (set $300→$600 effective-date change, History list, "Current" badge, same-date clash-replaces warning, delete, refresh-persists) — the automated-suite-only caveat from earlier in this session no longer applies.
 
+**M5 (Reporting & Dashboard Engine + Charts) — DONE, code-complete on branch `m5-reporting`** (off `main`; `725b812` core + `c0b2a4e` UI; not pushed/PR'd). TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean; dev server smoke-tested (all routes 200). **Still needs the user's manual browser walk** before the milestone is closed — nothing in the UI is auto-tested (Playwright is M11). See "M5 decisions and delivered code" below.
+
 **Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`, but **the user explicitly picked M5 next over M6** after M4 shipped — a deliberate re-ordering, not an oversight. **Do NOT silently "correct" this back to M6** — the dependency graph permits it either way (M5 needs M4+M3, both done; M6 needs only M3), so there's no technical reason to override the user's stated choice. If a future session is unsure which is next, ask rather than assume the impl doc's default order still holds.
 
 Git log (`m4-budget-targets`, current):
@@ -88,6 +91,27 @@ e44ea7f M3: containers, transfers, balances
 f4bdd4e M0: scaffold Next.js static-export app + toolchain
 8d9f122 chore: init main
 ```
+
+### M5 decisions and delivered code (this session, branch `m5-reporting`)
+- **No new ops, no schema/DB change.** M5 is a pure derived-view layer over the existing tables — every number is computed on demand (spec §7: only the core tables persist; dashboards are re-derivable views). `DB_VERSION` stays 2.
+- **Locked decisions made this session (with the user):**
+  - **Preset windows = rolling from today** (user's explicit pick over calendar-aligned): `resolvePeriod` gives `today − N months … today` inclusive; YTD = Jan 1 … today; All = unbounded (`{start:null,end:null}`, bounds derived from data where a month count is needed).
+  - **Two-range compare (§6.2) shipped**; **per-widget period override (§6.1) deferred to M11** (one global period drives all widgets).
+  - **Dashboard is the home route** (`/`); the ledger moved to `/ledger`. A route-aware `AppShell` (`src/features/AppShell.tsx`) widens the dashboard to `max-w-5xl` (the one multi-metric screen §12.4 permits to widen); every other screen stays `max-w-2xl`. `AppNav` gained a Dashboard link.
+  - **Chart category color reuses `categoryDotColor(id)`** (`src/features/category-color.ts`) — the §12.2 "one swatch scheme" rule; no separate chart palette. All other chart colors are **semantic tokens read as CSS vars** (`var(--positive)` income, `var(--muted-foreground)` expense-neutral, `var(--brand)` iris savings, `var(--destructive)` negative).
+  - **Reconstructed-balance historical curve is built** (user said do everything) — the investment sparkline, not just the single gain/loss figure.
+- **Core** (pure, unit-tested — `src/core/engine/`):
+  - `period.ts` — `ReportingPeriod`/`DateRange` types, `resolvePeriod(period, today)` (today passed in → core stays clock-free), `inRange`, `monthKeysInRange(range, fallbackDates)`, `monthsInRange` (the monthly-average divisor = touched-month-key count, ≥1).
+  - `reporting.ts` — `categoryBreakdown` + `categoryBreakdownMonthlyAverage` (signed-sum → magnitude, **genuine zero-filter** §6.4), `monthlyTotals` (income/expense/savings per month, transfers excluded), `categoryMonthlySpend` (vs. time-variant budget via `budgetOnDate`), `waterfallData`, `budgetComparison` (§6.3 re-scoped to active period), `totalExpenseBudgetOnDate` (monthly-bar overlay). **All run over `activeRows`** (void-aware) and exclude transfers (`category_id===null`).
+  - `flows.ts` — `containerFlows` (net transfer in/out per non-archived container), `unrealizedGainLoss` (latest snapshot − `netContributions`), `reconstructedBalance` (nearest snapshot ± **two-directional** transfers in the gap, §10 #4 — rolls forward from a past snapshot or backward from a future one).
+  - Exported via `engine/index.ts`. New tests: `period.test.ts` (16), `reporting.test.ts` (8), `flows.test.ts` (8) — hand-computed fixture (void pair nets out, refund nets within category, transfer excluded, budget resolved per-month).
+- **UI** (`src/features/reports/`, all `"use client"`, **Recharts** — already an M0 dep):
+  - `DashboardView.tsx` — orchestrator: reads atoms, resolves the primary + optional compare range against a session-stable `today`, renders one or two `ReportColumn`s (compare = `lg:grid-cols-2`). `ReportColumn` owns its own total/monthly-avg toggle + drill-down category selection and computes every aggregation with `useMemo`.
+  - `PeriodPicker.tsx` — preset `Select` + custom native date inputs + a Compare toggle revealing a second `PeriodField`. No new shadcn components needed.
+  - `chart-ui.tsx` — `CHART` token palette, `MoneyTooltip` (mono amounts, hides the waterfall's transparent `base` series), `monthLabel`/`formatAxisCents`, `Panel`/`EmptyNote`.
+  - `widgets.tsx` — `CategoryDoughnut` (center total + legend w/ %), `MonthlyBarsChart` (ComposedChart bars + dashed budget line), `WaterfallChart` (stacked BarChart + transparent base, impl §10 #28 — no 2nd chart lib), `CategoryDrilldown` (category Select + spend bars vs. budget line), `ContainerFlowsTable`, `BudgetComparisonTable` (Δ% rose-over/emerald-under), `InvestmentCard` (gain/loss + reconstructed sparkline).
+- **Store** (`src/features/store.ts`): `reportingPeriodAtom` (default `last-3-months`) + `comparePeriodAtom` (nullable). Hold only the period *descriptor*; `today` is supplied by the view (atoms stay clock-free). The §8.3 in-memory active-period cache is realized at the store layer (the full client dataset is already in memory); the IndexedDB-index fallback for cold historical periods stays a **later optimization, not built** (noted, low priority — everything is in-memory client-side today).
+- **Scope note / what's intentionally NOT here:** per-widget period override (→ M11), category-color user override UI (→ M11), the IndexedDB-index cold-period fallback (optimization). Nothing from the M5 spec scope was cut.
 
 ### M4 decisions and delivered code (this session, branch `m4-budget-targets`)
 - **No new op-type ceremony beyond what §5.3/impl §3 already specced.** `budget_targets` rows are unique per `(category_id, start_date)`; a single `budgetTarget.set` op **upserts by that natural key** (deletes any other row holding the key, same pattern as `snapshot.record`/`.update` from M3) — there's no separate `.update`, because set-onto-an-existing-date already IS the edit path (matches spec's "setting a budget for a date that already has a row upserts"). `budgetTarget.remove` is a **hard delete**, same rule of thumb as a superseded snapshot (impl §3: housekeeping, not a ledger amount) — the impl doc's op taxonomy already named this exact pairing, so this wasn't a new design decision, just the first milestone that needed it.
@@ -210,26 +234,29 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M4 is DONE.** Committed (`4e11529` on `m4-budget-targets`, off `main`), user-tested in the browser, confirmed working. Not pushed/PR'd — open one when the user wants (`gh pr create --base main`); nothing is blocking it.
+**M5 is code-complete** (branch `m5-reporting`, off `main`; `725b812` core + `c0b2a4e` UI). **The one open action to CLOSE M5: the user's manual browser walk.** Nothing in the UI is auto-tested (Playwright is M11), so a real browser pass is the milestone's own How-to-test and exit gate. Then open a PR (`gh pr create --base main`) when the user wants.
 
-### Up next: M5 — Reporting & Dashboard Engine + Charts (user's explicit pick)
+### Browser-verify checklist for M5 (do this WITH real logged data — the DB is empty on a fresh open)
+Log a few months of transactions/transfers/budgets/snapshots first, then on `/` (the dashboard):
+- **Period control:** switch presets (Last month/3/6/12/YTD/All) → every widget updates. Custom range (two date inputs). **Compare** toggle → two columns side by side, each independent.
+- **By category:** expense + income doughnuts; **Total vs. Monthly avg** toggle; confirm **$0 categories are omitted** (§6.4) and a refund nets within its category.
+- **Monthly bars:** income/expense/savings bars + dashed budget overlay line; empty months show as zero bars.
+- **Waterfall:** Income → Expenses → Savings reads as a running total (transparent-base trick).
+- **Category over time:** pick a category → spend bars vs. its time-variant budget line (change a budget's effective date in `/categories` and confirm the line steps).
+- **Container flows:** net in/out per container over the period (transfers only; archived containers hidden).
+- **Investments:** on an `is_investment` container with snapshots → current value, contributed, gain/loss (emerald/rose), reconstructed-balance sparkline.
+- **Budget comparison:** actual monthly-avg vs. budget, Δ% (rose over / emerald under), re-scoped to the active period.
+- Toggle light/dark → chart colors follow (they read CSS vars). Refresh → period atoms reset to defaults (they're not persisted — see note below).
 
-Dependencies satisfied (impl §7: "M5 needs M4 (+M3)" — both done). Read spec §6 in full before coding (already partly summarized below, but the spec is authoritative) and impl doc's M5 section (§4, "M5 — Reporting & Dashboard Engine + Charts") for the literal scope/how-to-test/exit-criteria.
+### Up next after M5 verified: **M6 — Recurring Rules, Templates & the Inbox** (CONFIRM with the user first)
+The impl §7 execution order is `…M4 → M6 → M5 → M7…`; the user swapped M6/M5 (did M5 first). So **M6 is the remaining milestone before M7**, and **M7 needs BOTH M5 and M6** (impl §7 dependency graph). M6 needs only M3 (done). But the user has re-ordered before and picks the next milestone explicitly — **ask, don't assume.** (M8 auth stays blocked on the user's Google Cloud setup, unchanged.)
 
-**Scope (impl doc M5, condensed — verify against the doc, don't build from this summary alone):**
-- **Unified global reporting-period control (§6.1):** presets (Last month / Last 3 / Last 6 / Last 12 / YTD / All / Custom) + optional per-widget override; two-range compare folded into the same control (§6.2), not a separate page. This is new UI infra nothing downstream of M4 built yet — no reporting-period picker exists anywhere in the app today.
-- In-memory active-period cache warming at boot (§8.3) — a stub existed since M1; M5 is where it becomes real. Falls back to IndexedDB for historical/non-active periods.
-- **Container Flows view (§5.4)** — deferred here from M3 on purpose (needs this milestone's period control): net in/out per container over the active period, via the `by_container_month` index (already created in M1, unused until now).
-- **Chart inventory (§6.5), Recharts** (already an M0 dependency — nothing new to install): category breakdown doughnut/pie (expense + income, **genuine zero-filtering** per §6.4 — the spreadsheet's version claimed to but didn't; period-total + period-monthly-average variants); monthly bar (income/expense/savings) with a budget-target overlay (this is where M4's `budgetOnDate` finally gets consumed by a chart); single-category drill-down bar vs. its time-variant budget target; Income→Expenses→Savings **waterfall**, built as a stacked `BarChart` + transparent base series (locked choice, impl §10 #28 — no second chart lib).
-- **Category chart color = `category.color` if set, else deterministic auto-palette by stable id** (§10.1's hybrid resolution, formally shipping here) — decide whether this reuses `categoryDotColor()` (`src/features/category-color.ts`, already used for the UI dots since M2) or wants a separate chart-specific palette function; nothing currently forces either choice, so it's an open call for the M5 session.
-- **Investment/asset reporting (§5.6):** Unrealized Gain/Loss = latest `container_snapshots.reported_balance` − Net Contributions (`netContributions()` already exists in `engine/balances.ts`); the **Reconstructed Balance Engine** for historical gap-filling (`nearest snapshot ± transfers in the gap`, NOT carry-forward). **Watch impl §10 #4:** the gap-filling must use the same two-directional crediting as the balance identity (in via `to_container_id`, out via `container_id`) — a naive one-sided `SUM(amount)` here would be a repeat of the exact bug the M0.4 balance identity was designed to prevent.
-- **Budget Targets comparison re-scoped to the active period (§6.3)** — the source spreadsheet always computed "Monthly Average" against all-time history regardless of the selected window; deliberately don't preserve that quirk.
+**M6 scope (impl §4 "M6", read it in full before coding):** `recurring_rules` CRUD + the `interval_config` frequency-discriminated union (M1 left it a loose `z.record` with a TODO — tighten it here), one-at-a-time pending generation with by-mode backfill (§5.8), templates (`template.create`/`.remove` — hard-remove allowed, they're shortcuts not ledger data), and the **Pending/Inbox** queue with 1-tap + bulk approve (`transaction.approve`). New ops named in impl §3: `template.create`/`remove`, `recurringRule.create`/`update`/`cancel`, `transaction.approve`.
 
-**How to test (impl doc's own words):** seed a fixture ledger spanning several months; verify each chart's numbers by hand against the fixture; confirm $0 categories are genuinely omitted; confirm switching the global period updates every non-overridden widget. Snapshot-test the aggregation functions in `src/core` (pure, unit-testable) before wiring any chart component to them — same TDD discipline as M1–M4.
-
-**Exit criteria:** a genuinely useful dashboard over real logged data; all four chart types render correct, period-aware numbers.
-
-**Not M5 (don't pull forward):** M6 recurring/inbox, M7 goals/monthly-plan, M8 auth (blocked on the user's Google Cloud setup — still true, unchanged), M9/M10 sync/native.
+**Deferred niceties surfaced during M5 (not blockers):**
+- **Period atoms aren't persisted** — `reportingPeriodAtom`/`comparePeriodAtom` reset on refresh. Fine for now; if wanted, persist to the synced `settings` store or localStorage (localStorage is device-local, which is arguably correct for a view preference). M11 polish candidate.
+- **Cold-period IndexedDB fallback (§8.3)** not built — all aggregation runs over the full in-memory transaction set (fine at current scale; the `by_container_month`/`by_container_category_month` indexes exist for when it matters).
+- **Per-widget period override (§6.1)** and **category-color user-override UI (§10.1/§5.1)** both deferred to M11 as speced.
 
 **Milestone-ownership deferrals to remember (flagged in M1, NOT open decisions):**
 - Complex cross-field zod refinements deferred to owning milestone: recurring `frequency↔interval_config` + `amount_mode↔template_amount` → **M6**; goal `mode`/`kind` invariants → **M7**. `interval_config` is currently a preserved `z.record` object; M6 tightens to a frequency-discriminated union. TODO comments mark both spots.
