@@ -13,6 +13,8 @@ const LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/ledger", label: "Ledger" },
   { href: "/inbox", label: "Inbox" },
+  { href: "/plan", label: "Plan" },
+  { href: "/goals", label: "Goals" },
   { href: "/recurring", label: "Recurring" },
   { href: "/containers", label: "Containers" },
   { href: "/categories", label: "Categories" },

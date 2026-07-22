@@ -8,6 +8,7 @@ import {
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
+  makeGoal,
   makeRecurringRule,
   makeTemplate,
   makeTransaction,
@@ -17,6 +18,7 @@ import {
   type Category,
   type Container,
   type ContainerSnapshot,
+  type Goal,
   type RecurringRule,
   type Setting,
   type Transaction,
@@ -754,6 +756,124 @@ describe("applyOp — recurring rules are cancellable AND restorable (§1.1, M6)
   });
 });
 
+describe("applyOp — goal ops (M7, §5.9)", () => {
+  const goal = makeGoal({
+    id: "g1",
+    container_id: "clothing",
+    kind: "spend_down",
+    mode: "deadline",
+    target_amount: 20000,
+    deadline: "2026-11-30",
+    created_date: "2026-01-01",
+  });
+  const seedGoal: Op = {
+    id: "op-g",
+    ts: at(1000),
+    type: "goal.create",
+    payload: { row: goal },
+  };
+
+  it("goal.create materializes the row", async () => {
+    const state = newMemoryState();
+    await applyOp(new MemoryTx(state), seedGoal);
+    const rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].mode).toBe("deadline");
+  });
+
+  it("goal.update replaces the full row (entity-LWW)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, seedGoal);
+    await applyOp(tx, {
+      id: "op-gu",
+      ts: at(2000),
+      type: "goal.update",
+      payload: { row: { ...goal, name: "Winter 2026" } },
+    });
+    const rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0].name).toBe("Winter 2026");
+  });
+
+  it("goal.complete latches status + completed_date; reversible via reopen", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, seedGoal);
+    await applyOp(tx, {
+      id: "op-gc",
+      ts: at(2000),
+      type: "goal.complete",
+      payload: { id: "g1", date: "2026-06-15" },
+    });
+    let rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0].status).toBe("completed");
+    expect(rows[0].completed_date).toBe("2026-06-15");
+    // reopen via an ordinary update (entity-LWW) — nothing is one-way (§1.1)
+    await applyOp(tx, {
+      id: "op-gr",
+      ts: at(3000),
+      type: "goal.update",
+      payload: { row: { ...goal, status: "active", completed_date: null } },
+    });
+    rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0].status).toBe("active");
+    expect(rows[0].completed_date).toBeNull();
+  });
+
+  it("goal.cancel / goal.uncancel flip status losslessly (§1.1)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, seedGoal);
+    await applyOp(tx, {
+      id: "op-gx",
+      ts: at(2000),
+      type: "goal.cancel",
+      payload: { id: "g1" },
+    });
+    let rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0].status).toBe("cancelled");
+    await applyOp(tx, {
+      id: "op-gux",
+      ts: at(3000),
+      type: "goal.uncancel",
+      payload: { id: "g1" },
+    });
+    rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0].status).toBe("active");
+    // only status changed — the rest of the row is untouched
+    expect(rows[0]).toEqual(goal);
+  });
+
+  it("goal.archive / goal.unarchive flip is_archived losslessly (§1.1)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, seedGoal);
+    await applyOp(tx, {
+      id: "op-ga",
+      ts: at(2000),
+      type: "goal.archive",
+      payload: { id: "g1" },
+    });
+    let rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0].is_archived).toBe(true);
+    await applyOp(tx, {
+      id: "op-gua",
+      ts: at(3000),
+      type: "goal.unarchive",
+      payload: { id: "g1" },
+    });
+    rows = await readAll<Goal>(state, STORE.goals);
+    expect(rows[0]).toEqual(goal);
+  });
+
+  it("cancel/complete/archive of a missing goal is a no-op (idempotent replay)", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, { id: "x", ts: at(1), type: "goal.cancel", payload: { id: "nope" } });
+    expect(await readAll<Goal>(state, STORE.goals)).toHaveLength(0);
+  });
+});
+
 describe("applyOp — every op type is idempotent by id (§8.2)", () => {
   // Table-driven so a new op type added without an idempotency proof fails here.
   const category = makeCategory({ id: "c1", name: "Groceries", type: "expense" });
@@ -803,6 +923,15 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     category_id: "c1",
     inbox_status: "pending",
   });
+  const goal = makeGoal({
+    id: "g1",
+    container_id: "k1",
+    kind: "spend_down",
+    mode: "deadline",
+    target_amount: 20000,
+    deadline: "2026-11-30",
+    created_date: "2026-01-01",
+  });
 
   const seed: Op[] = [
     { id: "seed-c", ts: at(1), type: "category.create", payload: { row: category } },
@@ -813,6 +942,7 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     { id: "seed-tm", ts: at(6), type: "template.create", payload: { row: template } },
     { id: "seed-r", ts: at(7), type: "recurringRule.create", payload: { row: rule } },
     { id: "seed-p", ts: at(8), type: "transaction.create", payload: { row: pending } },
+    { id: "seed-g", ts: at(9), type: "goal.create", payload: { row: goal } },
   ];
 
   const cases: Op[] = [
@@ -850,6 +980,18 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     { id: "o22", ts: at(31), type: "recurringRule.cancel", payload: { id: "r1" } },
     { id: "o23", ts: at(32), type: "recurringRule.uncancel", payload: { id: "r1" } },
     { id: "o24", ts: at(33), type: "transaction.approve", payload: { id: "p1" } },
+    { id: "o25", ts: at(34), type: "goal.create", payload: { row: goal } },
+    { id: "o26", ts: at(35), type: "goal.update", payload: { row: goal } },
+    {
+      id: "o27",
+      ts: at(36),
+      type: "goal.complete",
+      payload: { id: "g1", date: "2026-06-15" },
+    },
+    { id: "o28", ts: at(37), type: "goal.cancel", payload: { id: "g1" } },
+    { id: "o29", ts: at(38), type: "goal.uncancel", payload: { id: "g1" } },
+    { id: "o30", ts: at(39), type: "goal.archive", payload: { id: "g1" } },
+    { id: "o31", ts: at(40), type: "goal.unarchive", payload: { id: "g1" } },
   ];
 
   it.each(cases.map((op) => [op.type, op] as const))(

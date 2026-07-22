@@ -132,6 +132,41 @@ describe("generateDueOccurrences — goal_derived collapses to one current occur
   });
 });
 
+describe("generateDueOccurrences — goal_derived uses the resolved required_monthly (§5.9.5)", () => {
+  const goalRule = makeRecurringRule({
+    id: "gr",
+    frequency: "monthly",
+    interval_config: { day_of_month: 1 },
+    template_vendor_source: "to House",
+    template_container_id: "general",
+    template_category_id: null,
+    template_to_container_id: "house",
+    amount_mode: "goal_derived",
+    linked_goal_id: "g1",
+    template_amount: null,
+    start_date: "2026-01-01",
+  });
+
+  it("logs one transfer at the passed-in amount (not the stale template)", () => {
+    const { rows } = generateDueOccurrences(goalRule, "2026-04-15", {
+      goalDerivedAmount: 4000,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].date).toBe("2026-04-15");
+    expect(rows[0].amount).toBe(-4000); // transfer stored negative on the source
+    expect(rows[0].to_container_id).toBe("house");
+    expect(rows[0].inbox_status).toBe("pending");
+  });
+
+  it("a $0 required (goal reached / done) stops generating, but the cursor advances", () => {
+    const { rows, rule: advanced } = generateDueOccurrences(goalRule, "2026-04-15", {
+      goalDerivedAmount: 0,
+    });
+    expect(rows).toEqual([]);
+    expect(advanced.next_generation_date).toBe("2026-05-01");
+  });
+});
+
 describe("generateDueOccurrences — transfer rule generates a pending transfer", () => {
   it("negative row on the source, destination via to_container_id", () => {
     const r = makeRecurringRule({

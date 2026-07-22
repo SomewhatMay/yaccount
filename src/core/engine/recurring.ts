@@ -217,10 +217,17 @@ export interface GenerationResult {
  * Idempotent: occurrence rows are keyed by `(rule, date)` and the returned rule
  * carries an advanced `next_generation_date`, so re-running on the same day emits
  * nothing new even before the rule update persists.
+ *
+ * For a `goal_derived` rule (§5.9.5) the caller resolves the linked goal's current
+ * `required_monthly` and passes it as `opts.goalDerivedAmount` — the one genuinely
+ * new engine behavior the savings system adds. A resolved amount of `0` (the goal
+ * is funded / done) generates nothing but still advances the cursor. When no
+ * amount is supplied the rule falls back to its stored `template_amount`.
  */
 export function generateDueOccurrences(
   rule: RecurringRule,
   today: ISO,
+  opts?: { goalDerivedAmount?: number },
 ): GenerationResult {
   if (rule.status === "cancelled") return { rows: [], rule };
 
@@ -235,12 +242,18 @@ export function generateDueOccurrences(
 
   if (due.length === 0) return { rows: [], rule };
 
-  const amount = rule.template_amount ?? 0;
   let rows: Transaction[];
   if (rule.amount_mode === "goal_derived") {
-    // One occurrence, dated today, at the current (self-corrected) ask.
-    rows = [occurrenceRow(rule, today, amount)];
+    // One occurrence, dated today, at the current (self-corrected) ask (§5.8).
+    const resolved = opts?.goalDerivedAmount ?? rule.template_amount ?? 0;
+    // A funded/completed deadline goal asks $0 → stop generating (§5.9.5). Only
+    // skip when the caller actually resolved the ask; a null fallback still logs.
+    rows =
+      opts?.goalDerivedAmount !== undefined && opts.goalDerivedAmount <= 0
+        ? []
+        : [occurrenceRow(rule, today, resolved)];
   } else {
+    const amount = rule.template_amount ?? 0;
     rows = due.map((date) => occurrenceRow(rule, date, amount));
   }
 
