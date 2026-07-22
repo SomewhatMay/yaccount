@@ -8,6 +8,7 @@ import { MoonIcon, SunIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { pendingCountAtom } from "@/features/store";
+import { AuthButton } from "@/features/auth/AuthButton";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -60,7 +61,10 @@ export function AppNav() {
           );
         })}
       </nav>
-      <ThemeToggle />
+      <div className="ml-auto flex items-center gap-1.5">
+        <AuthButton />
+        <ThemeToggle />
+      </div>
     </header>
   );
 }
@@ -72,7 +76,7 @@ function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      className="text-muted-foreground ml-auto rounded-full"
+      className="text-muted-foreground rounded-full"
       onClick={() => setTheme(dark ? "light" : "dark")}
       aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
     >
