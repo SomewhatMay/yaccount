@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   activeRows,
+  isRegisterSort,
   isVoided,
   pendingRows,
+  REGISTER_SORTS,
   searchTransactions,
   sortForRegister,
+  sortRegister,
   templateRows,
 } from "./ledger";
 import { containerBalance } from "./balances";
@@ -240,6 +243,97 @@ describe("sortForRegister — newest first, and the clock breaks the day's tie (
     const before = rows.map((r) => r.id);
     sortForRegister(rows);
     expect(rows.map((r) => r.id)).toEqual(before);
+  });
+});
+
+describe("sortRegister — the four orders the register offers (M11)", () => {
+  const at = (
+    id: string,
+    date: string,
+    amount: number,
+    entered_at: string | null = null,
+  ): Transaction => ({
+    ...makeTransaction({ id, date, amount, vendor_source: id, category_id: "c" }),
+    entered_at,
+  });
+
+  const rows = [
+    at("small", "2026-07-18", -450),
+    at("big", "2026-07-19", -185000),
+    at("mid", "2026-07-20", 21400),
+  ];
+
+  it("newest is the register order, and the default", () => {
+    expect(sortRegister(rows, "newest").map((r) => r.id)).toEqual([
+      "mid",
+      "big",
+      "small",
+    ]);
+    expect(sortRegister(rows).map((r) => r.id)).toEqual(
+      sortForRegister(rows).map((r) => r.id),
+    );
+  });
+
+  it("oldest is exactly the register order reversed", () => {
+    expect(sortRegister(rows, "oldest").map((r) => r.id)).toEqual([
+      "small",
+      "big",
+      "mid",
+    ]);
+  });
+
+  it("largest and smallest read the SIZE of an entry, not its direction", () => {
+    // A $2,140 paycheck is a big entry. Ranking by signed amount would file
+    // every expense below every income and answer a different question.
+    expect(sortRegister(rows, "largest").map((r) => r.id)).toEqual([
+      "big",
+      "mid",
+      "small",
+    ]);
+    expect(sortRegister(rows, "smallest").map((r) => r.id)).toEqual([
+      "small",
+      "mid",
+      "big",
+    ]);
+  });
+
+  it("breaks a size tie on register order, so two devices agree (§8.5)", () => {
+    const tied = [
+      at("older", "2026-07-18", -500),
+      at("newer", "2026-07-20", 500),
+      at("newest", "2026-07-21", -500),
+    ];
+    expect(sortRegister(tied, "largest").map((r) => r.id)).toEqual([
+      "newest",
+      "newer",
+      "older",
+    ]);
+    expect(sortRegister([...tied].reverse(), "largest").map((r) => r.id)).toEqual([
+      "newest",
+      "newer",
+      "older",
+    ]);
+  });
+
+  it("does not mutate the caller's array, in any order", () => {
+    const before = rows.map((r) => r.id);
+    for (const order of ["newest", "oldest", "largest", "smallest"] as const) {
+      sortRegister(rows, order);
+    }
+    expect(rows.map((r) => r.id)).toEqual(before);
+  });
+
+  it("handles an empty register", () => {
+    expect(sortRegister([], "largest")).toEqual([]);
+  });
+
+  it("recognises exactly the four orders it can render", () => {
+    // A preference is persisted, so a value from another build (or a hand-edited
+    // one) must be rejected rather than putting the register in a state with no
+    // code behind it.
+    for (const order of REGISTER_SORTS) expect(isRegisterSort(order)).toBe(true);
+    expect(isRegisterSort("by-vibes")).toBe(false);
+    expect(isRegisterSort("")).toBe(false);
   });
 });
 

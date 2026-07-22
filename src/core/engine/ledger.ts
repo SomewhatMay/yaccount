@@ -1,5 +1,6 @@
 import type { Transaction } from "../model";
 import { isLiveLedgerRow } from "./balances";
+import { matchesFilter } from "./filter";
 
 /**
  * Which ledger rows are live right now, resolving void chains (§5.4 + §0.3).
@@ -122,28 +123,26 @@ export function templateRows(txns: Transaction[]): Transaction[] {
 /**
  * Free-text lookup over the register — what the ⌘K palette searches (M11).
  *
- * Every word must match somewhere, in any order, ignoring case: typing more
- * narrows rather than widens, which is how a person expects a search box to
- * behave. The engine knows nothing about what a category or a wallet is called,
- * so a caller that does can pass those in through `label` instead of the engine
- * growing a lookup table it would have to keep in sync.
+ * The matching itself is `matchesFilter`'s text half, so the palette narrows a
+ * payee by exactly the rule the ledger's filter rail uses — a search that finds a
+ * row the rail beside it hides would be two answers to one question.
  *
- * Order is the caller's (pass rows already in register order); `limit` caps what
- * a palette has room to show.
+ * What is local to a palette: a blank query returns nothing (nothing typed is not
+ * "everything" — the palette shows destinations instead), and `limit` caps what
+ * there is room to show. Order is the caller's; pass rows already in register
+ * order.
  */
 export function searchTransactions(
   txns: Transaction[],
   query: string,
   opts: { limit?: number; label?: (t: Transaction) => string } = {},
 ): Transaction[] {
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return []; // nothing typed is not "everything"
+  if (query.trim() === "") return [];
   const limit = opts.limit ?? 8;
   const found: Transaction[] = [];
   for (const t of txns) {
     if (found.length >= limit) break;
-    const hay = `${t.vendor_source} ${opts.label?.(t) ?? ""}`.toLowerCase();
-    if (terms.every((term) => hay.includes(term))) found.push(t);
+    if (matchesFilter(t, { text: query }, { label: opts.label })) found.push(t);
   }
   return found;
 }
@@ -171,4 +170,34 @@ export function sortForRegister(txns: Transaction[]): Transaction[] {
     if (ae !== be) return ae < be ? 1 : -1;
     return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
   });
+}
+
+/** The orders the register offers (§12.4 M11 filter rail). */
+export const REGISTER_SORTS = ["newest", "oldest", "largest", "smallest"] as const;
+export type RegisterSort = (typeof REGISTER_SORTS)[number];
+
+/** Whether a stored preference is one this build still knows how to render. */
+export function isRegisterSort(value: string): value is RegisterSort {
+  return (REGISTER_SORTS as readonly string[]).includes(value);
+}
+
+/**
+ * The register in the order the reader asked for.
+ *
+ * `oldest` is the register order reversed — literally the inverse comparator, so
+ * the two can never drift apart. `largest`/`smallest` rank by the SIZE of an
+ * entry, not its signed amount: a $2,140 paycheck is a big entry, and ranking by
+ * sign would file every expense below every income and answer a question nobody
+ * asked. Ties fall back to register order (the sort is stable over an
+ * already-ordered array), so two devices always agree (§8.5).
+ */
+export function sortRegister(
+  txns: Transaction[],
+  order: RegisterSort = "newest",
+): Transaction[] {
+  const register = sortForRegister(txns);
+  if (order === "newest") return register;
+  if (order === "oldest") return register.reverse();
+  const sign = order === "largest" ? 1 : -1;
+  return register.sort((a, b) => sign * (Math.abs(b.amount) - Math.abs(a.amount)));
 }

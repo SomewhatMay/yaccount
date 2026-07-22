@@ -4,6 +4,7 @@ import {
   inRange,
   monthKeysInRange,
   monthsInRange,
+  trailingDays,
   type ReportingPeriod,
 } from "./period";
 
@@ -115,5 +116,35 @@ describe("monthsInRange — the monthly-average divisor (>= 1)", () => {
   it("never returns 0 (single-day range still averages over one month)", () => {
     expect(monthsInRange({ start: "2026-07-21", end: "2026-07-21" }, [])).toBe(1);
     expect(monthsInRange({ start: null, end: null }, [])).toBe(1);
+  });
+});
+
+describe("trailingDays — the day axis behind a curve (M11)", () => {
+  it("ends on today and runs ascending", () => {
+    expect(trailingDays(TODAY, 3)).toEqual(["2026-07-19", "2026-07-20", "2026-07-21"]);
+  });
+
+  it("crosses a month and a year boundary by the calendar", () => {
+    expect(trailingDays("2026-03-02", 3)).toEqual([
+      "2026-02-28",
+      "2026-03-01",
+      "2026-03-02",
+    ]);
+    expect(trailingDays("2027-01-01", 2)).toEqual(["2026-12-31", "2027-01-01"]);
+  });
+
+  it("keeps Feb 29 in a leap year", () => {
+    expect(trailingDays("2028-03-01", 2)).toEqual(["2028-02-29", "2028-03-01"]);
+  });
+
+  it("gives today alone for a count of 1, and nothing below that", () => {
+    expect(trailingDays(TODAY, 1)).toEqual([TODAY]);
+    expect(trailingDays(TODAY, 0)).toEqual([]);
+    expect(trailingDays(TODAY, -5)).toEqual([]);
+  });
+
+  it("spans exactly the count asked for", () => {
+    expect(trailingDays(TODAY, 90)).toHaveLength(90);
+    expect(trailingDays(TODAY, 90)[0]).toBe("2026-04-23");
   });
 });

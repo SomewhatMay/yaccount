@@ -34,6 +34,13 @@ export function thisMonthIso(now: Date = new Date()): string {
   return todayIso(now).slice(0, 7);
 }
 
+/** Last month as `YYYY-MM` — the month a figure is compared against. Built from
+ * the month field, not by stepping back days: from the 31st that would land in
+ * the same month again (Mar 31 − 30 days is still March). */
+export function lastMonthIso(now: Date = new Date()): string {
+  return thisMonthIso(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+}
+
 const pad = (n: number): string => String(n).padStart(2, "0");
 
 /**

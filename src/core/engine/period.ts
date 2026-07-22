@@ -1,4 +1,4 @@
-import { subMonths, format } from "date-fns";
+import { subDays, subMonths, format } from "date-fns";
 
 /**
  * The unified reporting-period control (§6.1). One global window drives every
@@ -56,6 +56,22 @@ export function inRange(date: string, range: DateRange): boolean {
   if (range.start !== null && date < range.start) return false;
   if (range.end !== null && date > range.end) return false;
   return true;
+}
+
+/**
+ * The last `count` calendar days ending on `today`, ascending (M11).
+ *
+ * The day axis behind a curve — the hero balance's trailing series, and the
+ * calendar heatmap after it. Calendar arithmetic, not `today − n × 86400000`, so
+ * the 23- and 25-hour days at a DST switch don't shift the axis by one.
+ */
+export function trailingDays(today: string, count: number): string[] {
+  const end = parseDay(today);
+  const out: string[] = [];
+  for (let back = count - 1; back >= 0; back--) {
+    out.push(format(subDays(end, back), "yyyy-MM-dd"));
+  }
+  return out;
 }
 
 /** The yearMonth key ("2026-07") of an ISO date. */

@@ -5,6 +5,7 @@ import {
   formatEnteredTime,
   instantFrom,
   instantFromNow,
+  lastMonthIso,
   nowDateTimeInput,
   splitDateTime,
   thisMonthIso,
@@ -67,6 +68,22 @@ describe("thisMonthIso — the local reporting month (§8.3)", () => {
   it("matches the local calendar on the last evening of a month", () => {
     expect(thisMonthIso(local(2026, 7, 31, 21, 0))).toBe("2026-07");
     expect(thisMonthIso(local(2026, 8, 1, 0, 30))).toBe("2026-08");
+  });
+});
+
+describe("lastMonthIso — the month a figure is compared against", () => {
+  it("steps back one calendar month", () => {
+    expect(lastMonthIso(local(2026, 7, 22))).toBe("2026-06");
+  });
+
+  it("crosses the year boundary", () => {
+    expect(lastMonthIso(local(2026, 1, 5))).toBe("2025-12");
+  });
+
+  it("does not land on the wrong month from a long one", () => {
+    // Stepping back by days would put Mar 31 in "February 31" → March again.
+    expect(lastMonthIso(local(2026, 3, 31))).toBe("2026-02");
+    expect(lastMonthIso(local(2026, 5, 31))).toBe("2026-04");
   });
 });
 
