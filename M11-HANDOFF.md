@@ -112,9 +112,16 @@ Plus **the rule** (a hairline used ONLY above a total — it encodes "this sums 
                                      │   +   │   ← iris FAB, bottom-right,
                                      ╰───────╯      floats above the bar
 ┌──────────────────────────────────────────────┐
-│  ▣ Home     ≡ Ledger     ◈ Plan     ⋯ More ③ │
+│  ▣ Home    ≡ Ledger    ✉ Inbox ③    ⋯ More   │
 └──────────────────────────────────────────────┘
 ```
+
+> **Tab slots LOCKED by the user (2026-07-22): Home · Ledger · Inbox · More.**
+> Inbox takes the third slot, not Plan. It is the actionable screen — recurring occurrences land there
+> needing approval, and it already carries a live count (`pendingCountAtom`) — whereas Plan is a monthly
+> read. The badge therefore sits on the Inbox tab itself rather than on "More", where a count is a weak
+> signal. **Plan, Goals, Recurring, Containers, Categories and Settings live in the More sheet.** The
+> desktop sidebar is unaffected: it lists every destination.
 
 **Mobile — quick-add (the ONE orchestrated motion moment)**
 
@@ -395,17 +402,23 @@ npm run dev       # a dev server may ALREADY be running on :3000 — check befor
 
 ---
 
-## 7. Open questions for the user (asked twice, still unanswered — not blocking)
+## 7. Decisions from the user
 
-1. Bottom tabs = **Home · Ledger · Plan · More** with Inbox badged under More — or swap Plan out for
-   Inbox? (Shapes Phase 4. Current assumption: Home · Ledger · Plan · More.)
-2. Routes stay `/` = dashboard, `/ledger` = ledger. On mobile, should the app open to Ledger instead?
-   (Current assumption: no, keep routes stable.)
-3. Dashboard widget show/hide + reorder preference — worth it, or fixed order?
-   (Current assumption: fixed order, maybe collapsible sections.)
+**Answered — treat as locked:**
 
-Answered already: entry time is **stored, displayed AND user-editable** (Phase 1.5); the three new deps
-were fine.
+- **Bottom tabs = Home · Ledger · Inbox · More** (2026-07-22). Inbox takes the third slot, not Plan;
+  the pending badge sits on the Inbox tab. Plan/Goals/Recurring/Containers/Categories/Settings go in
+  the More sheet. See §2.
+- **Design direction = A, "The Standing Register."** Chosen from three illustrated options.
+- **Entry time is stored, displayed AND user-editable** (drove Phase 1.5).
+- **`loglevel`, `react-error-boundary`, `@playwright/test`** are acceptable dependencies.
+
+**Still open — not blocking, assume the default and flag it:**
+
+1. Routes stay `/` = dashboard, `/ledger` = ledger. On mobile, should the app open to Ledger instead?
+   (Assumption: no — keep routes stable.)
+2. Dashboard widget show/hide + reorder preference — worth building, or fixed order?
+   (Assumption: fixed order, possibly collapsible sections.)
 
 ---
 

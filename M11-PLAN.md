@@ -166,7 +166,8 @@ All pure, all in `src/core/engine/`, all TDD against hand-computed fixtures.
 
 - shadcn adds: `popover`, `command`, `skeleton`, `tabs`, `switch`, `collapsible`, `scroll-area`.
 - `AppShell.tsx` — `< lg`: compact top bar (wordmark + sync + theme) + **bottom tab bar**
-  (Home · Ledger · Plan · More, badge on More) + safe-area padding. `≥ lg`: **slim left sidebar rail**
+  (**Home · Ledger · Inbox · More** — locked by the user 2026-07-22; the pending badge sits on the
+  Inbox tab, and Plan moves into the More sheet) + safe-area padding. `≥ lg`: **slim left sidebar rail**
   with all 8 destinations + Settings; content stays a centred reading column (`max-w-2xl`, dashboard
   `max-w-5xl`).
 - `src/features/shell/QuickAddFab.tsx` — iris FAB bottom-right, floating above the tab bar, present on
@@ -261,8 +262,12 @@ Manual browser pass (the milestone's own exit criterion — UI has always been m
 
 ## Unresolved questions
 
-1. Bottom tabs = Home · Ledger · Plan · More. Inbox behind More w/ badge — or swap Plan out for Inbox?
-2. Ledger stays at `/ledger` and dashboard at `/`. On mobile, open to Ledger instead?
-3. Time-of-day: store + display only (my plan), or also make it user-editable in the edit sheet?
-4. OK to add 3 deps — `loglevel`, `react-error-boundary`, `@playwright/test` (dev)?
-5. Dashboard widget show/hide + reorder preference — worth it, or fixed order?
+*(Answers recorded as they came in — see `M11-HANDOFF.md` §7 for the live list.)*
+
+1. ~~Bottom tabs~~ **ANSWERED: Home · Ledger · Inbox · More.** Inbox replaces Plan in the third slot;
+   badge on the Inbox tab; Plan moves into the More sheet.
+2. Ledger stays at `/ledger` and dashboard at `/`. On mobile, open to Ledger instead? — still open.
+3. ~~Time-of-day: store + display only, or user-editable?~~ **ANSWERED: user-editable** — shipped as
+   Phase 1.5 (`96be47a`).
+4. ~~OK to add 3 deps?~~ **ANSWERED: yes.** `loglevel` + `react-error-boundary` are in as of Phase 2.
+5. Dashboard widget show/hide + reorder preference — worth it, or fixed order? — still open.
