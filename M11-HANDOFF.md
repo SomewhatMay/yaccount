@@ -413,12 +413,22 @@ npm run dev       # a dev server may ALREADY be running on :3000 — check befor
 - **Entry time is stored, displayed AND user-editable** (drove Phase 1.5).
 - **`loglevel`, `react-error-boundary`, `@playwright/test`** are acceptable dependencies.
 
-**Still open — not blocking, assume the default and flag it:**
+- **Routes stay stable** (2026-07-22). `/` = dashboard, `/ledger` = ledger, on every breakpoint. The
+  app does NOT open to a different screen on mobile.
+- **Dashboard widgets: fixed order + collapsible sections** for M11 (2026-07-22). Collapse state
+  persists (localStorage, keyed by widget id).
 
-1. Routes stay `/` = dashboard, `/ledger` = ledger. On mobile, should the app open to Ledger instead?
-   (Assumption: no — keep routes stable.)
-2. Dashboard widget show/hide + reorder preference — worth building, or fixed order?
-   (Assumption: fixed order, possibly collapsible sections.)
+**Nothing is currently open.** If something genuinely needs a decision, ask ONE question at a time —
+never batch them (a standing user preference).
+
+### Post-M11 roadmap (user-stated, do NOT build in M11)
+
+- **A real widget system** — the user intends a dashboard where widgets can be moved around freely.
+  Not M11 scope, but **Phase 7 must not make it a rewrite**: build each widget as a self-contained
+  entry in a registry (`{ id, title, defaultVisible, render }`) that the dashboard maps over, rather
+  than a hand-laid JSX blob. Use those same stable ids as the collapse-state keys, so the future
+  reorder/visibility layer is a wrapper over an existing list instead of a teardown. Per-widget
+  `ErrorBoundary` and per-widget period override (§6.1) fall out of the same shape.
 
 ---
 

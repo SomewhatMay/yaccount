@@ -208,6 +208,11 @@ Same `FilterBar` across `InboxView` (rule, wallet, category, date), `GoalsView` 
 - **Per-widget period override** (§6.1, deferred here) and **period persistence** to localStorage
   (`reportingPeriodAtom` / `comparePeriodAtom` reset on refresh today).
 - Responsive: single feed on mobile, 2-col grid on `lg`. Every widget wrapped in `ErrorBoundary`.
+- **Fixed order + collapsible sections** (user's call), collapse state persisted by widget id. Build
+  the widgets as a **registry** the dashboard maps over — `{ id, title, defaultVisible, render }` —
+  not a hand-laid JSX blob: the user intends a move-anything-around widget system after M11, and the
+  registry shape makes that a wrapper rather than a rewrite. Same ids serve as collapse keys and as
+  the anchor for per-widget period override.
 - Charts follow the `dataviz` skill for palette/axis/legend/tooltip consistency; category colour keeps
   coming from the one swatch scheme.
 
@@ -266,8 +271,10 @@ Manual browser pass (the milestone's own exit criterion — UI has always been m
 
 1. ~~Bottom tabs~~ **ANSWERED: Home · Ledger · Inbox · More.** Inbox replaces Plan in the third slot;
    badge on the Inbox tab; Plan moves into the More sheet.
-2. Ledger stays at `/ledger` and dashboard at `/`. On mobile, open to Ledger instead? — still open.
+2. ~~On mobile, open to Ledger instead?~~ **ANSWERED: no — routes stay stable on every breakpoint.**
 3. ~~Time-of-day: store + display only, or user-editable?~~ **ANSWERED: user-editable** — shipped as
    Phase 1.5 (`96be47a`).
 4. ~~OK to add 3 deps?~~ **ANSWERED: yes.** `loglevel` + `react-error-boundary` are in as of Phase 2.
-5. Dashboard widget show/hide + reorder preference — worth it, or fixed order? — still open.
+5. ~~Widget show/hide + reorder?~~ **ANSWERED: fixed order + collapsible sections for M11.** A full
+   move-anything-around widget system is planned for after M11 — build Phase 7 as a registry so it
+   stays a wrapper, not a rewrite.
