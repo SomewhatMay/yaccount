@@ -1,7 +1,7 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M5 (Reporting & Dashboard Engine + Charts) DONE — code-complete on branch `m5-reporting`** (off `main`, 2 commits: `725b812` core, `c0b2a4e` UI). Typecheck/lint/build/prettier clean; **266 vitest tests green** (was 234 at M4, +32 for M5). **NOT yet browser-verified by the user** — that is the pending step before this milestone is truly closed (UI has no auto-tests until Playwright/M11). Not pushed/PR'd yet. Next up: **M6** (recurring/inbox) then M7 — but confirm with the user, they have re-ordered before (see "Next Steps").
+> **Last updated:** **M5 (Reporting & Dashboard Engine + Charts) DONE — merged to `main` via PR #4** (2026-07-21). **User manually browser-verified the full dashboard** (period presets/custom/compare, both doughnut variants + monthly-avg, monthly bars + stepped budget overlay, waterfall, category drill-down vs. time-variant budget, container flows, investment gain/loss + reconstructed sparkline, budget comparison, light/dark, void/undo) against a hand-computed fixture — all numbers correct. Typecheck/lint/build/prettier clean; **266 vitest tests green** (was 234 at M4, +32 for M5). Next up: **M6** (recurring/inbox) then M7 — but confirm with the user, they have re-ordered before (see "Next Steps").
 > **NOTE:** M4 was merged to `main` via **PR #3** (`c2f7804`) since the last handoff — the "not pushed/PR'd" note for M4 below is stale; `main` has M4.
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
 > **NOTE (environment):** the M5 session ran back on **WSL2** (`/home/may/github/yaccount`, Node v22.18.0 via nvm — remember the `export PATH=…` prefix for every npm/npx call). The M4 session was native Windows. Both environments work; update whichever section matches where you're actually running.
@@ -65,7 +65,7 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M4 (time-variant budget targets) — DONE, committed on branch `m4-budget-targets`** (off `main`, commit `4e11529`; not yet pushed/PR'd). TDD followed: tests written first (confirmed red via missing modules), then implementation, then green. **234 vitest tests green (was 212 on `main`, +22 for M4); typecheck/lint/prettier/build clean.** No DB migration needed — `budget_targets` object store already existed since M1 (schema-only until now), so `DB_VERSION` stays 2. **User manually walked through the browser UI and confirmed it works** (set $300→$600 effective-date change, History list, "Current" badge, same-date clash-replaces warning, delete, refresh-persists) — the automated-suite-only caveat from earlier in this session no longer applies.
 
-**M5 (Reporting & Dashboard Engine + Charts) — DONE, code-complete on branch `m5-reporting`** (off `main`; `725b812` core + `c0b2a4e` UI; not pushed/PR'd). TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean; dev server smoke-tested (all routes 200). **Still needs the user's manual browser walk** before the milestone is closed — nothing in the UI is auto-tested (Playwright is M11). See "M5 decisions and delivered code" below.
+**M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
 **Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`, but **the user explicitly picked M5 next over M6** after M4 shipped — a deliberate re-ordering, not an oversight. **Do NOT silently "correct" this back to M6** — the dependency graph permits it either way (M5 needs M4+M3, both done; M6 needs only M3), so there's no technical reason to override the user's stated choice. If a future session is unsure which is next, ask rather than assume the impl doc's default order still holds.
 
@@ -234,21 +234,9 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M5 is code-complete** (branch `m5-reporting`, off `main`; `725b812` core + `c0b2a4e` UI). **The one open action to CLOSE M5: the user's manual browser walk.** Nothing in the UI is auto-tested (Playwright is M11), so a real browser pass is the milestone's own How-to-test and exit gate. Then open a PR (`gh pr create --base main`) when the user wants.
+**M5 is DONE and merged to `main` (PR #4), browser-verified.** No open actions.
 
-### Browser-verify checklist for M5 (do this WITH real logged data — the DB is empty on a fresh open)
-Log a few months of transactions/transfers/budgets/snapshots first, then on `/` (the dashboard):
-- **Period control:** switch presets (Last month/3/6/12/YTD/All) → every widget updates. Custom range (two date inputs). **Compare** toggle → two columns side by side, each independent.
-- **By category:** expense + income doughnuts; **Total vs. Monthly avg** toggle; confirm **$0 categories are omitted** (§6.4) and a refund nets within its category.
-- **Monthly bars:** income/expense/savings bars + dashed budget overlay line; empty months show as zero bars.
-- **Waterfall:** Income → Expenses → Savings reads as a running total (transparent-base trick).
-- **Category over time:** pick a category → spend bars vs. its time-variant budget line (change a budget's effective date in `/categories` and confirm the line steps).
-- **Container flows:** net in/out per container over the period (transfers only; archived containers hidden).
-- **Investments:** on an `is_investment` container with snapshots → current value, contributed, gain/loss (emerald/rose), reconstructed-balance sparkline.
-- **Budget comparison:** actual monthly-avg vs. budget, Δ% (rose over / emerald under), re-scoped to the active period.
-- Toggle light/dark → chart colors follow (they read CSS vars). Refresh → period atoms reset to defaults (they're not persisted — see note below).
-
-### Up next after M5 verified: **M6 — Recurring Rules, Templates & the Inbox** (CONFIRM with the user first)
+### Up next: **M6 — Recurring Rules, Templates & the Inbox** (CONFIRM with the user first)
 The impl §7 execution order is `…M4 → M6 → M5 → M7…`; the user swapped M6/M5 (did M5 first). So **M6 is the remaining milestone before M7**, and **M7 needs BOTH M5 and M6** (impl §7 dependency graph). M6 needs only M3 (done). But the user has re-ordered before and picks the next milestone explicitly — **ask, don't assume.** (M8 auth stays blocked on the user's Google Cloud setup, unchanged.)
 
 **M6 scope (impl §4 "M6", read it in full before coding):** `recurring_rules` CRUD + the `interval_config` frequency-discriminated union (M1 left it a loose `z.record` with a TODO — tighten it here), one-at-a-time pending generation with by-mode backfill (§5.8), templates (`template.create`/`.remove` — hard-remove allowed, they're shortcuts not ledger data), and the **Pending/Inbox** queue with 1-tap + bulk approve (`transaction.approve`). New ops named in impl §3: `template.create`/`remove`, `recurringRule.create`/`update`/`cancel`, `transaction.approve`.
