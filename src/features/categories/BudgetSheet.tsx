@@ -36,8 +36,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 /**
  * A category's budget over time (§5.3) — no end_date, just "effective from."
@@ -98,13 +97,13 @@ function BudgetHistory({
     [budgetTargets, category.id],
   );
   const activeRow = useMemo(
-    () => history.find((b) => b.start_date <= today()),
+    () => history.find((b) => b.start_date <= todayIso()),
     [history],
   );
 
   const [editing, setEditing] = useState<BudgetTarget | null>(null);
   const [removing, setRemoving] = useState<BudgetTarget | null>(null);
-  const [startDate, setStartDate] = useState(today());
+  const [startDate, setStartDate] = useState(todayIso());
   const [amountStr, setAmountStr] = useState("");
 
   // Unique per (category_id, start_date) (§5.3): saving onto an occupied date
@@ -119,7 +118,7 @@ function BudgetHistory({
 
   function cancelEdit() {
     setEditing(null);
-    setStartDate(today());
+    setStartDate(todayIso());
     setAmountStr("");
   }
 

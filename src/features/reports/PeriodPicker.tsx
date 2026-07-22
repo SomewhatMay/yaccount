@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { todayIso } from "@/features/clock";
 
 const PRESETS: { value: PeriodPreset; label: string }[] = [
   { value: "last-month", label: "Last month" },
@@ -21,8 +22,6 @@ const PRESETS: { value: PeriodPreset; label: string }[] = [
   { value: "ytd", label: "Year to date" },
   { value: "all", label: "All time" },
 ];
-
-const today = (): string => new Date().toISOString().slice(0, 10);
 
 /** One period as a preset dropdown; picking "Custom" reveals two date inputs. */
 function PeriodField({
@@ -40,7 +39,7 @@ function PeriodField({
         value={selectValue}
         onValueChange={(v) => {
           if (v === "custom") {
-            const end = today();
+            const end = todayIso();
             onChange({ kind: "custom", start: `${end.slice(0, 4)}-01-01`, end });
           } else {
             onChange({ kind: "preset", preset: v as PeriodPreset });

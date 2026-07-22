@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { todayIso } from "@/features/clock";
 
 const monthKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -49,7 +50,7 @@ export function PlanView() {
   const settings = useAtomValue(settingsAtom);
   const dispatch = useSetAtom(dispatchAtom);
 
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const [today] = useState(() => todayIso());
   const [yearMonth, setYearMonth] = useState(() => monthKey(new Date()));
   const [editingIncome, setEditingIncome] = useState(false);
   const [incomeStr, setIncomeStr] = useState("");

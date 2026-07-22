@@ -35,8 +35,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 /**
  * What an investment container is really worth, over time (§5.6). Market growth
@@ -98,7 +97,7 @@ function BalanceHistory({
 
   const [editing, setEditing] = useState<ContainerSnapshot | null>(null);
   const [removing, setRemoving] = useState<ContainerSnapshot | null>(null);
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(todayIso());
   const [amountStr, setAmountStr] = useState("");
 
   // One report per day (§5.6): saving onto an occupied day replaces it, so say so
@@ -113,7 +112,7 @@ function BalanceHistory({
 
   function cancelEdit() {
     setEditing(null);
-    setDate(today());
+    setDate(todayIso());
     setAmountStr("");
   }
 

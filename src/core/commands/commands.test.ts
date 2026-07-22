@@ -129,6 +129,81 @@ describe("transaction commands", () => {
   });
 });
 
+describe("entered_at is stamped from the op timestamp (M11)", () => {
+  // The op already carries the authoritative instant. Reusing it keeps the row and
+  // the journal in agreement and keeps commands deterministic under injected meta.
+  it("createTransaction / createTransfer / createTemplate stamp the op ts", () => {
+    const create = createTransaction(
+      {
+        date: "2026-07-20",
+        amount: -1000,
+        vendor_source: "Starbucks",
+        category_id: "coffee",
+      },
+      META,
+    );
+    if (create.type !== "transaction.create") throw new Error("narrow");
+    expect(create.payload.row.entered_at).toBe(META.ts);
+
+    const transfer = createTransfer(
+      {
+        date: "2026-07-20",
+        amount: 10000,
+        container_id: "general",
+        to_container_id: "vacation",
+        fromName: "General",
+        toName: "Vacation",
+      },
+      META,
+    );
+    if (transfer.type !== "transaction.create") throw new Error("narrow");
+    expect(transfer.payload.row.entered_at).toBe(META.ts);
+
+    const template = createTemplate(
+      {
+        template_name: "Tims",
+        amount: -400,
+        vendor_source: "Tims",
+        container_id: "general",
+        category_id: "coffee",
+      },
+      META,
+    );
+    if (template.type !== "template.create") throw new Error("narrow");
+    expect(template.payload.row.entered_at).toBe(META.ts);
+  });
+
+  it("a void stamps its OWN op ts, not the original's instant", () => {
+    const orig = makeTransaction({
+      id: "t1",
+      date: "2026-07-20",
+      amount: -1000,
+      vendor_source: "Starbucks",
+      category_id: "coffee",
+      entered_at: "2026-07-14T09:00:00.000Z",
+    });
+    const later = { id: "op2", ts: "2026-07-22T18:30:00.000Z" };
+    const op = voidTransaction(orig, { ...later, voidId: "v1" });
+    if (op.type !== "transaction.void") throw new Error("narrow");
+    expect(op.payload.row.entered_at).toBe(later.ts);
+  });
+
+  it("quick-logging a template dates the new row now, not at the template's instant", () => {
+    const template = makeTemplate({
+      id: "tmpl9",
+      template_name: "Tims",
+      amount: -400,
+      vendor_source: "Tims",
+      container_id: "general",
+      category_id: "coffee",
+      entered_at: "2026-01-01T00:00:00.000Z",
+    });
+    const op = logTemplate(template, { date: "2026-07-20", id: "new1" }, META);
+    if (op.type !== "transaction.create") throw new Error("narrow");
+    expect(op.payload.row.entered_at).toBe(META.ts);
+  });
+});
+
 describe("container commands (§5.2, §5.5)", () => {
   it("createContainer defaults to excluded from overall balance (opt-in, §5.7)", () => {
     const op = createContainer({ name: "Vacation" }, META);

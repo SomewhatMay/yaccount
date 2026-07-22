@@ -142,6 +142,7 @@ describe("TransactionSchema (§5.4)", () => {
     recurring_rule_id: null,
     notes: null,
     reverses_id: null,
+    entered_at: null,
     yearMonth: "2026-07",
   };
   it("accepts an expense (negative amount, category set, no destination)", () => {
@@ -323,7 +324,13 @@ describe("schema edges the ledger depends on", () => {
       vendor_source: "Starbucks",
       category_id: "coffee",
     });
-    for (const key of ["reverses_id", "notes", "to_container_id", "template_name"]) {
+    for (const key of [
+      "reverses_id",
+      "notes",
+      "to_container_id",
+      "template_name",
+      "entered_at",
+    ]) {
       const partial = { ...row } as Record<string, unknown>;
       delete partial[key];
       expect(() => TransactionSchema.parse(partial), key).toThrow();

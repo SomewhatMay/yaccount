@@ -49,8 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 export function RecurringView() {
   const ready = useAtomValue(readyAtom);
@@ -192,7 +191,7 @@ export function RecurringView() {
             });
             const next = {
               ...draft,
-              next_generation_date: firstOccurrenceOnOrAfter(draft, today()),
+              next_generation_date: firstOccurrenceOnOrAfter(draft, todayIso()),
             };
             await dispatch(updateRecurringRule(next));
             toast.success("Recurring updated", {

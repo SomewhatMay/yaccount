@@ -2,14 +2,16 @@ import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { Repo } from "@/core/repo";
-import { STORE } from "@/core/repo/db";
+import { STORE, openDb } from "@/core/repo/db";
 import { replay, MemoryTx, type Op } from "@/core/oplog";
 import {
   makeCategory,
   makeContainer,
+  makeTransaction,
   GENERAL_CONTAINER_ID,
   type Category,
   type Container,
+  type Transaction,
 } from "@/core/model";
 
 const at = (ms: number): string => new Date(ms).toISOString();
@@ -286,5 +288,119 @@ describe("Repo — seeding is deterministic and respects the user (§8.4)", () =
     }
     const sameTs = (await repo.listOps()).filter((o) => o.ts === ts).map((o) => o.id);
     expect(sameTs).toEqual(["op-a", "op-z"]);
+  });
+});
+
+describe("Repo — backfilling entered_at on rows that predate it (M11)", () => {
+  // A pre-M11 row carries no instant, so the register can only tie-break it on a
+  // random UUID. The journal already knows when it was written: the op's `ts`.
+  // No DB_VERSION bump — IndexedDB records are schemaless, so this is a one-shot
+  // data pass guarded by a marker, not a schema upgrade.
+  const legacyRow = (id: string, date = "2026-07-20"): Record<string, unknown> => {
+    const row = {
+      ...makeTransaction({
+        id,
+        date,
+        amount: -1000,
+        vendor_source: id,
+        category_id: "coffee",
+      }),
+    } as Record<string, unknown>;
+    delete row.entered_at;
+    return row;
+  };
+
+  async function seedLegacy(
+    rows: Record<string, unknown>[],
+    ops: { id: string; ts: string; rowId: string; type?: string }[],
+  ): Promise<void> {
+    const db = await openDb();
+    for (const row of rows) await db.put(STORE.transactions, row);
+    for (const o of ops) {
+      await db.put(STORE.oplog, {
+        id: o.id,
+        ts: o.ts,
+        type: o.type ?? "transaction.create",
+        payload: { row: legacyRow(o.rowId) },
+      });
+    }
+    db.close();
+  }
+
+  it("stamps a legacy row from the op that created it", async () => {
+    await seedLegacy([legacyRow("t1")], [{ id: "op-t1", ts: at(1000), rowId: "t1" }]);
+    const repo = await Repo.open();
+    const stored = await repo.get<Transaction>(STORE.transactions, "t1");
+    expect(stored!.entered_at).toBe(at(1000));
+  });
+
+  it("uses the EARLIEST op for the row, not a later edit", async () => {
+    await seedLegacy(
+      [legacyRow("t1")],
+      [
+        { id: "op-edit", ts: at(5000), rowId: "t1", type: "transaction.update" },
+        { id: "op-t1", ts: at(1000), rowId: "t1" },
+      ],
+    );
+    const repo = await Repo.open();
+    const stored = await repo.get<Transaction>(STORE.transactions, "t1");
+    expect(stored!.entered_at).toBe(at(1000)); // when it was written, not last touched
+  });
+
+  it("leaves a row whose creating op has been collapsed away as null (§8.4)", async () => {
+    // After an op-log collapse the deep history lives in an archived Drive ledger,
+    // so some rows genuinely have no op here. That must not throw or invent a time.
+    await seedLegacy([legacyRow("orphan")], []);
+    const repo = await Repo.open();
+    const stored = await repo.get<Transaction>(STORE.transactions, "orphan");
+    expect(stored).toBeDefined();
+    expect(stored!.entered_at ?? null).toBeNull();
+  });
+
+  it("never overwrites an instant the row already carries", async () => {
+    const own = "2026-07-20T09:00:00.000Z";
+    const db = await openDb();
+    await db.put(STORE.transactions, {
+      ...makeTransaction({
+        id: "t1",
+        date: "2026-07-20",
+        amount: -1000,
+        vendor_source: "t1",
+        category_id: "coffee",
+        entered_at: own,
+      }),
+    });
+    await db.put(STORE.oplog, {
+      id: "op-t1",
+      ts: at(1000),
+      type: "transaction.create",
+      payload: { row: legacyRow("t1") },
+    });
+    db.close();
+    const repo = await Repo.open();
+    const stored = await repo.get<Transaction>(STORE.transactions, "t1");
+    expect(stored!.entered_at).toBe(own);
+  });
+
+  it("runs once — a second open is a no-op and does not rewrite rows", async () => {
+    await seedLegacy([legacyRow("t1")], [{ id: "op-t1", ts: at(1000), rowId: "t1" }]);
+    const first = await Repo.open();
+    const afterFirst = await first.get<Transaction>(STORE.transactions, "t1");
+    first.close();
+
+    const second = await Repo.open();
+    const afterSecond = await second.get<Transaction>(STORE.transactions, "t1");
+    expect(afterSecond).toEqual(afterFirst);
+  });
+
+  it("does not disturb the op-log or any other table", async () => {
+    await seedLegacy([legacyRow("t1")], [{ id: "op-t1", ts: at(1000), rowId: "t1" }]);
+    const repo = await Repo.open();
+    const ops = await repo.listOps();
+    // the seeded create op + the 'general' seed op, unchanged in count
+    expect(ops.filter((o) => o.id === "op-t1")).toHaveLength(1);
+    expect(
+      await repo.get<Container>(STORE.containers, GENERAL_CONTAINER_ID),
+    ).toBeDefined();
   });
 });

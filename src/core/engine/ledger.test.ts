@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { activeRows, isVoided, pendingRows, templateRows } from "./ledger";
+import {
+  activeRows,
+  isVoided,
+  pendingRows,
+  sortForRegister,
+  templateRows,
+} from "./ledger";
 import { containerBalance } from "./balances";
 import { makeTemplate, makeTransaction, makeVoidRow, type Transaction } from "../model";
 
@@ -182,5 +188,56 @@ describe("pendingRows / templateRows — the Inbox and shortcuts (§5.8)", () =>
     });
     expect(templateRows([t1, tpl]).map((r) => r.id)).toEqual(["tmpl1"]);
     expect(pendingRows([t1, tpl])).toEqual([]); // a template is never pending
+  });
+});
+
+describe("sortForRegister — newest first, and the clock breaks the day's tie (M11)", () => {
+  const on = (id: string, date: string, entered_at: string | null): Transaction => ({
+    ...makeTransaction({ id, date, amount: -100, vendor_source: id, category_id: "c" }),
+    entered_at,
+  });
+
+  it("orders by calendar day, newest day first", () => {
+    const rows = [
+      on("a", "2026-07-18", null),
+      on("b", "2026-07-20", null),
+      on("c", "2026-07-19", null),
+    ];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("within one day, the most recently entered row surfaces first", () => {
+    // The bug this fixes: three entries logged back-to-back today all share a
+    // date, so the old tie-break on a random UUID scattered them arbitrarily.
+    const rows = [
+      on("first", "2026-07-20", "2026-07-20T09:00:00.000Z"),
+      on("third", "2026-07-20", "2026-07-20T17:30:00.000Z"),
+      on("second", "2026-07-20", "2026-07-20T13:15:00.000Z"),
+    ];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["third", "second", "first"]);
+  });
+
+  it("puts rows with no recorded instant last within their day", () => {
+    // Pre-M11 rows whose op never carried one: they are the oldest thing we know
+    // about that day, so they sink rather than jumping the queue.
+    const rows = [
+      on("legacy", "2026-07-20", null),
+      on("timed", "2026-07-20", "2026-07-20T08:00:00.000Z"),
+    ];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["timed", "legacy"]);
+  });
+
+  it("falls back to a deterministic id tie-break so two devices agree (§8.5)", () => {
+    const same = "2026-07-20T09:00:00.000Z";
+    const rows = [on("aaa", "2026-07-20", same), on("bbb", "2026-07-20", same)];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["bbb", "aaa"]);
+    expect(sortForRegister([...rows].reverse()).map((r) => r.id)).toEqual(["bbb", "aaa"]);
+  });
+
+  it("does not mutate the caller's array", () => {
+    const rows = [on("a", "2026-07-18", null), on("b", "2026-07-20", null)];
+    const before = rows.map((r) => r.id);
+    sortForRegister(rows);
+    expect(rows.map((r) => r.id)).toEqual(before);
   });
 });

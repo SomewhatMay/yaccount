@@ -9,9 +9,14 @@ import {
   type Op,
   type Tx,
 } from "../oplog";
-import { makeGeneralContainer, GENERAL_CONTAINER_ID } from "../model";
+import { makeGeneralContainer, GENERAL_CONTAINER_ID, type Transaction } from "../model";
 
 const DEVICE_ID_KEY = "deviceId";
+// One-shot data passes, marked done in `app_meta` so they never re-run. NOT a
+// DB_VERSION bump: IndexedDB records are schemaless, so adding a field needs no
+// schema upgrade — and bumping would trip `blocked()` in other tabs and lock out
+// older builds for nothing. A failed pass simply retries on the next open.
+const MIGRATION_ENTERED_AT = "migration:entered_at";
 // Deterministic seed op: same id + epoch ts on every device, so two fresh
 // installs converge on a single 'general' wallet (idempotent by op id, §8.2)
 // and the seed always sorts first in the total order.
@@ -74,6 +79,62 @@ export class Repo {
         type: "container.create",
         payload: { row: makeGeneralContainer() },
       });
+    }
+    await this.backfillEnteredAt();
+  }
+
+  /**
+   * Give pre-M11 transaction rows the instant they were written (`entered_at`),
+   * so the register can order a day's entries by when they were logged instead of
+   * by a random UUID. The journal already knows: each row's earliest op `ts` is
+   * exactly that instant — the same rule `applyOp` uses for new rows, so a
+   * backfilled device and a freshly replayed one agree.
+   *
+   * A row whose creating op has been collapsed away (§8.4 — the deep history
+   * lives in an archived Drive ledger) keeps `entered_at: null` and simply sorts
+   * to the end of its day. Runs once, guarded by a marker; the whole pass is one
+   * transaction, so a crash leaves it un-marked and it retries on the next open.
+   */
+  private async backfillEnteredAt(): Promise<void> {
+    if (await this.db.get(STORE.appMeta, MIGRATION_ENTERED_AT)) return;
+
+    const tx = this.db.transaction(
+      [STORE.oplog, STORE.transactions, STORE.appMeta],
+      "readwrite",
+    );
+    try {
+      // Earliest op per row id — the write, not a later edit.
+      const writtenAt = new Map<string, string>();
+      for (const op of (await tx.objectStore(STORE.oplog).getAll()) as Op[]) {
+        const row = (op as { payload?: { row?: { id?: string } } }).payload?.row;
+        if (!op.type.startsWith("transaction.") && op.type !== "template.create")
+          continue;
+        if (!row?.id) continue;
+        const seen = writtenAt.get(row.id);
+        if (seen === undefined || op.ts < seen) writtenAt.set(row.id, op.ts);
+      }
+
+      const rows = tx.objectStore(STORE.transactions);
+      for (const row of (await rows.getAll()) as Transaction[]) {
+        if (row.entered_at != null) continue; // never overwrite what a row carries
+        const ts = writtenAt.get(row.id);
+        if (ts === undefined) continue;
+        await rows.put({ ...row, entered_at: ts });
+      }
+
+      await tx.objectStore(STORE.appMeta).put({
+        key: MIGRATION_ENTERED_AT,
+        value: new Date().toISOString(),
+      });
+      await tx.done;
+    } catch (err) {
+      try {
+        tx.abort();
+      } catch {
+        // already settled
+      }
+      await tx.done.catch(() => {});
+      throw err;
     }
   }
 

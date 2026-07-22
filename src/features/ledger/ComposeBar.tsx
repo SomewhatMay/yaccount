@@ -24,8 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 type Mode = "entry" | "transfer";
 
@@ -53,7 +52,7 @@ export function ComposeBar({
   );
 
   const [mode, setMode] = useState<Mode>("entry");
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(todayIso());
   const [vendor, setVendor] = useState("");
   const [categoryId, setCategoryId] = useState(activeCategories[0]?.id ?? "");
   // Null = "follow the Default Spending Container" (§5.2); a pick overrides it.

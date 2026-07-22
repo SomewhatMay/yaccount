@@ -55,8 +55,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 export function GoalsView() {
   const ready = useAtomValue(readyAtom);
@@ -145,7 +144,7 @@ export function GoalsView() {
         deadline: input.deadline,
         planned_monthly: input.planned_monthly,
         opening_contributed: opening,
-        created_date: today(),
+        created_date: todayIso(),
       }),
     );
 
@@ -161,7 +160,7 @@ export function GoalsView() {
           amount_mode: input.mode === "deadline" ? "goal_derived" : "fixed",
           template_amount: input.mode === "fixed" ? input.planned_monthly : null,
           linked_goal_id: goalId,
-          start_date: today(),
+          start_date: todayIso(),
         }),
       );
       await generate();
@@ -318,7 +317,7 @@ function GoalCard({
   onArchive?: () => void;
   onResume?: () => void;
 }) {
-  const now = today();
+  const now = todayIso();
   const contributed = goalContributed(goal, txns);
   const basis = goalBasis(goal, txns);
   const balance = containerBalance(txns, goal.container_id);

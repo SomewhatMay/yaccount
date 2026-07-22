@@ -24,8 +24,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 export interface GoalFormInput {
   name: string;

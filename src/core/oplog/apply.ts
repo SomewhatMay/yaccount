@@ -49,6 +49,18 @@ async function putBudgetTargetUpsert(tx: Tx, row: BudgetTarget): Promise<void> {
 }
 
 /**
+ * Give a row the instant it was written when its payload didn't carry one (M11).
+ * The op's `ts` IS that instant, so this is a pure function of the op — replay
+ * stays deterministic and two devices materialize identical state (§8.2). It
+ * covers rows authored by a pre-M11 client arriving over sync, and rows built by
+ * the recurring generator, which has no clock of its own. A row that already
+ * carries an instant is returned untouched.
+ */
+function withEnteredAt(row: Transaction, ts: string): Transaction {
+  return row.entered_at == null ? { ...row, entered_at: ts } : row;
+}
+
+/**
  * The single reducer: mutate materialized state for one op. Every branch is
  * idempotent — `put` is last-writer-wins by id (entity-level LWW, §8.5) and
  * `archive` is a read-modify-write that sets a flag — so replaying an op twice
@@ -84,7 +96,7 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     case "transaction.create":
     case "transaction.update":
     case "transaction.void":
-      await tx.put(STORE.transactions, op.payload.row);
+      await tx.put(STORE.transactions, withEnteredAt(op.payload.row, op.ts));
       return;
     // One report per container per day (§5.6): `put` by id, minus any other row
     // holding the same natural key. Idempotent — re-applying leaves the same row.
@@ -119,7 +131,7 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     // `remove` is a hard delete — a shortcut is housekeeping, not a ledger amount
     // (impl §3), and nothing derives a balance from it.
     case "template.create":
-      await tx.put(STORE.transactions, op.payload.row);
+      await tx.put(STORE.transactions, withEnteredAt(op.payload.row, op.ts));
       return;
     case "template.remove":
       await tx.delete(STORE.transactions, op.payload.id);

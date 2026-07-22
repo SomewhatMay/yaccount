@@ -14,6 +14,7 @@ import {
   type Transaction,
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
+import { todayIso } from "@/features/clock";
 import { runSync } from "@/sync";
 import { getDriveFS, describeSyncError } from "@/sync/drive";
 import { getAuthProvider } from "@/auth/web";
@@ -238,7 +239,7 @@ export const reconnectAtom = atom(null, async (_get, set) => {
  * never in `core`). Dispatches go through the same op-log path as any mutation.
  */
 export const runRecurringGenerationAtom = atom(null, async (get, set) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const rules = get(recurringRulesAtom).filter((r) => r.status === "active");
   const goals = get(goalsAtom);
   const txns = get(transactionsAtom);
@@ -271,7 +272,7 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
  * generation, over approved contributions only.
  */
 export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const txns = get(transactionsAtom);
   const rules = get(recurringRulesAtom);
   const goals = get(goalsAtom).filter((g) => g.status === "active" && !g.is_archived);

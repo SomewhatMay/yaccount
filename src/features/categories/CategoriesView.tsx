@@ -46,8 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 export function CategoriesView() {
   const ready = useAtomValue(readyAtom);
@@ -228,7 +227,7 @@ function CategorySection({
               category={c}
               siblings={siblings}
               divider={i > 0}
-              budget={budgetOnDate(budgetTargets, c.id, today())}
+              budget={budgetOnDate(budgetTargets, c.id, todayIso())}
               onChange={onChange}
               onBudget={() => onBudget(c)}
             />

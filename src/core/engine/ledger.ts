@@ -118,3 +118,28 @@ export function pendingRows(txns: Transaction[]): Transaction[] {
 export function templateRows(txns: Transaction[]): Transaction[] {
   return txns.filter((t) => t.is_template);
 }
+
+/**
+ * Register order: newest first (§12.4 date-grouped rows).
+ *
+ * `date` alone can't do this. It is the calendar day the money moved — the user
+ * picks it and may backdate it — so everything logged this afternoon shares one
+ * value, and the old tie-break on `id` (a random UUID) scattered a burst of
+ * entries arbitrarily. `entered_at` is the instant the row was written, taken
+ * from the authoring op, so it puts the most recent entry on top.
+ *
+ * A row with no instant predates M11 (or came from an older client): it sinks to
+ * the end of its day, since it is the oldest thing we can say about that day. The
+ * `id` tie-break stays last so two devices always agree on the same order (§8.5).
+ * Returns a new array — the caller's is untouched.
+ */
+export function sortForRegister(txns: Transaction[]): Transaction[] {
+  return [...txns].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    // "" for a missing instant sorts below every real ISO timestamp.
+    const ae = a.entered_at ?? "";
+    const be = b.entered_at ?? "";
+    if (ae !== be) return ae < be ? 1 : -1;
+    return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+  });
+}

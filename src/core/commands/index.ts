@@ -82,10 +82,14 @@ export function createTransaction(
   },
   m?: OpMeta,
 ): Op {
+  const op = meta(m);
+  // The op already holds the authoritative instant (it is the total order's sort
+  // key, §8.2). Reusing it for the row keeps state and journal in agreement and
+  // keeps commands deterministic when tests inject `meta` — no second clock read.
   return {
-    ...meta(m),
+    ...op,
     type: "transaction.create",
-    payload: { row: makeTransaction(input) },
+    payload: { row: makeTransaction({ ...input, entered_at: op.ts }) },
   };
 }
 
@@ -103,8 +107,9 @@ export function voidTransaction(
   original: Transaction,
   m?: OpMeta & { voidId?: string; on?: string },
 ): Op {
-  const row = makeVoidRow(original, { id: m?.voidId, on: m?.on });
-  return { ...meta(m), type: "transaction.void", payload: { row } };
+  const op = meta(m);
+  const row = makeVoidRow(original, { id: m?.voidId, on: m?.on, entered_at: op.ts });
+  return { ...op, type: "transaction.void", payload: { row } };
 }
 
 /**
@@ -117,8 +122,9 @@ export function unvoidTransaction(
   voidRow: Transaction,
   m?: OpMeta & { voidId?: string; on?: string },
 ): Op {
-  const row = makeVoidRow(voidRow, { id: m?.voidId, on: m?.on });
-  return { ...meta(m), type: "transaction.void", payload: { row } };
+  const op = meta(m);
+  const row = makeVoidRow(voidRow, { id: m?.voidId, on: m?.on, entered_at: op.ts });
+  return { ...op, type: "transaction.void", payload: { row } };
 }
 
 // ── Containers (§5.2, §5.5) ───────────────────────────────────────────────
@@ -172,10 +178,11 @@ export function createTransfer(
   },
   m?: OpMeta,
 ): Op {
+  const op = meta(m);
   return {
-    ...meta(m),
+    ...op,
     type: "transaction.create",
-    payload: { row: makeTransfer(input) },
+    payload: { row: makeTransfer({ ...input, entered_at: op.ts }) },
   };
 }
 
@@ -266,7 +273,12 @@ export function createTemplate(
   },
   m?: OpMeta,
 ): Op {
-  return { ...meta(m), type: "template.create", payload: { row: makeTemplate(input) } };
+  const op = meta(m);
+  return {
+    ...op,
+    type: "template.create",
+    payload: { row: makeTemplate({ ...input, entered_at: op.ts }) },
+  };
 }
 
 /** Delete a shortcut — a hard remove (housekeeping, not ledger data). */

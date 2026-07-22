@@ -52,7 +52,7 @@ import {
   type InvestmentReport,
 } from "./widgets";
 
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 /** Last calendar day of a "YYYY-MM" key, as an ISO date. */
 function monthEnd(key: string): string {
@@ -83,7 +83,7 @@ export function DashboardView() {
   const [comparePeriod, setComparePeriod] = useAtom(comparePeriodAtom);
 
   // `today` is stable for the session's render; core stays clock-free (§ engine).
-  const now = useMemo(() => today(), []);
+  const now = useMemo(() => todayIso(), []);
   const primaryRange = useMemo(() => resolvePeriod(period, now), [period, now]);
   const compareRange = useMemo(
     () => (comparePeriod ? resolvePeriod(comparePeriod, now) : null),

@@ -39,8 +39,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { todayIso } from "@/features/clock";
 
-const today = (): string => new Date().toISOString().slice(0, 10);
 const WEEKDAYS = [
   "Sunday",
   "Monday",
@@ -144,7 +144,7 @@ function RuleForm({
 
   const [frequency, setFrequency] = useState<Frequency>(rule?.frequency ?? "monthly");
   const [cfg, setCfg] = useState<ConfigState>(() => initialConfig(rule));
-  const [startDate, setStartDate] = useState(rule?.start_date ?? today());
+  const [startDate, setStartDate] = useState(rule?.start_date ?? todayIso());
   const [endDate, setEndDate] = useState(rule?.end_date ?? "");
 
   const cat = categories.find((c) => c.id === categoryId);

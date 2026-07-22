@@ -30,7 +30,13 @@ import {
   voidTransaction,
 } from "@/core/commands";
 import { isLiveLedgerRow, isTransfer, overallBalance } from "@/core/engine/balances";
-import { activeRows } from "@/core/engine/ledger";
+import { activeRows, sortForRegister } from "@/core/engine/ledger";
+import {
+  formatEnteredTime,
+  thisMonthIso,
+  todayIso,
+  yesterdayIso,
+} from "@/features/clock";
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
@@ -45,9 +51,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const thisMonth = (): string => new Date().toISOString().slice(0, 7);
-const today = (): string => new Date().toISOString().slice(0, 10);
-
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -55,12 +58,15 @@ const dayFormat = new Intl.DateTimeFormat("en-US", {
 });
 
 function formatDay(iso: string): string {
-  const t = new Date();
-  const todayIso = t.toISOString().slice(0, 10);
-  const y = new Date(t.getTime() - 86400000).toISOString().slice(0, 10);
-  if (iso === todayIso) return "Today";
-  if (iso === y) return "Yesterday";
+  if (iso === todayIso()) return "Today";
+  if (iso === yesterdayIso()) return "Yesterday";
   return dayFormat.format(new Date(iso + "T00:00:00"));
+}
+
+/** Show the clock time only where a burst of entries actually happens — it is
+ * what separates three rows logged this afternoon; on older days it is noise. */
+function showsTime(iso: string): boolean {
+  return iso === todayIso() || iso === yesterdayIso();
 }
 
 export function LedgerView() {
@@ -88,7 +94,7 @@ export function LedgerView() {
   // This-month in/out across the counted containers. Transfers are excluded —
   // moving your own money between containers is neither income nor expense.
   const { monthIn, monthOut } = useMemo(() => {
-    const ym = thisMonth();
+    const ym = thisMonthIso();
     const ids = new Set(counted.map((c) => c.id));
     let inSum = 0;
     let outSum = 0;
@@ -119,9 +125,9 @@ export function LedgerView() {
   // Deleting appends a reversing row and undoing appends one that reverses THAT,
   // so what is live is a chain walk (§0.3) — `activeRows` owns the rule.
   const groups = useMemo(() => {
-    const rows = activeRows(transactions).sort((a, b) =>
-      a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1,
-    );
+    // Newest first, with the entry clock breaking each day's tie — `date` alone
+    // can't order a burst of entries logged the same afternoon (§ sortForRegister).
+    const rows = sortForRegister(activeRows(transactions));
     const out: { day: string; items: Transaction[] }[] = [];
     for (const t of rows) {
       const last = out[out.length - 1];
@@ -153,7 +159,7 @@ export function LedgerView() {
   }
 
   async function quickLog(template: Transaction) {
-    await dispatch(logTemplate(template, { date: today() }));
+    await dispatch(logTemplate(template, { date: todayIso() }));
     toast.success("Logged", {
       description: `${template.vendor_source} · ${formatCents(template.amount)}`,
     });
@@ -300,6 +306,7 @@ export function LedgerView() {
                 <LedgerRow
                   key={t.id}
                   tx={t}
+                  time={showsTime(g.day) ? formatEnteredTime(t.entered_at) : null}
                   categoryName={nameOf(t.category_id)}
                   containerName={showContainer ? containerNameOf(t.container_id) : ""}
                   toContainerName={containerNameOf(t.to_container_id)}
@@ -330,6 +337,7 @@ export function LedgerView() {
 
 function LedgerRow({
   tx,
+  time,
   categoryName,
   containerName,
   toContainerName,
@@ -338,6 +346,7 @@ function LedgerRow({
   onSaveShortcut,
 }: {
   tx: Transaction;
+  time: string | null;
   categoryName: string;
   containerName: string;
   toContainerName: string;
@@ -348,9 +357,14 @@ function LedgerRow({
   const transfer = isTransfer(tx);
   // Money in is emerald; a transfer is your own money moving, so it stays quiet.
   const income = !transfer && tx.amount >= 0;
-  const sub = transfer
-    ? [containerName || "Transfer", toContainerName].filter(Boolean).join(" → ")
-    : [categoryName, containerName].filter(Boolean).join(" · ");
+  const sub = [
+    transfer
+      ? [containerName || "Transfer", toContainerName].filter(Boolean).join(" → ")
+      : [categoryName, containerName].filter(Boolean).join(" · "),
+    time,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors">

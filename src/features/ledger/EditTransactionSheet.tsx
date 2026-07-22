@@ -20,6 +20,7 @@ import {
 } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { categoryDotColor } from "@/features/category-color";
+import { formatEnteredAt } from "@/features/clock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,9 @@ export function EditTransactionSheet({
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const transfer = editing !== null && isTransfer(editing);
+  // When this row was written, as opposed to the date it is filed under — the two
+  // differ whenever the user backdates an entry, and it is what orders the day.
+  const enteredAt = formatEnteredAt(editing?.entered_at);
   return (
     <Sheet open={editing !== null} onOpenChange={onOpenChange}>
       <SheetContent className="gap-0 sm:max-w-md">
@@ -65,6 +69,9 @@ export function EditTransactionSheet({
           <SheetDescription>
             Changes are recorded as a ledger update — history is never lost.
           </SheetDescription>
+          {editing && enteredAt !== null && (
+            <p className="text-muted-foreground/80 mt-1 text-xs">Entered {enteredAt}</p>
+          )}
         </SheetHeader>
         {editing &&
           (transfer ? (
