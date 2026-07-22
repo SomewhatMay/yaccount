@@ -1,7 +1,7 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M8 (Authentication — Google OAuth, web flow) DONE on branch `m8-auth`, PR opened.** **User browser-verified** the full journey (connect via GIS popup → real `drive.appdata` token cached → refresh persists → tab-close persists → sign-out clears; no misleading control flash). Typecheck/lint/build/prettier clean; **380 vitest tests green** (was 367 at M7, +13 for the pure token-lifecycle seam). **No `DB_VERSION`/schema change** (auth state lives in `localStorage`, not IndexedDB). The user's Google Cloud setup is DONE (project + consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
+> **Last updated:** **M8 (Authentication — Google OAuth, web flow) DONE — merged to `main` via PR #7** (merge commit `3e384a6`, 2026-07-22). **User browser-verified** the full journey (connect via GIS popup → real `drive.appdata` token cached → refresh persists → tab-close persists → sign-out clears; no misleading control flash). Typecheck/lint/build/prettier clean; **380 vitest tests green** on `main` (was 367 at M7, +13 for the pure token-lifecycle seam). **No `DB_VERSION`/schema change** (auth state lives in `localStorage`, not IndexedDB). The user's Google Cloud setup is DONE (project + consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **⚠️ Next up: M9 (Google Drive Sync — the Checkpointer).** **Mandatory for v1** (§9 Q7). Rides on the M8 `AuthProvider.getAccessToken` seam + the M1 op-log — nothing from M3–M7. Confirm the milestone with the user first (M10/M11 are valid picks too). Two known merge-path obligations to close in M9: buffer/sort remote ops under the total order (§8.5 / impl §10 #33) and the snapshot natural-key-in-row-id question (§8.5 / #34). See "Next Steps".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
 > **Prior:** **M6 DONE — merged via PR #5** (`0e9416e`), browser-verified, 312 tests. M5 via PR #4; M4 via PR #3; M3 via PR #2; M0–M2 via PR #1.
@@ -71,16 +71,18 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
-**M8 (Authentication — Google OAuth, web flow) — DONE on branch `m8-auth`, PR opened, browser-verified.** First PLATFORM milestone. Core-first: **367 → 380 tests** (+13, all pure token-lifecycle). Typecheck/lint/build/prettier clean. **No DB/schema change** (auth state in `localStorage`). See "M8 decisions and delivered code" below. **M9 (Drive sync) is next and consumes the `getAccessToken` seam built here.**
+**M8 (Authentication — Google OAuth, web flow) — DONE, merged to `main` via PR #7 (`3e384a6`), browser-verified.** First PLATFORM milestone. Core-first: **367 → 380 tests** (+13, all pure token-lifecycle). Typecheck/lint/build/prettier clean. **No DB/schema change** (auth state in `localStorage`). See "M8 decisions and delivered code" below. **M9 (Drive sync) is next and consumes the `getAccessToken` seam built here.**
 
 **M7 (Savings Goals & the Monthly Allocation Plan) — DONE, merged to `main` via PR #6 (`2c97a1f`), browser-verified.** Core-first TDD: **312 → 367 tests** (+55). Typecheck/lint/build/prettier clean. **No DB/schema change** (`goals` store existed since M1, DB_VERSION stays 2). See "M7 decisions and delivered code" below. **This completes the product feature set — M8+ is platform work.**
 
 **M6 (Recurring Rules, Templates & the Inbox) — DONE, merged to `main` via PR #5 (`0e9416e`).** Core-first: **266 → 312 tests** (+46). Typecheck/lint/build/prettier clean. **User browser-verified** all flows (incl. the three post-verify fix rounds + bulk dismiss below). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). See "M6 decisions and delivered code" below.
 
-**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`; the user swapped it to `…M4 → M5 → M6 → M7…` (did M5 before M6), then confirmed **M6 next after M5** when asked. **Both M5 and M6 are now done**, so the sequencing is moot going forward — **M7 is the only remaining feature milestone** and needs both (both merged). The lesson stands: **the user picks the next milestone explicitly — ask, don't assume** the impl doc's default order. (M8 auth stays blocked on the user's Google Cloud setup.)
+**Execution order note (historical):** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and kept going with product milestones (M4–M7) before auth. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`; the user swapped it to `…M4 → M5 → M6 → M7…` (did M5 before M6). **M0–M8 are all now done and merged** (M8 auth shipped after the feature set, once the user's Google Cloud setup was ready — no longer blocked). The lesson stands: **the user picks the next milestone explicitly — ask, don't assume** the impl doc's default order. Next is **M9 (Drive sync)**.
 
-Git log (`main`, current — M0–M7 merged):
+Git log (`main`, current — M0–M8 merged):
 ```
+3e384a6 Merge pull request #7 from SomewhatMay/m8-auth        (M8)
+eec4db7 M8 auth: Google OAuth web flow (durable-grant AuthProvider seam)
 2c97a1f Merge pull request #6 from SomewhatMay/m7-goals      (M7)
 48ddd24 docs: M7 code-complete, handoff for browser-verify
 1ab215f M7 UI: goals + monthly allocation plan (auto-create/reuse container, absorb, auto-contribution, plan view)
@@ -285,7 +287,7 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M8 is DONE (branch `m8-auth`, PR opened, browser-verified); M7 merged to `main` (PR #6).** No open actions on the auth side — the `getAccessToken` seam is live and green (380 tests). See "M8 decisions and delivered code".
+**M8 is DONE and merged to `main` (PR #7, `3e384a6`), browser-verified.** No open actions on the auth side — the `getAccessToken` seam is live on `main` and green (380 tests). `main` now has M0–M8. See "M8 decisions and delivered code".
 
 ### Up next: **M9 — Google Drive Sync (the Checkpointer)** — CONFIRM the milestone with the user first
 **Roadmap:** `M8 (auth) ✔ → M9 (Drive sync) → M10 (Capacitor native) → M11 (design polish)` — see impl §7. Per impl §9 Q7, **cloud sync (M9) is MANDATORY for v1**. M9 rides on the **M8 `AuthProvider` seam + the M1 op-log — nothing from M3–M7**. But the user picks the next milestone explicitly — **ask, don't assume** (M10/M11 are valid picks; M11 needs no external setup).
@@ -309,7 +311,7 @@ All in `src/core/` (pure TS; only idb/zod deps):
 - Recurring `frequency↔interval_config` + `amount_mode↔template_amount` refinements — ✔ **DONE in M6**. Goal `mode`/`kind` invariants — ✔ **DONE in M7** (`GoalSchema` now has 5 `.refine`s + `makeGoal`; the `model/goal.ts` NOTE is resolved). **All model refinements are now closed.**
 
 **Remaining platform milestones (M9 is the active target — see "Up next" above for its full scope):**
-- **M8** (Google OAuth, web flow) — ✔ **DONE** (branch `m8-auth`, PR opened, browser-verified). The `getAccessToken`/`getAccessTokenSilent` seam is ready for M9.
+- **M8** (Google OAuth, web flow) — ✔ **DONE, merged to `main`** (PR #7, `3e384a6`), browser-verified. The `getAccessToken`/`getAccessTokenSilent` seam is ready for M9.
 - **M9** (Drive sync) — NEXT; **mandatory for v1** (§9 Q7). Rides on M8 + the M1 op-log. Two known merge-path obligations to close here: buffer/sort remote ops under the total order (§8.5 / impl §10 #33) and decide the snapshot natural-key-in-row-id question (§8.5 / #34).
 - **M10** (Capacitor native) — after M9; needs iOS/Android OAuth client IDs + secure token storage.
 - **M11** (design polish) — the finishing pass ON TOP of the locked §12 "Quiet Register" language (motion, empty/error/sync states, category-color override UI, responsive density, Playwright e2e). Needs no external setup, so it's a valid "do now" pick if the user wants to defer M8 until Google Cloud is ready.
@@ -322,7 +324,7 @@ All in `src/core/` (pure TS; only idb/zod deps):
 **On native Windows (this session's environment, `E:\GitHub\yaccount`):**
 ```bash
 node -v           # must be >=20.19 or >=22.12 — vitest 4/rolldown/vite 8 refuse to start below that
-npm test          # vitest — 367 passing at M7
+npm test          # vitest — 380 passing at M8
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
@@ -352,5 +354,5 @@ npm test && npm run typecheck && npm run lint && npm run build && npx prettier -
 - **Spec §12.4-a (added M3) covers editing patterns:** inline rename = ✓/✗ never blur-commit; loggable-repeatedly records get a **history list** with `⋯` Edit/Delete, never a write-only form; money direction = visible `SignToggle`; toggle menu entries = checkbox item with a **leading** indicator. shadcn `select`/`dropdown-menu` were edited in-repo (copy-in components) for width/padding/animation — selects are `position="popper"` so they animate.
 - **Design language = "Quiet Register", LOCKED — spec §12 is law** (impl §2 build map; HANDOFF cheat-sheet in invariant #8). Fonts Fraunces/Geist/Geist Mono; iris brand + emerald-positive tokens; compose-bar/Sheet/register-row/`⋯`-menu patterns; `categoryDotColor(id)` swatches. Read §12 before building any UI; do not drift. Memory: `quiet-register-design-language`.
 - **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
-- **`HANDOFF.md` is gitignored** (local-only working doc) — update it on disk each milestone; it is not committed and won't be in a fresh clone.
+- **`HANDOFF.md` is TRACKED in git** (commit `88ebfa8` moved it into the repo so it travels across devices; the old "gitignored/local-only" note is stale). **Commit it at every milestone boundary** as a `docs:` commit on `main` (as was done for M7 → `c4c9992` and now M8) so a fresh clone / new agent sees the current state.
 - UI can't be auto-tested until Playwright (M11); `next build` prerendering to "Loading…" is only a smoke check, not runtime verification.
