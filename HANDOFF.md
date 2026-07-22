@@ -1,7 +1,7 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** M4 (time-variant budget targets) implemented on branch `m4-budget-targets`, not yet committed/pushed (2026-07-21).
+> **Last updated:** M4 (time-variant budget targets) DONE — committed on `m4-budget-targets`, user manually browser-tested and confirmed working (2026-07-21). Not pushed/PR'd yet. Next up: **M5**, by the user's explicit direction (see "Next Steps").
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
 > **NOTE (environment):** this session ran on **native Windows** (`E:\GitHub\yaccount`), not the WSL environment (`/home/may/github/yaccount`) earlier sessions used. See "Key facts / gotchas" for what changed (Node version, no WSL PATH export, npm optional-deps gotcha). Both environments should work; update whichever section matches where you're actually running.
 
@@ -62,12 +62,13 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M3 (containers, transfers, balances) — DONE, PR'd, and MERGED to `main`** (PR #2, `SomewhatMay/yaccount`). The `m3-containers` branch listed as "not yet PR'd" in an earlier version of this doc has since been merged — see the git log below, current as of this session's start.
 
-**M4 (time-variant budget targets) — implemented on branch `m4-budget-targets`** (off `main`), **not yet committed**. TDD followed: tests written first (confirmed red via missing modules), then implementation, then green. **234 vitest tests green (was 212 on `main`, +22 for M4); typecheck/lint/prettier/build clean.** No DB migration needed — `budget_targets` object store already existed since M1 (schema-only until now), so `DB_VERSION` stays 2. Outstanding: **no interactive browser walkthrough this session — no browser-automation tool was available**, so the UI is verified by code review + the full automated suite only, not click-tested. Do a manual pass before considering M4's exit criteria fully met (see spec's M4 "How to test": set Groceries $300 from Jan, $600 from Jun in the actual UI; confirm the Budget sheet on the category row shows the right history and "Applies today" figure).
+**M4 (time-variant budget targets) — DONE, committed on branch `m4-budget-targets`** (off `main`, commit `4e11529`; not yet pushed/PR'd). TDD followed: tests written first (confirmed red via missing modules), then implementation, then green. **234 vitest tests green (was 212 on `main`, +22 for M4); typecheck/lint/prettier/build clean.** No DB migration needed — `budget_targets` object store already existed since M1 (schema-only until now), so `DB_VERSION` stays 2. **User manually walked through the browser UI and confirmed it works** (set $300→$600 effective-date change, History list, "Current" badge, same-date clash-replaces warning, delete, refresh-persists) — the automated-suite-only caveat from earlier in this session no longer applies.
 
-**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. Per the stated order (`…M3 → M4 → M6 → M5 → M7…`), the next product milestone after M4 is **M6 (recurring rules, templates, inbox)** — but WAIT for the user's green light before starting it; don't assume this session's continuation implies blanket approval for every future milestone too.
+**Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`, but **the user explicitly picked M5 next over M6** after M4 shipped — a deliberate re-ordering, not an oversight. **Do NOT silently "correct" this back to M6** — the dependency graph permits it either way (M5 needs M4+M3, both done; M6 needs only M3), so there's no technical reason to override the user's stated choice. If a future session is unsure which is next, ask rather than assume the impl doc's default order still holds.
 
-Git log (`main`, as of this session's start — M4 work below is on top of this, uncommitted):
+Git log (`m4-budget-targets`, current):
 ```
+4e11529 M4: time-variant budget targets
 88ebfa8 Keep handoff on cloud for cross-device development
 0e007e6 Merge pull request #2 from SomewhatMay/m3-containers
 249fe34 fix: adversarial test audit — 10 real bugs, 126 -> 212 tests
@@ -209,21 +210,32 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M4 loose ends (clear these first):**
-- **Commit + push `m4-budget-targets`.** Nothing from this session is committed yet — working tree has the full M4 diff on top of `main`.
-- **Manual browser walkthrough** (M4's spirit of M3's exit criteria — M4 doesn't specify one explicitly beyond the resolution-engine unit tests, but §12.4-a-style editing UI has always gotten a click-test before sign-off): `npm run dev` → open Categories → set Groceries to $300/mo starting today → set $600/mo starting next month → confirm the row's `$300/mo budget` marginalia, then bump the effective date forward and watch it read `$600/mo` → open the Budget sheet, confirm History shows both rows with the "Current" badge on the right one → edit a row's amount → delete a row → confirm the "saving replaces it" clash warning fires when two rows share a date. **No browser-automation tool was available this session**, so this hasn't been done — do it before telling the user M4 is fully verified.
-- Branch `m4-budget-targets` is local only (not yet pushed). Open a PR when the user is happy (`gh pr create --base main`).
+**M4 is DONE.** Committed (`4e11529` on `m4-budget-targets`, off `main`), user-tested in the browser, confirmed working. Not pushed/PR'd — open one when the user wants (`gh pr create --base main`); nothing is blocking it.
 
-**Then AWAIT green light. Per the user's established ordering (M3 pulled ahead of M8/M9, then continuing with product milestones), the next candidate is M6 (recurring rules, templates, inbox — needs M3, which is done).** M8 (Google OAuth) remains available too, but is **BLOCKED ON THE USER**: they must first create the Google Cloud project + OAuth consent screen ("Testing" status) + a **Web SPA client ID** with the `drive.appdata` scope, and hand over the client ID (env var). Ask which they want next rather than assuming — don't silently start M6 just because it's unblocked.
-- If M8: build the `AuthProvider` seam (§3.4): a single `getAccessToken(): Promise<string>`, `src/auth/web.ts` via GIS token client (`ux_mode:'popup'`), silent re-auth (`prompt:''`) before expiry with a re-consent popup fallback scoped for all browsers. No refresh token on web (accepted asymmetry). **Exit:** `getAccessToken()` returns a valid `drive.appdata` token in a browser. No data synced yet (that's M9).
-- Everything M0–M7 must stay demoable in a plain browser with NO auth/network — don't let M8 wiring gate the local-first app.
+### Up next: M5 — Reporting & Dashboard Engine + Charts (user's explicit pick)
+
+Dependencies satisfied (impl §7: "M5 needs M4 (+M3)" — both done). Read spec §6 in full before coding (already partly summarized below, but the spec is authoritative) and impl doc's M5 section (§4, "M5 — Reporting & Dashboard Engine + Charts") for the literal scope/how-to-test/exit-criteria.
+
+**Scope (impl doc M5, condensed — verify against the doc, don't build from this summary alone):**
+- **Unified global reporting-period control (§6.1):** presets (Last month / Last 3 / Last 6 / Last 12 / YTD / All / Custom) + optional per-widget override; two-range compare folded into the same control (§6.2), not a separate page. This is new UI infra nothing downstream of M4 built yet — no reporting-period picker exists anywhere in the app today.
+- In-memory active-period cache warming at boot (§8.3) — a stub existed since M1; M5 is where it becomes real. Falls back to IndexedDB for historical/non-active periods.
+- **Container Flows view (§5.4)** — deferred here from M3 on purpose (needs this milestone's period control): net in/out per container over the active period, via the `by_container_month` index (already created in M1, unused until now).
+- **Chart inventory (§6.5), Recharts** (already an M0 dependency — nothing new to install): category breakdown doughnut/pie (expense + income, **genuine zero-filtering** per §6.4 — the spreadsheet's version claimed to but didn't; period-total + period-monthly-average variants); monthly bar (income/expense/savings) with a budget-target overlay (this is where M4's `budgetOnDate` finally gets consumed by a chart); single-category drill-down bar vs. its time-variant budget target; Income→Expenses→Savings **waterfall**, built as a stacked `BarChart` + transparent base series (locked choice, impl §10 #28 — no second chart lib).
+- **Category chart color = `category.color` if set, else deterministic auto-palette by stable id** (§10.1's hybrid resolution, formally shipping here) — decide whether this reuses `categoryDotColor()` (`src/features/category-color.ts`, already used for the UI dots since M2) or wants a separate chart-specific palette function; nothing currently forces either choice, so it's an open call for the M5 session.
+- **Investment/asset reporting (§5.6):** Unrealized Gain/Loss = latest `container_snapshots.reported_balance` − Net Contributions (`netContributions()` already exists in `engine/balances.ts`); the **Reconstructed Balance Engine** for historical gap-filling (`nearest snapshot ± transfers in the gap`, NOT carry-forward). **Watch impl §10 #4:** the gap-filling must use the same two-directional crediting as the balance identity (in via `to_container_id`, out via `container_id`) — a naive one-sided `SUM(amount)` here would be a repeat of the exact bug the M0.4 balance identity was designed to prevent.
+- **Budget Targets comparison re-scoped to the active period (§6.3)** — the source spreadsheet always computed "Monthly Average" against all-time history regardless of the selected window; deliberately don't preserve that quirk.
+
+**How to test (impl doc's own words):** seed a fixture ledger spanning several months; verify each chart's numbers by hand against the fixture; confirm $0 categories are genuinely omitted; confirm switching the global period updates every non-overridden widget. Snapshot-test the aggregation functions in `src/core` (pure, unit-testable) before wiring any chart component to them — same TDD discipline as M1–M4.
+
+**Exit criteria:** a genuinely useful dashboard over real logged data; all four chart types render correct, period-aware numbers.
+
+**Not M5 (don't pull forward):** M6 recurring/inbox, M7 goals/monthly-plan, M8 auth (blocked on the user's Google Cloud setup — still true, unchanged), M9/M10 sync/native.
 
 **Milestone-ownership deferrals to remember (flagged in M1, NOT open decisions):**
 - Complex cross-field zod refinements deferred to owning milestone: recurring `frequency↔interval_config` + `amount_mode↔template_amount` → **M6**; goal `mode`/`kind` invariants → **M7**. `interval_config` is currently a preserved `z.record` object; M6 tightens to a frequency-discriminated union. TODO comments mark both spots.
 
-**Later product milestones:** M6 recurring/inbox, M5 reporting/charts (needs M4, done — this is where the budget-vs-actual comparison view and the unified reporting-period control land), M7 goals/monthly-plan. Don't pull them forward.
-
 **Deferred platform work (do NOT touch until their milestone):**
+- **M8** (Google OAuth) — blocked on the user creating the Google Cloud project + OAuth consent screen + Web SPA client ID; ask before assuming they want to switch to it.
 - **M9** (Drive sync) / **M10** (Capacitor native): after M8. The impl §6 parallel non-code track (Google Cloud project, the three OAuth client IDs, privacy policy) is the **user's** to do; it gates M8–M10, not local product work.
 
 ---
