@@ -80,11 +80,41 @@ export function isVoided(txns: Transaction[], id: string): boolean {
 }
 
 /**
- * The rows a register should show: live, non-template, and not themselves a
- * reversal (a reversal is bookkeeping for the pair it cancels, not an event the
- * user logged). Order is the caller's business.
+ * The rows a register should show: live, approved, non-template, and not
+ * themselves a reversal (a reversal is bookkeeping for the pair it cancels, not
+ * an event the user logged). Pending rows (§5.8) are excluded — they live in the
+ * Inbox until approved, never in the register or any derivation. Order is the
+ * caller's business.
  */
 export function activeRows(txns: Transaction[]): Transaction[] {
   const live = liveIds(txns);
-  return txns.filter((t) => !t.is_template && !t.reverses_id && live.has(t.id));
+  return txns.filter(
+    (t) =>
+      !t.is_template && t.inbox_status === "approved" && !t.reverses_id && live.has(t.id),
+  );
+}
+
+/**
+ * The Inbox queue (§5.8): pending, non-template rows the user hasn't acted on.
+ * A dismissed occurrence is voided (a reversing row points at it), so any row
+ * carrying a reversal is excluded — the proposal has been withdrawn. Approving a
+ * row moves it out of this list (its `inbox_status` becomes 'approved') and into
+ * the register.
+ */
+export function pendingRows(txns: Transaction[]): Transaction[] {
+  const reversed = new Set(
+    txns.filter((t) => t.reverses_id).map((t) => t.reverses_id as string),
+  );
+  return txns.filter(
+    (t) =>
+      t.inbox_status === "pending" &&
+      !t.is_template &&
+      !t.reverses_id &&
+      !reversed.has(t.id),
+  );
+}
+
+/** Every non-template shortcut the user has saved (§5.8). */
+export function templateRows(txns: Transaction[]): Transaction[] {
+  return txns.filter((t) => t.is_template);
 }

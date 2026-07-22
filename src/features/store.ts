@@ -8,11 +8,15 @@ import {
   type Category,
   type Container,
   type ContainerSnapshot,
+  type RecurringRule,
   type Setting,
   type Transaction,
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
 import type { ReportingPeriod } from "@/core/engine/period";
+import { generateDueOccurrences } from "@/core/engine/recurring";
+import { pendingRows } from "@/core/engine/ledger";
+import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -32,6 +36,14 @@ export const transactionsAtom = atom<Transaction[]>([]);
 export const snapshotsAtom = atom<ContainerSnapshot[]>([]);
 export const settingsAtom = atom<Setting[]>([]);
 export const budgetTargetsAtom = atom<BudgetTarget[]>([]);
+export const recurringRulesAtom = atom<RecurringRule[]>([]);
+
+/** Live shortcuts (§5.8) — the is_template rows, for the ledger's quick-log strip. */
+export const templatesAtom = atom((get) =>
+  get(transactionsAtom).filter((t) => t.is_template),
+);
+/** The Inbox queue count (§5.8) — drives the nav badge. */
+export const pendingCountAtom = atom((get) => pendingRows(get(transactionsAtom)).length);
 
 /** Default Spending Container (§5.2) — the compose bar's preselected wallet.
  * A synced setting; falls back to the seeded 'general' wallet. */
@@ -65,13 +77,14 @@ function getRepo(): Promise<Repo> {
 /** Re-read the materialized tables into the atoms (local-first read path). */
 export const refreshAtom = atom(null, async (_get, set) => {
   const repo = await getRepo();
-  const [cats, conts, txns, snaps, settings, budgetTargets] = await Promise.all([
+  const [cats, conts, txns, snaps, settings, budgetTargets, rules] = await Promise.all([
     repo.getAll<Category>(STORE.categories),
     repo.getAll<Container>(STORE.containers),
     repo.getAll<Transaction>(STORE.transactions),
     repo.getAll<ContainerSnapshot>(STORE.containerSnapshots),
     repo.getAll<Setting>(STORE.settings),
     repo.getAll<BudgetTarget>(STORE.budgetTargets),
+    repo.getAll<RecurringRule>(STORE.recurringRules),
   ]);
   set(categoriesAtom, cats);
   set(containersAtom, conts);
@@ -79,6 +92,7 @@ export const refreshAtom = atom(null, async (_get, set) => {
   set(snapshotsAtom, snaps);
   set(settingsAtom, settings);
   set(budgetTargetsAtom, budgetTargets);
+  set(recurringRulesAtom, rules);
 });
 
 /** Append + apply one op atomically (§0.1), then refresh the caches. */
@@ -88,9 +102,31 @@ export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
   await set(refreshAtom);
 });
 
-/** Open the repo (seeds 'general' + deviceId on first run), load, mark ready. */
+/**
+ * Generate any recurring occurrences that came due while the app was closed
+ * (§5.8 backfill). Runs after boot, over the loaded rules; each occurrence is a
+ * deterministic-id pending row (idempotent regen) and the rule's cursor advances,
+ * so re-running is a no-op. `today` is read here (the clock lives in the UI layer,
+ * never in `core`). Dispatches go through the same op-log path as any mutation.
+ */
+export const runRecurringGenerationAtom = atom(null, async (get, set) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const rules = get(recurringRulesAtom).filter((r) => r.status === "active");
+  for (const rule of rules) {
+    const { rows, rule: advanced } = generateDueOccurrences(rule, today);
+    if (rows.length === 0) continue;
+    const repo = await getRepo();
+    for (const row of rows) await repo.dispatch(recordGeneratedOccurrence(row));
+    await repo.dispatch(updateRecurringRule(advanced));
+  }
+  await set(refreshAtom);
+});
+
+/** Open the repo (seeds 'general' + deviceId on first run), load, mark ready,
+ * then backfill due recurring occurrences in the background (§8.6 instant-open). */
 export const bootstrapAtom = atom(null, async (_get, set) => {
   await getRepo();
   await set(refreshAtom);
   set(readyAtom, true);
+  await set(runRecurringGenerationAtom);
 });

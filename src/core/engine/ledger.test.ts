@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { activeRows, isVoided } from "./ledger";
+import { activeRows, isVoided, pendingRows, templateRows } from "./ledger";
 import { containerBalance } from "./balances";
-import { makeTransaction, makeVoidRow, type Transaction } from "../model";
+import { makeTemplate, makeTransaction, makeVoidRow, type Transaction } from "../model";
 
 const expense = (id: string, amount: number): Transaction =>
   makeTransaction({
@@ -129,9 +129,49 @@ describe("activeRows — multi-device and malformed chains", () => {
     expect(activeRows([t1, tpl]).map((r) => r.id)).toEqual(["t1"]);
   });
 
+  it("never returns pending rows — they live in the Inbox until approved (§5.8)", () => {
+    const pending: Transaction = { ...expense("pend", -500), inbox_status: "pending" };
+    expect(activeRows([t1, pending]).map((r) => r.id)).toEqual(["t1"]);
+  });
+
   it("returns rows in input order and reports unknown ids as not voided", () => {
     const t2 = expense("t2", -250);
     expect(activeRows([t2, t1]).map((r) => r.id)).toEqual(["t2", "t1"]);
     expect(isVoided([t1], "nope")).toBe(false);
+  });
+});
+
+describe("pendingRows / templateRows — the Inbox and shortcuts (§5.8)", () => {
+  const t1 = expense("t1", -1000);
+  const pending = (id: string): Transaction => ({
+    ...expense(id, -500),
+    inbox_status: "pending",
+  });
+
+  it("lists pending, non-template rows and excludes approved ones", () => {
+    const approved = expense("a", -100);
+    expect(pendingRows([approved, pending("p1"), pending("p2")]).map((r) => r.id)).toEqual([
+      "p1",
+      "p2",
+    ]);
+  });
+
+  it("a dismissed (voided) pending row drops out of the queue", () => {
+    const p = pending("p1");
+    const dismiss = makeVoidRow(p, { id: "v1" }); // reverses_id → p, stays pending
+    expect(pendingRows([p, dismiss]).map((r) => r.id)).toEqual([]);
+  });
+
+  it("templateRows returns only shortcuts", () => {
+    const tpl = makeTemplate({
+      id: "tmpl1",
+      template_name: "Coffee",
+      amount: -300,
+      vendor_source: "Coffee",
+      category_id: "coffee",
+      container_id: "general",
+    });
+    expect(templateRows([t1, tpl]).map((r) => r.id)).toEqual(["tmpl1"]);
+    expect(pendingRows([t1, tpl])).toEqual([]); // a template is never pending
   });
 });

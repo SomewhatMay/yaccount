@@ -3,17 +3,23 @@ import {
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
+  makeRecurringRule,
   makeSetting,
+  makeTemplate,
   makeTransaction,
   makeTransfer,
   makeVoidRow,
   newId,
   SETTING,
+  type AmountMode,
   type BudgetTarget,
   type Category,
   type CategoryType,
   type Container,
   type ContainerSnapshot,
+  type Frequency,
+  type IntervalConfig,
+  type RecurringRule,
   type Transaction,
 } from "../model";
 import type { Op } from "../oplog";
@@ -235,5 +241,128 @@ export function removeBudgetTarget(id: string, m?: OpMeta): Op {
   return { ...meta(m), type: "budgetTarget.remove", payload: { id } };
 }
 
+// ── Templates (§5.8, M6) ──────────────────────────────────────────────────
+
+/**
+ * Save a 1-tap shortcut. A template is a transactions row with is_template=true —
+ * an expense/income (pass `category_id`) or a transfer (pass `to_container_id`),
+ * never both. Amount is signed for expense/income, a positive magnitude for a
+ * transfer (matching the two generators).
+ */
+export function createTemplate(
+  input: {
+    template_name: string;
+    amount: number;
+    vendor_source: string;
+    container_id: string;
+    category_id?: string | null;
+    to_container_id?: string | null;
+    id?: string;
+    notes?: string | null;
+  },
+  m?: OpMeta,
+): Op {
+  return { ...meta(m), type: "template.create", payload: { row: makeTemplate(input) } };
+}
+
+/** Delete a shortcut — a hard remove (housekeeping, not ledger data). */
+export function removeTemplate(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "template.remove", payload: { id } };
+}
+
+/**
+ * 1-tap quick-log: turn a saved template into a real, dated ledger row (a fresh
+ * id, `is_template=false`, approved). The shape follows the template — a transfer
+ * template logs a transfer, otherwise an expense/income.
+ */
+export function logTemplate(
+  template: Transaction,
+  input: { date: string; id?: string },
+  m?: OpMeta,
+): Op {
+  if (template.to_container_id !== null) {
+    return createTransfer(
+      {
+        id: input.id,
+        date: input.date,
+        amount: Math.abs(template.amount),
+        container_id: template.container_id,
+        to_container_id: template.to_container_id,
+        vendor_source: template.vendor_source,
+      },
+      m,
+    );
+  }
+  return createTransaction(
+    {
+      id: input.id,
+      date: input.date,
+      amount: template.amount,
+      vendor_source: template.vendor_source,
+      category_id: template.category_id!,
+      container_id: template.container_id,
+    },
+    m,
+  );
+}
+
+// ── Recurring rules (§5.8, M6) ────────────────────────────────────────────
+
+export function createRecurringRule(
+  input: {
+    frequency: Frequency;
+    interval_config: IntervalConfig;
+    template_vendor_source: string;
+    template_container_id: string;
+    start_date: string;
+    id?: string;
+    template_amount?: number | null;
+    template_category_id?: string | null;
+    template_to_container_id?: string | null;
+    amount_mode?: AmountMode;
+    linked_goal_id?: string | null;
+    end_date?: string | null;
+  },
+  m?: OpMeta,
+): Op {
+  return {
+    ...meta(m),
+    type: "recurringRule.create",
+    payload: { row: makeRecurringRule(input) },
+  };
+}
+
+/** Edit a rule (entity-LWW). Also the advance path: generation hands back the
+ * rule with its `next_generation_date` moved on, persisted via this op. */
+export function updateRecurringRule(row: RecurringRule, m?: OpMeta): Op {
+  return { ...meta(m), type: "recurringRule.update", payload: { row } };
+}
+
+/** Stop a rule generating (reversible §1.1) — already-generated pending rows stay. */
+export function cancelRecurringRule(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "recurringRule.cancel", payload: { id } };
+}
+
+/** Put a cancelled rule back to work. */
+export function uncancelRecurringRule(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "recurringRule.uncancel", payload: { id } };
+}
+
+// ── Inbox (§5.8, M6) ──────────────────────────────────────────────────────
+
+/** Approve a pending row → it becomes live (counts toward balances/reports). */
+export function approveTransaction(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "transaction.approve", payload: { id } };
+}
+
+/**
+ * Persist a recurring-generated occurrence row (already keyed to `(rule, date)`,
+ * pending). It's an ordinary `transaction.create` — the row carries its own
+ * pending status + `recurring_rule_id`, so no new op type is needed.
+ */
+export function recordGeneratedOccurrence(row: Transaction, m?: OpMeta): Op {
+  return { ...meta(m), type: "transaction.create", payload: { row } };
+}
+
 /** Convenience re-export for callers reading the row types. */
-export type { BudgetTarget, ContainerSnapshot };
+export type { BudgetTarget, ContainerSnapshot, RecurringRule };

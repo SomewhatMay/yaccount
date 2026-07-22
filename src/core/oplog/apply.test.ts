@@ -8,6 +8,8 @@ import {
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
+  makeRecurringRule,
+  makeTemplate,
   makeTransaction,
   makeVoidRow,
   SETTING,
@@ -15,6 +17,7 @@ import {
   type Category,
   type Container,
   type ContainerSnapshot,
+  type RecurringRule,
   type Setting,
   type Transaction,
 } from "@/core/model";
@@ -620,6 +623,137 @@ describe("applyOp — transaction ops (the ledger spine, §5.4/§0.3)", () => {
   });
 });
 
+describe("applyOp — templates & inbox approval (M6, §5.8)", () => {
+  const template = makeTemplate({
+    id: "tmpl1",
+    template_name: "Blue Bottle",
+    amount: -650,
+    vendor_source: "Blue Bottle",
+    category_id: "coffee",
+    container_id: "general",
+  });
+
+  it("template.create materializes an is_template row; template.remove hard-deletes it", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, {
+      id: "o1",
+      ts: at(1),
+      type: "template.create",
+      payload: { row: template },
+    });
+    let rows = await readAll<Transaction>(state, STORE.transactions);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].is_template).toBe(true);
+
+    const remove: Op = {
+      id: "o2",
+      ts: at(2),
+      type: "template.remove",
+      payload: { id: "tmpl1" },
+    };
+    await applyOp(tx, remove);
+    await applyOp(tx, remove); // replay — delete of a missing key is a no-op
+    rows = await readAll<Transaction>(state, STORE.transactions);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("transaction.approve flips a pending row live, idempotently", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    const pending = makeTransaction({
+      id: "p1",
+      date: "2026-07-01",
+      amount: -1500,
+      vendor_source: "Netflix",
+      category_id: "sub",
+      inbox_status: "pending",
+      recurring_rule_id: "r1",
+    });
+    await applyOp(tx, {
+      id: "o1",
+      ts: at(1),
+      type: "transaction.create",
+      payload: { row: pending },
+    });
+    const approve: Op = {
+      id: "o2",
+      ts: at(2),
+      type: "transaction.approve",
+      payload: { id: "p1" },
+    };
+    await applyOp(tx, approve);
+    await applyOp(tx, approve); // replay
+    const rows = await readAll<Transaction>(state, STORE.transactions);
+    expect(rows[0].inbox_status).toBe("approved");
+  });
+
+  it("approving a missing row is a no-op", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, {
+      id: "o1",
+      ts: at(1),
+      type: "transaction.approve",
+      payload: { id: "ghost" },
+    });
+    expect(await readAll<Transaction>(state, STORE.transactions)).toHaveLength(0);
+  });
+});
+
+describe("applyOp — recurring rules are cancellable AND restorable (§1.1, M6)", () => {
+  const rule = makeRecurringRule({
+    id: "r1",
+    frequency: "monthly",
+    interval_config: { day_of_month: 1 },
+    template_vendor_source: "Netflix",
+    template_container_id: "general",
+    template_category_id: "sub",
+    template_amount: -1500,
+    start_date: "2026-01-01",
+  });
+
+  it("cancel flips status; uncancel restores it, losslessly", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, {
+      id: "o1",
+      ts: at(1),
+      type: "recurringRule.create",
+      payload: { row: rule },
+    });
+    await applyOp(tx, {
+      id: "o2",
+      ts: at(2),
+      type: "recurringRule.cancel",
+      payload: { id: "r1" },
+    });
+    let rows = await readAll<RecurringRule>(state, STORE.recurringRules);
+    expect(rows[0].status).toBe("cancelled");
+
+    await applyOp(tx, {
+      id: "o3",
+      ts: at(3),
+      type: "recurringRule.uncancel",
+      payload: { id: "r1" },
+    });
+    rows = await readAll<RecurringRule>(state, STORE.recurringRules);
+    expect(rows[0]).toEqual(rule); // every other field untouched
+  });
+
+  it("cancelling a missing rule is a no-op", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, {
+      id: "o1",
+      ts: at(1),
+      type: "recurringRule.cancel",
+      payload: { id: "ghost" },
+    });
+    expect(await readAll<RecurringRule>(state, STORE.recurringRules)).toHaveLength(0);
+  });
+});
+
 describe("applyOp — every op type is idempotent by id (§8.2)", () => {
   // Table-driven so a new op type added without an idempotency proof fails here.
   const category = makeCategory({ id: "c1", name: "Groceries", type: "expense" });
@@ -643,6 +777,32 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     amount: 30000,
     start_date: "2026-01-01",
   });
+  const template = makeTemplate({
+    id: "tmpl1",
+    template_name: "Blue Bottle",
+    amount: -650,
+    vendor_source: "Blue Bottle",
+    category_id: "c1",
+    container_id: "k1",
+  });
+  const rule = makeRecurringRule({
+    id: "r1",
+    frequency: "monthly",
+    interval_config: { day_of_month: 1 },
+    template_vendor_source: "Netflix",
+    template_container_id: "k1",
+    template_category_id: "c1",
+    template_amount: -1500,
+    start_date: "2026-01-01",
+  });
+  const pending = makeTransaction({
+    id: "p1",
+    date: "2026-07-01",
+    amount: -1500,
+    vendor_source: "Netflix",
+    category_id: "c1",
+    inbox_status: "pending",
+  });
 
   const seed: Op[] = [
     { id: "seed-c", ts: at(1), type: "category.create", payload: { row: category } },
@@ -650,6 +810,9 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     { id: "seed-t", ts: at(3), type: "transaction.create", payload: { row: txRow } },
     { id: "seed-s", ts: at(4), type: "snapshot.record", payload: { row: snap } },
     { id: "seed-bt", ts: at(5), type: "budgetTarget.set", payload: { row: budget } },
+    { id: "seed-tm", ts: at(6), type: "template.create", payload: { row: template } },
+    { id: "seed-r", ts: at(7), type: "recurringRule.create", payload: { row: rule } },
+    { id: "seed-p", ts: at(8), type: "transaction.create", payload: { row: pending } },
   ];
 
   const cases: Op[] = [
@@ -680,6 +843,13 @@ describe("applyOp — every op type is idempotent by id (§8.2)", () => {
     },
     { id: "o16", ts: at(25), type: "budgetTarget.set", payload: { row: budget } },
     { id: "o17", ts: at(26), type: "budgetTarget.remove", payload: { id: "bt1" } },
+    { id: "o18", ts: at(27), type: "template.create", payload: { row: template } },
+    { id: "o19", ts: at(28), type: "template.remove", payload: { id: "tmpl1" } },
+    { id: "o20", ts: at(29), type: "recurringRule.create", payload: { row: rule } },
+    { id: "o21", ts: at(30), type: "recurringRule.update", payload: { row: rule } },
+    { id: "o22", ts: at(31), type: "recurringRule.cancel", payload: { id: "r1" } },
+    { id: "o23", ts: at(32), type: "recurringRule.uncancel", payload: { id: "r1" } },
+    { id: "o24", ts: at(33), type: "transaction.approve", payload: { id: "p1" } },
   ];
 
   it.each(cases.map((op) => [op.type, op] as const))(

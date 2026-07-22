@@ -4,6 +4,7 @@ import type { Transaction } from "../model/transaction";
 import type { ContainerSnapshot } from "../model/containerSnapshot";
 import type { Setting } from "../model/setting";
 import type { BudgetTarget } from "../model/budgetTarget";
+import type { RecurringRule } from "../model/recurringRule";
 
 /**
  * Every mutation is an idempotent op appended to the journal AND applied to the
@@ -51,6 +52,21 @@ export type Op =
   // as snapshot.record/update. `remove` is a hard delete: a superseded row is
   // housekeeping, not a ledger amount (impl §3 rule of thumb).
   | (OpBase & { type: "budgetTarget.set"; payload: { row: BudgetTarget } })
-  | (OpBase & { type: "budgetTarget.remove"; payload: { id: string } });
+  | (OpBase & { type: "budgetTarget.remove"; payload: { id: string } })
+  // Templates (M6, §5.8) — a saved 1-tap shortcut is a transactions row with
+  // is_template=true. Not ledger data (nothing derives from it), so `remove` is a
+  // genuine hard delete — a shortcut the user deleted, not a money movement.
+  | (OpBase & { type: "template.create"; payload: { row: Transaction } })
+  | (OpBase & { type: "template.remove"; payload: { id: string } })
+  // Recurring rules (M6, §5.8). create/update carry the full row (entity-LWW).
+  // cancel/uncancel flip `status` (reversible per §1.1, like archive/unarchive) —
+  // a cancelled rule stops generating but stays restorable.
+  | (OpBase & { type: "recurringRule.create"; payload: { row: RecurringRule } })
+  | (OpBase & { type: "recurringRule.update"; payload: { row: RecurringRule } })
+  | (OpBase & { type: "recurringRule.cancel"; payload: { id: string } })
+  | (OpBase & { type: "recurringRule.uncancel"; payload: { id: string } })
+  // Approve a pending (inbox) row → it becomes a live ledger entry (§5.8). RMW on
+  // inbox_status, so it is idempotent and needs only the row id.
+  | (OpBase & { type: "transaction.approve"; payload: { id: string } });
 
 export type OpType = Op["type"];
