@@ -1,4 +1,4 @@
-import { atom } from "jotai";
+import { atom, type Setter } from "jotai";
 import { Repo } from "@/core/repo";
 import { STORE } from "@/core/repo/db";
 import {
@@ -14,6 +14,9 @@ import {
   type Transaction,
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
+import { runSync } from "@/sync";
+import { getDriveFS, describeSyncError } from "@/sync/drive";
+import { getAuthProvider } from "@/auth/web";
 import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
 import { requiredMonthly, isAchieved } from "@/core/engine/goals";
@@ -111,11 +114,120 @@ export const refreshAtom = atom(null, async (_get, set) => {
   set(goalsAtom, goals);
 });
 
-/** Append + apply one op atomically (§0.1), then refresh the caches. */
+/** Append + apply one op atomically (§0.1), then refresh the caches. The op is
+ * now queued in the repo outbox, so we also nudge a debounced background sync to
+ * push it to Drive promptly (§8.6 — never blocking; the write already landed
+ * locally). */
 export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
   const repo = await getRepo();
   await repo.dispatch(op);
   await set(refreshAtom);
+  scheduleSync(set);
+});
+
+/**
+ * ── Drive sync status (M9, §8.4/§8.6) ──────────────────────────────────────
+ * `idle` — not connected (nothing to sync); `syncing` — a cycle is in flight;
+ * `synced` — last cycle succeeded; `disconnected` — connected but the token needs
+ * an interactive reconnect (silent renewal failed, §3.3-B); `error` — a Drive/
+ * network failure (the app stays fully usable, §8.6). Instant-open is unaffected:
+ * boot never waits on any of this.
+ */
+export type SyncStatus = "idle" | "syncing" | "synced" | "disconnected" | "error";
+export const syncStatusAtom = atom<SyncStatus>("idle");
+export const lastSyncedAtAtom = atom<number | null>(null);
+/** Human-readable detail of the last sync failure (DriveError status+body when
+ * available, formatted by the sync seam) — shown in the indicator tooltip so a
+ * failure is diagnosable, not a mystery. */
+export const lastSyncErrorAtom = atom<string | null>(null);
+
+// Guard against overlapping cycles (the boot kick, the interval, and the
+// post-edit debounce can all fire close together). A skipped run is fine — the
+// next tick picks up whatever changed (every step is idempotent).
+let syncing = false;
+let syncDebounce: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce a background sync after local edits so a burst of dispatches results
+ * in one push, not one per op. */
+function scheduleSync(set: Setter): void {
+  if (syncDebounce) clearTimeout(syncDebounce);
+  syncDebounce = setTimeout(() => {
+    void set(syncAtom);
+  }, 1500);
+}
+
+/**
+ * One background sync cycle (§8.4/§8.5): pull the snapshot + all device ledgers,
+ * merge them into local state under the total order, push this device's queued
+ * ops to its own ledger, collapse/truncate as needed. Pre-gates on a SILENT token
+ * (no popup on a background tick, §3.3-B): if the account is connected but the
+ * token can't be renewed silently, surface `disconnected` so the UI can offer an
+ * interactive reconnect. Never throws — a Drive failure leaves the app usable.
+ */
+export const syncAtom = atom(null, async (_get, set) => {
+  if (syncing) return;
+  // Claim the guard SYNCHRONOUSLY, before any await, so near-simultaneous
+  // triggers (a tab refocus fires both `visibilitychange` and `focus`) can't both
+  // slip past into overlapping cycles.
+  syncing = true;
+  try {
+    const auth = getAuthProvider();
+    if (!auth.isConnected()) {
+      set(syncStatusAtom, "idle"); // signed out — the sign-in control drives onboarding
+      return;
+    }
+    let token: string | null = null;
+    try {
+      token = await auth.getAccessTokenSilent();
+    } catch {
+      token = null;
+    }
+    if (!token) {
+      set(syncStatusAtom, "disconnected");
+      return;
+    }
+
+    set(syncStatusAtom, "syncing");
+    const repo = await getRepo();
+    const deviceId = await repo.getDeviceId();
+    const yearMonth = new Date().toISOString().slice(0, 7);
+    await runSync({
+      fs: getDriveFS(),
+      deviceId,
+      listOps: () => repo.listOps(),
+      applyRemoteOps: (ops) => repo.applyRemoteOps(ops),
+      getOutboxOps: () => repo.getOutboxOps(),
+      clearOutbox: (ids) => repo.clearOutbox(ids),
+      yearMonth,
+    });
+    await set(refreshAtom); // re-derive the UI from the merged state (§8.6)
+    set(lastSyncedAtAtom, Date.now());
+    set(lastSyncErrorAtom, null);
+    set(syncStatusAtom, "synced");
+  } catch (err) {
+    // DriveError / offline — stay usable, surface honestly (§8.6). Log the raw
+    // error (it carries .status/.body) so a failing sync is diagnosable.
+    console.error("[yaccount] Drive sync failed:", err);
+    set(lastSyncErrorAtom, describeSyncError(err));
+    set(syncStatusAtom, "error");
+  } finally {
+    syncing = false;
+  }
+});
+
+/**
+ * Interactive reconnect (§3.3-B): a user gesture re-consents when a silent
+ * renewal has failed (`disconnected`). Must be called from a click handler — it
+ * may open the GIS popup. On success it immediately runs a sync.
+ */
+export const reconnectAtom = atom(null, async (_get, set) => {
+  try {
+    await getAuthProvider().getAccessToken(); // interactive — needs the gesture
+  } catch {
+    set(syncStatusAtom, "disconnected");
+    return;
+  }
+  await set(syncAtom);
 });
 
 /**
@@ -187,4 +299,7 @@ export const bootstrapAtom = atom(null, async (_get, set) => {
   set(readyAtom, true);
   await set(runRecurringGenerationAtom);
   await set(runGoalMaintenanceAtom);
+  // Kick the first Drive sync in the background — never awaited on the boot path,
+  // so the network can't gate the already-rendered UI (§8.6). No-ops if signed out.
+  void set(syncAtom);
 });

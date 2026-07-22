@@ -1,6 +1,14 @@
 import type { IDBPDatabase, IDBPTransaction } from "idb";
-import { openDb, STORE, ALL_STORES, type StoreName } from "./db";
-import { applyOp, compareOps, type Op, type Tx } from "../oplog";
+import { openDb, STORE, ALL_STORES, STATE_STORES, type StoreName } from "./db";
+import {
+  applyOp,
+  applyInOrder,
+  compareOps,
+  MemoryTx,
+  newMemoryState,
+  type Op,
+  type Tx,
+} from "../oplog";
 import { makeGeneralContainer, GENERAL_CONTAINER_ID } from "../model";
 
 const DEVICE_ID_KEY = "deviceId";
@@ -84,6 +92,10 @@ export class Repo {
       const oplog = tx.objectStore(STORE.oplog);
       if (!(await oplog.get(op.id))) {
         await oplog.put(op);
+        // Enqueue for push to THIS device's ledger (§8.4). Only locally-authored
+        // ops land here — `applyRemoteOps` deliberately skips the outbox, so a
+        // device never re-uploads another device's op to its own ledger.
+        await tx.objectStore(STORE.outbox).put({ id: op.id });
         await applyOp(
           new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),
           op,
@@ -120,5 +132,100 @@ export class Repo {
   async listOps(): Promise<Op[]> {
     const ops = (await this.db.getAll(STORE.oplog)) as Op[];
     return ops.sort(compareOps);
+  }
+
+  /**
+   * Merge a batch of ops pulled from Drive (snapshot + all device ledgers) into
+   * local state (§8.5). This is the seam §8.6 needs and the fix for merge-hole
+   * impl §10 #33: `dispatch` applies in arrival order and rows carry no version,
+   * so handing remote ops straight to `dispatch` would let a LATE older op
+   * clobber a newer local edit. Instead we union the genuinely-new ops into the
+   * journal and **rebuild materialized state by replaying the whole journal under
+   * the total order** (`compareOps`) — last-writer-wins by (`ts`, `id`), never by
+   * arrival. Idempotent by op id (§8.2); a re-pulled op is skipped.
+   *
+   * It is a rebuild over the UNION (local ops included), so it behaves as a
+   * *delta on top of live state*, never a wholesale replace (§8.6): a local edit
+   * made mid-sync is in the journal and therefore survives, merging with the
+   * incoming remote ops under the same order. `appMeta`/`outbox` are untouched.
+   *
+   * An op whose type this client can't apply (a newer client's op arriving via
+   * sync) is dropped rather than journaled, so one futuristic op can't wedge sync
+   * — it is simply re-seen (and re-skipped) on the next pull until this client
+   * ships that op type.
+   */
+  async applyRemoteOps(remoteOps: Op[]): Promise<void> {
+    // Which pulled ops are genuinely new? A steady-state sync re-sees only ops
+    // already journaled, so this is empty and we skip the rebuild entirely — the
+    // common tick costs one oplog read, not a full clear+replay. Done OUTSIDE the
+    // idb transaction (the validation probe below awaits non-idb work, which would
+    // auto-close a live tx); a concurrent local `dispatch` only ADDS this device's
+    // own already-applied op, so deciding "new" here can't miss a remote change.
+    const existing = new Set((await this.listOps()).map((o) => o.id));
+    const candidates = remoteOps.filter((o) => !existing.has(o.id));
+    if (candidates.length === 0) return;
+
+    // Drop ops this client can't apply (a newer client's op type), so one
+    // futuristic op can't wedge sync. Only the NEW candidates are probed —
+    // trivial in steady state. Our own payloads are trusted, so this filters type.
+    const applicable: Op[] = [];
+    for (const op of candidates) {
+      try {
+        await applyOp(new MemoryTx(newMemoryState()), op);
+        applicable.push(op);
+      } catch {
+        // unknown op type from a newer client — skip; re-evaluated next pull
+      }
+    }
+    if (applicable.length === 0) return;
+
+    const tx = this.db.transaction(ALL_STORES, "readwrite");
+    try {
+      const oplog = tx.objectStore(STORE.oplog);
+      for (const op of applicable) {
+        if (!(await oplog.get(op.id))) await oplog.put(op);
+      }
+      // Rebuild from the full post-merge journal under the total order. A
+      // concurrent local `dispatch` serializes with this tx (overlapping stores),
+      // so its op is already in `getAll` and joins the replay — never lost.
+      const all = (await oplog.getAll()) as Op[];
+      const itx = new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">);
+      for (const store of STATE_STORES) await tx.objectStore(store).clear();
+      await applyInOrder(itx, all);
+      await tx.done;
+    } catch (err) {
+      try {
+        tx.abort();
+      } catch {
+        // already settled
+      }
+      await tx.done.catch(() => {});
+      throw err;
+    }
+  }
+
+  /**
+   * The locally-authored ops not yet flushed to this device's Drive ledger, in
+   * total order (§8.4). The sync layer appends these to `ledger_<deviceId>.json`
+   * then calls `clearOutbox` with the flushed ids. Kept as op ids (the journal
+   * holds the payloads) so the queue is a thin pointer set.
+   */
+  async getOutboxOps(): Promise<Op[]> {
+    const entries = (await this.db.getAll(STORE.outbox)) as { id: string }[];
+    // Fetch each queued op by id (the outbox is a handful of ops) rather than
+    // materializing the whole journal to filter it.
+    const ops = await Promise.all(
+      entries.map((e) => this.db.get(STORE.oplog, e.id) as Promise<Op | undefined>),
+    );
+    return ops.filter((o): o is Op => o !== undefined).sort(compareOps);
+  }
+
+  /** Drop the given ids from the outbox after a successful ledger flush. Ids not
+   * in the list stay queued (a mid-flush local dispatch isn't lost). */
+  async clearOutbox(ids: string[]): Promise<void> {
+    const tx = this.db.transaction(STORE.outbox, "readwrite");
+    const store = tx.objectStore(STORE.outbox);
+    for (const id of ids) await store.delete(id);
+    await tx.done;
   }
 }

@@ -194,15 +194,20 @@ export function compareOps(a: Op, b: Op): number {
 }
 
 /**
- * Rebuild materialized state by replaying ops under the canonical total order.
- * Convergence depends on the order, not on id-keying alone (impl §5) — so we sort
- * before applying rather than trusting input order.
+ * Apply ops into a `Tx` under the canonical total order. Convergence depends on
+ * the order, not on id-keying alone (impl §5) — so we sort before applying rather
+ * than trusting input order. Works against any `Tx` (the in-memory replay below
+ * and the IndexedDB rebuild in `Repo.applyRemoteOps` share this one loop).
  */
+export async function applyInOrder(tx: Tx, ops: Op[]): Promise<void> {
+  for (const op of [...ops].sort(compareOps)) await applyOp(tx, op);
+}
+
+/** Rebuild materialized state by replaying ops into a fresh in-memory state. */
 export async function replay(
   ops: Op[],
   state: MemoryState = newMemoryState(),
 ): Promise<MemoryState> {
-  const tx = new MemoryTx(state);
-  for (const op of [...ops].sort(compareOps)) await applyOp(tx, op);
+  await applyInOrder(new MemoryTx(state), ops);
   return state;
 }
