@@ -19,12 +19,21 @@ import {
   unarchiveCategory,
   unarchiveContainer,
   unvoidTransaction,
+  createTemplate,
+  removeTemplate,
+  logTemplate,
+  createRecurringRule,
+  updateRecurringRule,
+  cancelRecurringRule,
+  uncancelRecurringRule,
+  approveTransaction,
 } from "@/core/commands";
 import {
   makeBudgetTarget,
   makeCategory,
   makeContainer,
   makeContainerSnapshot,
+  makeTemplate,
   makeTransaction,
   SETTING,
 } from "@/core/model";
@@ -275,5 +284,104 @@ describe("undo commands (§0.3 — every soft delete is reversible)", () => {
     expect(undo.payload.row.id).toBe("u1");
     expect(undo.payload.row.reverses_id).toBe("v1"); // reverses the reversal
     expect(undo.payload.row.amount).toBe(-1000); // nets the void back out
+  });
+});
+
+describe("template & recurring commands (M6, §5.8)", () => {
+  const template = makeTemplate({
+    id: "tmpl1",
+    template_name: "Blue Bottle",
+    amount: -650,
+    vendor_source: "Blue Bottle",
+    category_id: "coffee",
+    container_id: "general",
+  });
+
+  it("createTemplate builds a template.create op with an is_template row", () => {
+    const op = createTemplate(
+      {
+        template_name: "Blue Bottle",
+        amount: -650,
+        vendor_source: "Blue Bottle",
+        category_id: "coffee",
+        container_id: "general",
+      },
+      META,
+    );
+    expect(op.type).toBe("template.create");
+    if (op.type !== "template.create") throw new Error("narrow");
+    expect(op.payload.row.is_template).toBe(true);
+    expect(op.payload.row.template_name).toBe("Blue Bottle");
+  });
+
+  it("removeTemplate builds a template.remove op", () => {
+    expect(removeTemplate("tmpl1", META).type).toBe("template.remove");
+  });
+
+  it("logTemplate turns a template into a real dated ledger row", () => {
+    const op = logTemplate(template, { date: "2026-07-21", id: "t9" }, META);
+    expect(op.type).toBe("transaction.create");
+    if (op.type !== "transaction.create") throw new Error("narrow");
+    expect(op.payload.row.is_template).toBe(false);
+    expect(op.payload.row.date).toBe("2026-07-21");
+    expect(op.payload.row.amount).toBe(-650);
+    expect(op.payload.row.category_id).toBe("coffee");
+  });
+
+  it("logTemplate on a transfer template logs a transfer", () => {
+    const transferTemplate = makeTemplate({
+      id: "tmpl2",
+      template_name: "to savings",
+      amount: 20000,
+      vendor_source: "to savings",
+      container_id: "general",
+      to_container_id: "savings",
+    });
+    const op = logTemplate(transferTemplate, { date: "2026-07-21" }, META);
+    expect(op.type).toBe("transaction.create");
+    if (op.type !== "transaction.create") throw new Error("narrow");
+    expect(op.payload.row.to_container_id).toBe("savings");
+    expect(op.payload.row.amount).toBe(-20000); // transfer stored negative on source
+  });
+
+  it("createRecurringRule builds a rule with a computed cursor and active status", () => {
+    const op = createRecurringRule(
+      {
+        frequency: "monthly",
+        interval_config: { day_of_month: 1 },
+        template_vendor_source: "Netflix",
+        template_container_id: "general",
+        template_category_id: "sub",
+        template_amount: -1500,
+        start_date: "2026-01-01",
+        id: "r1",
+      },
+      META,
+    );
+    expect(op.type).toBe("recurringRule.create");
+    if (op.type !== "recurringRule.create") throw new Error("narrow");
+    expect(op.payload.row.status).toBe("active");
+    expect(op.payload.row.next_generation_date).toBe("2026-01-01");
+  });
+
+  it("cancel/uncancel/update/approve build the right op types", () => {
+    expect(cancelRecurringRule("r1", META).type).toBe("recurringRule.cancel");
+    expect(uncancelRecurringRule("r1", META).type).toBe("recurringRule.uncancel");
+    expect(approveTransaction("p1", META).type).toBe("transaction.approve");
+    const rule = createRecurringRule(
+      {
+        frequency: "daily",
+        interval_config: {},
+        template_vendor_source: "Coffee",
+        template_container_id: "general",
+        template_category_id: "coffee",
+        template_amount: -300,
+        start_date: "2026-01-01",
+        id: "r2",
+      },
+      META,
+    );
+    if (rule.type !== "recurringRule.create") throw new Error("narrow");
+    expect(updateRecurringRule(rule.payload.row, META).type).toBe("recurringRule.update");
   });
 });

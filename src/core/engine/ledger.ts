@@ -17,13 +17,17 @@ import { isLiveLedgerRow } from "./balances";
  * Balance never depends on this — every reversal is a real signed amount, so the
  * arithmetic nets out on its own (§0.4). This is presentation only.
  */
-function liveIds(txns: Transaction[]): Set<string> {
-  // Only a reversal that actually moves money can cancel anything: a pending or
-  // template "void" is not a live ledger row (§10 #2/#3), so hiding its target
-  // would take a row off screen whose amount the balance still counts.
+function liveIds(
+  txns: Transaction[],
+  // Which rows may act as reversers. For the ledger, only a live (approved,
+  // non-template) reversal can cancel anything — a pending/template "void" is not
+  // a live ledger row (§10 #2/#3). The Inbox passes its own predicate so that a
+  // pending dismissal (and its undo) resolve within the pending world.
+  isReverser: (t: Transaction) => boolean = isLiveLedgerRow,
+): Set<string> {
   const reversers = new Map<string, Transaction[]>();
   for (const t of txns) {
-    if (!t.reverses_id || !isLiveLedgerRow(t)) continue;
+    if (!t.reverses_id || !isReverser(t)) continue;
     const list = reversers.get(t.reverses_id) ?? [];
     list.push(t);
     reversers.set(t.reverses_id, list);
@@ -80,11 +84,37 @@ export function isVoided(txns: Transaction[], id: string): boolean {
 }
 
 /**
- * The rows a register should show: live, non-template, and not themselves a
- * reversal (a reversal is bookkeeping for the pair it cancels, not an event the
- * user logged). Order is the caller's business.
+ * The rows a register should show: live, approved, non-template, and not
+ * themselves a reversal (a reversal is bookkeeping for the pair it cancels, not
+ * an event the user logged). Pending rows (§5.8) are excluded — they live in the
+ * Inbox until approved, never in the register or any derivation. Order is the
+ * caller's business.
  */
 export function activeRows(txns: Transaction[]): Transaction[] {
   const live = liveIds(txns);
-  return txns.filter((t) => !t.is_template && !t.reverses_id && live.has(t.id));
+  return txns.filter(
+    (t) =>
+      !t.is_template && t.inbox_status === "approved" && !t.reverses_id && live.has(t.id),
+  );
+}
+
+/**
+ * The Inbox queue (§5.8): pending, non-template rows the user hasn't acted on.
+ * A dismissal appends a pending reversing row; undoing it appends a row reversing
+ * THAT (dismiss → undo → redo), so liveness is a chain walk, not a one-step "is
+ * reversed" check (§0.3) — otherwise an undone dismiss would never reappear.
+ * Pending reversals are what count here (a dismiss copies the occurrence's
+ * pending status). Approving a row moves it out of this list.
+ */
+export function pendingRows(txns: Transaction[]): Transaction[] {
+  const live = liveIds(txns, (t) => t.inbox_status === "pending");
+  return txns.filter(
+    (t) =>
+      t.inbox_status === "pending" && !t.is_template && !t.reverses_id && live.has(t.id),
+  );
+}
+
+/** Every non-template shortcut the user has saved (§5.8). */
+export function templateRows(txns: Transaction[]): Transaction[] {
+  return txns.filter((t) => t.is_template);
 }

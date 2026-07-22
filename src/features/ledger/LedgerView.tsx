@@ -7,9 +7,11 @@ import {
   ArrowDownLeftIcon,
   ArrowRightIcon,
   ArrowUpRightIcon,
+  BookmarkIcon,
   MoreHorizontalIcon,
   PencilIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react";
 import {
   categoriesAtom,
@@ -17,9 +19,16 @@ import {
   defaultContainerIdAtom,
   dispatchAtom,
   readyAtom,
+  templatesAtom,
   transactionsAtom,
 } from "@/features/store";
-import { unvoidTransaction, voidTransaction } from "@/core/commands";
+import {
+  createTemplate,
+  logTemplate,
+  removeTemplate,
+  unvoidTransaction,
+  voidTransaction,
+} from "@/core/commands";
 import { isLiveLedgerRow, isTransfer, overallBalance } from "@/core/engine/balances";
 import { activeRows } from "@/core/engine/ledger";
 import { formatCents } from "@/core/money";
@@ -37,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const thisMonth = (): string => new Date().toISOString().slice(0, 7);
+const today = (): string => new Date().toISOString().slice(0, 10);
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -58,6 +68,7 @@ export function LedgerView() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const transactions = useAtomValue(transactionsAtom);
+  const templates = useAtomValue(templatesAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -120,6 +131,57 @@ export function LedgerView() {
     return out;
   }, [transactions]);
 
+  // Save a row as a 1-tap shortcut (§5.8). The template keeps the shape (transfer
+  // vs. expense/income) so quick-logging it later reproduces the same kind of row.
+  async function saveShortcut(t: Transaction) {
+    const transfer = t.to_container_id !== null;
+    const id = crypto.randomUUID();
+    const input = {
+      id,
+      template_name: t.vendor_source,
+      amount: transfer ? Math.abs(t.amount) : t.amount,
+      vendor_source: t.vendor_source,
+      container_id: t.container_id,
+      category_id: transfer ? null : t.category_id,
+      to_container_id: transfer ? t.to_container_id : null,
+    };
+    await dispatch(createTemplate(input));
+    toast.success("Saved as shortcut", {
+      description: t.vendor_source,
+      action: { label: "Undo", onClick: () => void dispatch(removeTemplate(id)) },
+    });
+  }
+
+  async function quickLog(template: Transaction) {
+    await dispatch(logTemplate(template, { date: today() }));
+    toast.success("Logged", {
+      description: `${template.vendor_source} · ${formatCents(template.amount)}`,
+    });
+  }
+
+  async function removeShortcut(template: Transaction) {
+    await dispatch(removeTemplate(template.id));
+    const transfer = template.to_container_id !== null;
+    toast.success("Shortcut removed", {
+      description: template.vendor_source,
+      action: {
+        label: "Undo",
+        onClick: () =>
+          void dispatch(
+            createTemplate({
+              id: template.id,
+              template_name: template.template_name ?? template.vendor_source,
+              amount: template.amount,
+              vendor_source: template.vendor_source,
+              container_id: template.container_id,
+              category_id: transfer ? null : template.category_id,
+              to_container_id: transfer ? template.to_container_id : null,
+            }),
+          ),
+      },
+    });
+  }
+
   async function del(t: Transaction) {
     const op = voidTransaction(t);
     await dispatch(op);
@@ -180,6 +242,40 @@ export function LedgerView() {
         </div>
       </section>
 
+      {templates.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">
+            Shortcuts
+          </span>
+          {templates.map((t) => (
+            <div
+              key={t.id}
+              className="border-input bg-card hover:border-primary/30 group inline-flex items-center rounded-full border text-sm transition-colors"
+            >
+              <button
+                type="button"
+                onClick={() => quickLog(t)}
+                className="flex items-center gap-1.5 py-1 pr-1 pl-3"
+              >
+                <BookmarkIcon className="text-muted-foreground size-3" aria-hidden />
+                <span className="font-medium">{t.template_name}</span>
+                <span className="tnum text-muted-foreground font-mono text-xs">
+                  {formatCents(t.to_container_id ? Math.abs(t.amount) : t.amount)}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => removeShortcut(t)}
+                aria-label={`Remove ${t.template_name} shortcut`}
+                className="text-muted-foreground hover:text-destructive mr-1 rounded-full p-1"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <ComposeBar
         categories={categories}
         containers={containers}
@@ -209,6 +305,7 @@ export function LedgerView() {
                   toContainerName={containerNameOf(t.to_container_id)}
                   onEdit={() => setEditing(t)}
                   onDelete={() => del(t)}
+                  onSaveShortcut={() => saveShortcut(t)}
                 />
               ))}
             </div>
@@ -238,6 +335,7 @@ function LedgerRow({
   toContainerName,
   onEdit,
   onDelete,
+  onSaveShortcut,
 }: {
   tx: Transaction;
   categoryName: string;
@@ -245,6 +343,7 @@ function LedgerRow({
   toContainerName: string;
   onEdit: () => void;
   onDelete: () => void;
+  onSaveShortcut: () => void;
 }) {
   const transfer = isTransfer(tx);
   // Money in is emerald; a transfer is your own money moving, so it stays quiet.
@@ -296,6 +395,10 @@ function LedgerRow({
           <DropdownMenuItem onClick={onEdit}>
             <PencilIcon className="size-4" />
             Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onSaveShortcut}>
+            <BookmarkIcon className="size-4" />
+            Save as shortcut
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
             <Trash2Icon className="size-4" />

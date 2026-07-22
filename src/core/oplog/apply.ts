@@ -1,7 +1,14 @@
 import type { Op } from "./types";
 import { MemoryTx, newMemoryState, type MemoryState, type Tx } from "./tx";
 import { STORE } from "../repo/db";
-import type { BudgetTarget, Category, Container, ContainerSnapshot } from "../model";
+import type {
+  BudgetTarget,
+  Category,
+  Container,
+  ContainerSnapshot,
+  RecurringRule,
+  Transaction,
+} from "../model";
 
 /**
  * Upsert a reported value by its natural key `(container_id, date)` — at most
@@ -107,6 +114,37 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
     case "budgetTarget.remove":
       await tx.delete(STORE.budgetTargets, op.payload.id);
       return;
+    // A template is a transactions row with is_template=true; `put` is idempotent.
+    // `remove` is a hard delete — a shortcut is housekeeping, not a ledger amount
+    // (impl §3), and nothing derives a balance from it.
+    case "template.create":
+      await tx.put(STORE.transactions, op.payload.row);
+      return;
+    case "template.remove":
+      await tx.delete(STORE.transactions, op.payload.id);
+      return;
+    // Recurring rules (M6). create/update `put` the full row (entity-LWW).
+    case "recurringRule.create":
+    case "recurringRule.update":
+      await tx.put(STORE.recurringRules, op.payload.row);
+      return;
+    // cancel/uncancel flip `status` in place (reversible, §1.1) — the same shape
+    // as category/container archive/unarchive, driven by op type. A missing rule
+    // is a no-op, so replay stays idempotent and order-independent.
+    case "recurringRule.cancel":
+    case "recurringRule.uncancel": {
+      const cur = await tx.get<RecurringRule>(STORE.recurringRules, op.payload.id);
+      const status = op.type === "recurringRule.cancel" ? "cancelled" : "active";
+      if (cur) await tx.put(STORE.recurringRules, { ...cur, status });
+      return;
+    }
+    // Approve a pending row → it becomes a live ledger entry. RMW on inbox_status,
+    // so re-applying is a no-op. A missing row is a no-op (idempotent replay).
+    case "transaction.approve": {
+      const cur = await tx.get<Transaction>(STORE.transactions, op.payload.id);
+      if (cur) await tx.put(STORE.transactions, { ...cur, inbox_status: "approved" });
+      return;
+    }
     default: {
       const never: never = op;
       throw new Error(`applyOp: unhandled op type: ${(never as { type: string }).type}`);
