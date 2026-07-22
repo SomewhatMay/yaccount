@@ -1,7 +1,7 @@
 # yaccount — Handoff
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M6 (Recurring Rules, Templates & the Inbox) CODE-COMPLETE on branch `m6-recurring`** (2026-07-21) — committed (`da944a5`), **NOT yet PR'd/merged, awaiting the user's browser-verify** (UI can't be auto-tested pre-Playwright/M11). Typecheck/lint/build/prettier clean; **311 vitest tests green** (was 266 at M5, +45 for M6). Dev server smoke: `/inbox` + `/recurring` serve 200, nav + client shell render, no runtime errors. **No `DB_VERSION` bump** — `recurring_rules` store existed since M1. Next up: **M7** (savings goals + monthly allocation plan) — the LAST feature milestone; M7 needs BOTH M5+M6 (now both done). But confirm with the user (they re-order; see "Next Steps").
+> **Last updated:** **M6 (Recurring Rules, Templates & the Inbox) CODE-COMPLETE on branch `m6-recurring`** (2026-07-21) — committed (`da944a5`), **NOT yet PR'd/merged, awaiting the user's browser-verify** (UI can't be auto-tested pre-Playwright/M11). Typecheck/lint/build/prettier clean; **312 vitest tests green** (was 266 at M5, +45 for M6). Dev server smoke: `/inbox` + `/recurring` serve 200, nav + client shell render, no runtime errors. **No `DB_VERSION` bump** — `recurring_rules` store existed since M1. Next up: **M7** (savings goals + monthly allocation plan) — the LAST feature milestone; M7 needs BOTH M5+M6 (now both done). But confirm with the user (they re-order; see "Next Steps").
 > **Prior:** M5 (Reporting & Dashboard) DONE — merged to `main` via PR #4 (2026-07-21), user browser-verified against a hand-computed fixture.
 > **NOTE:** M4 was merged to `main` via **PR #3** (`c2f7804`) since the last handoff — the "not pushed/PR'd" note for M4 below is stale; `main` has M4.
 > **NOTE:** this file is now **tracked in git** (commit `88ebfa8`, "Keep handoff on cloud for cross-device development") — the "gitignored, local-only" note below this line is stale from before that change. It's meant to travel with the repo across devices now, so keep committing it at milestone boundaries.
@@ -68,7 +68,7 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
-**M6 (Recurring Rules, Templates & the Inbox) — CODE-COMPLETE on branch `m6-recurring`, committed `da944a5`, NOT yet PR'd/merged.** Core-first: **266 → 311 tests** (+45). Typecheck/lint/build/prettier clean; dev-server smoke passed (routes 200, no runtime errors). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). Remaining: **user browser-verify**, then PR + merge. See "M6 decisions and delivered code" below.
+**M6 (Recurring Rules, Templates & the Inbox) — CODE-COMPLETE on branch `m6-recurring`, committed `da944a5`, NOT yet PR'd/merged.** Core-first: **266 → 312 tests** (+45). Typecheck/lint/build/prettier clean; dev-server smoke passed (routes 200, no runtime errors). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). Remaining: **user browser-verify**, then PR + merge. See "M6 decisions and delivered code" below.
 
 **Execution order note:** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and then to keep going with product milestones rather than stopping for M8. M8 remains blocked on their Google Cloud setup. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`, but **the user explicitly picked M5 next over M6** after M4 shipped — a deliberate re-ordering, not an oversight. **Do NOT silently "correct" this back to M6** — the dependency graph permits it either way (M5 needs M4+M3, both done; M6 needs only M3), so there's no technical reason to override the user's stated choice. If a future session is unsure which is next, ask rather than assume the impl doc's default order still holds.
 
@@ -114,6 +114,10 @@ f4bdd4e M0: scaffold Next.js static-export app + toolchain
   - **Nav** (`AppNav.tsx`) — added **Inbox** (with a live **pending-count badge** via `pendingCountAtom`) + **Recurring** links.
   - **Store** — `recurringRulesAtom` (+ in `refreshAtom`), derived `templatesAtom`/`pendingCountAtom`, and **`runRecurringGenerationAtom`** run on bootstrap (after ready, §8.6 background) — generates due occurrences for active rules, dispatches create + cursor-advance ops.
 - **Scope note / deferred to M7 (as specced):** `amount_mode='goal_derived'` amount is stubbed to `template_amount` (M7 wires `required_monthly` from the linked goal, §5.9.5); `linked_goal_id` is carried but nothing sets it yet (goals are M7). Nothing from the M6 spec scope was cut.
+- **Post-first-verify fixes (user feedback, commit `c593d47`) — keep these:**
+  1. **Editing a rule is forward-looking:** on edit the cursor is **reset to `firstOccurrenceOnOrAfter(editedRule, today)`**, not preserved from the old rule — preserving it could **mass-backfill** on a frequency increase if the old cursor sat in a past due-window. Already-generated pending/approved rows are left as independent proposals (the user edits/dismisses pending ones in the inbox); editing does not retro-rewrite them.
+  2. **Generation runs immediately after create/edit** (`RecurringView` calls `runRecurringGenerationAtom` after the dispatch) — was **boot-only**, so a new rule's due/backfilled occurrences didn't hit the inbox until a refresh (bad on mobile).
+  3. **`pendingRows` now uses the chain-walk liveness** (`liveIds` was parametrized with a reverser predicate; the Inbox passes "pending reversals count"). The old flat "is this id reversed by anything?" check meant **undoing a dismiss never restored the row** (the dismiss void still pointed at it). Dismiss → undo → redo now behaves like the ledger's void chain.
 
 ### M5 decisions and delivered code (this session, branch `m5-reporting`)
 - **No new ops, no schema/DB change.** M5 is a pure derived-view layer over the existing tables — every number is computed on demand (spec §7: only the core tables persist; dashboards are re-derivable views). `DB_VERSION` stays 2.
@@ -285,7 +289,7 @@ All in `src/core/` (pure TS; only idb/zod deps):
 **On native Windows (this session's environment, `E:\GitHub\yaccount`):**
 ```bash
 node -v           # must be >=20.19 or >=22.12 — vitest 4/rolldown/vite 8 refuse to start below that
-npm test          # vitest — 311 passing at M6
+npm test          # vitest — 312 passing at M6
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
