@@ -1,10 +1,10 @@
 # yaccount — Handoff
 
 > ## 🚧 **M11 IS IN PROGRESS — READ [`M11-HANDOFF.md`](M11-HANDOFF.md) FIRST.**
-> Branch `m11-design-polish` (pushed). Phases 1, 1.5, 2, 3, 4 and 5 of 10 are done, user browser-tested
-> and committed; **Phase 6 (filters + mobile density on the other 5 list views) is next**. The approved
-> design direction, the phase table, per-phase decisions and the working protocol all live in that
-> file. The approved plan is [`M11-PLAN.md`](M11-PLAN.md). Test count is **659** (was 407 at M9).
+> Branch `m11-design-polish` (pushed). Phases 1, 1.5, 2, 3, 4, 5 and 6 of 10 are done, user
+> browser-tested and committed; **Phase 7 (Dashboard v2) is next**. The approved design direction, the
+> phase table, per-phase decisions and the working protocol all live in that file. The approved plan is
+> [`M11-PLAN.md`](M11-PLAN.md). Test count is **715** (was 407 at M9).
 >
 > **⚠️ Three things below are now STALE — `M11-HANDOFF.md` and spec §12 win:**
 > 1. **The design language is no longer the M2 shadcn-neutral ramp.** Spec §12 was **edited
@@ -15,8 +15,9 @@
 >    **Read spec §12 itself — the passages marked (M11) are the current law.**
 > 2. **New UI code composes `src/features/ui/` primitives** (`Figure`, `Money`, `Eyebrow`,
 >    `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`,
->    `ListSkeleton`) rather than hand-rolling Tailwind classes. `theme.test.ts` holds the token ramp to
->    WCAG AA in both themes — if you change a colour token, that test tells you what it costs.
+>    `ListSkeleton`, `PageHeader`, `RowActions`, `CollapsibleSection`) rather than hand-rolling Tailwind
+>    classes. `theme.test.ts` holds the token ramp to WCAG AA in both themes — if you change a colour
+>    token, that test tells you what it costs.
 > 3. **`AppNav.tsx` is gone (Phase 4), and so is `ledger/ComposeBar.tsx` (Phase 5).** Navigation is now
 >    `src/features/shell/` — one destination registry (`nav.ts`) behind a bottom tab bar
 >    (Home · Ledger · Inbox · More) below `lg`, a sidebar rail from `lg`, a More sheet, a quick-add FAB
