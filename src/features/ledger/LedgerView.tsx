@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
@@ -117,6 +118,8 @@ export function LedgerView() {
   const flashed = useAtomValue(flashedRowAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [editing, setEditing] = useState<Transaction | null>(null);
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11 — a filter
@@ -124,26 +127,31 @@ export function LedgerView() {
   // exception is arriving from a dashboard drill-down: the `/ledger?…` link seeds
   // the rail once, on mount, and then the URL is cleared so it behaves like any
   // hand-typed filter — clearable, and gone on the next visit.
+  //
+  // The seed reads `useSearchParams`, NOT `window.location`: during a client
+  // navigation the address bar updates a beat after this first renders, so
+  // reading the window here seeded an empty filter while the URL visibly carried
+  // one. The hook is synced to the router and correct on that first render.
   const [sort, setSort] = useLocalPref(SORT_KEY, "newest", isRegisterSort);
-  const [draft, setDraft] = useState<FilterDraft>(() =>
-    typeof window === "undefined"
-      ? NO_FILTER
-      : parseLedgerQuery(window.location.search).draft,
+  const [draft, setDraft] = useState<FilterDraft>(
+    () => parseLedgerQuery(searchParams.toString()).draft,
   );
   const filter = useMemo(() => toFilter(draft), [draft]);
   const filtering = isFilterActive(filter);
 
   // A `focus=` link scrolls to and flashes one row (the same landing the ⌘K
-  // palette gives a search hit). Once read, the query is stripped so a refresh
-  // returns the plain ledger and the drill-down doesn't outlive its click.
-  // `flashRow`/`replaceState` are side effects, not React state, so this is not
-  // the `setState`-in-an-effect the repo's ESLint forbids.
+  // palette gives a search hit). Then the query is stripped so the drill-down is
+  // clearable and a refresh returns the plain ledger — the seeded draft survives
+  // the strip, since its initializer only runs once. `flashRow`/`router.replace`
+  // are side effects, not React state, so this is not the `setState`-in-an-effect
+  // the repo's ESLint forbids.
   useEffect(() => {
-    if (typeof window === "undefined" || !window.location.search) return;
-    const { focus } = parseLedgerQuery(window.location.search);
+    const query = searchParams.toString();
+    if (!query) return;
+    const { focus } = parseLedgerQuery(query);
     if (focus) flashRow({ id: focus, scroll: true });
-    window.history.replaceState(null, "", window.location.pathname);
-  }, [flashRow]);
+    router.replace("/ledger", { scroll: false });
+  }, [searchParams, flashRow, router]);
 
   // Stable for the session's render; `core` stays clock-free (§ engine).
   const today = useMemo(() => todayIso(), []);
