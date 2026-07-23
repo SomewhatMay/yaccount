@@ -18,6 +18,10 @@ export function Sparkline({
   area = false,
   strokeWidth = 1.5,
   className,
+  // Pulled out of the spread deliberately: `style` is where the height lives, so
+  // a caller setting `color` on it (the category-tinted sparkline in the
+  // breakdown legend) would otherwise replace the height and squash the curve.
+  style,
   ...props
 }: {
   values: number[];
@@ -40,8 +44,8 @@ export function Sparkline({
       aria-hidden="true"
       focusable="false"
       className={cn("block w-full overflow-visible", className)}
-      style={{ height }}
       {...props}
+      style={{ height, ...style }}
     >
       {area && <path d={geometry.area} fill="currentColor" fillOpacity={0.14} />}
       <path

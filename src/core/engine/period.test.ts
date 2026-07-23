@@ -4,6 +4,7 @@ import {
   inRange,
   monthKeysInRange,
   monthsInRange,
+  precedingRange,
   trailingDays,
   type ReportingPeriod,
 } from "./period";
@@ -146,5 +147,47 @@ describe("trailingDays — the day axis behind a curve (M11)", () => {
   it("spans exactly the count asked for", () => {
     expect(trailingDays(TODAY, 90)).toHaveLength(90);
     expect(trailingDays(TODAY, 90)[0]).toBe("2026-04-23");
+  });
+});
+
+describe("precedingRange — the window a KPI is compared against (M11)", () => {
+  it("is the same number of days, ending the day before the window opens", () => {
+    // Apr 21 … Jul 21 is 92 days; the 92 days before it are Jan 19 … Apr 20.
+    expect(precedingRange({ start: "2026-04-21", end: "2026-07-21" })).toEqual({
+      start: "2026-01-19",
+      end: "2026-04-20",
+    });
+  });
+
+  it("matches length exactly across months of different sizes", () => {
+    // July (31 days) is compared against the 31 days before it, not against June.
+    expect(precedingRange({ start: "2026-07-01", end: "2026-07-31" })).toEqual({
+      start: "2026-05-31",
+      end: "2026-06-30",
+    });
+  });
+
+  it("a single day compares against the day before", () => {
+    expect(precedingRange({ start: "2026-07-21", end: "2026-07-21" })).toEqual({
+      start: "2026-07-20",
+      end: "2026-07-20",
+    });
+  });
+
+  it("crosses a leap day by the calendar", () => {
+    expect(precedingRange({ start: "2028-03-01", end: "2028-03-01" })).toEqual({
+      start: "2028-02-29",
+      end: "2028-02-29",
+    });
+  });
+
+  it("has no answer for an unbounded window — 'all time' has no 'before'", () => {
+    expect(precedingRange({ start: null, end: null })).toBeNull();
+    expect(precedingRange({ start: "2026-01-01", end: null })).toBeNull();
+    expect(precedingRange({ start: null, end: "2026-01-01" })).toBeNull();
+  });
+
+  it("has no answer for an inverted window", () => {
+    expect(precedingRange({ start: "2026-07-21", end: "2026-07-01" })).toBeNull();
   });
 });

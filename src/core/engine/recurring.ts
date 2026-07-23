@@ -259,3 +259,62 @@ export function generateDueOccurrences(
 
   return { rows, rule: { ...rule, next_generation_date: cursor } };
 }
+
+export interface UpcomingOccurrence {
+  rule: RecurringRule;
+  date: ISO;
+  /** What it will cost, when the rule knows. Null for a goal-derived rule with
+   *  nothing stored — its ask is recomputed at generation time (§5.9.5), and a
+   *  guess printed as a commitment would be worse than an honest blank. */
+  amount: number | null;
+}
+
+/**
+ * What is coming, between `from` and `to` inclusive (M11) — a read over the same
+ * occurrence grid `generateDueOccurrences` walks, but it **generates nothing**.
+ * Nothing here touches `next_generation_date`, so opening the dashboard can never
+ * put a row in the Inbox.
+ *
+ * It reads the SCHEDULE, not the cursor: a rule whose occurrences have already
+ * been generated still shows what it owes next, which is the question "coming up"
+ * asks. A rule that has not started yet, one that has ended, and a paused one all
+ * say nothing.
+ *
+ * Ordered by date, then payee, then rule id, so two devices list them the same
+ * way (§8.5). `limit` bounds the answer — a daily rule over a long window would
+ * otherwise return a wall of rows nothing has room for.
+ */
+export function upcomingOccurrences(
+  rules: RecurringRule[],
+  from: ISO,
+  to: ISO,
+  opts: { limit?: number } = {},
+): UpcomingOccurrence[] {
+  const limit = opts.limit ?? 20;
+  const out: UpcomingOccurrence[] = [];
+
+  for (const rule of rules) {
+    if (rule.status === "cancelled") continue;
+    // A rule can't occur before it starts — the occurrence grid itself extends
+    // backwards, so the window has to be clamped or a rule starting in September
+    // would report a date in July.
+    const begin = from > rule.start_date ? from : rule.start_date;
+    if (begin > to) continue;
+
+    let date = firstOccurrenceOnOrAfter(rule, begin);
+    for (let guard = 0; date <= to && guard < 1000; guard++) {
+      if (endedBy(rule, date)) break;
+      out.push({ rule, date, amount: rule.template_amount });
+      date = nextOccurrence(rule, date);
+    }
+  }
+
+  return out
+    .sort(
+      (a, b) =>
+        (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) ||
+        a.rule.template_vendor_source.localeCompare(b.rule.template_vendor_source) ||
+        (a.rule.id < b.rule.id ? -1 : a.rule.id > b.rule.id ? 1 : 0),
+    )
+    .slice(0, limit);
+}

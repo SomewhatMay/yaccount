@@ -31,8 +31,12 @@ export function PageHeader({
 }) {
   return (
     <section className="pt-3 pb-1">
+      {/* The eyebrow never shrinks: it is two words, and letting flexbox take
+          width from it wraps "DASHBOARD" onto two lines to save a control eight
+          pixels. The action absorbs the squeeze instead — the dashboard's period
+          picker wraps its own chips when there isn't room. */}
       <div className="flex min-h-8 items-center justify-between gap-3">
-        <Eyebrow>{eyebrow}</Eyebrow>
+        <Eyebrow className="shrink-0">{eyebrow}</Eyebrow>
         {action}
       </div>
       <h1 className="figure-lg mt-1.5">{title}</h1>

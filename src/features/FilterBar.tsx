@@ -152,8 +152,10 @@ function SortSelect<T extends string>({ sort }: { sort: SortControl<T> }) {
 }
 
 /** A chip reads as chosen through the brand colour, not a filled plate — §12.2
- *  spends iris on the few things that are genuinely active. */
-function chipClass(active: boolean): string {
+ *  spends iris on the few things that are genuinely active. Exported so the
+ *  dashboard's period chips are the same object as a filter chip rather than a
+ *  second thing that looks nearly like one. */
+export function chipClass(active: boolean): string {
   return cn(
     "h-8 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap transition-colors duration-[var(--dur-1)] ease-[var(--ease-register)]",
     active

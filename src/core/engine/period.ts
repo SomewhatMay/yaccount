@@ -1,12 +1,24 @@
-import { subDays, subMonths, format } from "date-fns";
+import { differenceInCalendarDays, subDays, subMonths, format } from "date-fns";
 
 /**
  * The unified reporting-period control (§6.1). One global window drives every
  * dashboard widget; two-range compare (§6.2) is just two of these resolved
  * independently. Per-widget override is deferred to M11.
  */
-export type PeriodPreset =
-  "last-month" | "last-3-months" | "last-6-months" | "last-12-months" | "ytd" | "all";
+export const PERIOD_PRESETS = [
+  "last-month",
+  "last-3-months",
+  "last-6-months",
+  "last-12-months",
+  "ytd",
+  "all",
+] as const;
+export type PeriodPreset = (typeof PERIOD_PRESETS)[number];
+
+/** Whether a stored period preference names a window this build can resolve. */
+export function isPeriodPreset(value: string): value is PeriodPreset {
+  return (PERIOD_PRESETS as readonly string[]).includes(value);
+}
 
 export type ReportingPeriod =
   | { kind: "preset"; preset: PeriodPreset }
@@ -72,6 +84,28 @@ export function trailingDays(today: string, count: number): string[] {
     out.push(format(subDays(end, back), "yyyy-MM-dd"));
   }
   return out;
+}
+
+/**
+ * The window immediately before this one, of the same length (M11).
+ *
+ * What "▲ 18% vs. previous period" is measured against. It is deliberately the
+ * same NUMBER OF DAYS rather than the previous calendar month: a 31-day July
+ * compared against a 28-day February would report a fifth more spending on
+ * arithmetic alone, and a KPI that moves when nothing happened is worse than no
+ * KPI. An unbounded window has no "before" — "all time" is already everything —
+ * so it answers `null` rather than inventing one.
+ */
+export function precedingRange(range: DateRange): DateRange | null {
+  if (range.start === null || range.end === null) return null;
+  const start = parseDay(range.start);
+  const days = differenceInCalendarDays(parseDay(range.end), start) + 1;
+  if (days <= 0) return null; // inverted window: nothing to compare
+  const end = subDays(start, 1);
+  return {
+    start: format(subDays(end, days - 1), "yyyy-MM-dd"),
+    end: format(end, "yyyy-MM-dd"),
+  };
 }
 
 /** The yearMonth key ("2026-07") of an ISO date. */

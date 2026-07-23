@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Eyebrow,
+  PageHeader,
   FigureSkeleton,
   LeaderRow,
   ListSkeleton,
@@ -110,16 +111,10 @@ export function PlanView() {
 
   return (
     <div className="space-y-6">
-      <section className="flex items-end justify-between pt-3 pb-1">
-        <div>
-          <Eyebrow>Monthly plan</Eyebrow>
-          <h1 className="figure-lg mt-1.5">Every dollar a purpose</h1>
-          <p className="text-muted-foreground mt-3 max-w-md text-sm">
-            Give the month&apos;s income a job — steady category allowances and goal
-            contributions — until nothing is left unassigned.
-          </p>
-        </div>
-      </section>
+      <PageHeader eyebrow="Monthly plan" title="Every dollar a purpose">
+        Give the month&apos;s income a job — steady category allowances and goal
+        contributions — until nothing is left unassigned.
+      </PageHeader>
 
       <div className="flex items-center gap-2">
         <Button

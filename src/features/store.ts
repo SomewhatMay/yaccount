@@ -125,17 +125,13 @@ export const flashRowAtom = atom(
 );
 
 /**
- * The unified global reporting-period control (§6.1). One period drives every
- * dashboard widget (per-widget override is deferred to M11). `comparePeriodAtom`
- * holds the optional second range for two-range compare (§6.2); null = compare
- * off. These carry only the period *descriptor* — resolution to a concrete range
- * needs `today`, which the view supplies, keeping the atoms free of clock state.
+ * The reporting period (§6.1) used to live here as two plain atoms, which meant
+ * it reset on every refresh — you chose a window, reloaded, and were quietly
+ * looking at a different one. It is a device-local VIEW preference, so M11 moved
+ * it to `features/reports/period-pref.ts` over `prefs.ts` (localStorage,
+ * `useSyncExternalStore`) alongside the per-widget overrides and folds, which are
+ * keyed the same way. Nothing about a period belongs in the synced op log.
  */
-export const reportingPeriodAtom = atom<ReportingPeriod>({
-  kind: "preset",
-  preset: "last-3-months",
-});
-export const comparePeriodAtom = atom<ReportingPeriod | null>(null);
 
 let repoPromise: Promise<Repo> | null = null;
 function getRepo(): Promise<Repo> {

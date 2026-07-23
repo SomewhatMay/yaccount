@@ -3,6 +3,7 @@ import {
   firstOccurrenceOnOrAfter,
   nextOccurrence,
   generateDueOccurrences,
+  upcomingOccurrences,
 } from "@/core/engine/recurring";
 import { makeRecurringRule, type IntervalConfig } from "@/core/model";
 
@@ -193,5 +194,87 @@ describe("generateDueOccurrences — a cancelled rule is inert", () => {
   it("generates nothing while cancelled", () => {
     const r = rule("daily", {}, { status: "cancelled" });
     expect(generateDueOccurrences(r, "2027-01-01").rows).toEqual([]);
+  });
+});
+
+// ── M11: what is coming, without generating anything ─────────────────────────
+describe("upcomingOccurrences — the commitments ahead of you (M11)", () => {
+  const rent = rule(
+    "monthly",
+    { day_of_month: 25 },
+    { id: "rent", template_vendor_source: "Rent", template_amount: -185000 },
+  );
+  const gym = rule(
+    "monthly",
+    { day_of_month: 1 },
+    { id: "gym", template_vendor_source: "Gym", template_amount: -4500 },
+  );
+
+  it("walks each rule's grid inside the window, earliest first", () => {
+    expect(upcomingOccurrences([rent, gym], "2026-07-22", "2026-08-21")).toEqual([
+      { rule: rent, date: "2026-07-25", amount: -185000 },
+      { rule: gym, date: "2026-08-01", amount: -4500 },
+    ]);
+  });
+
+  it("is inclusive of both ends", () => {
+    expect(
+      upcomingOccurrences([rent], "2026-07-25", "2026-07-25").map((o) => o.date),
+    ).toEqual(["2026-07-25"]);
+    expect(upcomingOccurrences([rent], "2026-07-26", "2026-08-24")).toEqual([]);
+  });
+
+  it("says nothing about a paused rule or one that has already ended", () => {
+    const paused = rule("monthly", { day_of_month: 25 }, { status: "cancelled" });
+    const ended = rule(
+      "monthly",
+      { day_of_month: 25 },
+      { id: "ended", end_date: "2026-07-24" },
+    );
+    expect(upcomingOccurrences([paused, ended], "2026-07-22", "2026-08-21")).toEqual([]);
+  });
+
+  it("ignores a rule that has not started yet", () => {
+    const future = rule(
+      "monthly",
+      { day_of_month: 25 },
+      { id: "future", start_date: "2026-09-01" },
+    );
+    expect(upcomingOccurrences([future], "2026-07-22", "2026-08-21")).toEqual([]);
+  });
+
+  it("lists every occurrence a frequent rule owes, capped by the limit", () => {
+    const coffee = rule("daily", {}, { id: "coffee", template_amount: -450 });
+    expect(upcomingOccurrences([coffee], "2026-07-22", "2026-07-31")).toHaveLength(10);
+    expect(
+      upcomingOccurrences([coffee], "2026-07-22", "2026-07-31", { limit: 3 }),
+    ).toHaveLength(3);
+  });
+
+  it("carries no amount for a goal-derived rule that has none stored", () => {
+    const goalRule = rule(
+      "monthly",
+      { day_of_month: 25 },
+      { id: "goal", amount_mode: "goal_derived", template_amount: null },
+    );
+    expect(
+      upcomingOccurrences([goalRule], "2026-07-22", "2026-08-21")[0].amount,
+    ).toBeNull();
+  });
+
+  it("orders same-day occurrences by name then id, so two devices agree (§8.5)", () => {
+    const zzz = rule(
+      "monthly",
+      { day_of_month: 25 },
+      { id: "a", template_vendor_source: "Zzz" },
+    );
+    const aaa = rule(
+      "monthly",
+      { day_of_month: 25 },
+      { id: "b", template_vendor_source: "Aaa" },
+    );
+    expect(
+      upcomingOccurrences([zzz, aaa], "2026-07-22", "2026-07-26").map((o) => o.rule.id),
+    ).toEqual(["b", "a"]);
   });
 });

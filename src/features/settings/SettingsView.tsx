@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DiagnosticsPanel } from "@/features/settings/DiagnosticsPanel";
 import { ErrorBoundary } from "@/features/ErrorBoundary";
-import { Eyebrow } from "@/features/ui";
+import { PageHeader } from "@/features/ui";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -14,10 +14,10 @@ import { Button } from "@/components/ui/button";
 export function SettingsView() {
   return (
     <div className="space-y-8">
-      <section className="pt-3 pb-1">
-        <Eyebrow>Settings</Eyebrow>
-        <h1 className="figure-lg mt-1.5">Under the hood</h1>
-      </section>
+      <PageHeader eyebrow="Settings" title="Under the hood">
+        How this copy of yaccount is running, and what to send along when something goes
+        wrong.
+      </PageHeader>
 
       <ErrorBoundary label="Diagnostics">
         <DiagnosticsPanel />
