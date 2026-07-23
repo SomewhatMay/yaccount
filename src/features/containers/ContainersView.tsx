@@ -34,7 +34,10 @@ import {
   type ContainerSnapshot,
 } from "@/core/model";
 import { cn } from "@/lib/utils";
-import { ContainerSheet } from "@/features/containers/ContainerSheet";
+import {
+  ContainerSheet,
+  type ContainerFormInput,
+} from "@/features/containers/ContainerSheet";
 import { LogBalanceSheet } from "@/features/containers/LogBalanceSheet";
 import {
   activeContainerFilterCount,
@@ -151,10 +154,14 @@ export function ContainersView() {
     return by;
   }, [snapshots]);
 
-  async function add(input: { name: string; is_investment: boolean }) {
+  async function add(input: ContainerFormInput) {
     await dispatch(createContainer(input));
     toast.success("Container added", {
-      description: `${input.name} · not counted in your overall balance yet`,
+      description: `${input.name} · ${
+        input.include_in_overall_balance
+          ? "counting toward your overall balance"
+          : "not counted in your overall balance"
+      }`,
     });
     setCreating(false);
   }

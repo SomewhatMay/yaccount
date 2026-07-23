@@ -6,6 +6,7 @@ import type { Container } from "@/core/model";
 import { nameTaken } from "@/features/unique-name";
 import { ResponsiveSheet } from "@/features/ui";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SheetFooter } from "@/components/ui/sheet";
@@ -18,6 +19,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
  * per-container switches — counted, investment, default wallet — stay in the
  * row's `⋯` menu, because they are edits to something that already exists.
  */
+export interface ContainerFormInput {
+  name: string;
+  is_investment: boolean;
+  include_in_overall_balance: boolean;
+}
+
 export function ContainerSheet({
   open,
   siblings,
@@ -27,7 +34,7 @@ export function ContainerSheet({
   open: boolean;
   siblings: Container[];
   onOpenChange: (open: boolean) => void;
-  onSubmit: (input: { name: string; is_investment: boolean }) => Promise<void>;
+  onSubmit: (input: ContainerFormInput) => Promise<void>;
 }) {
   return (
     <ResponsiveSheet
@@ -47,10 +54,14 @@ function ContainerForm({
   onSubmit,
 }: {
   siblings: Container[];
-  onSubmit: (input: { name: string; is_investment: boolean }) => Promise<void>;
+  onSubmit: (input: ContainerFormInput) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [investment, setInvestment] = useState(false);
+  // Unchecked to start: §5.7's overall balance is opt-in and stays opt-in. What
+  // changed is that the choice is now ON the form — "why isn't my money in the
+  // headline" was a surprise you met later, at the far end of a ⋯ menu.
+  const [counted, setCounted] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,7 +70,11 @@ function ContainerForm({
     if (nameTaken(siblings, trimmed)) {
       return toast.error("You already have a container with that name.");
     }
-    await onSubmit({ name: trimmed, is_investment: investment });
+    await onSubmit({
+      name: trimmed,
+      is_investment: investment,
+      include_in_overall_balance: counted,
+    });
   }
 
   return (
@@ -104,10 +119,28 @@ function ContainerForm({
           </p>
         </div>
 
-        <p className="text-muted-foreground text-xs">
-          A new container stays out of your overall balance until you say otherwise — you
-          can count it from its ⋯ menu any time.
-        </p>
+        <div className="grid gap-1.5">
+          <Label>Overall balance</Label>
+          {/* Checkbox and Label are SIBLINGS tied by id — Radix renders a
+              <button>, and a label wrapped around its own control leaves "did
+              that click toggle once or twice" to the browser. */}
+          <div className="flex items-start gap-2.5">
+            <Checkbox
+              id="ct-counted"
+              checked={counted}
+              onCheckedChange={(v) => setCounted(v === true)}
+              className="mt-0.5"
+            />
+            <Label htmlFor="ct-counted" className="cursor-pointer font-normal">
+              Count this in my overall balance
+            </Label>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {counted
+              ? "Its balance adds to the figure at the top of your ledger."
+              : "Money in here won't show in the figure at the top of your ledger — which is what you want for savings you've already set aside. You can change this any time."}
+          </p>
+        </div>
       </div>
 
       <SheetFooter className="mt-auto">
