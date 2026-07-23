@@ -14,6 +14,7 @@ export { LeaderRow } from "@/features/ui/LeaderRow";
 export { ListSkeleton, FigureSkeleton } from "@/features/ui/ListSkeleton";
 export { Marginalia } from "@/features/ui/Marginalia";
 export { Money, type MoneyTone } from "@/features/ui/Money";
+export { PageHeader } from "@/features/ui/PageHeader";
 export { ResponsiveSheet } from "@/features/ui/ResponsiveSheet";
 export { RuledTotal } from "@/features/ui/RuledTotal";
 export { Sparkline } from "@/features/ui/Sparkline";

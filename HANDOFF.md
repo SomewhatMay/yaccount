@@ -23,7 +23,14 @@
 >    + sheet, and a ⌘K palette. **Writing a transaction is the FAB + quick-add sheet**, over
 >    `ledger/compose.ts` + `useComposeFields`; the ledger no longer carries an inline compose bar
 >    (Categories and Containers still do, so the §12.4 pattern stands).
-> 4. **One filter predicate, one filter rail (Phase 5).** `core/engine/filter.ts`
+> 4. **The inline compose bar is RETIRED (Phase 6 fix round, 2026-07-22 — the user's call).**
+>    **Creating anything opens a `ResponsiveSheet`**, from a `PageHeader` "New" action or, for a
+>    transaction, the quick-add FAB. `ledger/ComposeBar.tsx` was deleted in Phase 5; Categories and
+>    Containers lost theirs in Phase 6 (`CategorySheet`/`ContainerSheet`). The cheat-sheet's
+>    "create→compose-bar" and "create = inline" lines below are **stale** — spec §12.4 (M11) is the
+>    rule now, and `border-primary/15 bg-primary/[0.04]` is not a pattern in this app any more.
+>    Single-field **rename stays inline** (§12.4-a) — that exception is unchanged.
+> 5. **One filter predicate, one filter rail (Phase 5).** `core/engine/filter.ts`
 >    (`matchesFilter`/`applyFilter`) is the shared rule — `searchTransactions` is now its text half —
 >    and `src/features/FilterBar.tsx` is the shared rail, generic over facets so a list view supplies
 >    facets rather than forking it. View preferences persist through `src/features/prefs.ts`

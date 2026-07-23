@@ -73,7 +73,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
-import { CollapsibleSection, EmptyState, Eyebrow } from "@/features/ui";
+import { CollapsibleSection, EmptyState, Eyebrow, PageHeader } from "@/features/ui";
 
 /** Device-local: how you like to READ your goals, not a fact about them. */
 const SORT_KEY = "yaccount.goals.sort";
@@ -248,20 +248,19 @@ export function GoalsView() {
 
   return (
     <div className="space-y-6">
-      <section className="flex items-end justify-between pt-3 pb-1">
-        <div>
-          <Eyebrow>Goals</Eyebrow>
-          <h1 className="figure-lg mt-1.5">Savings goals</h1>
-          <p className="text-muted-foreground mt-3 max-w-md text-sm">
-            Give every pool of money a purpose and a pace. Progress tracks what you set
-            aside — not what&apos;s left to spend.
-          </p>
-        </div>
-        <Button className="rounded-full" onClick={() => setSheet("new")}>
-          <PlusIcon className="size-4" />
-          New
-        </Button>
-      </section>
+      <PageHeader
+        eyebrow="Goals"
+        title="Savings goals"
+        action={
+          <Button className="rounded-full" onClick={() => setSheet("new")}>
+            <PlusIcon className="size-4" />
+            New
+          </Button>
+        }
+      >
+        Give every pool of money a purpose and a pace. Progress tracks what you set aside
+        — not what&apos;s left to spend.
+      </PageHeader>
 
       {goals.length > 0 && (
         <FilterBar
@@ -312,7 +311,21 @@ export function GoalsView() {
               see them.
             </EmptyState>
           ) : (
-            <EmptyState icon={TargetIcon} title="No goals yet">
+            <EmptyState
+              icon={TargetIcon}
+              title="No goals yet"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setSheet("new")}
+                >
+                  <PlusIcon className="size-4" />
+                  New goal
+                </Button>
+              }
+            >
               Start one to save toward something specific — a trip, a deposit, a buffer
               you don&apos;t want to touch.
             </EmptyState>

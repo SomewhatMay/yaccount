@@ -33,7 +33,7 @@ import { FilterBar } from "@/features/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { EmptyState, Eyebrow, Money, RowActions } from "@/features/ui";
+import { EmptyState, Money, PageHeader, RowActions } from "@/features/ui";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -183,16 +183,13 @@ export function InboxView() {
 
   return (
     <div className="space-y-6">
-      <section className="pt-3 pb-1">
-        <Eyebrow>Inbox</Eyebrow>
-        <h1 className="figure-lg mt-1.5">
-          {pending.length === 0 ? "All clear" : `${pending.length} to review`}
-        </h1>
-        <p className="text-muted-foreground mt-3 text-sm">
-          Recurring transactions wait here until you approve them. Nothing counts toward a
-          balance until it does.
-        </p>
-      </section>
+      <PageHeader
+        eyebrow="Inbox"
+        title={pending.length === 0 ? "All clear" : `${pending.length} to review`}
+      >
+        Recurring transactions wait here until you approve them. Nothing counts toward a
+        balance until it does.
+      </PageHeader>
 
       {pending.length > 0 && (
         <FilterBar

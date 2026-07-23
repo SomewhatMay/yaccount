@@ -29,6 +29,7 @@ import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
 import { BudgetSheet } from "@/features/categories/BudgetSheet";
+import { CategorySheet } from "@/features/categories/CategorySheet";
 import {
   activeCategoryFilterCount,
   applyCategoryFilter,
@@ -45,16 +46,14 @@ import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { todayIso } from "@/features/clock";
-import { CollapsibleSection, EmptyState, Eyebrow, RowActions } from "@/features/ui";
+import {
+  CollapsibleSection,
+  EmptyState,
+  Eyebrow,
+  PageHeader,
+  RowActions,
+} from "@/features/ui";
 
 /** Device-local: how you like to READ the list, not a fact about your money. */
 const SORT_KEY = "yaccount.categories.sort";
@@ -93,8 +92,7 @@ export function CategoriesView() {
   const categories = useAtomValue(categoriesAtom);
   const budgetTargets = useAtomValue(budgetTargetsAtom);
   const dispatch = useSetAtom(dispatchAtom);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<CategoryType>("expense");
+  const [creating, setCreating] = useState(false);
   const [budgeting, setBudgeting] = useState<Category | null>(null);
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11).
@@ -129,61 +127,30 @@ export function CategoriesView() {
     toast.success("Restored", { description: c.name });
   }
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return toast.error("Name the category.");
-    if (nameTaken(categories, trimmed)) {
-      return toast.error("You already have a category with that name.");
-    }
-    await dispatch(createCategory({ name: trimmed, type }));
-    toast.success("Category added", { description: `${trimmed} · ${type}` });
-    setName("");
+  async function add(input: { name: string; type: CategoryType }) {
+    await dispatch(createCategory(input));
+    toast.success("Category added", {
+      description: `${input.name} · ${input.type}`,
+    });
+    setCreating(false);
   }
 
   if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
 
   return (
     <div className="space-y-6">
-      <section className="pt-3 pb-1">
-        <h1 className="figure-lg">Categories</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          What your money does. Rename or archive anytime — old transactions keep their
-          label.
-        </p>
-      </section>
-
-      <form
-        onSubmit={add}
-        className="border-primary/15 bg-primary/[0.04] rounded-2xl border p-2"
-      >
-        <div className="grid grid-cols-2 items-center gap-1.5 sm:grid-cols-[1fr_9rem_auto]">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Name a category (e.g. Groceries)"
-            aria-label="Category name"
-            className="col-span-2 border-0 bg-transparent shadow-none focus-visible:ring-0 sm:col-span-1"
-          />
-          <Select value={type} onValueChange={(v) => setType(v as CategoryType)}>
-            <SelectTrigger className="border-0 bg-transparent shadow-none focus-visible:ring-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="expense">Expense</SelectItem>
-              <SelectItem value="income">Income</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            type="submit"
-            size="icon"
-            aria-label="Add category"
-            className="justify-self-end rounded-xl"
-          >
+      <PageHeader
+        eyebrow="Categories"
+        title="What your money does"
+        action={
+          <Button className="rounded-full" onClick={() => setCreating(true)}>
             <PlusIcon className="size-4" />
+            New
           </Button>
-        </div>
-      </form>
+        }
+      >
+        Rename or archive anytime — old transactions keep their label.
+      </PageHeader>
 
       {categories.length > 0 && (
         <FilterBar
@@ -224,9 +191,23 @@ export function CategoriesView() {
 
       {categories.length === 0 ? (
         <div className="bg-card rounded-2xl border">
-          <EmptyState icon={ShapesIcon} title="No categories yet">
-            Add a few above for what your money does — groceries, rent, salary. Every
-            entry you log is filed under one.
+          <EmptyState
+            icon={ShapesIcon}
+            title="No categories yet"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => setCreating(true)}
+              >
+                <PlusIcon className="size-4" />
+                New category
+              </Button>
+            }
+          >
+            Add a few for what your money does — groceries, rent, salary. Every entry you
+            log is filed under one.
           </EmptyState>
         </div>
       ) : expenses.length === 0 && incomes.length === 0 && archived.length === 0 ? (
@@ -315,6 +296,13 @@ export function CategoriesView() {
           ))}
         </div>
       </CollapsibleSection>
+
+      <CategorySheet
+        open={creating}
+        siblings={categories}
+        onOpenChange={setCreating}
+        onSubmit={add}
+      />
 
       <BudgetSheet
         category={budgeting}

@@ -57,8 +57,8 @@ import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
   EmptyState,
-  Eyebrow,
   Money,
+  PageHeader,
   RowActions,
 } from "@/features/ui";
 
@@ -148,20 +148,19 @@ export function RecurringView() {
 
   return (
     <div className="space-y-6">
-      <section className="flex items-end justify-between pt-3 pb-1">
-        <div>
-          <Eyebrow>Recurring</Eyebrow>
-          <h1 className="figure-lg mt-1.5">Scheduled transactions</h1>
-          <p className="text-muted-foreground mt-3 max-w-md text-sm">
-            Each rule drops one transaction into your inbox as it comes due — you always
-            approve before anything is logged.
-          </p>
-        </div>
-        <Button className="rounded-full" onClick={() => setSheet("new")}>
-          <PlusIcon className="size-4" />
-          New
-        </Button>
-      </section>
+      <PageHeader
+        eyebrow="Recurring"
+        title="Scheduled transactions"
+        action={
+          <Button className="rounded-full" onClick={() => setSheet("new")}>
+            <PlusIcon className="size-4" />
+            New
+          </Button>
+        }
+      >
+        Each rule drops one transaction into your inbox as it comes due — you always
+        approve before anything is logged.
+      </PageHeader>
 
       {rules.length > 0 && (
         <FilterBar
@@ -220,7 +219,21 @@ export function RecurringView() {
               see them.
             </EmptyState>
           ) : (
-            <EmptyState icon={RepeatIcon} title="Nothing scheduled yet">
+            <EmptyState
+              icon={RepeatIcon}
+              title="Nothing scheduled yet"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setSheet("new")}
+                >
+                  <PlusIcon className="size-4" />
+                  New rule
+                </Button>
+              }
+            >
               Add a rule to automate a bill, a paycheck or a savings transfer. Each one
               still asks before it logs anything.
             </EmptyState>
