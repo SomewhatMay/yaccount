@@ -6,9 +6,9 @@ import { toast } from "sonner";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
-  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  ShapesIcon,
   TargetIcon,
 } from "lucide-react";
 import {
@@ -25,19 +25,26 @@ import {
 } from "@/core/commands";
 import { budgetOnDate } from "@/core/engine/budgets";
 import { formatCents } from "@/core/money";
-import type { BudgetTarget, Category, CategoryType } from "@/core/model";
+import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
 import { BudgetSheet } from "@/features/categories/BudgetSheet";
+import {
+  activeCategoryFilterCount,
+  applyCategoryFilter,
+  isCategorySort,
+  sortCategories,
+  type BudgetState,
+  type CategoryFilter,
+  type CategorySort,
+  type CategoryState,
+} from "@/features/categories/filter";
+import { useLocalPref } from "@/features/prefs";
+import { FilterBar } from "@/features/FilterBar";
 import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -47,7 +54,39 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { todayIso } from "@/features/clock";
-import { Eyebrow } from "@/features/ui";
+import { CollapsibleSection, EmptyState, Eyebrow, RowActions } from "@/features/ui";
+
+/** Device-local: how you like to READ the list, not a fact about your money. */
+const SORT_KEY = "yaccount.categories.sort";
+
+const SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "budget", label: "Budget" },
+] as const;
+
+const TYPES: { value: CategoryType; label: string }[] = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+];
+
+const BUDGETS: { value: BudgetState; label: string }[] = [
+  { value: "budgeted", label: "Has a budget" },
+  { value: "unbudgeted", label: "No budget" },
+];
+
+const STATES: { value: CategoryState; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "archived", label: "Archived" },
+];
+
+interface CategoryDraft {
+  text: string;
+  types: CategoryType[];
+  budgets: BudgetState[];
+  states: CategoryState[];
+}
+
+const NO_FILTER: CategoryDraft = { text: "", types: [], budgets: [], states: [] };
 
 export function CategoriesView() {
   const ready = useAtomValue(readyAtom);
@@ -58,15 +97,32 @@ export function CategoriesView() {
   const [type, setType] = useState<CategoryType>("expense");
   const [budgeting, setBudgeting] = useState<Category | null>(null);
 
+  // Sort is remembered; the filters are deliberately not (§12.4 M11).
+  const [sort, setSort] = useLocalPref(SORT_KEY, "name", isCategorySort);
+  const [draft, setDraft] = useState<CategoryDraft>(NO_FILTER);
+  const filter: CategoryFilter = draft;
+  const filtering = activeCategoryFilterCount(filter) > 0;
+
+  // A budget is time-variant (§5.3) — a category has one *on a date*. Resolve it
+  // once here for today, and the predicate and the row read the same figure.
+  const budgetOf = useMemo(() => {
+    const today = todayIso();
+    return (c: Category) => budgetOnDate(budgetTargets, c.id, today);
+  }, [budgetTargets]);
+
   const { expenses, incomes, archived } = useMemo(() => {
-    const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
-    const active = categories.filter((c) => !c.is_archived).sort(byName);
+    const shown = sortCategories(
+      applyCategoryFilter(categories, filter, { budget: budgetOf }),
+      sort,
+      { budget: budgetOf },
+    );
+    const active = shown.filter((c) => !c.is_archived);
     return {
       expenses: active.filter((c) => c.type === "expense"),
       incomes: active.filter((c) => c.type === "income"),
-      archived: categories.filter((c) => c.is_archived).sort(byName),
+      archived: shown.filter((c) => c.is_archived),
     };
-  }, [categories]);
+  }, [categories, filter, sort, budgetOf]);
 
   async function restore(c: Category) {
     await dispatch(unarchiveCategory(c.id));
@@ -129,61 +185,136 @@ export function CategoriesView() {
         </div>
       </form>
 
-      <CategorySection
-        title="Expenses"
-        items={expenses}
-        siblings={categories}
-        budgetTargets={budgetTargets}
-        onChange={dispatch}
-        onBudget={setBudgeting}
-      />
-      <CategorySection
-        title="Income"
-        items={incomes}
-        siblings={categories}
-        budgetTargets={budgetTargets}
-        onChange={dispatch}
-        onBudget={setBudgeting}
-      />
-
-      {archived.length > 0 && (
-        <section>
-          <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
-            <Eyebrow as="h2">Archived</Eyebrow>
-            <span className="tnum font-mono text-xs">{archived.length}</span>
-          </div>
-          <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
-            {archived.map((c, i) => (
-              <div
-                key={c.id}
-                className={cn(
-                  "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
-                  i > 0 && "border-t border-dashed",
-                )}
-              >
-                <span
-                  className="size-2.5 shrink-0 rounded-full opacity-50"
-                  style={{ backgroundColor: categoryDotColor(c.id) }}
-                  aria-hidden
-                />
-                <span className="text-muted-foreground flex-1 text-sm">{c.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground h-8 rounded-lg"
-                  onClick={() => restore(c)}
-                >
-                  <ArchiveRestoreIcon className="size-4" />
-                  Restore
-                </Button>
-              </div>
-            ))}
-          </div>
-          <p className="text-muted-foreground mt-2 px-1 text-xs">
-            Hidden from pickers; old transactions still show their name. Restore any time.
-          </p>
-        </section>
+      {categories.length > 0 && (
+        <FilterBar
+          search={draft.text}
+          onSearch={(text) => setDraft((d) => ({ ...d, text }))}
+          searchPlaceholder="Search categories"
+          facets={[
+            {
+              id: "type",
+              label: "Type",
+              selected: draft.types,
+              onChange: (types) =>
+                setDraft((d) => ({ ...d, types: types as CategoryType[] })),
+              options: TYPES,
+            },
+            {
+              id: "budget",
+              label: "Budget",
+              selected: draft.budgets,
+              onChange: (budgets) =>
+                setDraft((d) => ({ ...d, budgets: budgets as BudgetState[] })),
+              options: BUDGETS,
+            },
+            {
+              id: "state",
+              label: "Status",
+              selected: draft.states,
+              onChange: (states) =>
+                setDraft((d) => ({ ...d, states: states as CategoryState[] })),
+              options: STATES,
+            },
+          ]}
+          sort={{ value: sort, options: [...SORT_OPTIONS], onChange: setSort }}
+          activeCount={activeCategoryFilterCount(filter)}
+          onClear={() => setDraft(NO_FILTER)}
+        />
       )}
+
+      {categories.length === 0 ? (
+        <div className="bg-card rounded-2xl border">
+          <EmptyState icon={ShapesIcon} title="No categories yet">
+            Add a few above for what your money does — groceries, rent, salary. Every
+            entry you log is filed under one.
+          </EmptyState>
+        </div>
+      ) : expenses.length === 0 && incomes.length === 0 && archived.length === 0 ? (
+        <div className="bg-card rounded-2xl border">
+          <EmptyState
+            title="Nothing matches those filters"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => setDraft(NO_FILTER)}
+              >
+                Clear filters
+              </Button>
+            }
+          >
+            {categories.length} categor{categories.length === 1 ? "y" : "ies"} — widen the
+            filters to see them.
+          </EmptyState>
+        </div>
+      ) : (
+        <>
+          {/* A section whose type was filtered out has nothing to say — the rail
+              above already explains why the list is shorter. */}
+          {(expenses.length > 0 || !filtering) && (
+            <CategorySection
+              title="Expenses"
+              items={expenses}
+              siblings={categories}
+              budgetOf={budgetOf}
+              sort={sort}
+              onChange={dispatch}
+              onBudget={setBudgeting}
+            />
+          )}
+          {(incomes.length > 0 || !filtering) && (
+            <CategorySection
+              title="Income"
+              items={incomes}
+              siblings={categories}
+              budgetOf={budgetOf}
+              sort={sort}
+              onChange={dispatch}
+              onBudget={setBudgeting}
+            />
+          )}
+        </>
+      )}
+
+      {/* Folded away by default (§12.4 M11 responsive density) — an archived
+          category is out of every picker, so it is never why you opened this
+          screen. The count and Restore stay reachable (§1.1). */}
+      <CollapsibleSection
+        title="Archived"
+        count={archived.length}
+        note="Hidden from pickers; old transactions still show their name. Restore any time."
+      >
+        <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
+          {archived.map((c, i) => (
+            <div
+              key={c.id}
+              className={cn(
+                "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
+                i > 0 && "border-t border-dashed",
+              )}
+            >
+              <span
+                className="size-2.5 shrink-0 rounded-full opacity-50"
+                style={{ backgroundColor: categoryDotColor(c.id) }}
+                aria-hidden
+              />
+              <span className="text-muted-foreground flex-1 truncate text-sm">
+                {c.name}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground h-8 shrink-0 rounded-lg"
+                onClick={() => restore(c)}
+              >
+                <ArchiveRestoreIcon className="size-4" />
+                Restore
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
 
       <BudgetSheet
         category={budgeting}
@@ -199,14 +330,16 @@ function CategorySection({
   title,
   items,
   siblings,
-  budgetTargets,
+  budgetOf,
+  sort,
   onChange,
   onBudget,
 }: {
   title: string;
   items: Category[];
   siblings: Category[];
-  budgetTargets: BudgetTarget[];
+  budgetOf: (c: Category) => number | null;
+  sort: CategorySort;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
   onBudget: (c: Category) => void;
 }) {
@@ -228,7 +361,10 @@ function CategorySection({
               category={c}
               siblings={siblings}
               divider={i > 0}
-              budget={budgetOnDate(budgetTargets, c.id, todayIso())}
+              budget={budgetOf(c)}
+              // Ranked by budget, the figure is what orders the list, so it has
+              // to be on every row — including the ones with none to show.
+              alwaysShowBudget={sort === "budget"}
               onChange={onChange}
               onBudget={() => onBudget(c)}
             />
@@ -244,6 +380,7 @@ function CategoryRow({
   siblings,
   divider,
   budget,
+  alwaysShowBudget,
   onChange,
   onBudget,
 }: {
@@ -251,6 +388,7 @@ function CategoryRow({
   siblings: Category[];
   divider: boolean;
   budget: number | null;
+  alwaysShowBudget: boolean;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
   onBudget: () => void;
 }) {
@@ -305,38 +443,30 @@ function CategoryRow({
         ) : (
           <span className="truncate text-sm font-medium">{category.name}</span>
         )}
-        {budget !== null && (
+        {budget !== null ? (
           <div className="text-muted-foreground truncate text-xs">
             {formatCents(budget)}/mo budget
           </div>
+        ) : (
+          alwaysShowBudget && (
+            <div className="text-muted-foreground/70 truncate text-xs">no budget set</div>
+          )
         )}
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground size-8 rounded-lg opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-            aria-label="Category actions"
-          >
-            <MoreHorizontalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditing(true)}>
-            <PencilIcon className="size-4" />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onBudget}>
-            <TargetIcon className="size-4" />
-            Budget
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={archive}>
-            <ArchiveIcon className="size-4" />
-            Archive
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActions label={`Actions for ${category.name}`}>
+        <DropdownMenuItem onClick={() => setEditing(true)}>
+          <PencilIcon className="size-4" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onBudget}>
+          <TargetIcon className="size-4" />
+          Budget
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={archive}>
+          <ArchiveIcon className="size-4" />
+          Archive
+        </DropdownMenuItem>
+      </RowActions>
     </div>
   );
 }

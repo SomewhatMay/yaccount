@@ -23,7 +23,13 @@ import {
   updateGoal,
 } from "@/core/commands";
 import { formatCents } from "@/core/money";
-import { makeGoal, newId, type Goal, type Transaction } from "@/core/model";
+import {
+  makeGoal,
+  newId,
+  type Goal,
+  type GoalKind,
+  type Transaction,
+} from "@/core/model";
 import { containerBalance } from "@/core/engine/balances";
 import {
   goalBasis,
@@ -34,6 +40,17 @@ import {
   requiredMonthly,
   requiresReplan,
 } from "@/core/engine/goals";
+import {
+  activeGoalFilterCount,
+  applyGoalFilter,
+  goalState,
+  isGoalSort,
+  sortGoals,
+  type GoalFilter,
+  type GoalState,
+} from "@/features/goals/filter";
+import { useLocalPref } from "@/features/prefs";
+import { FilterBar } from "@/features/FilterBar";
 import {
   containersAtom,
   defaultContainerIdAtom,
@@ -56,7 +73,36 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
-import { Eyebrow } from "@/features/ui";
+import { CollapsibleSection, EmptyState, Eyebrow } from "@/features/ui";
+
+/** Device-local: how you like to READ your goals, not a fact about them. */
+const SORT_KEY = "yaccount.goals.sort";
+
+const SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "progress", label: "Progress" },
+  { value: "deadline", label: "Deadline" },
+] as const;
+
+const STATES: { value: GoalState; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "archived", label: "Archived" },
+];
+
+const KINDS: { value: GoalKind; label: string }[] = [
+  { value: "spend_down", label: "Save & spend" },
+  { value: "reserve", label: "Reserve" },
+];
+
+interface GoalDraft {
+  text: string;
+  states: GoalState[];
+  kinds: GoalKind[];
+}
+
+const NO_FILTER: GoalDraft = { text: "", states: [], kinds: [] };
 
 export function GoalsView() {
   const ready = useAtomValue(readyAtom);
@@ -69,23 +115,48 @@ export function GoalsView() {
 
   const [sheet, setSheet] = useState<Goal | "new" | null>(null);
 
+  // Sort is remembered; the filters are deliberately not (§12.4 M11).
+  const [sort, setSort] = useLocalPref(SORT_KEY, "name", isGoalSort);
+  const [draft, setDraft] = useState<GoalDraft>(NO_FILTER);
+  const filter: GoalFilter = draft;
+  const filtering = activeGoalFilterCount(filter) > 0;
+
   const containerName = useMemo(() => {
     const m = new Map(containers.map((c) => [c.id, c.name]));
     return (id: string) => m.get(id) ?? "Unknown";
   }, [containers]);
 
-  const active = useMemo(
+  // A goal without a name shows its container's, so that is what the search box
+  // and the A–Z sort have to read.
+  const labelOf = useMemo(
+    () => (g: Goal) => g.name ?? containerName(g.container_id),
+    [containerName],
+  );
+
+  const shown = useMemo(
+    () =>
+      sortGoals(applyGoalFilter(goals, filter, { label: labelOf }), sort, {
+        label: labelOf,
+        progress: (g) => goalProgress(g, txns),
+      }),
+    [goals, filter, labelOf, sort, txns],
+  );
+
+  // The sections stay — a filter narrows what is in them, it does not flatten
+  // the difference between a goal you are still saving into and one you closed.
+  const active = useMemo(() => shown.filter((g) => goalState(g) === "active"), [shown]);
+  const done = useMemo(
+    () => shown.filter((g) => ["completed", "cancelled"].includes(goalState(g))),
+    [shown],
+  );
+  const archived = useMemo(
+    () => shown.filter((g) => goalState(g) === "archived"),
+    [shown],
+  );
+  const activeGoals = useMemo(
     () => goals.filter((g) => g.status === "active" && !g.is_archived),
     [goals],
   );
-  const done = useMemo(
-    () =>
-      goals.filter(
-        (g) => !g.is_archived && (g.status === "completed" || g.status === "cancelled"),
-      ),
-    [goals],
-  );
-  const archived = useMemo(() => goals.filter((g) => g.is_archived), [goals]);
 
   async function handleSubmit(input: GoalFormInput, editing: Goal | null) {
     if (editing) {
@@ -117,7 +188,9 @@ export function GoalsView() {
     const existing = containers.find(
       (c) => !c.is_archived && c.name.trim().toLowerCase() === nameKey,
     );
-    if (existing && active.some((g) => g.container_id === existing.id)) {
+    // Against every active goal, not the filtered view: a rule about what may
+    // exist can't depend on what happens to be on screen.
+    if (existing && activeGoals.some((g) => g.container_id === existing.id)) {
       toast.error(`You already have an active ${existing.name} goal.`);
       return;
     }
@@ -190,11 +263,62 @@ export function GoalsView() {
         </Button>
       </section>
 
-      {active.length === 0 ? (
-        <div className="bg-card text-muted-foreground rounded-2xl border px-5 py-14 text-center text-sm">
-          No goals yet. Start one to save toward something specific.
+      {goals.length > 0 && (
+        <FilterBar
+          search={draft.text}
+          onSearch={(text) => setDraft((d) => ({ ...d, text }))}
+          searchPlaceholder="Search goals"
+          facets={[
+            {
+              id: "state",
+              label: "Status",
+              selected: draft.states,
+              onChange: (states) =>
+                setDraft((d) => ({ ...d, states: states as GoalState[] })),
+              options: STATES,
+            },
+            {
+              id: "kind",
+              label: "Kind",
+              selected: draft.kinds,
+              onChange: (kinds) =>
+                setDraft((d) => ({ ...d, kinds: kinds as GoalKind[] })),
+              options: KINDS,
+            },
+          ]}
+          sort={{ value: sort, options: [...SORT_OPTIONS], onChange: setSort }}
+          activeCount={activeGoalFilterCount(filter)}
+          onClear={() => setDraft(NO_FILTER)}
+        />
+      )}
+
+      {shown.length === 0 ? (
+        <div className="bg-card rounded-2xl border">
+          {filtering && goals.length > 0 ? (
+            <EmptyState
+              title="Nothing matches those filters"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setDraft(NO_FILTER)}
+                >
+                  Clear filters
+                </Button>
+              }
+            >
+              {goals.length} goal{goals.length === 1 ? "" : "s"} — widen the filters to
+              see them.
+            </EmptyState>
+          ) : (
+            <EmptyState icon={TargetIcon} title="No goals yet">
+              Start one to save toward something specific — a trip, a deposit, a buffer
+              you don&apos;t want to touch.
+            </EmptyState>
+          )}
         </div>
-      ) : (
+      ) : active.length === 0 ? null : (
         <div className="grid gap-3">
           {active.map((g) => (
             <GoalCard
@@ -254,38 +378,38 @@ export function GoalsView() {
         </section>
       )}
 
-      {archived.length > 0 && (
-        <section className="space-y-2">
-          <Eyebrow as="h2" className="px-1">
-            Archived
-          </Eyebrow>
-          <div className="rounded-2xl border border-dashed">
-            {archived.map((g, i) => (
-              <div
-                key={g.id}
-                className={cn(
-                  "text-muted-foreground flex items-center gap-3 px-5 py-3",
-                  i > 0 && "border-t border-dashed",
-                )}
+      {/* Folded away by default: an archived goal is never what you came for,
+          and on a phone a long list of them pushes the live ones off the screen.
+          The count stays on screen, so the way back is still visible (§1.1). */}
+      <CollapsibleSection
+        title="Archived"
+        count={archived.length}
+        note="Nothing was deleted — restore any of these at any time."
+      >
+        <div className="rounded-2xl border border-dashed">
+          {archived.map((g, i) => (
+            <div
+              key={g.id}
+              className={cn(
+                "text-muted-foreground flex items-center gap-3 px-5 py-3",
+                i > 0 && "border-t border-dashed",
+              )}
+            >
+              <TargetIcon className="size-4 shrink-0" aria-hidden />
+              <div className="min-w-0 flex-1 truncate text-sm">{labelOf(g)}</div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 rounded-full"
+                onClick={() => dispatch(unarchiveGoal(g.id))}
               >
-                <TargetIcon className="size-4 shrink-0" aria-hidden />
-                <div className="min-w-0 flex-1 truncate text-sm">
-                  {g.name ?? containerName(g.container_id)}
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="rounded-full"
-                  onClick={() => dispatch(unarchiveGoal(g.id))}
-                >
-                  <RotateCcwIcon className="size-4" />
-                  Restore
-                </Button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+                <RotateCcwIcon className="size-4" />
+                Restore
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
 
       <GoalSheet
         open={sheet !== null}

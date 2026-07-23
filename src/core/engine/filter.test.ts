@@ -2,8 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   activeFilterCount,
   applyFilter,
+  constrains,
   isFilterActive,
   matchesFilter,
+  matchesWords,
+  terms,
   transactionKind,
   type TransactionFilter,
 } from "@/core/engine/filter";
@@ -224,5 +227,68 @@ describe("activeFilterCount / isFilterActive — what the rail reports", () => {
     expect(isFilterActive({})).toBe(false);
     expect(isFilterActive({ categoryIds: [] })).toBe(false);
     expect(isFilterActive({ text: "blue" })).toBe(true);
+  });
+});
+
+describe("ruleIds — which recurring rule proposed a row (the Inbox's facet)", () => {
+  const fromRent = makeTransaction({
+    id: "r1",
+    date: "2026-07-20",
+    amount: -185000,
+    vendor_source: "Rent",
+    category_id: "housing",
+    recurring_rule_id: "rule-rent",
+    inbox_status: "pending",
+  });
+  const fromGym = makeTransaction({
+    id: "g1",
+    date: "2026-07-20",
+    amount: -4500,
+    vendor_source: "Gym",
+    category_id: "health",
+    recurring_rule_id: "rule-gym",
+    inbox_status: "pending",
+  });
+  const byHand = row({ id: "h1", amount: -450 });
+  const all = [fromRent, fromGym, byHand];
+
+  it("narrows to the rows a chosen rule proposed", () => {
+    expect(applyFilter(all, { ruleIds: ["rule-rent"] }).map((t) => t.id)).toEqual(["r1"]);
+    expect(
+      applyFilter(all, { ruleIds: ["rule-rent", "rule-gym"] }).map((t) => t.id),
+    ).toEqual(["r1", "g1"]);
+  });
+
+  it("never matches a row nothing proposed", () => {
+    // A hand-written row came from no rule, so no rule can claim it.
+    expect(applyFilter(all, { ruleIds: ["rule-rent"] }).map((t) => t.id)).not.toContain(
+      "h1",
+    );
+  });
+
+  it("empty means all, and it counts as one facet", () => {
+    expect(applyFilter(all, { ruleIds: [] })).toEqual(all);
+    expect(activeFilterCount({ ruleIds: [] })).toBe(0);
+    expect(activeFilterCount({ ruleIds: ["rule-rent", "rule-gym"] })).toBe(1);
+  });
+});
+
+describe("the shared text primitives", () => {
+  it("terms drops the whitespace an empty box is made of", () => {
+    expect(terms(undefined)).toEqual([]);
+    expect(terms("   ")).toEqual([]);
+    expect(terms(" Blue  BOTTLE ")).toEqual(["blue", "bottle"]);
+  });
+
+  it("matchesWords needs every word, in any order, ignoring case", () => {
+    expect(matchesWords("Blue Bottle Coffee", [])).toBe(true);
+    expect(matchesWords("Blue Bottle Coffee", ["bottle", "blue"])).toBe(true);
+    expect(matchesWords("Blue Bottle Coffee", ["blue", "rent"])).toBe(false);
+  });
+
+  it("constrains reads an emptied facet as no constraint", () => {
+    expect(constrains(undefined)).toBe(false);
+    expect(constrains([])).toBe(false);
+    expect(constrains(["a"])).toBe(true);
   });
 });

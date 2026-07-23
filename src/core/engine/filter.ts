@@ -24,6 +24,8 @@ export interface TransactionFilter {
   /** Matches EITHER leg of a transfer (source or destination). */
   containerIds?: string[];
   kinds?: TransactionKind[];
+  /** Which recurring rule proposed the row (§5.8) — the Inbox's own question. */
+  ruleIds?: string[];
   range?: DateRange;
   /** Inclusive bounds on the SIZE of an entry, in cents. */
   minAmount?: number | null;
@@ -46,14 +48,28 @@ export function transactionKind(t: Transaction): TransactionKind {
   return t.amount < 0 ? "expense" : "income";
 }
 
-/** Words to match, or none — an empty box is not a constraint. */
-function terms(text: string | undefined): string[] {
+/**
+ * Words to match, or none — an empty box is not a constraint.
+ *
+ * Exported because the M11 list views (goals, recurring, containers, categories)
+ * are not transactions and so carry their own predicates — but "what does typing
+ * narrow" has to mean one thing across all six screens, so they borrow this
+ * rather than each rewriting the split.
+ */
+export function terms(text: string | undefined): string[] {
   return (text ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/** Every word must be somewhere in the haystack, in any order, ignoring case. */
+export function matchesWords(haystack: string, words: string[]): boolean {
+  if (words.length === 0) return true;
+  const hay = haystack.toLowerCase();
+  return words.every((word) => hay.includes(word));
 }
 
 /** A facet with nothing chosen means "all", not "none" — the UI clears one by
  *  emptying it, and an empty list must not empty the screen. */
-function constrains(values: string[] | undefined): values is string[] {
+export function constrains<T extends string>(values: T[] | undefined): values is T[] {
   return Array.isArray(values) && values.length > 0;
 }
 
@@ -70,9 +86,7 @@ export function matchesText(
   words: string[],
   label?: (t: Transaction) => string,
 ): boolean {
-  if (words.length === 0) return true;
-  const hay = `${t.vendor_source} ${label?.(t) ?? ""}`.toLowerCase();
-  return words.every((word) => hay.includes(word));
+  return matchesWords(`${t.vendor_source} ${label?.(t) ?? ""}`, words);
 }
 
 export function matchesFilter(
@@ -93,6 +107,11 @@ export function matchesFilter(
   }
   if (constrains(filter.kinds) && !filter.kinds.includes(transactionKind(t)))
     return false;
+  // A row nothing proposed belongs to no rule, so no rule can claim it.
+  if (constrains(filter.ruleIds)) {
+    if (t.recurring_rule_id === null || !filter.ruleIds.includes(t.recurring_rule_id))
+      return false;
+  }
   if (boundedRange(filter.range) && !inRange(t.date, filter.range)) return false;
   // Size, not direction: "anything over $100" is a question about how big the
   // entry is, and a paycheck is as big as the rent it pays.
@@ -122,6 +141,7 @@ export function activeFilterCount(filter: TransactionFilter): number {
   if (constrains(filter.categoryIds)) n += 1;
   if (constrains(filter.containerIds)) n += 1;
   if (constrains(filter.kinds)) n += 1;
+  if (constrains(filter.ruleIds)) n += 1;
   if (boundedRange(filter.range)) n += 1;
   if (filter.minAmount != null || filter.maxAmount != null) n += 1;
   return n;

@@ -5,7 +5,6 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
   ArrowRightIcon,
-  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   RepeatIcon,
@@ -18,7 +17,6 @@ import {
   uncancelRecurringRule,
   updateRecurringRule,
 } from "@/core/commands";
-import { formatCents } from "@/core/money";
 import {
   isTransferRule,
   makeRecurringRule,
@@ -27,6 +25,7 @@ import {
   type Frequency,
   type IntervalConfig,
   type RecurringRule,
+  type RuleStatus,
 } from "@/core/model";
 import { firstOccurrenceOnOrAfter } from "@/core/engine/recurring";
 import {
@@ -39,18 +38,67 @@ import {
 } from "@/features/store";
 import { describeRule } from "@/features/recurring/describe";
 import { RecurringRuleSheet } from "@/features/recurring/RecurringRuleSheet";
+import {
+  activeRuleFilterCount,
+  applyRuleFilter,
+  isRuleSort,
+  sortRules,
+  type RuleFilter,
+  type RuleKind,
+} from "@/features/recurring/filter";
+import { useLocalPref } from "@/features/prefs";
+import { FilterBar } from "@/features/FilterBar";
 import { categoryDotColor } from "@/features/category-color";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
-import { Eyebrow } from "@/features/ui";
+import {
+  CollapsibleSection,
+  EmptyState,
+  Eyebrow,
+  Money,
+  RowActions,
+} from "@/features/ui";
+
+/** Device-local: how you like to READ your rules, not a fact about them. */
+const SORT_KEY = "yaccount.recurring.sort";
+
+const SORT_OPTIONS = [
+  { value: "next", label: "Next due" },
+  { value: "name", label: "Name" },
+  { value: "amount", label: "Amount" },
+] as const;
+
+const STATUSES: { value: RuleStatus; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "cancelled", label: "Paused" },
+];
+
+const FREQUENCIES: { value: Frequency; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "biweekly", label: "Twice a month" },
+  { value: "monthly", label: "Monthly" },
+  { value: "annually", label: "Annually" },
+  { value: "custom", label: "Custom" },
+];
+
+const KINDS: { value: RuleKind; label: string }[] = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+  { value: "transfer", label: "Transfer" },
+];
+
+interface RuleDraft {
+  text: string;
+  statuses: RuleStatus[];
+  frequencies: Frequency[];
+  kinds: RuleKind[];
+}
+
+const NO_FILTER: RuleDraft = { text: "", statuses: [], frequencies: [], kinds: [] };
 
 export function RecurringView() {
   const ready = useAtomValue(readyAtom);
@@ -63,14 +111,11 @@ export function RecurringView() {
   // `null` = sheet closed; `"new"` = create; a rule = edit.
   const [sheet, setSheet] = useState<RecurringRule | "new" | null>(null);
 
-  const active = useMemo(
-    () =>
-      rules
-        .filter((r) => r.status === "active")
-        .sort((a, b) => a.next_generation_date.localeCompare(b.next_generation_date)),
-    [rules],
-  );
-  const cancelled = useMemo(() => rules.filter((r) => r.status === "cancelled"), [rules]);
+  // Sort is remembered; the filters are deliberately not (§12.4 M11).
+  const [sort, setSort] = useLocalPref(SORT_KEY, "next", isRuleSort);
+  const [draft, setDraft] = useState<RuleDraft>(NO_FILTER);
+  const filter: RuleFilter = draft;
+  const filtering = activeRuleFilterCount(filter) > 0;
 
   const catName = useMemo(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
@@ -80,6 +125,24 @@ export function RecurringView() {
     const m = new Map(containers.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
   }, [containers]);
+
+  // What else a rule can be found by: the category and wallets it writes through.
+  const labelOf = useMemo(
+    () => (r: RecurringRule) =>
+      `${catName(r.template_category_id) ?? ""} ${contName(r.template_container_id)} ${contName(r.template_to_container_id)}`,
+    [catName, contName],
+  );
+
+  const shown = useMemo(
+    () =>
+      sortRules(applyRuleFilter(rules, filter, { label: labelOf }), sort, {
+        label: (r) => r.template_vendor_source,
+      }),
+    [rules, filter, labelOf, sort],
+  );
+
+  const active = useMemo(() => shown.filter((r) => r.status === "active"), [shown]);
+  const cancelled = useMemo(() => shown.filter((r) => r.status === "cancelled"), [shown]);
 
   if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
 
@@ -100,12 +163,72 @@ export function RecurringView() {
         </Button>
       </section>
 
+      {rules.length > 0 && (
+        <FilterBar
+          search={draft.text}
+          onSearch={(text) => setDraft((d) => ({ ...d, text }))}
+          searchPlaceholder="Search rules"
+          facets={[
+            {
+              id: "status",
+              label: "Status",
+              selected: draft.statuses,
+              onChange: (statuses) =>
+                setDraft((d) => ({ ...d, statuses: statuses as RuleStatus[] })),
+              options: STATUSES,
+            },
+            {
+              id: "frequency",
+              label: "Frequency",
+              selected: draft.frequencies,
+              onChange: (frequencies) =>
+                setDraft((d) => ({ ...d, frequencies: frequencies as Frequency[] })),
+              options: FREQUENCIES,
+            },
+            {
+              id: "kind",
+              label: "Type",
+              selected: draft.kinds,
+              onChange: (kinds) =>
+                setDraft((d) => ({ ...d, kinds: kinds as RuleKind[] })),
+              options: KINDS,
+            },
+          ]}
+          sort={{ value: sort, options: [...SORT_OPTIONS], onChange: setSort }}
+          activeCount={activeRuleFilterCount(filter)}
+          onClear={() => setDraft(NO_FILTER)}
+        />
+      )}
+
       <div className="bg-card overflow-hidden rounded-2xl border">
-        {active.length === 0 ? (
-          <div className="text-muted-foreground px-5 py-14 text-center text-sm">
-            No recurring transactions yet. Add one to automate a bill, paycheck, or
-            savings transfer.
-          </div>
+        {shown.length === 0 ? (
+          filtering && rules.length > 0 ? (
+            <EmptyState
+              title="Nothing matches those filters"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setDraft(NO_FILTER)}
+                >
+                  Clear filters
+                </Button>
+              }
+            >
+              {rules.length} rule{rules.length === 1 ? "" : "s"} — widen the filters to
+              see them.
+            </EmptyState>
+          ) : (
+            <EmptyState icon={RepeatIcon} title="Nothing scheduled yet">
+              Add a rule to automate a bill, a paycheck or a savings transfer. Each one
+              still asks before it logs anything.
+            </EmptyState>
+          )
+        ) : active.length === 0 ? (
+          <EmptyState title="Nothing active">
+            Every rule that matches is paused — resume one below to schedule it again.
+          </EmptyState>
         ) : (
           active.map((r, i) => (
             <RuleRow
@@ -131,41 +254,44 @@ export function RecurringView() {
         )}
       </div>
 
-      {cancelled.length > 0 && (
-        <section className="space-y-2">
-          <Eyebrow as="h2" className="px-1">
-            Paused
-          </Eyebrow>
-          <div className="rounded-2xl border border-dashed">
-            {cancelled.map((r, i) => (
-              <div
-                key={r.id}
-                className={cn(
-                  "text-muted-foreground flex items-center gap-3 px-5 py-3",
-                  i > 0 && "border-t border-dashed",
-                )}
-              >
-                <RepeatIcon className="size-4 shrink-0" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">
-                    {r.template_vendor_source}
-                  </div>
-                  <div className="truncate text-xs">{describeRule(r)}</div>
+      {/* Folded away by default (§12.4 M11 responsive density): a paused rule
+          generates nothing, so it is never the reason you opened this screen —
+          but its count stays on screen, because Resume is the visible inverse of
+          Pause (§1.1). */}
+      <CollapsibleSection
+        title="Paused"
+        count={cancelled.length}
+        note="These generate nothing until you resume them. Nothing was deleted."
+      >
+        <div className="rounded-2xl border border-dashed">
+          {cancelled.map((r, i) => (
+            <div
+              key={r.id}
+              className={cn(
+                "text-muted-foreground flex items-center gap-3 px-5 py-3",
+                i > 0 && "border-t border-dashed",
+              )}
+            >
+              <RepeatIcon className="size-4 shrink-0" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">
+                  {r.template_vendor_source}
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="rounded-full"
-                  onClick={() => dispatch(uncancelRecurringRule(r.id))}
-                >
-                  <RotateCcwIcon className="size-4" />
-                  Resume
-                </Button>
+                <div className="truncate text-xs">{describeRule(r)}</div>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 rounded-full"
+                onClick={() => dispatch(uncancelRecurringRule(r.id))}
+              >
+                <RotateCcwIcon className="size-4" />
+                Resume
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
 
       <RecurringRuleSheet
         open={sheet !== null}
@@ -260,42 +386,27 @@ function RuleRow({
           {sub && <span> · {sub}</span>}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-0.5">
-        <span
-          className={cn(
-            "tnum font-mono text-sm tracking-tight",
-            income && "text-positive",
-            transfer && "text-muted-foreground",
-          )}
-        >
-          {formatCents(Math.abs(rule.template_amount ?? 0))}
-        </span>
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <Money
+          cents={rule.template_amount ?? 0}
+          absolute
+          tone={transfer ? "quiet" : income ? "in" : "neutral"}
+          className="text-sm tracking-tight"
+        />
         <Badge variant="secondary" className="rounded-full text-[10px] font-normal">
           next {rule.next_generation_date.slice(5)}
         </Badge>
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground size-8 rounded-lg opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-            aria-label={`Actions for ${rule.template_vendor_source}`}
-          >
-            <MoreHorizontalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onEdit}>
-            <PencilIcon className="size-4" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onCancel}>
-            <XIcon className="size-4" />
-            Pause
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActions label={`Actions for ${rule.template_vendor_source}`}>
+        <DropdownMenuItem onClick={onEdit}>
+          <PencilIcon className="size-4" />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" onClick={onCancel}>
+          <XIcon className="size-4" />
+          Pause
+        </DropdownMenuItem>
+      </RowActions>
     </div>
   );
 }

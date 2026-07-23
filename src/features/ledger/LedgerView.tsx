@@ -8,7 +8,6 @@ import {
   ArrowRightIcon,
   ArrowUpRightIcon,
   BookmarkIcon,
-  MoreHorizontalIcon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -37,9 +36,9 @@ import {
   activeFilterCount,
   applyFilter,
   isFilterActive,
-  type TransactionFilter,
   type TransactionKind,
 } from "@/core/engine/filter";
+import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
 import { activeRows, isRegisterSort, sortRegister } from "@/core/engine/ledger";
 import { trailingDays } from "@/core/engine/period";
 import {
@@ -49,7 +48,7 @@ import {
   todayIso,
   yesterdayIso,
 } from "@/features/clock";
-import { formatCents, parseDollars } from "@/core/money";
+import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryDotColor } from "@/features/category-color";
@@ -62,16 +61,12 @@ import {
   ListSkeleton,
   Marginalia,
   Money,
+  RowActions,
 } from "@/features/ui";
 import { FilterBar } from "@/features/FilterBar";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -111,50 +106,6 @@ const KINDS: { value: TransactionKind; label: string }[] = [
   { value: "income", label: "Income" },
   { value: "transfer", label: "Transfer" },
 ];
-
-/** What the user has typed into the rail. Held as strings so a half-typed bound
- *  simply doesn't constrain yet, rather than erroring under their fingers. */
-interface FilterDraft {
-  text: string;
-  categoryIds: string[];
-  containerIds: string[];
-  kinds: TransactionKind[];
-  dates: { from: string; to: string };
-  amounts: { from: string; to: string };
-}
-
-const NO_FILTER: FilterDraft = {
-  text: "",
-  categoryIds: [],
-  containerIds: [],
-  kinds: [],
-  dates: { from: "", to: "" },
-  amounts: { from: "", to: "" },
-};
-
-/** A typed amount as a magnitude, or no constraint. `parseDollars` throws on a
- * partial value ("1.", "$") — mid-keystroke that is not an error, it is just not
- * a bound yet. */
-function boundCents(input: string): number | null {
-  if (input.trim() === "") return null;
-  try {
-    return Math.abs(parseDollars(input));
-  } catch {
-    return null;
-  }
-}
-
-function toFilter(draft: FilterDraft): TransactionFilter {
-  return {
-    text: draft.text,
-    categoryIds: draft.categoryIds,
-    containerIds: draft.containerIds,
-    kinds: draft.kinds,
-    range: { start: draft.dates.from || null, end: draft.dates.to || null },
-    minAmount: boundCents(draft.amounts.from),
-    maxAmount: boundCents(draft.amounts.to),
-  };
-}
 
 export function LedgerView() {
   const ready = useAtomValue(readyAtom);
@@ -649,32 +600,20 @@ function LedgerRow({
         tone={transfer ? "quiet" : income ? "in" : "neutral"}
         className="text-sm tracking-tight"
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground size-8 rounded-lg opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-            aria-label="Transaction actions"
-          >
-            <MoreHorizontalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onEdit}>
-            <PencilIcon className="size-4" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onSaveShortcut}>
-            <BookmarkIcon className="size-4" />
-            Save as shortcut
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onDelete}>
-            <Trash2Icon className="size-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActions label={`Actions for ${tx.vendor_source}`}>
+        <DropdownMenuItem onClick={onEdit}>
+          <PencilIcon className="size-4" />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onSaveShortcut}>
+          <BookmarkIcon className="size-4" />
+          Save as shortcut
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" onClick={onDelete}>
+          <Trash2Icon className="size-4" />
+          Delete
+        </DropdownMenuItem>
+      </RowActions>
     </div>
   );
 }

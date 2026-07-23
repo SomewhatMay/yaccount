@@ -5,9 +5,11 @@
  * instead of re-deriving it in Tailwind classes. If you find yourself hand-
  * rolling an eyebrow, a total or a money span, the primitive already exists.
  */
+export { CollapsibleSection } from "@/features/ui/CollapsibleSection";
 export { Eyebrow } from "@/features/ui/Eyebrow";
 export { Figure } from "@/features/ui/Figure";
 export { EmptyState } from "@/features/ui/EmptyState";
+export { RowActions } from "@/features/ui/RowActions";
 export { LeaderRow } from "@/features/ui/LeaderRow";
 export { ListSkeleton, FigureSkeleton } from "@/features/ui/ListSkeleton";
 export { Marginalia } from "@/features/ui/Marginalia";
