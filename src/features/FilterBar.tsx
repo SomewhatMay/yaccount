@@ -188,16 +188,21 @@ function FacetChip({ facet }: { facet: Facet }) {
         {facet.options.map((o) => {
           const id = `${uid}-${o.value}`;
           return (
-            <div
-              key={o.value}
-              className="hover:bg-accent flex items-center gap-2.5 rounded-lg px-2 py-1.5"
-            >
+            <div key={o.value} className="hover:bg-accent relative flex rounded-lg">
+              {/* The LABEL is the whole row — full width, full height — and the
+                  checkbox sits on top of it. Anything else leaves dead pixels
+                  inside the hover highlight: the row looks pressable right to
+                  its edges, so it has to be pressable right to its edges. */}
               <Checkbox
                 id={id}
                 checked={facet.selected.includes(o.value)}
                 onCheckedChange={() => toggle(o.value)}
+                className="absolute top-1/2 left-2 -translate-y-1/2"
               />
-              <Label htmlFor={id} className="min-w-0 flex-1 cursor-pointer font-normal">
+              <Label
+                htmlFor={id}
+                className="w-full cursor-pointer overflow-hidden py-2 pr-2 pl-8 font-normal"
+              >
                 {o.dot && (
                   <span
                     className="size-2 shrink-0 rounded-full"

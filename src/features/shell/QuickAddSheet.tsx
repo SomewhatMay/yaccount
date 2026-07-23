@@ -2,7 +2,7 @@
 
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
-import { ArrowRightIcon, BookmarkIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, XIcon } from "lucide-react";
 import { createTemplate, logTemplate, removeTemplate } from "@/core/commands";
 import { formatCents } from "@/core/money";
 import type { Container, Transaction } from "@/core/model";
@@ -145,19 +145,21 @@ function QuickAddForm({
       {templates.length > 0 && (
         <div className="space-y-2">
           <Eyebrow as="h3">Shortcuts</Eyebrow>
+          {/* Stacked, not strung out: a name and its amount on two lines makes a
+              card you can read at a glance and hit with a thumb, where one long
+              pill per shortcut ran the strip off the side of the screen after
+              three of them. */}
           <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
             {templates.map((t) => (
-              <div
-                key={t.id}
-                className="border-input bg-card hover:border-primary/30 inline-flex shrink-0 items-center rounded-full border text-sm transition-colors duration-[var(--dur-1)]"
-              >
+              <div key={t.id} className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => void quickLog(t)}
-                  className="flex items-center gap-1.5 py-1.5 pr-1 pl-3"
+                  className="border-input bg-card hover:border-primary/30 flex w-32 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left transition-colors duration-[var(--dur-1)]"
                 >
-                  <BookmarkIcon className="text-muted-foreground size-3" aria-hidden />
-                  <span className="font-medium whitespace-nowrap">{t.template_name}</span>
+                  <span className="w-full truncate pr-4 text-sm font-medium">
+                    {t.template_name}
+                  </span>
                   <Money
                     cents={t.amount}
                     absolute={t.to_container_id !== null}
@@ -169,7 +171,7 @@ function QuickAddForm({
                   type="button"
                   onClick={() => void removeShortcut(t)}
                   aria-label={`Remove ${t.template_name} shortcut`}
-                  className="text-muted-foreground hover:text-destructive mr-1 rounded-full p-1"
+                  className="text-muted-foreground hover:text-destructive absolute top-1 right-1 rounded-full p-1"
                 >
                   <XIcon className="size-3" />
                 </button>

@@ -15,7 +15,6 @@ import {
 import {
   categoriesAtom,
   containersAtom,
-  defaultContainerIdAtom,
   dispatchAtom,
   flashedRowAtom,
   readyAtom,
@@ -65,7 +64,6 @@ import {
   Money,
 } from "@/features/ui";
 import { FilterBar } from "@/features/FilterBar";
-import { ComposeBar } from "@/features/ledger/ComposeBar";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -163,7 +161,6 @@ export function LedgerView() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const transactions = useAtomValue(transactionsAtom);
-  const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const flashed = useAtomValue(flashedRowAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -382,13 +379,11 @@ export function LedgerView() {
         )}
       </Figure>
 
-      {/* Shortcuts moved into the quick-add sheet (M11): they belong where you
-          are about to write, not on the screen you read. */}
-      <ComposeBar
-        categories={categories}
-        containers={containers}
-        defaultContainerId={defaultContainerId}
-      />
+      {/* No compose bar here any more (M11 phase 5). Writing an entry is the
+          FAB and the quick-add sheet, from every screen — a second, permanently
+          expanded copy of the same form sat between the figure and the register
+          costing a third of the page. The compose-bar pattern (§12.4) is
+          unchanged and still how Categories and Containers create. */}
 
       {live.length > 0 && (
         <FilterBar
