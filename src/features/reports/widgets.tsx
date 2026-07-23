@@ -17,6 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import Link from "next/link";
 import { formatCents } from "@/core/money";
 import type { Category } from "@/core/model";
 import type {
@@ -57,18 +58,26 @@ export function CategoryDoughnut({
   slices,
   emptyLabel,
   trends,
+  hrefFor,
 }: {
   slices: CategorySlice[];
   emptyLabel: string;
   /** Each category's month-by-month shape (`categoryTrendSeries`), drawn beside
    *  its total — the share answers "how much", the sparkline "which way". */
   trends?: Map<string, number[]>;
+  /** A legend row links to the register filtered to that category. The pie
+   *  SEGMENTS deliberately don't: a thin slice is the too-small-to-tap target the
+   *  legend row beside it already solves. */
+  hrefFor?: (categoryId: string) => string;
 }) {
   if (slices.length === 0) return <EmptyNote>{emptyLabel}</EmptyNote>;
   const total = slices.reduce((s, x) => s + x.amount, 0);
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row">
-      <div className="relative shrink-0" style={{ width: 168, height: 168 }}>
+      {/* `isolate` puts the centre label and the tooltip in one stacking context
+          so their z-index compares; without it the label (a later sibling) always
+          painted over the tooltip, hiding it behind the total. */}
+      <div className="relative isolate shrink-0" style={{ width: 168, height: 168 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -84,10 +93,10 @@ export function CategoryDoughnut({
                 <Cell key={s.categoryId} fill={categoryDotColor(s.categoryId)} />
               ))}
             </Pie>
-            <Tooltip content={<MoneyTooltip />} />
+            <Tooltip content={<MoneyTooltip />} wrapperStyle={{ zIndex: 20 }} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center">
           <span className="tnum font-mono text-sm font-medium">{formatCents(total)}</span>
           <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
             total
@@ -97,8 +106,9 @@ export function CategoryDoughnut({
       <ul className="min-w-0 flex-1 space-y-1.5 self-stretch">
         {slices.map((s) => {
           const series = trends?.get(s.categoryId);
-          return (
-            <li key={s.categoryId} className="flex items-center gap-2 text-sm">
+          const href = hrefFor?.(s.categoryId);
+          const inner = (
+            <>
               <span
                 className="size-2.5 shrink-0 rounded-full"
                 style={{ background: categoryDotColor(s.categoryId) }}
@@ -119,6 +129,20 @@ export function CategoryDoughnut({
               <span className="tnum shrink-0 font-mono text-sm">
                 {formatCents(s.amount)}
               </span>
+            </>
+          );
+          return (
+            <li key={s.categoryId}>
+              {href ? (
+                <Link
+                  href={href}
+                  className="hover:bg-muted/60 -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5 text-sm transition-colors"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">{inner}</div>
+              )}
             </li>
           );
         })}

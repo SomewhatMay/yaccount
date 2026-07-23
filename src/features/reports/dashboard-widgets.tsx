@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import { formatCents } from "@/core/money";
@@ -84,27 +85,34 @@ export interface Kpi {
 export function KpiStrip({ kpis, note }: { kpis: Kpi[]; note?: string }) {
   return (
     <section>
-      <div className="-mx-5 flex snap-x [scrollbar-width:none] gap-2 overflow-x-auto px-5 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
-        {kpis.map((kpi) => (
-          <div
-            key={kpi.id}
-            className="bg-card min-w-36 shrink-0 snap-start rounded-2xl border p-3.5 sm:min-w-0"
-          >
-            <p className="eyebrow text-muted-foreground truncate">{kpi.label}</p>
-            <p className="mt-1.5 text-lg leading-none">{kpi.value}</p>
-            <div className="mt-2 flex h-4 items-center justify-between gap-2">
-              <Delta value={kpi.delta} unit={kpi.unit} />
-              {kpi.spark && kpi.spark.length > 1 && (
-                <Sparkline
-                  values={kpi.spark}
-                  height={14}
-                  strokeWidth={1.25}
-                  className="text-brand/50 w-10 shrink-0"
-                />
-              )}
+      {/* Full-bleed to the screen edge on a phone, re-inset by `px-5` so the
+          first card lines up with the panels below. The inner `w-max` track is
+          the fix that makes BOTH ends of that padding render: with the cards as
+          direct children of the scroll container, a browser drops the padding on
+          one edge (here the left), so the strip sat flush against the screen. */}
+      <div className="-mx-5 [scrollbar-width:none] overflow-x-auto px-5 sm:mx-0 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-max snap-x gap-2 sm:grid sm:w-auto sm:grid-cols-2 xl:grid-cols-4">
+          {kpis.map((kpi) => (
+            <div
+              key={kpi.id}
+              className="bg-card min-w-36 shrink-0 snap-start rounded-2xl border p-3.5 sm:min-w-0"
+            >
+              <p className="eyebrow text-muted-foreground truncate">{kpi.label}</p>
+              <p className="mt-1.5 text-lg leading-none">{kpi.value}</p>
+              <div className="mt-2 flex h-4 items-center justify-between gap-2">
+                <Delta value={kpi.delta} unit={kpi.unit} />
+                {kpi.spark && kpi.spark.length > 1 && (
+                  <Sparkline
+                    values={kpi.spark}
+                    height={14}
+                    strokeWidth={1.25}
+                    className="text-brand/50 w-10 shrink-0"
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       {note && <p className="text-muted-foreground mt-2 text-xs">{note}</p>}
     </section>
@@ -313,11 +321,16 @@ const monthName = new Intl.DateTimeFormat("en-US", { month: "short" });
 export function SpendingCalendar({
   days,
   spend,
+  hrefFor,
 }: {
   /** The day axis, ascending (`trailingDays`). */
   days: string[];
   /** Sparse per-day outflow (`dailySpend`), keyed by ISO day. */
   spend: Map<string, number>;
+  /** A day with activity links to the register for exactly that day. A blank day
+   *  is not a link — there is nothing to land on, and a grid of 56 tiny targets
+   *  where most go nowhere is the "too small to tap" trap. */
+  hrefFor?: (day: string) => string;
 }) {
   if (days.length === 0) return <EmptyNote>No days to show.</EmptyNote>;
   const level = heatScale(days.map((d) => spend.get(d) ?? 0));
@@ -341,21 +354,34 @@ export function SpendingCalendar({
           {days.map((day) => {
             const amount = spend.get(day) ?? 0;
             const lv = level(amount);
-            return (
-              <div
+            const label = `${cellDate.format(new Date(`${day}T00:00:00`))} · ${
+              amount > 0
+                ? formatCents(amount)
+                : amount < 0
+                  ? // A refunded day is not a quiet day, and the grid draws both
+                    // the same — so the label has to tell them apart.
+                    `${formatCents(-amount)} came back`
+                  : "nothing spent"
+            }`;
+            // Only a day that has something links anywhere.
+            const href = amount !== 0 ? hrefFor?.(day) : undefined;
+            const cls = cn(
+              "h-7 rounded-md",
+              lv === 0 && "bg-surface-sunken",
+              href &&
+                "hover:ring-primary/50 cursor-pointer transition-shadow hover:ring-2",
+            );
+            return href ? (
+              <Link
                 key={day}
-                title={`${cellDate.format(new Date(`${day}T00:00:00`))} · ${
-                  amount > 0
-                    ? formatCents(amount)
-                    : amount < 0
-                      ? // A refunded day is not a quiet day, and the grid draws
-                        // both the same — so the label has to tell them apart.
-                        `${formatCents(-amount)} came back`
-                      : "nothing spent"
-                }`}
+                href={href}
+                aria-label={label}
+                title={label}
                 style={heatStyle(lv)}
-                className={cn("h-7 rounded-md", lv === 0 && "bg-surface-sunken")}
+                className={cls}
               />
+            ) : (
+              <div key={day} title={label} style={heatStyle(lv)} className={cls} />
             );
           })}
         </div>
@@ -377,14 +403,55 @@ export function SpendingCalendar({
 
 // ── The three lists ──────────────────────────────────────────────────────────
 
+/**
+ * A row that is a door into the ledger when the widget gives it one (M11).
+ *
+ * The whole row is the target — a name in a summary list is small, and a link
+ * that only covers the text is a link you keep missing. `hover:bg-muted` is the
+ * one affordance that says "this goes somewhere"; §12 spends nothing louder on it.
+ */
+function LinkRow({
+  href,
+  className,
+  children,
+}: {
+  href?: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  if (!href) return <div className={className}>{children}</div>;
+  return (
+    <Link
+      href={href}
+      className={cn(
+        className,
+        "hover:bg-muted/60 -mx-2 rounded-lg px-2 transition-colors",
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
 /** A name, a rail of dots, an amount — §12.4's leaders, earning their keep on a
- *  short summary list rather than in the dense register. */
-export function PayeeList({ payees }: { payees: PayeeTotal[] }) {
+ *  short summary list rather than in the dense register. Each payee links to the
+ *  register searched for it, over the widget's window. */
+export function PayeeList({
+  payees,
+  hrefFor,
+}: {
+  payees: PayeeTotal[];
+  hrefFor?: (payee: string) => string;
+}) {
   if (payees.length === 0) return <EmptyNote>No spending in this period.</EmptyNote>;
   return (
     <div>
       {payees.map((p) => (
-        <div key={p.payee} className="leaders py-1.5 text-sm">
+        <LinkRow
+          key={p.payee}
+          href={hrefFor?.(p.payee)}
+          className="leaders py-1.5 text-sm"
+        >
           <span className="inline-flex min-w-0 items-baseline gap-2">
             <span className="truncate">{p.payee}</span>
             {p.count > 1 && (
@@ -394,7 +461,7 @@ export function PayeeList({ payees }: { payees: PayeeTotal[] }) {
             )}
           </span>
           <Money cents={p.amount} className="text-sm" />
-        </div>
+        </LinkRow>
       ))}
     </div>
   );
@@ -411,31 +478,36 @@ function formatDay(iso: string): string {
 export function LargestList({
   rows,
   nameOf,
+  hrefFor,
 }: {
   rows: Transaction[];
   nameOf: (categoryId: string | null) => string;
+  /** Each entry links to itself in the register, scrolled to and flashed. */
+  hrefFor?: (t: Transaction) => string;
 }) {
   if (rows.length === 0) return <EmptyNote>Nothing logged in this period.</EmptyNote>;
   return (
     <ul className="divide-y">
       {rows.map((t) => (
-        <li key={t.id} className="flex items-center gap-3 py-2">
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ background: categoryDotColor(t.category_id ?? "") }}
-            aria-hidden
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm">{t.vendor_source}</span>
-            <span className="text-muted-foreground block truncate text-xs">
-              {nameOf(t.category_id)} · {formatDay(t.date)}
+        <li key={t.id}>
+          <LinkRow href={hrefFor?.(t)} className="flex items-center gap-3 py-2">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ background: categoryDotColor(t.category_id ?? "") }}
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">{t.vendor_source}</span>
+              <span className="text-muted-foreground block truncate text-xs">
+                {nameOf(t.category_id)} · {formatDay(t.date)}
+              </span>
             </span>
-          </span>
-          <Money
-            cents={t.amount}
-            tone={t.amount >= 0 ? "in" : "neutral"}
-            className="shrink-0 text-sm"
-          />
+            <Money
+              cents={t.amount}
+              tone={t.amount >= 0 ? "in" : "neutral"}
+              className="shrink-0 text-sm"
+            />
+          </LinkRow>
         </li>
       ))}
     </ul>

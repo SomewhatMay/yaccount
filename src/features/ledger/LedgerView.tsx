@@ -15,6 +15,7 @@ import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
+  flashRowAtom,
   flashedRowAtom,
   readyAtom,
   transactionsAtom,
@@ -39,6 +40,7 @@ import {
   type TransactionKind,
 } from "@/core/engine/filter";
 import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
+import { parseLedgerQuery } from "@/features/ledger/deep-link";
 import { activeRows, isRegisterSort, sortRegister } from "@/core/engine/ledger";
 import { trailingDays } from "@/core/engine/period";
 import {
@@ -114,14 +116,34 @@ export function LedgerView() {
   const transactions = useAtomValue(transactionsAtom);
   const flashed = useAtomValue(flashedRowAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11 — a filter
-  // still on from yesterday is a hidden reason the list looks wrong).
+  // still on from yesterday is a hidden reason the list looks wrong). The one
+  // exception is arriving from a dashboard drill-down: the `/ledger?…` link seeds
+  // the rail once, on mount, and then the URL is cleared so it behaves like any
+  // hand-typed filter — clearable, and gone on the next visit.
   const [sort, setSort] = useLocalPref(SORT_KEY, "newest", isRegisterSort);
-  const [draft, setDraft] = useState<FilterDraft>(NO_FILTER);
+  const [draft, setDraft] = useState<FilterDraft>(() =>
+    typeof window === "undefined"
+      ? NO_FILTER
+      : parseLedgerQuery(window.location.search).draft,
+  );
   const filter = useMemo(() => toFilter(draft), [draft]);
   const filtering = isFilterActive(filter);
+
+  // A `focus=` link scrolls to and flashes one row (the same landing the ⌘K
+  // palette gives a search hit). Once read, the query is stripped so a refresh
+  // returns the plain ledger and the drill-down doesn't outlive its click.
+  // `flashRow`/`replaceState` are side effects, not React state, so this is not
+  // the `setState`-in-an-effect the repo's ESLint forbids.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.location.search) return;
+    const { focus } = parseLedgerQuery(window.location.search);
+    if (focus) flashRow({ id: focus, scroll: true });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [flashRow]);
 
   // Stable for the session's render; `core` stays clock-free (§ engine).
   const today = useMemo(() => todayIso(), []);

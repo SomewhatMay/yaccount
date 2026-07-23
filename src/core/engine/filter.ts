@@ -15,7 +15,8 @@ import { inRange, type DateRange } from "./period";
  */
 
 /** What a row IS (§5.4) — the shape decides, not the label on it. */
-export type TransactionKind = "expense" | "income" | "transfer";
+export const TRANSACTION_KINDS = ["expense", "income", "transfer"] as const;
+export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 
 export interface TransactionFilter {
   /** Free text over the payee, plus whatever else the caller can name a row by. */

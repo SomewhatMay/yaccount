@@ -42,6 +42,7 @@ import type {
   RecurringRule,
   Transaction,
 } from "@/core/model";
+import { ledgerHref } from "@/features/ledger/deep-link";
 import { Figure, Marginalia, Money } from "@/features/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EmptyNote } from "./chart-ui";
@@ -294,7 +295,13 @@ function Calendar({ range, today, categories, transactions }: WidgetContext) {
   // No marginalia here on purpose: the grid's own footer already names the months
   // it covers, and §12.3 caps a screen at two asides before they read as labels.
   // This screen spends both on the hero and on budget pace.
-  return <SpendingCalendar days={days} spend={spend} />;
+  return (
+    <SpendingCalendar
+      days={days}
+      spend={spend}
+      hrefFor={(day) => ledgerHref({ range: { start: day, end: day } })}
+    />
+  );
 }
 
 // ── Where it went ────────────────────────────────────────────────────────────
@@ -354,6 +361,7 @@ function Breakdown({ range, categories, transactions }: WidgetContext) {
           slices={slices.expense}
           trends={trends}
           emptyLabel="No spending in this period."
+          hrefFor={(id) => ledgerHref({ categoryIds: [id], range })}
         />
       </div>
       <div>
@@ -362,6 +370,7 @@ function Breakdown({ range, categories, transactions }: WidgetContext) {
           slices={slices.income}
           trends={trends}
           emptyLabel="No income in this period."
+          hrefFor={(id) => ledgerHref({ categoryIds: [id], range })}
         />
       </div>
     </div>
@@ -375,7 +384,9 @@ function Payees({ range, categories, transactions }: WidgetContext) {
     () => topPayees(transactions, categories, range, 6),
     [transactions, categories, range],
   );
-  return <PayeeList payees={payees} />;
+  return (
+    <PayeeList payees={payees} hrefFor={(payee) => ledgerHref({ text: payee, range })} />
+  );
 }
 
 function Largest({ range, categories, transactions }: WidgetContext) {
@@ -387,7 +398,13 @@ function Largest({ range, categories, transactions }: WidgetContext) {
     const m = new Map(categories.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "Transfer");
   }, [categories]);
-  return <LargestList rows={rows} nameOf={nameOf} />;
+  return (
+    <LargestList
+      rows={rows}
+      nameOf={nameOf}
+      hrefFor={(t) => ledgerHref({ focus: t.id })}
+    />
+  );
 }
 
 /** How far ahead "coming up" looks. A month is what a commitment list is for. */
