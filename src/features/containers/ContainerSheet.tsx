@@ -6,7 +6,6 @@ import type { Container } from "@/core/model";
 import { nameTaken } from "@/features/unique-name";
 import { ResponsiveSheet } from "@/features/ui";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SheetFooter } from "@/components/ui/sheet";
@@ -58,9 +57,9 @@ function ContainerForm({
 }) {
   const [name, setName] = useState("");
   const [investment, setInvestment] = useState(false);
-  // Unchecked to start: §5.7's overall balance is opt-in and stays opt-in. What
-  // changed is that the choice is now ON the form — "why isn't my money in the
-  // headline" was a surprise you met later, at the far end of a ⋯ menu.
+  // "Not counted" to start: §5.7's overall balance is opt-in and stays opt-in.
+  // What changed is that the choice is now ON the form — "why isn't my money in
+  // the headline" was a surprise you met later, at the far end of a ⋯ menu.
   const [counted, setCounted] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -119,26 +118,35 @@ function ContainerForm({
           </p>
         </div>
 
+        {/* The same shape as every other field on this sheet and on the category
+            one: label, a segmented pair, one line saying what the choice means.
+            A checkbox with its sentence beside it was the odd control out, and
+            on a phone that sentence wrapped around it. */}
         <div className="grid gap-1.5">
           <Label>Overall balance</Label>
-          {/* Checkbox and Label are SIBLINGS tied by id — Radix renders a
-              <button>, and a label wrapped around its own control leaves "did
-              that click toggle once or twice" to the browser. */}
-          <div className="flex items-start gap-2.5">
-            <Checkbox
-              id="ct-counted"
-              checked={counted}
-              onCheckedChange={(v) => setCounted(v === true)}
-              className="mt-0.5"
-            />
-            <Label htmlFor="ct-counted" className="cursor-pointer font-normal">
-              Count this in my overall balance
-            </Label>
-          </div>
+          <ToggleGroup
+            type="single"
+            value={counted ? "counted" : "uncounted"}
+            onValueChange={(v) => v && setCounted(v === "counted")}
+            className="bg-muted/50 w-fit rounded-full p-0.5"
+          >
+            <ToggleGroupItem
+              value="uncounted"
+              className="data-[state=on]:bg-background h-7 rounded-full px-3 text-xs"
+            >
+              Not counted
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="counted"
+              className="data-[state=on]:bg-background h-7 rounded-full px-3 text-xs"
+            >
+              Counted
+            </ToggleGroupItem>
+          </ToggleGroup>
           <p className="text-muted-foreground text-xs">
             {counted
               ? "Its balance adds to the figure at the top of your ledger."
-              : "Money in here won't show in the figure at the top of your ledger — which is what you want for savings you've already set aside. You can change this any time."}
+              : "Money here stays out of the figure at the top of your ledger — which is what you want for savings you have already set aside."}
           </p>
         </div>
       </div>
