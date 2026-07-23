@@ -106,14 +106,18 @@ export function FilterBar<T extends string>({
       </div>
 
       {/* The chips scroll sideways on a phone: a rail that wraps to three lines
-          is a filter panel, and a filter panel is not what a thumb wants. */}
-      <div className="-mx-2 flex [scrollbar-width:none] items-center gap-1.5 overflow-x-auto px-2 pb-0.5 [&::-webkit-scrollbar]:hidden">
-        {facets.map((facet) => (
-          <FacetChip key={facet.id} facet={facet} />
-        ))}
-        {ranges.map((range) => (
-          <RangeChip key={range.label} range={range} />
-        ))}
+          is a filter panel, and a filter panel is not what a thumb wants. Clear
+          sits OUTSIDE that scroll, pinned to the right and adjacent to the rail,
+          so it is always in reach — never buried at the far end of a scroll. */}
+      <div className="flex items-center gap-1.5">
+        <div className="-ml-2 flex min-w-0 flex-1 [scrollbar-width:none] items-center gap-1.5 overflow-x-auto pb-0.5 pl-2 [&::-webkit-scrollbar]:hidden">
+          {facets.map((facet) => (
+            <FacetChip key={facet.id} facet={facet} />
+          ))}
+          {ranges.map((range) => (
+            <RangeChip key={range.label} range={range} />
+          ))}
+        </div>
         {activeCount > 0 && (
           <Button
             variant="ghost"
