@@ -48,7 +48,7 @@ import {
 } from "@/features/recurring/filter";
 import { useLocalPref } from "@/features/prefs";
 import { FilterBar } from "@/features/FilterBar";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColorFor } from "@/features/category-color";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,8 +57,10 @@ import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
   EmptyState,
+  ListSkeleton,
   Money,
   PageHeader,
+  PageHeaderSkeleton,
   RowActions,
 } from "@/features/ui";
 
@@ -125,6 +127,10 @@ export function RecurringView() {
     const m = new Map(containers.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
   }, [containers]);
+  const dotOf = useMemo(
+    () => (id: string | null) => (id ? categoryColorFor(id, categories) : undefined),
+    [categories],
+  );
 
   // What else a rule can be found by: the category and wallets it writes through.
   const labelOf = useMemo(
@@ -144,7 +150,15 @@ export function RecurringView() {
   const active = useMemo(() => shown.filter((r) => r.status === "active"), [shown]);
   const cancelled = useMemo(() => shown.filter((r) => r.status === "cancelled"), [shown]);
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <PageHeaderSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={4} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
@@ -247,6 +261,7 @@ export function RecurringView() {
             <RuleRow
               key={r.id}
               rule={r}
+              dot={dotOf(r.template_category_id)}
               categoryName={catName(r.template_category_id)}
               containerName={contName(r.template_container_id)}
               toContainerName={contName(r.template_to_container_id)}
@@ -351,6 +366,7 @@ export function RecurringView() {
 
 function RuleRow({
   rule,
+  dot,
   categoryName,
   containerName,
   toContainerName,
@@ -359,6 +375,8 @@ function RuleRow({
   onCancel,
 }: {
   rule: RecurringRule;
+  /** The category's colour (override or auto), resolved by the parent. */
+  dot: string | undefined;
   categoryName: string | null;
   containerName: string;
   toContainerName: string;
@@ -384,11 +402,7 @@ function RuleRow({
       ) : (
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{
-            backgroundColor: rule.template_category_id
-              ? categoryDotColor(rule.template_category_id)
-              : undefined,
-          }}
+          style={{ backgroundColor: dot }}
           aria-hidden
         />
       )}

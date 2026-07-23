@@ -7,7 +7,7 @@ import { PencilIcon } from "lucide-react";
 import { parseDollars } from "@/core/money";
 import { monthlyPlan } from "@/core/engine/plan";
 import { setSetting } from "@/core/commands";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColorFor } from "@/features/category-color";
 import {
   budgetTargetsAtom,
   categoriesAtom,
@@ -198,7 +198,7 @@ export function PlanView() {
           {plan.allowances.map((a) => (
             <LeaderRow
               key={a.categoryId}
-              dot={categoryDotColor(a.categoryId)}
+              dot={categoryColorFor(a.categoryId, categories)}
               label={a.name}
             >
               <Money cents={a.amount} tone="quiet" />

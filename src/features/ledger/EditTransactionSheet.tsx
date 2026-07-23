@@ -19,7 +19,7 @@ import {
   type Sign,
 } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor } from "@/features/category-color";
 import { instantFrom, timeInputValue } from "@/features/clock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -253,7 +253,7 @@ function EditForm({
                 <SelectItem key={c.id} value={c.id}>
                   <span
                     className="mr-0.5 size-2 rounded-full"
-                    style={{ backgroundColor: categoryDotColor(c.id) }}
+                    style={{ backgroundColor: categoryColor(c) }}
                   />
                   {c.name}
                   <span className="text-muted-foreground ml-1">· {c.type}</span>

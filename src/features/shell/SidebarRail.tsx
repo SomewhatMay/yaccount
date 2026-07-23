@@ -86,6 +86,7 @@ function RailLink({
         aria-current={current ? "page" : undefined}
         className={cn(
           "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors duration-[var(--dur-1)]",
+          "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
           current
             ? "text-primary"
             : "text-muted-foreground hover:text-foreground hover:bg-accent/60",

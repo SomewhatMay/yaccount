@@ -195,11 +195,15 @@ export function BudgetPaceMeter({
 
 type FlowKind = SankeyFlows["nodes"][number]["kind"];
 
-function flowColor(kind: FlowKind, id: string | null): string {
+function flowColor(
+  kind: FlowKind,
+  id: string | null,
+  colorOf: (id: string) => string = categoryDotColor,
+): string {
   if (kind === "income") return CHART.income;
   if (kind === "drawdown") return CHART.negative;
   if (kind === "hub" || kind === "saved") return CHART.savings;
-  return id ? categoryDotColor(id) : CHART.expense;
+  return id ? colorOf(id) : CHART.expense;
 }
 
 interface FlowNodePayload {
@@ -215,17 +219,19 @@ interface FlowNodePayload {
  * neighbour, so those nodes stay unlabelled and the tooltip names them instead —
  * a clipped label is worse than none (dataviz: measure before you place).
  */
-function FlowNode(props: unknown) {
-  const { x, y, width, height, payload, depth } = props as {
+function FlowNode(props: { colorOf?: (id: string) => string }) {
+  const { x, y, width, height, payload, depth, colorOf } = props as {
     x: number;
     y: number;
     width: number;
     height: number;
     payload: FlowNodePayload;
     depth?: number;
+    // recharts preserves author-set props while injecting its own layout props.
+    colorOf?: (id: string) => string;
   };
   const kind = payload.kind ?? "expense";
-  const fill = flowColor(kind, payload.id ?? null);
+  const fill = flowColor(kind, payload.id ?? null, colorOf);
   const at = depth ?? payload.depth ?? 0;
   const label = kind === "hub" ? null : (payload.name ?? "");
   const right = at > 0;
@@ -248,7 +254,13 @@ function FlowNode(props: unknown) {
   );
 }
 
-export function MoneyFlowChart({ flows }: { flows: SankeyFlows }) {
+export function MoneyFlowChart({
+  flows,
+  colorOf,
+}: {
+  flows: SankeyFlows;
+  colorOf?: (categoryId: string) => string;
+}) {
   if (flows.links.length === 0)
     return <EmptyNote>Nothing flowed in or out in this period.</EmptyNote>;
 
@@ -268,7 +280,7 @@ export function MoneyFlowChart({ flows }: { flows: SankeyFlows }) {
         nodePadding={16}
         nodeWidth={9}
         margin={{ top: 6, right: 4, bottom: 6, left: 4 }}
-        node={<FlowNode />}
+        node={<FlowNode colorOf={colorOf} />}
         link={{ stroke: CHART.axis, strokeOpacity: 0.16 }}
       >
         <Tooltip content={<MoneyTooltip />} />
@@ -369,7 +381,7 @@ export function SpendingCalendar({
               "h-7 rounded-md",
               lv === 0 && "bg-surface-sunken",
               href &&
-                "hover:ring-primary/50 cursor-pointer transition-shadow hover:ring-2",
+                "hover:ring-primary/50 focus-visible:ring-ring cursor-pointer transition-shadow hover:ring-2 focus-visible:ring-2 focus-visible:outline-none",
             );
             return href ? (
               <Link
@@ -425,7 +437,7 @@ function LinkRow({
       href={href}
       className={cn(
         className,
-        "hover:bg-muted/60 -mx-2 rounded-lg px-2 transition-colors",
+        "hover:bg-muted/60 focus-visible:ring-ring -mx-2 rounded-lg px-2 transition-colors focus-visible:ring-2 focus-visible:outline-none",
       )}
     >
       {children}
@@ -479,11 +491,13 @@ export function LargestList({
   rows,
   nameOf,
   hrefFor,
+  colorOf = categoryDotColor,
 }: {
   rows: Transaction[];
   nameOf: (categoryId: string | null) => string;
   /** Each entry links to itself in the register, scrolled to and flashed. */
   hrefFor?: (t: Transaction) => string;
+  colorOf?: (categoryId: string) => string;
 }) {
   if (rows.length === 0) return <EmptyNote>Nothing logged in this period.</EmptyNote>;
   return (
@@ -493,7 +507,7 @@ export function LargestList({
           <LinkRow href={hrefFor?.(t)} className="flex items-center gap-3 py-2">
             <span
               className="size-2 shrink-0 rounded-full"
-              style={{ background: categoryDotColor(t.category_id ?? "") }}
+              style={{ background: colorOf(t.category_id ?? "") }}
               aria-hidden
             />
             <span className="min-w-0 flex-1">

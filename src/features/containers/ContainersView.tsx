@@ -73,8 +73,10 @@ import {
 import {
   CollapsibleSection,
   EmptyState,
+  ListSkeleton,
   Money,
   PageHeader,
+  PageHeaderSkeleton,
   RowActions,
 } from "@/features/ui";
 
@@ -187,7 +189,15 @@ export function ContainersView() {
     });
   }
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <PageHeaderSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={4} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">

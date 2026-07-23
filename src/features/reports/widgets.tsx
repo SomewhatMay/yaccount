@@ -27,7 +27,11 @@ import type {
   MonthlyTotal,
 } from "@/core/engine";
 import { cn } from "@/lib/utils";
-import { categoryDotColor } from "@/features/category-color";
+import {
+  categoryColor,
+  categoryColorFor,
+  categoryDotColor,
+} from "@/features/category-color";
 import { Sparkline } from "@/features/ui";
 import {
   Select,
@@ -59,9 +63,13 @@ export function CategoryDoughnut({
   emptyLabel,
   trends,
   hrefFor,
+  colorOf = categoryDotColor,
 }: {
   slices: CategorySlice[];
   emptyLabel: string;
+  /** Resolve a category's colour (override or auto). Defaults to the auto hue so
+   *  the widget still paints if a caller forgets to thread the override. */
+  colorOf?: (categoryId: string) => string;
   /** Each category's month-by-month shape (`categoryTrendSeries`), drawn beside
    *  its total — the share answers "how much", the sparkline "which way". */
   trends?: Map<string, number[]>;
@@ -90,7 +98,7 @@ export function CategoryDoughnut({
               strokeWidth={0}
             >
               {slices.map((s) => (
-                <Cell key={s.categoryId} fill={categoryDotColor(s.categoryId)} />
+                <Cell key={s.categoryId} fill={colorOf(s.categoryId)} />
               ))}
             </Pie>
             <Tooltip content={<MoneyTooltip />} wrapperStyle={{ zIndex: 20 }} />
@@ -111,7 +119,7 @@ export function CategoryDoughnut({
             <>
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ background: categoryDotColor(s.categoryId) }}
+                style={{ background: colorOf(s.categoryId) }}
               />
               <span className="min-w-0 flex-1 truncate">{s.name}</span>
               {series && series.length > 1 && (
@@ -120,7 +128,7 @@ export function CategoryDoughnut({
                   height={14}
                   strokeWidth={1.25}
                   className="w-9 shrink-0 opacity-70"
-                  style={{ color: categoryDotColor(s.categoryId) }}
+                  style={{ color: colorOf(s.categoryId) }}
                 />
               )}
               <span className="text-muted-foreground tnum shrink-0 text-xs">
@@ -136,7 +144,7 @@ export function CategoryDoughnut({
               {href ? (
                 <Link
                   href={href}
-                  className="hover:bg-muted/60 -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5 text-sm transition-colors"
+                  className="hover:bg-muted/60 focus-visible:ring-ring -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   {inner}
                 </Link>
@@ -287,7 +295,7 @@ export function CategoryDrilldown({
             <SelectItem key={c.id} value={c.id}>
               <span
                 className="size-2.5 rounded-full"
-                style={{ background: categoryDotColor(c.id) }}
+                style={{ background: categoryColor(c) }}
               />
               {c.name}
             </SelectItem>
@@ -318,7 +326,7 @@ export function CategoryDrilldown({
             <Bar
               dataKey="spend"
               name="Spent"
-              fill={selectedId ? categoryDotColor(selectedId) : CHART.expense}
+              fill={selectedId ? categoryColorFor(selectedId, categories) : CHART.expense}
               radius={[3, 3, 0, 0]}
             />
             <Line
@@ -467,7 +475,13 @@ function deltaText(deltaPct: number | null): string {
 }
 
 // ── Budget comparison table, re-scoped to the active period (§6.3) ───────────
-export function BudgetComparisonTable({ rows }: { rows: BudgetComparisonRow[] }) {
+export function BudgetComparisonTable({
+  rows,
+  colorOf = categoryDotColor,
+}: {
+  rows: BudgetComparisonRow[];
+  colorOf?: (categoryId: string) => string;
+}) {
   if (rows.length === 0)
     return <EmptyNote>No budgets or spending in this period.</EmptyNote>;
   return (
@@ -477,7 +491,7 @@ export function BudgetComparisonTable({ rows }: { rows: BudgetComparisonRow[] })
           <CardRow
             key={r.categoryId}
             title={r.name}
-            dot={categoryDotColor(r.categoryId)}
+            dot={colorOf(r.categoryId)}
             lead={
               <span className="tnum shrink-0 font-mono text-sm">
                 {formatCents(r.actualMonthlyAvg)}
@@ -512,7 +526,7 @@ export function BudgetComparisonTable({ rows }: { rows: BudgetComparisonRow[] })
               <TableCell className="flex items-center gap-2 font-medium">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: categoryDotColor(r.categoryId) }}
+                  style={{ background: colorOf(r.categoryId) }}
                 />
                 {r.name}
               </TableCell>

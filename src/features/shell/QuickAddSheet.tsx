@@ -16,7 +16,7 @@ import {
   quickAddAtom,
   templatesAtom,
 } from "@/features/store";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor } from "@/features/category-color";
 import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
@@ -245,7 +245,7 @@ function QuickAddForm({
                   <SelectItem key={c.id} value={c.id}>
                     <span
                       className="mr-0.5 size-2 rounded-full"
-                      style={{ backgroundColor: categoryDotColor(c.id) }}
+                      style={{ backgroundColor: categoryColor(c) }}
                     />
                     {c.name}
                   </SelectItem>

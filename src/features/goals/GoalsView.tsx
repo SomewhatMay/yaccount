@@ -73,7 +73,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
-import { CollapsibleSection, EmptyState, Eyebrow, PageHeader } from "@/features/ui";
+import {
+  CollapsibleSection,
+  EmptyState,
+  Eyebrow,
+  ListSkeleton,
+  PageHeader,
+  PageHeaderSkeleton,
+} from "@/features/ui";
 
 /** Device-local: how you like to READ your goals, not a fact about them. */
 const SORT_KEY = "yaccount.goals.sort";
@@ -244,7 +251,15 @@ export function GoalsView() {
     setSheet(null);
   }
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <PageHeaderSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={3} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">

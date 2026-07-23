@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  CheckIcon,
+  PaletteIcon,
   PencilIcon,
   PlusIcon,
   ShapesIcon,
@@ -27,7 +29,7 @@ import { budgetOnDate } from "@/core/engine/budgets";
 import { formatCents } from "@/core/money";
 import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor, CATEGORY_PALETTE } from "@/features/category-color";
 import { BudgetSheet } from "@/features/categories/BudgetSheet";
 import { CategorySheet } from "@/features/categories/CategorySheet";
 import {
@@ -46,12 +48,15 @@ import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
   EmptyState,
   Eyebrow,
+  ListSkeleton,
   PageHeader,
+  PageHeaderSkeleton,
   RowActions,
 } from "@/features/ui";
 
@@ -135,7 +140,15 @@ export function CategoriesView() {
     setCreating(false);
   }
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <PageHeaderSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={6} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
@@ -277,7 +290,7 @@ export function CategoriesView() {
             >
               <span
                 className="size-2.5 shrink-0 rounded-full opacity-50"
-                style={{ backgroundColor: categoryDotColor(c.id) }}
+                style={{ backgroundColor: categoryColor(c) }}
                 aria-hidden
               />
               <span className="text-muted-foreground flex-1 truncate text-sm">
@@ -381,6 +394,7 @@ function CategoryRow({
   onBudget: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [coloring, setColoring] = useState(false);
 
   async function save(name: string) {
     if (name !== category.name) {
@@ -388,6 +402,17 @@ function CategoryRow({
       toast.success("Renamed", { description: name });
     }
     setEditing(false);
+  }
+
+  // §10.1 override: store a chosen colour, or clear it (null) to fall back to
+  // the deterministic hue. The dot updates the moment it lands, everywhere.
+  async function setColor(color: string | null) {
+    setColoring(false);
+    if (color === category.color) return;
+    await onChange(updateCategory({ ...category, color }));
+    toast.success(color ? "Colour set" : "Colour reset to auto", {
+      description: category.name,
+    });
   }
 
   async function archive() {
@@ -412,11 +437,22 @@ function CategoryRow({
         divider && "border-t",
       )}
     >
-      <span
-        className="size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: categoryDotColor(category.id) }}
-        aria-hidden
-      />
+      <Popover open={coloring} onOpenChange={setColoring}>
+        <PopoverAnchor asChild>
+          <span
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: categoryColor(category) }}
+            aria-hidden
+          />
+        </PopoverAnchor>
+        <PopoverContent align="start" className="w-auto p-3">
+          <ColorPalette
+            selected={category.color}
+            auto={categoryColor({ id: category.id, color: null })}
+            onPick={setColor}
+          />
+        </PopoverContent>
+      </Popover>
       <div className="min-w-0 flex-1">
         {editing ? (
           <RenameField
@@ -446,6 +482,12 @@ function CategoryRow({
           <PencilIcon className="size-4" />
           Rename
         </DropdownMenuItem>
+        {/* Open on the next frame so the menu finishes closing (and restoring
+            focus) before the popover claims it — otherwise the two fight. */}
+        <DropdownMenuItem onSelect={() => requestAnimationFrame(() => setColoring(true))}>
+          <PaletteIcon className="size-4" />
+          Set colour
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onBudget}>
           <TargetIcon className="size-4" />
           Budget
@@ -455,6 +497,57 @@ function CategoryRow({
           Archive
         </DropdownMenuItem>
       </RowActions>
+    </div>
+  );
+}
+
+/**
+ * The §10.1 override palette: a fixed, legible set to pick from, plus Auto to
+ * clear the override and fall back to the deterministic hue. Selection is a ring
+ * in the ink colour, so it reads on a light swatch and a dark one alike.
+ */
+function ColorPalette({
+  selected,
+  auto,
+  onPick,
+}: {
+  selected: string | null;
+  /** The deterministic hue this category shows when it has no override. */
+  auto: string;
+  onPick: (color: string | null) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Eyebrow as="p">Colour</Eyebrow>
+      <div className="grid grid-cols-6 gap-2">
+        {CATEGORY_PALETTE.map((c, i) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onPick(c)}
+            aria-label={`Colour ${i + 1}`}
+            aria-pressed={selected === c}
+            className={cn(
+              "focus-visible:ring-ring ring-offset-popover size-7 rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+              selected === c && "ring-foreground ring-2 ring-offset-2",
+            )}
+            style={{ backgroundColor: c }}
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onPick(null)}
+        aria-pressed={selected === null}
+        className="hover:bg-muted/60 focus-visible:ring-ring flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <span
+          className="size-4 shrink-0 rounded-full border border-dashed opacity-70"
+          style={{ backgroundColor: auto }}
+        />
+        <span className="flex-1 text-left">Auto</span>
+        {selected === null && <CheckIcon className="text-muted-foreground size-4" />}
+      </button>
     </div>
   );
 }

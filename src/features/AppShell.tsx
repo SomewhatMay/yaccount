@@ -14,6 +14,7 @@ import { MoreSheet } from "@/features/shell/MoreSheet";
 import { QuickAddFab } from "@/features/shell/QuickAddFab";
 import { QuickAddSheet } from "@/features/shell/QuickAddSheet";
 import { SidebarRail } from "@/features/shell/SidebarRail";
+import { SyncErrorBanner } from "@/features/SyncErrorBanner";
 import { TopBar } from "@/features/shell/TopBar";
 
 /**
@@ -49,11 +50,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {bootError ? (
           <BootFailure detail={bootError} />
         ) : (
-          // Keyed on the route so moving to another screen clears a failure
-          // rather than stranding you on it.
-          <ErrorBoundary label="This screen" resetKeys={[pathname]}>
-            {children}
-          </ErrorBoundary>
+          <>
+            {/* A persistent sync failure, surfaced on every screen (§12.6). */}
+            <SyncErrorBanner />
+            {/* Keyed on the route so moving to another screen clears a failure
+                rather than stranding you on it. */}
+            <ErrorBoundary label="This screen" resetKeys={[pathname]}>
+              {children}
+            </ErrorBoundary>
+          </>
         )}
       </main>
 

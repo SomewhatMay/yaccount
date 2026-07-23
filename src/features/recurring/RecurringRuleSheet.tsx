@@ -19,7 +19,7 @@ import {
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor } from "@/features/category-color";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -232,7 +232,7 @@ function RuleForm({
                   <SelectItem key={c.id} value={c.id}>
                     <span
                       className="mr-0.5 size-2 rounded-full"
-                      style={{ backgroundColor: categoryDotColor(c.id) }}
+                      style={{ backgroundColor: categoryColor(c) }}
                     />
                     {c.name}
                     <span className="text-muted-foreground ml-1">· {c.type}</span>

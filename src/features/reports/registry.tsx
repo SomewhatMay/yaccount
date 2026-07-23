@@ -42,6 +42,7 @@ import type {
   RecurringRule,
   Transaction,
 } from "@/core/model";
+import { categoryColorFor } from "@/features/category-color";
 import { ledgerHref } from "@/features/ledger/deep-link";
 import { Figure, Marginalia, Money } from "@/features/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -273,7 +274,9 @@ function Flow({ range, categories, transactions }: WidgetContext) {
     () => sankeyFlows(transactions, categories, range),
     [transactions, categories, range],
   );
-  return <MoneyFlowChart flows={flows} />;
+  return (
+    <MoneyFlowChart flows={flows} colorOf={(id) => categoryColorFor(id, categories)} />
+  );
 }
 
 // ── Spending calendar ────────────────────────────────────────────────────────
@@ -362,6 +365,7 @@ function Breakdown({ range, categories, transactions }: WidgetContext) {
           trends={trends}
           emptyLabel="No spending in this period."
           hrefFor={(id) => ledgerHref({ categoryIds: [id], range })}
+          colorOf={(id) => categoryColorFor(id, categories)}
         />
       </div>
       <div>
@@ -371,6 +375,7 @@ function Breakdown({ range, categories, transactions }: WidgetContext) {
           trends={trends}
           emptyLabel="No income in this period."
           hrefFor={(id) => ledgerHref({ categoryIds: [id], range })}
+          colorOf={(id) => categoryColorFor(id, categories)}
         />
       </div>
     </div>
@@ -403,6 +408,7 @@ function Largest({ range, categories, transactions }: WidgetContext) {
       rows={rows}
       nameOf={nameOf}
       hrefFor={(t) => ledgerHref({ focus: t.id })}
+      colorOf={(id) => categoryColorFor(id, categories)}
     />
   );
 }
@@ -538,7 +544,12 @@ function Budgets({ range, categories, transactions, budgetTargets }: WidgetConte
     () => budgetComparison(transactions, categories, range, budgetTargets),
     [transactions, categories, range, budgetTargets],
   );
-  return <BudgetComparisonTable rows={rows} />;
+  return (
+    <BudgetComparisonTable
+      rows={rows}
+      colorOf={(id) => categoryColorFor(id, categories)}
+    />
+  );
 }
 
 // ── The list itself ──────────────────────────────────────────────────────────

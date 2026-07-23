@@ -42,3 +42,19 @@ export function FigureSkeleton({ className }: { className?: string }) {
     </div>
   );
 }
+
+/**
+ * The shape of a list screen's `PageHeader` (§12.4): an eyebrow, a serif title,
+ * and one line of lede. Smaller than the hero `FigureSkeleton` — a list screen
+ * opens on a `.figure-lg` title, not a balance moment — so the placeholder does
+ * not promise a figure that isn't coming.
+ */
+export function PageHeaderSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("space-y-2.5 pt-1", className)} aria-hidden="true">
+      <Skeleton className="h-2.5 w-24" />
+      <Skeleton className="h-7 w-52" />
+      <Skeleton className="h-3 w-72 max-w-full" />
+    </div>
+  );
+}

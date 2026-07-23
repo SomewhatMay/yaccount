@@ -25,7 +25,7 @@ import { isRegisterSort, pendingRows, sortRegister } from "@/core/engine/ledger"
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor, categoryColorFor } from "@/features/category-color";
 import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
 import { useLocalPref } from "@/features/prefs";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
@@ -33,7 +33,14 @@ import { FilterBar } from "@/features/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { EmptyState, Money, PageHeader, RowActions } from "@/features/ui";
+import {
+  EmptyState,
+  ListSkeleton,
+  Money,
+  PageHeader,
+  PageHeaderSkeleton,
+  RowActions,
+} from "@/features/ui";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -88,6 +95,10 @@ export function InboxView() {
     const m = new Map(categories.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "Transfer");
   }, [categories]);
+  const dotOf = useMemo(
+    () => (id: string | null) => (id ? categoryColorFor(id, categories) : undefined),
+    [categories],
+  );
   const containerNameOf = useMemo(() => {
     const m = new Map(containers.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
@@ -179,7 +190,15 @@ export function InboxView() {
 
   const dismiss = (t: Transaction) => dismissMany([t]);
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <PageHeaderSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={4} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
@@ -223,7 +242,7 @@ export function InboxView() {
                 .map((c) => ({
                   value: c.id,
                   label: c.name,
-                  dot: categoryDotColor(c.id),
+                  dot: categoryColor(c),
                 })),
             },
           ]}
@@ -321,6 +340,7 @@ export function InboxView() {
                 tx={t}
                 checked={liveSelection.has(t.id)}
                 onCheck={() => toggle(t.id)}
+                dot={dotOf(t.category_id)}
                 categoryName={nameOf(t.category_id)}
                 containerName={containerNameOf(t.container_id)}
                 toContainerName={containerNameOf(t.to_container_id)}
@@ -356,6 +376,7 @@ function InboxRow({
   tx,
   checked,
   onCheck,
+  dot,
   categoryName,
   containerName,
   toContainerName,
@@ -367,6 +388,8 @@ function InboxRow({
   tx: Transaction;
   checked: boolean;
   onCheck: () => void;
+  /** The category's colour (override or auto), resolved by the parent. */
+  dot: string | undefined;
   categoryName: string;
   containerName: string;
   toContainerName: string;
@@ -401,11 +424,7 @@ function InboxRow({
       ) : (
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{
-            backgroundColor: tx.category_id
-              ? categoryDotColor(tx.category_id)
-              : undefined,
-          }}
+          style={{ backgroundColor: dot }}
           aria-hidden
         />
       )}

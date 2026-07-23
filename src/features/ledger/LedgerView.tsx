@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
@@ -10,6 +11,7 @@ import {
   ArrowUpRightIcon,
   BookmarkIcon,
   PencilIcon,
+  SparklesIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -54,7 +56,7 @@ import {
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor, categoryColorFor } from "@/features/category-color";
 import { useLocalPref } from "@/features/prefs";
 import {
   EmptyState,
@@ -213,6 +215,14 @@ export function LedgerView() {
     const m = new Map(categories.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "Transfer");
   }, [categories]);
+
+  // A row's dot wears the category's colour — its override if it has one, its
+  // deterministic hue otherwise (§10.1). Resolved here where the category list
+  // is, and handed to the row like its name is, so the row stays presentational.
+  const dotOf = useMemo(
+    () => (id: string | null) => (id ? categoryColorFor(id, categories) : undefined),
+    [categories],
+  );
 
   // Show which wallet a row moved through only once there is more than one.
   const containerNameOf = useMemo(() => {
@@ -382,7 +392,7 @@ export function LedgerView() {
                 .map((c) => ({
                   value: c.id,
                   label: c.name,
-                  dot: categoryDotColor(c.id),
+                  dot: categoryColor(c),
                 })),
             },
             {
@@ -452,6 +462,22 @@ export function LedgerView() {
               {live.length} entr{live.length === 1 ? "y is" : "ies are"} in the register —
               widen the filters to see them.
             </EmptyState>
+          ) : categories.length === 0 ? (
+            // First run: you cannot file an entry before a category exists, so the
+            // empty register invites the one thing that unblocks everything else
+            // (§12.6 — invite, don't shrug).
+            <EmptyState
+              icon={SparklesIcon}
+              title="Welcome to yaccount"
+              action={
+                <Button asChild className="rounded-full">
+                  <Link href="/categories">Add your first category</Link>
+                </Button>
+              }
+            >
+              Start with a category or two for what your money does — groceries, rent,
+              salary. Every entry you log is filed under one.
+            </EmptyState>
           ) : (
             <EmptyState title="Nothing logged yet">
               Every entry you add lands here, newest first. Start with what you spent
@@ -468,6 +494,7 @@ export function LedgerView() {
                   tx={t}
                   flashed={flashed?.id === t.id ? flashed : null}
                   when={showsTime(g.day) ? formatEnteredTime(t.entered_at) : null}
+                  dot={dotOf(t.category_id)}
                   categoryName={nameOf(t.category_id)}
                   containerName={showContainer ? containerNameOf(t.container_id) : ""}
                   toContainerName={containerNameOf(t.to_container_id)}
@@ -489,6 +516,7 @@ export function LedgerView() {
                 tx={t}
                 flashed={flashed?.id === t.id ? flashed : null}
                 when={formatDay(t.date)}
+                dot={dotOf(t.category_id)}
                 categoryName={nameOf(t.category_id)}
                 containerName={showContainer ? containerNameOf(t.container_id) : ""}
                 toContainerName={containerNameOf(t.to_container_id)}
@@ -549,6 +577,7 @@ function LedgerRow({
   tx,
   flashed,
   when,
+  dot,
   categoryName,
   containerName,
   toContainerName,
@@ -562,6 +591,8 @@ function LedgerRow({
   /** The last thing on the row's sub-line: the clock time inside a day
    *  group, the date when the register is ranked by size instead. */
   when: string | null;
+  /** The category's colour (override or auto), resolved by the parent. */
+  dot: string | undefined;
   categoryName: string;
   containerName: string;
   toContainerName: string;
@@ -612,11 +643,7 @@ function LedgerRow({
       ) : (
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{
-            backgroundColor: tx.category_id
-              ? categoryDotColor(tx.category_id)
-              : undefined,
-          }}
+          style={{ backgroundColor: dot }}
           aria-hidden
         />
       )}

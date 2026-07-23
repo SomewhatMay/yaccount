@@ -11,7 +11,11 @@ export { Figure } from "@/features/ui/Figure";
 export { EmptyState } from "@/features/ui/EmptyState";
 export { RowActions } from "@/features/ui/RowActions";
 export { LeaderRow } from "@/features/ui/LeaderRow";
-export { ListSkeleton, FigureSkeleton } from "@/features/ui/ListSkeleton";
+export {
+  ListSkeleton,
+  FigureSkeleton,
+  PageHeaderSkeleton,
+} from "@/features/ui/ListSkeleton";
 export { Marginalia } from "@/features/ui/Marginalia";
 export { Money, type MoneyTone } from "@/features/ui/Money";
 export { PageHeader } from "@/features/ui/PageHeader";
