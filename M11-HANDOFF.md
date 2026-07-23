@@ -1,10 +1,10 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 17 commits ahead of `main`).
-> **Status:** Phases 1, 1.5, 2, 3, 4, 5 and 6 of 10 are DONE, **user browser-tested and passed**,
-> committed and pushed. **Phase 7 (Dashboard v2) is next.**
-> **Last updated:** 2026-07-22, after Phase 6 passed its browser test (and its three fix rounds).
+> **Branch:** `m11-design-polish` (pushed to origin, 22 commits ahead of `main`).
+> **Status:** Phases 1, 1.5, 2, 3, 4, 5, 6 and 7 of 10 are DONE, **user browser-tested and passed**,
+> committed and pushed. **Phase 8 (category colours, empty/loading/error states, a11y) is next.**
+> **Last updated:** 2026-07-22, after Phase 7 (Dashboard v2) passed its browser test (+ two follow-up fix rounds).
 
 ---
 
@@ -250,8 +250,8 @@ does. Keep that discipline.
 | 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ✅ **DONE** — `2e4d6cc`, user-tested PASS |
 | 5 | Ledger v2 (history curve, carried balance, filters/sort) | ✅ **DONE** — `14650d7` + `afaa8de`, user-tested PASS |
 | 6 | Filters + mobile density on the other 5 list views | ✅ **DONE** — `acf8f26` + `3683b74` + `b0483b4` + `7372a80`, user-tested PASS |
-| 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ⬜ **NEXT** |
-| 8 | Category colours, empty/loading/error states, a11y | ⬜ |
+| 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ✅ **DONE** — `bff1dc8` + `432a770` + `7de2c5f` + `cfe1bfb`, user-tested PASS |
+| 8 | Category colours, empty/loading/error states, a11y | ⬜ **NEXT** |
 | 9 | Playwright e2e | ⬜ |
 | 10 | Docs (spec §12, impl §4, HANDOFF) | ⬜ |
 
@@ -600,103 +600,142 @@ this one needed no fix round.
 
 ---
 
-## 5. Phase 7 — what to do next
+### Phase 7 — `bff1dc8` "dashboard v2 — a widget registry, and nine derivations to fill it" (+ 3 follow-ups)
 
-From `M11-PLAN.md` §8 ("dashboard v2 — KPI deltas, pace, Sankey, calendar, payees, upcoming") plus the
-two §7 items the plan deferred here (per-widget period override, period persistence). **Re-ground it in
-the code before you start; do not work from this summary.**
+**User browser-tested and passed** after two rounds of feedback (`432a770` drill-downs, `7de2c5f` the
+URL-timing fix, `cfe1bfb` the Clear button). Tests **715 → 788**.
 
-### The screen as it stands (checked, 2026-07-22)
+- **The screen is a LIST, not a layout.** `src/features/reports/registry.tsx` is `DASHBOARD_WIDGETS` — 16
+  entries of `{ id, title, defaultVisible, bare?, fixedWindow?, render(ctx) }`. `DashboardView.tsx` owns
+  only the period + the data + the ORDER; it has no chart in it. The move-anything-around widget system
+  the user wants next is now a different *list*, not a teardown. `registry.test.ts` pins the ids
+  (they are stored-preference keys) and the invariants (one opening figure, which widgets are bare, which
+  are fixed-window). **Each `render` returns a COMPONENT** so the widget owns its own memoised
+  derivations — inline hooks would belong to the dashboard and break on reorder.
+- **`WidgetShell.tsx`** wraps every non-bare widget: the fold (persisted per id via `useLocalPref`, as
+  `"open"|"closed"`), the per-widget period override (§6.1, a `⋯` menu of presets, `RowActions`), and a
+  per-widget `ErrorBoundary` named after the widget. `bare` widgets (the hero, the KPI strip) get none of
+  that — they are the screen's opening statement.
+- **Nine new pure engine derivations, TDD against hand-computed fixtures** (all in `src/core/engine/`):
+  `periodSummary`/`comparePeriodSummary`, `dailySpend`, `topPayees`, `largestTransactions`,
+  `savingsRateSeries`, `categoryTrendSeries`, `sankeyFlows` (`reporting.ts`); `budgetPace` (`budgets.ts`);
+  `upcomingOccurrences` (`recurring.ts`); plus `precedingRange` + `PERIOD_PRESETS`/`isPeriodPreset`
+  (`period.ts`) and `TRANSACTION_KINDS` (`filter.ts`). Judgement calls worth keeping: `precedingRange`
+  compares equal DAY COUNTS not calendar months; a rate moves in POINTS not percent; an overspend enters
+  the Sankey as a `drawdown` strand so the picture balances; `upcomingOccurrences` READS the grid and
+  generates nothing (opening the dashboard must never fill the Inbox); `budgetPace` draws the month as its
+  own bar so "71% spent" is legible as early/late.
+- **The reporting period now persists** (`features/reports/period-pref.ts` over `prefs.ts`). The old
+  `reportingPeriodAtom`/`comparePeriodAtom` are **deleted** — a period is a device-local view preference,
+  never the op log. It survives a refresh now, keyed `yaccount.dashboard.{period,compare}`, and each
+  widget's fold/window are `yaccount.dashboard.{open,window}.<id>`.
+- **§12.4's last table debt paid.** `ContainerFlowsTable` and `BudgetComparisonTable` (the only `Table`
+  consumers left in the app) collapse to card rows below `sm`. `PageHeader` now also carries the
+  dashboard, Plan and Settings; its eyebrow no longer shrinks.
+- **Charts follow the `dataviz` skill** for form (gridlines de-dashed, solid; one hue for the calendar
+  heat, bucketed by the reader's own quartiles) but the palette stays **§12.2 semantic tokens +
+  `categoryDotColor(id)`** — the skill's palette is a placeholder, ours wins. Deltas carry an arrow, not a
+  colour (§12.2 spends emerald only on money coming in). recharts 3.10's `Sankey` needed no new dep;
+  `sankey-layout.test.ts` runs its real layout pass over the engine output (the one automated proof the
+  chart renders before Playwright) via a deep import typed in `recharts-sankey.d.ts`.
+- **Dashboard numbers are doors into the ledger** (`432a770`). New pure `features/ledger/deep-link.ts`
+  (`ledgerHref`/`parseLedgerQuery`, tested) turns a drill-down into a real `/ledger?…` URL and reads it
+  back into the rail's `FilterDraft`. **Made interactive, deliberately:** a breakdown category → that
+  category over the window; a top payee → the register searched for it; a largest entry → that exact row
+  flashed; a calendar day WITH spend → that day. **Left alone on purpose:** the Money flow (strands too
+  thin — the user's explicit call), the hero/KPIs (summaries, no single target), budget pace, upcoming,
+  goals, and the doughnut SEGMENTS (the legend row beside each is the honest target). Whole-row hit areas,
+  one quiet hover.
+- **Two real bugs found and fixed on the way:** `Sparkline` spread `...props` after `style={{height}}`,
+  so any caller passing `style` (the category-tinted legend sparkline) silently lost its height. And the
+  deep-link filter had to seed from **`useSearchParams`, not `window.location`** — during a client `<Link>`
+  navigation the address bar updates a beat after the destination first renders, so reading the window
+  seeded an empty filter while the URL visibly carried one (`7de2c5f`). Static export needs a Suspense
+  boundary around `useSearchParams`; `src/app/ledger/page.tsx` has one, with a skeleton fallback.
+- **`cfe1bfb`:** the filter `Clear ×N` button is pinned OUTSIDE the scrolling chip rail now (always
+  visible on the right, rail adjacent to its left) — it used to be the last item inside the scroll.
 
-- **`src/features/reports/DashboardView.tsx`** (323 lines) — reads the atoms, resolves the primary and
-  optional compare range against a session-stable `today`, and renders one or two `ReportColumn`s
-  (compare = `lg:grid-cols-2`). `ReportColumn` is a **hand-laid JSX blob of `<Panel>` blocks**: category
-  doughnut, monthly bars, waterfall, category-over-time, container flows, investments, budget comparison.
-- **`src/features/reports/widgets.tsx`** (454 lines) — `CategoryDoughnut`, `MonthlyBarsChart`,
-  `WaterfallChart`, `CategoryDrilldown`, `ContainerFlowsTable`, `BudgetComparisonTable`, `InvestmentCard`.
-- **`chart-ui.tsx`** — the `CHART` token palette, `MoneyTooltip`, `monthLabel`/`formatAxisCents`,
-  `Panel`, `EmptyNote`. Chart colours are semantic tokens read as CSS vars; category colour is
-  `categoryDotColor(id)` (§12.2's one swatch scheme). **Do not invent a second chart palette.**
-- **`PeriodPicker.tsx`** — preset `Select` + custom dates + a Compare toggle.
+---
 
-### What does NOT exist yet — every derivation this phase needs is missing
+## 5. Phase 8 — what to do next
 
-`reporting.ts` today has only `categoryBreakdown`, `categoryBreakdownMonthlyAverage`, `monthlyTotals`,
-`categoryMonthlySpend`, `totalExpenseBudgetOnDate`, `waterfallData`, `budgetComparison`.
-`budgets.ts` has **only** `budgetOnDate`. `recurring.ts` has `firstOccurrenceOnOrAfter`,
-`nextOccurrence`, `generateDueOccurrences`.
+From `M11-PLAN.md` §9 ("category colours, empty/loading/error states, a11y pass"). Three strands, all UI,
+no new engine. **Re-ground each in the code before you start; do not work from this summary.** The user
+tests each phase in a browser — end your turn with what to test, then STOP.
 
-So all of these are new, pure, `src/core/engine/`, TDD against hand-computed fixtures:
+### Strand 1 — the category-colour override UI (the last deferred SPEC item, §10.1)
 
-| Needed | Home | For |
-|---|---|---|
-| `periodSummary(range)` + `comparePeriodSummary(a,b)` | `reporting.ts` | the KPI strip + its Δ |
-| `dailySpend(range)` | `reporting.ts` | the spending calendar heatmap |
-| `topPayees(range, limit)` | `reporting.ts` | groups `vendor_source` |
-| `largestTransactions(range, limit)` | `reporting.ts` | |
-| `savingsRateSeries(monthly)` | `reporting.ts` | the hero sparkline |
-| `categoryTrendSeries` | `reporting.ts` | per-row sparklines in the breakdown |
-| `sankeyFlows(range)` → `{nodes, links}` | `reporting.ts` | recharts 3.10 exports `Sankey` — **no new dep** |
-| `budgetPace(txns, categories, targets, ym, today)` | `budgets.ts` | `{spent, budget, monthElapsedPct, spentPct, projected, onPace}` |
-| `upcomingOccurrences(rules, from, to)` | `recurring.ts` | over the existing occurrence grid |
+Spec §10.1 is a **hybrid auto-palette + per-category override**. The auto half shipped at M5
+(`categoryDotColor(id)`); this phase adds the override. **The data already exists** — do not touch the
+model or the op log:
 
-`trailingDays(today, count)` already exists in `period.ts` — the calendar wants it.
+- `Category.color` is `z.string().nullable()` in `src/core/model/category.ts`; `createCategory` and
+  `updateCategory` already carry it (`updateCategory` takes a full `Category` row).
+- The presentational scheme is `src/features/category-color.ts` `categoryDotColor(id)`. §10.1 wants
+  **`categoryColor(category) = category.color ?? categoryDotColor(category.id)`** — a new helper that
+  prefers a stored colour and falls back to the deterministic hue. **12 files call `categoryDotColor(id)`
+  today** (grep: ledger, inbox, categories, recurring, plan, quick-add, both reports files, chart-ui,
+  dashboard-widgets, widgets, edit-sheet). They pass an **id**, but the override needs the **category**
+  — so either thread the category through, or add a lookup `(id) => color ?? auto(id)` fed by the
+  categories list at each call site. Decide one approach and hold it; a second swatch scheme is exactly
+  what §12.2 forbids.
+- **The UI:** §12.4-a puts per-item edits behind the `⋯` menu → "Set colour" → a `Popover` palette +
+  an "Auto" reset. `CategoriesView` already has the row `⋯` menu (`RowActions`) and a `BudgetSheet`
+  precedent. Read `CategorySheet.tsx` / `CategoriesView.tsx` first. The palette swatches should be a
+  fixed, legible set (pick from the same oklch discipline as the ramp) — **run the contrast intuition,
+  and remember `theme.test.ts` guards the token ramp, not arbitrary category colours** (a user-chosen
+  dot sits on `--card`, so keep the set readable there in both themes).
 
-### The locked shape: a widget REGISTRY, not a JSX blob
+### Strand 2 — empty / loading / error / sync states (§12.6)
 
-**This is the one structural requirement and it comes from the user** (§7 below, post-M11 roadmap).
-They intend a move-anything-around widget system *after* M11. Build each widget as a self-contained
-entry the dashboard maps over — `{ id, title, defaultVisible, render }` — so that future layer is a
-wrapper, not a teardown. **The same stable ids serve as the collapse-state keys and as the anchor for
-the per-widget period override (§6.1).** Per-widget `ErrorBoundary`
-(`src/features/ErrorBoundary.tsx`, `label` + `resetKeys`) falls out of the same shape — a bad chart
-should cost you the chart, not the screen.
+- **Skeletons, not "Loading…".** `FigureSkeleton`/`ListSkeleton` exist and Ledger/Plan/Dashboard already
+  use them. **Five list views still render a plain `<p>Loading…`** on `!ready`: `ContainersView`,
+  `CategoriesView`, `GoalsView`, `RecurringView`, `InboxView`. Give each a skeleton in its own shape.
+- **Empty states as invitations.** `EmptyState` (icon + title + line + action) is used in 8 places; the
+  list views already distinguish "nothing here yet" from "nothing matches those filters". Sweep for any
+  hand-rolled empty `<div>`s that slipped through, and add **first-run onboarding when there are no
+  categories at all** (the app is unusable until one exists — §12.6 says invite, don't shrug).
+- **Sync + `DriveError` surfaces.** `SyncIndicator.tsx` already has a spinner / muted cloud / struck
+  cloud + a Reconnect pill, and `describeSyncError` lives in `src/sync/drive.ts`. This phase adds the
+  **persistent-error banner** (a sync that keeps failing is currently only a small header glyph) and
+  considers a first-run "not connected yet" state. `lastSyncErrorAtom` is in `store.ts`. Do NOT re-open
+  the M9 sync mechanism — this is surfacing, not plumbing.
+- **`src/app/error.tsx` + `global-error.tsx`** (Phase 2) already exist in §12 voice — leave them; this
+  strand is about the *in-view* states, not the route boundaries.
 
-**Fixed order + collapsible sections for M11** (user's call, locked). Collapse state persists,
-keyed by widget id.
+### Strand 3 — the accessibility pass
 
-### What Phases 3–6 built FOR this phase — compose it, don't fork it
+- **Visible iris focus rings** on every interactive control; **`aria-label` on every icon-only control**
+  (the FAB, `RowActions`, sync glyph, sort select, chart toggles). Grep `size="icon"` and bare
+  `<button>`s.
+- **Contrast** — the new ramp is already held to WCAG AA by `theme.test.ts`; extend the intuition to any
+  new colour this phase introduces (the category palette).
+- **Reduced motion** is a global kill-switch already (§12.5, `globals.css`) — verify nothing added since
+  bypasses it.
+- **Keyboard reachability** of the FAB, the sheets, the ⌘K palette, the More sheet, and the new dashboard
+  drill-down links (they are real `<Link>`s / `<a>`s now, so they should already tab).
+- **Landmarks** on the tab bar / sidebar rail (`nav`), `main`, etc.
 
-- **`src/features/prefs.ts`** — `useLocalPref(key, fallback, isValid)` is how collapse state and the
-  reporting period persist. **⚠ It is typed `T extends string`**, so a boolean needs `"open"|"closed"`
-  (or a small typed wrapper) — don't reach for `useState` + an effect, this repo's ESLint forbids
-  `setState` in an effect.
-- **`reportingPeriodAtom` / `comparePeriodAtom` are plain atoms and reset on refresh** — the plan wants
-  them persisted. They hold only the period *descriptor*; `today` is supplied by the view so the atoms
-  stay clock-free. Keep that.
-- **`src/features/ui/`** — `Figure` (hero + its curve), `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`,
-  `LeaderRow`, `Sparkline` + pure `sparklinePath`, `ResponsiveSheet`, `EmptyState`, `ListSkeleton`,
-  `useMediaQuery`, and from phase 6 **`PageHeader`**, **`RowActions`**, **`CollapsibleSection`**.
-  Hand-rolling one of these in Tailwind is forking the language (§12.8).
-  - **`CollapsibleSection` is NOT the widget-collapse component.** It is count-driven, closed by
-    default, for archived/paused lists. A widget is default-*open* and its state persists. Reuse
-    shadcn `collapsible` underneath; don't bend the section component into both jobs.
-- **`PageHeader`** should take the dashboard's header too (and Plan/Settings, which still hand-roll
-  theirs) — the period picker is that screen's `action`.
+### Compose it, don't fork it
 
-### The two `Table`s
+`src/features/ui/` is the language: `EmptyState`, `ListSkeleton`/`FigureSkeleton`, `RowActions`,
+`PageHeader`, `Money`, `Figure`, `Eyebrow`, `Marginalia`, and shadcn `popover`/`collapsible`. Hand-rolling
+one of these in Tailwind is forking §12.8. `useLocalPref` is `T extends string` (a boolean needs
+`"open"|"closed"`); the repo's ESLint forbids `setState` in an effect — use lazy `useState`,
+`useSyncExternalStore`, or a jotai setter.
 
-`ContainerFlowsTable` and `BudgetComparisonTable` in `widgets.tsx` are **the only `Table` consumers left
-in the app** — the five list views never used one. §12.4's "tables collapse to card rows below `sm`, no
-horizontal page scroll ever" is owed here, and nowhere else.
-
-### Follow the `dataviz` skill
-
-Charts follow it for palette/axis/legend/tooltip consistency — but the palette it hands you is a
-placeholder: **yaccount's chart colours are the semantic tokens already in `chart-ui.tsx`**, and
-category colour is always `categoryDotColor(id)`.
-
-Phases 8–10 are specified in `M11-PLAN.md`; don't re-plan them, but do re-ground each in the code
-before starting it.
+Phases 9 (Playwright e2e) and 10 (docs) are specified in `M11-PLAN.md`; don't re-plan them, but re-ground
+each in the code before starting.
 
 **Owed to Phase 10 (docs), noted so it isn't lost:**
 - §12.4 has no paragraph on the **navigation shell** (bottom tabs vs. rail, the More sheet,
-  iris-marks-the-active-tab). Phase 4 invented no new device, so nothing is out of compliance — but the
-  shell should be described there.
+  iris-marks-the-active-tab), nor on the **dashboard as a widget registry** (fold, per-widget window,
+  the drill-down deep links). Phases 4 and 7 invented no new *device*, so nothing is out of compliance —
+  but both should be described.
 - §12.4's carried-day-header paragraph should note the **`overflow-clip`** requirement, since the next
   person to add a sticky header inside a card will hit the same wall.
-- ~~§12.4 still describes the compose bar as the create pattern~~ — **done in phase 6** (`3683b74`):
-  §12.4, §12.8 and impl §2 now say creating opens a sheet. Nothing owed.
+- §6.1's **per-widget period override** and period **persistence** are now built (Phase 7) — the spec
+  describes them as intended; confirm the wording matches what shipped.
 - `HANDOFF.md`'s §12 cheat-sheet (invariant #8) still describes the M2 language. Its banner flags this,
   but Phase 10 should rewrite the cheat-sheet itself.
 
@@ -709,7 +748,7 @@ before starting it.
 ```bash
 export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
 cd /home/may/github/yaccount
-npm test          # vitest — 715 passing at end of Phase 6
+npm test          # vitest — 788 passing at end of Phase 7
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
@@ -718,7 +757,7 @@ npm run dev       # a dev server may ALREADY be running on :3000 — check befor
 ```
 
 - **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → 573 (P3) → 608 (P4) → 659 (P5) →
-  **715 (P6)**.
+  715 (P6) → **788 (P7)** (+73: 60 engine derivations, 13 deep-link/period-pref/registry/sankey-layout).
 - **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
   "%{http_code}" http://localhost:3000/ledger` to check before launching a second one.
 - **Pre-existing prettier drift** on `src/components/ui/checkbox.tsx`, `progress.tsx`,
@@ -852,8 +891,13 @@ never batch them (a standing user preference).
 ## 9. Git state
 
 ```
-branch: m11-design-polish  (pushed, tracking origin/m11-design-polish — 17 ahead of main)
+branch: m11-design-polish  (pushed, tracking origin/m11-design-polish — 22 ahead of main)
 
+cfe1bfb fix: pin the filter Clear button, always in reach beside the rail      (Phase 7 fix 3)
+7de2c5f fix: seed the ledger's deep-link filter from useSearchParams, not window  (Phase 7 fix 2)
+432a770 feat: dashboard drill-downs, and two layout fixes                       (Phase 7 fix 1)
+bff1dc8 feat: dashboard v2 — a widget registry, and nine derivations to fill it (Phase 7)
+d632bf9 docs: Phase 6 passed its browser test; hand off Phase 7
 7372a80 fix: the counted choice is a segmented pair, like every other field   (Phase 6 fix 3)
 b0483b4 feat: choose whether a container counts, at the moment you make it    (Phase 6 fix 2)
 3683b74 fix: one create surface everywhere, and a header that fits a phone    (Phase 6 fix 1)
