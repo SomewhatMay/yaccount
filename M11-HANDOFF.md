@@ -1,10 +1,10 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 8 commits ahead of `main`).
-> **Status:** Phases 1, 1.5, 2, 3 and 4 of 10 are DONE, **user browser-tested and passed**, committed
-> and pushed. **Phase 5 is next.**
-> **Last updated:** 2026-07-22, after Phase 4 passed its browser test.
+> **Branch:** `m11-design-polish` (pushed to origin, 10 commits ahead of `main`).
+> **Status:** Phases 1, 1.5, 2, 3, 4 and 5 of 10 are DONE, **user browser-tested and passed**, committed
+> and pushed. **Phase 6 is next.**
+> **Last updated:** 2026-07-22, after Phase 5 passed its browser test (and its fix round).
 
 ---
 
@@ -248,8 +248,8 @@ does. Keep that discipline.
 | 2 | Logging, error boundaries, diagnostics | ✅ **DONE** — `97228ca`, user-tested PASS |
 | 3 | Design system v2 (tokens/type/motion) + spec §12 edit | ✅ **DONE** — `7b5a4c2`, user-tested PASS |
 | 4 | Mobile shell (tab bar, sidebar, FAB, quick-add, ⌘K) | ✅ **DONE** — `2e4d6cc`, user-tested PASS |
-| 5 | Ledger v2 (history curve, carried balance, filters/sort) | ⬜ **NEXT** |
-| 6 | Filters + mobile density on the other 5 list views | ⬜ |
+| 5 | Ledger v2 (history curve, carried balance, filters/sort) | ✅ **DONE** — `14650d7` + `afaa8de`, user-tested PASS |
+| 6 | Filters + mobile density on the other 5 list views | ⬜ **NEXT** |
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ⬜ |
 | 8 | Category colours, empty/loading/error states, a11y | ⬜ |
 | 9 | Playwright e2e | ⬜ |
@@ -446,45 +446,140 @@ this one needed no fix round.
   **`globals.css` was NOT touched by the CLI** — check that every time you run `shadcn add`.
 - Tests **573 → 608** (+35: 12 nav, 18 compose, 5 searchTransactions). Typecheck/lint/build/prettier clean.
 
+### Phase 5 — `14650d7` "ledger v2: the figure on its history, the carried balance, filters" (+ `afaa8de` fixes)
+
+**User browser-tested and passed** after one fix round (the three items in `afaa8de`, below).
+
+- **`core/engine/balances.ts` — `overallBalanceAsOf(txns, containers, iso)` and
+  `overallBalanceSeries(txns, containers, days[])`.** The §5.7 counted rule (`include_in_overall_balance
+  && !is_archived`) wound back to a day, over the §0.4 identity summed across the counted SET rather
+  than per container (`overallDelta`) — a transfer between two counted containers cancels itself out.
+  The series is **one ordered pass**: deltas sorted once, days walked **ascending internally** and
+  mapped back to the caller's order, so unsorted days give right answers instead of a silently wrong
+  curve. Reversals count like any row, so a deleted entry stands in the running balance until the day
+  its reversal is dated (which is what a check register does).
+- **`core/engine/period.ts` — `trailingDays(today, count)`**, ascending, `date-fns` `subDays` on the
+  existing local-midnight `parseDay`. Phase 7's spending calendar wants the same helper.
+- **`core/engine/filter.ts` (new) — `TransactionFilter` + `matchesFilter`/`applyFilter`/
+  `activeFilterCount`/`isFilterActive`/`transactionKind`.** ONE predicate: `searchTransactions` is now
+  its **text half**, not a second matcher, so ⌘K can never find a row the ledger's rail hides.
+  Details that matter: a wallet filter matches **either leg** of a transfer; amount bounds read the
+  **SIZE** of an entry, not its sign; an **empty facet array means "all", not "none"** (the UI clears a
+  facet by emptying it); `transactionKind` uses `amount >= 0` ⇒ income, the same rule the register
+  colours by. `activeFilterCount` counts **facets**, not values, and a range counts once.
+- **`core/engine/ledger.ts` — `sortRegister` + `REGISTER_SORTS`/`isRegisterSort`.** `oldest` is
+  literally `sortForRegister(...).reverse()` (the exact inverse comparator, so they can't drift);
+  `largest`/`smallest` stable-sort by `|amount|` over the register-ordered array, so ties keep register
+  order and two devices agree (§8.5).
+- **`src/features/prefs.ts` (new)** — `pickPref`/`readPref`/`writePref`/`useLocalPref` over
+  `useSyncExternalStore` (module listener set + cross-tab `storage` event; server snapshot = the
+  fallback). Storage is a convenience, never a dependency — SSR and blocked storage both render the
+  fallback. **A stored value this build doesn't recognise falls back** rather than putting the UI in a
+  state it has no code for. **Phase 7 should reuse this for widget-collapse state.**
+- **`src/features/clock.ts` — `lastMonthIso`**, built from the month field (stepping back days would
+  put Mar 31 in March again).
+- **The hero stands on its trailing 90 days.** `Figure` already drew the curve; Phase 5 fed it.
+  `series` is omitted entirely when nothing is logged — a flat line at zero is not a story. Added the
+  approved screen's marginalia (`‹ up $312 on last month ›`, this month's net vs last month's), shown
+  only once last month has rows.
+- **The carried day header (§12.4 M11)** — sticky `top-14` (the `TopBar` is `sticky top-0 h-14 z-30`),
+  `z-10`, on `--surface-sunken`, day eyebrow + carried `Money` on `.leaders`. **Hidden whenever a
+  filter is active.** `.leaders` is applied **only when the figure shows** — with a single child its
+  `::before` rail would shove the label to the right.
+  **⚠ The register card had to become `overflow-clip`, not `overflow-hidden`:** `overflow: hidden`
+  establishes a scroll container, so the sticky header would stick to the card (which never scrolls)
+  instead of the viewport. `clip` still rounds the corners and creates no scroll container. **The other
+  12 `overflow-hidden` cards were left alone — change one only when it gains a sticky child.**
+- **`src/features/FilterBar.tsx` (new)** — search + facet chips + range chips + sort + count + Clear, on
+  `--surface-sunken` (§12.2 names it for filter rails), h-scrolling below `sm`. **Written generic over
+  `facets`/`ranges`/`sort` so Phase 6 WRAPS it rather than forking it.** Chips are `Popover` +
+  `Checkbox`. Sort persists, **filters do not**.
+- **A size sort drops day grouping** — "largest" ranks across days, so the date moves onto the row, a
+  quiet `divide-y` replaces the headers, and nothing pretends to carry a running balance.
+- **Press state is a colour (`active:bg-muted/60`), not a transform** — §12.5's budget is three
+  durations and one curve, with no scale in it. Flagged to the user; they accepted it.
+- **New shadcn `popover`** (its only import is `radix-ui`, already a dep — **no new npm package**).
+  Retuned to the motion budget (`--dur-2` + `--ease-register`) like Phase 4 did to `sheet.tsx`.
+  **`globals.css` was NOT touched by the CLI** — checked, as always.
+- Tests **608 → 659** (+51: 12 balances-through-time, 5 trailingDays, 19 filter, 7 sortRegister, 3
+  lastMonthIso, 5 prefs). Typecheck/lint/build/prettier clean.
+
+**Fix round `afaa8de` (user feedback after testing) — keep these:**
+1. **The compose bar is GONE from the ledger,** and `ledger/ComposeBar.tsx` is **deleted** (nothing else
+   imported it). The FAB + quick-add sheet write from every screen, so a second permanently-expanded
+   copy of the same form between the figure and the register earned nothing. **The write rule never
+   lived in the bar** — it is `ledger/compose.ts` + `useComposeFields`, which the sheet uses. The
+   §12.4 compose-bar **pattern is untouched**: Categories and Containers still create that way.
+   **Do not put an inline compose bar back on the ledger.**
+2. **A filter option is clickable to its edges.** The `<Label>` had wrapped only the text, so the row's
+   padding highlighted on hover and swallowed the press. Now the label IS the row (`w-full`, `py-2`,
+   `pl-8`) with the `Checkbox` absolutely positioned over it. Note the reason it is not a `<label>`
+   *wrapping* the checkbox: Radix renders a `<button>`, and a label containing its own control leaves
+   "did that click toggle once or twice" to the browser.
+3. **Shortcut chips stack** — name on line one, amount on line two, `w-32` cards in the scrolling strip.
+   One long pill each ran the strip off the screen after three.
+
 ---
 
-## 5. Phase 5 — what to do next
+## 5. Phase 6 — what to do next
 
-From `M11-PLAN.md` §6 (plus the engine slice in §2 that it consumes). **Re-ground it in the code before
-you start; do not work from this summary.**
+From `M11-PLAN.md` §7 ("filters and mobile density for every list view"). **Re-ground it in the code
+before you start; do not work from this summary.**
 
-- **The hero curve.** `Figure` (`src/features/ui/Figure.tsx`) **already takes a `series` prop** and
-  renders the area curve under the number — Phase 5 supplies the data, it does not build the component.
-  Needs new pure engine functions in `core/engine/balances.ts`: `overallBalanceAsOf(txns, containers,
-  iso)` and `overallBalanceSeries(txns, containers, days[])` (one ordered pass), reusing the §5.7
-  counted-container rule already in `overallBalance`. **Neither exists yet.**
-- **The carried balance** (§12.4, M11): the sticky day header prints the running overall balance as of
-  that day, with dot leaders. **Hidden whenever a filter is active** — a filtered list's rows no longer
-  explain the number, and a balance you can't reconcile is worse than none. The day header is already
-  an `Eyebrow` on `--surface-sunken`; it is not sticky yet.
-- **`core/engine/filter.ts` (new, pure, TDD):** `TransactionFilter` + `matchesFilter` / `applyFilter`
-  (text, category ids, container ids, kind expense|income|transfer, date range, amount range) so every
-  list view in Phase 6 shares one predicate. `searchTransactions` (Phase 4) is the text half of this —
-  fold it in rather than growing a second matcher.
-- **`src/features/FilterBar.tsx`:** search field + h-scrolling chip filters (Popover + checkbox
-  multi-select) + sort control + active count + Clear. **Filters are NOT persisted** (a hidden active
-  filter is a trap); the sort preference IS. Sort: newest / oldest / largest / smallest.
-- shadcn adds likely needed: `popover` (`checkbox` and `scroll-area`-free alternatives already exist —
-  `checkbox.tsx` is present). Run `npx shadcn add` with `yes n |` piped in so it declines overwriting
-  `button.tsx`/`input.tsx`, and check `git status` afterwards for an unwanted `globals.css` rewrite.
-- Row press states / `active:` scale on touch. The just-logged iris wash **already shipped in Phase 4**
-  (`flashRowAtom` + `LedgerRow`'s `flashed` prop) — don't rebuild it.
+Same `FilterBar` across the five remaining list views, each with the facets that view's rows actually
+have:
 
-**Phase 4 is user-testable as:** the tab bar at 390×844, More sheet, FAB → quick-add → the row landing
-with its wash, shortcuts only in the sheet now, the rail at ≥1024px, ⌘K.
+| View | File | Facets the plan names |
+|---|---|---|
+| Inbox | `src/features/inbox/InboxView.tsx` | rule, wallet, category, date |
+| Goals | `src/features/goals/GoalsView.tsx` | status, kind |
+| Recurring | `src/features/recurring/RecurringView.tsx` | status, frequency, type |
+| Containers | `src/features/containers/ContainersView.tsx` | type, counted, archived |
+| Categories | `src/features/categories/CategoriesView.tsx` | type, has-budget, archived |
 
-Phases 5–10 are specified in `M11-PLAN.md`; don't re-plan them, but do re-ground each in the code
+**What Phase 5 built FOR this phase — compose it, don't fork it:**
+
+- **`src/features/FilterBar.tsx` is already generic.** Props: `search`/`onSearch`, `facets` (each
+  `{ id, label, options: [{value,label,dot?}], selected, onChange }`), `ranges` (date/amount), an
+  optional `sort` (`{value, options, onChange}`), `activeCount`, `onClear`. A view supplies its own
+  facets; **it should not need to edit `FilterBar.tsx`** except to add a genuinely new *kind* of
+  control. Read `LedgerView.tsx`'s call for the worked example.
+- **`core/engine/filter.ts`** is the transaction predicate — the **Inbox** should use it directly
+  (`applyFilter` over `pendingRows`, with a `label` for category/wallet names, exactly as the ledger
+  does). Goals / Recurring / Containers / Categories are **not** transactions: give each a small pure
+  predicate in its own module (or a tiny shared generic in `features/`), **do not bend
+  `TransactionFilter` into a universal shape** — that is how one predicate becomes five bad ones.
+- **`src/features/prefs.ts`** — `useLocalPref(key, fallback, isValid)` for any per-view sort
+  preference. Key them `yaccount.<view>.sort`, and pass a validator so an unknown stored value falls
+  back instead of rendering a state with no code behind it.
+- Filters are **not persisted**; a sort preference **is**. Same rule as the ledger.
+
+**Two things checked in the code that the plan gets slightly wrong:**
+
+1. **None of the five list views uses `Table`.** They are already row/card layouts (built M3–M7). The
+   plan's "Every `Table` gets a card-list layout below `sm`" applies to **`src/features/reports/
+   widgets.tsx`** (`ContainerFlowsTable`, `BudgetComparisonTable`) — the ONLY `Table` consumers left.
+   That is Phase 7's screen; do it there, or here deliberately, but don't go hunting for tables in the
+   list views.
+2. **Mobile density in these views is mostly about the archived/paused sections and the row action
+   affordances**, not table overflow. Check each at 390×844 before deciding what actually needs work.
+
+**Phase 5 is user-testable as:** the hero on its curve, the sticky day header carrying the balance,
+the carried figure vanishing under any filter, sort largest → flat list with dates, sort surviving a
+reload while filters don't, and the ledger having **no compose bar** (the FAB writes).
+
+Phases 6–10 are specified in `M11-PLAN.md`; don't re-plan them, but do re-ground each in the code
 before starting it.
 
-**Owed to Phase 10 (docs), noted so it isn't lost:** §12.4 has no paragraph on the navigation shell
-(bottom tabs vs. rail, the More sheet, iris-marks-the-active-tab). Phase 4 followed §12.2/§12.5 as
-written and invented no new device, so nothing is out of compliance — but the shell itself should be
-described in §12.4 when the docs phase runs.
+**Owed to Phase 10 (docs), noted so it isn't lost:**
+- §12.4 has no paragraph on the **navigation shell** (bottom tabs vs. rail, the More sheet,
+  iris-marks-the-active-tab). Phase 4 invented no new device, so nothing is out of compliance — but the
+  shell should be described there.
+- §12.4 says the **compose bar** is "pinned above the list" as *the* create pattern. After Phase 5's fix
+  round that is true of Categories and Containers but **not the ledger**, which writes through the FAB
+  and the quick-add sheet. A deliberate change (the user asked for it), not drift — needs a sentence.
+- §12.4's carried-day-header paragraph should note the **`overflow-clip`** requirement, since the next
+  person to add a sticky header inside a card will hit the same wall.
 
 ---
 
@@ -495,7 +590,7 @@ described in §12.4 when the docs phase runs.
 ```bash
 export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
 cd /home/may/github/yaccount
-npm test          # vitest — 494 passing at end of Phase 2
+npm test          # vitest — 659 passing at end of Phase 5
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
@@ -503,7 +598,7 @@ npx prettier --check src
 npm run dev       # a dev server may ALREADY be running on :3000 — check before starting another
 ```
 
-- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → 573 (P3) → **608 (P4)**.
+- **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → 573 (P3) → 608 (P4) → **659 (P5)**.
 - **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
   "%{http_code}" http://localhost:3000/ledger` to check before launching a second one.
 - **Pre-existing prettier drift** on `src/components/ui/checkbox.tsx`, `progress.tsx`,
@@ -536,9 +631,20 @@ npm run dev       # a dev server may ALREADY be running on :3000 — check befor
 - **Settings is no longer a header gear.** Desktop: the rail's footer. Phone: the More sheet. The
   phone header carries identity and status only — there is no room for a fourth control.
 - **Shortcuts live only in the quick-add sheet.** That was the declutter ask; do not put the strip back
-  on the ledger in Phase 5.
+  on the ledger.
 - **The FAB is on every breakpoint,** not just mobile — the dashboard has no compose bar, and ⌘K's
   "log an expense" needs a visible home.
+
+**Settled inside Phase 5 (user feedback during its browser test — don't silently undo these):**
+
+- **The ledger has NO compose bar.** The FAB + quick-add sheet are how you write, from every screen.
+  `ledger/ComposeBar.tsx` is deleted. The §12.4 compose-bar pattern still governs Categories and
+  Containers.
+- **Shortcut chips are two-line cards** (name, then amount), not long pills.
+- **A row in a filter popover is clickable to its edges** — if it highlights on hover it must respond
+  to a press there.
+- **Press feedback is a colour, not a scale.** §12.5's motion budget has no transform in it; the user
+  accepted this when it was flagged.
 
 **Nothing is currently open.** If something genuinely needs a decision, ask ONE question at a time —
 never batch them (a standing user preference).
@@ -561,6 +667,16 @@ never batch them (a standing user preference).
 - **`shadcn add` prompts and will hang on a non-TTY** when a component it depends on already exists
   ("overwrite button.tsx?"). Pipe answers in: `yes n | npx shadcn@latest add <name>`. Then check
   `git status` — the CLI can rewrite `globals.css`, and the M11 token ramp lives there.
+- **`overflow-hidden` BREAKS `position: sticky` inside it.** `overflow: hidden` establishes a scroll
+  container, so a sticky child sticks to that box — which never scrolls — instead of the viewport. Use
+  **`overflow-clip`**: it clips to the rounded corners and creates no scroll container. This bit the
+  carried day header in Phase 5. Only the ledger's register card was changed; change another card only
+  when it gains a sticky child.
+- **Don't wrap a `<label>` around a Radix control.** `Checkbox`/`RadioGroup` render a `<button>`, and a
+  label containing its own control leaves "did that click toggle once or twice" to the browser. Use
+  `<Label htmlFor>` as a SIBLING — and make the label the full row (`w-full` + its own padding, control
+  positioned over it) so the whole hover area is pressable. A row that highlights but doesn't respond
+  at its edges was a real complaint in Phase 5.
 - **Tailwind arbitrary values: `calc()` needs whitespace around `+`/`-`, written as underscores** —
   `bottom-[calc(4.25rem_+_env(safe-area-inset-bottom))]`. Without them the declaration is invalid and
   is dropped silently, so the element just loses that property (this bit the FAB in Phase 4).
@@ -587,6 +703,9 @@ never batch them (a standing user preference).
 ```
 branch: m11-design-polish  (pushed, tracking origin/m11-design-polish)
 
+afaa8de fix: ledger v2 follow-ups from browser testing                   (Phase 5 fixes)
+14650d7 feat: ledger v2 — the figure on its history, the carried balance, filters  (Phase 5)
+f754444 docs: Phase 4 passed its browser test; hand off Phase 5
 2e4d6cc feat: mobile shell — tab bar, sidebar rail, quick-add FAB, ⌘K    (Phase 4)
 6fb7df0 docs: Phase 3 passed its browser test; flag the stale §12 cheat-sheet
 7b5a4c2 feat: design system v2 — tinted paper, the figure scale, the rule (Phase 3)
