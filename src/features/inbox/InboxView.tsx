@@ -26,6 +26,7 @@ import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryColor, categoryColorFor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
 import { useLocalPref } from "@/features/prefs";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
@@ -95,10 +96,16 @@ export function InboxView() {
     const m = new Map(categories.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "Transfer");
   }, [categories]);
-  const dotOf = useMemo(
-    () => (id: string | null) => (id ? categoryColorFor(id, categories) : undefined),
-    [categories],
-  );
+  const glyphOf = useMemo(() => {
+    const m = new Map(categories.map((c) => [c.id, c]));
+    return (id: string | null): { color: string | undefined; icon: string | null } => {
+      if (!id) return { color: undefined, icon: null };
+      const c = m.get(id);
+      return c
+        ? { color: categoryColor(c), icon: c.icon }
+        : { color: categoryColorFor(id, categories), icon: null };
+    };
+  }, [categories]);
   const containerNameOf = useMemo(() => {
     const m = new Map(containers.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
@@ -340,7 +347,7 @@ export function InboxView() {
                 tx={t}
                 checked={liveSelection.has(t.id)}
                 onCheck={() => toggle(t.id)}
-                dot={dotOf(t.category_id)}
+                glyph={glyphOf(t.category_id)}
                 categoryName={nameOf(t.category_id)}
                 containerName={containerNameOf(t.container_id)}
                 toContainerName={containerNameOf(t.to_container_id)}
@@ -376,7 +383,7 @@ function InboxRow({
   tx,
   checked,
   onCheck,
-  dot,
+  glyph,
   categoryName,
   containerName,
   toContainerName,
@@ -388,8 +395,8 @@ function InboxRow({
   tx: Transaction;
   checked: boolean;
   onCheck: () => void;
-  /** The category's colour (override or auto), resolved by the parent. */
-  dot: string | undefined;
+  /** The category's mark (icon + colour), resolved by the parent. */
+  glyph: { color: string | undefined; icon: string | null };
   categoryName: string;
   containerName: string;
   toContainerName: string;
@@ -420,13 +427,11 @@ function InboxRow({
         aria-label={`Select ${tx.vendor_source}`}
       />
       {transfer ? (
-        <ArrowRightIcon className="text-muted-foreground size-2.5 shrink-0" aria-hidden />
+        <span className="inline-flex size-4 shrink-0 items-center justify-center">
+          <ArrowRightIcon className="text-muted-foreground size-2.5" aria-hidden />
+        </span>
       ) : (
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: dot }}
-          aria-hidden
-        />
+        <CategoryGlyph icon={glyph.icon} color={glyph.color} />
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>

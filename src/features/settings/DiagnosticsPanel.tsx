@@ -153,7 +153,10 @@ export function DiagnosticsPanel() {
 
       <dl className="bg-card grid gap-x-6 gap-y-2 rounded-2xl border p-5 text-sm sm:grid-cols-2">
         {Object.entries(facts()).map(([k, v]) => (
-          <div key={k} className="flex items-baseline justify-between gap-3">
+          // `min-w-0` at THIS level too: a grid item defaults to `min-width:auto`,
+          // so a nowrap-truncated value (the user-agent string) would set the
+          // track to its full width and scroll the whole page sideways.
+          <div key={k} className="flex min-w-0 items-baseline justify-between gap-3">
             <dt className="text-muted-foreground shrink-0">{k}</dt>
             <dd className="tnum min-w-0 truncate text-right font-mono text-xs">
               {v === null || v === "" ? "—" : String(v)}

@@ -1,10 +1,11 @@
 /**
- * Category identity is colour (§12.2, §12.7 signature #2). The scheme is a
- * hybrid (spec §10.1): a category with no stored colour is painted a stable,
- * deterministic hue derived from its id; a category the user has coloured wears
- * that override. There is exactly ONE swatch scheme — `categoryColor` /
- * `categoryColorFor` are the only entry points, and both fall back through
- * `categoryDotColor`, so a second scheme can never creep in.
+ * A category's colour (§12.2, §12.7 signature #2): the tint of its dot, and of
+ * its icon when it has one. A category with no stored colour is painted a stable,
+ * deterministic hue derived from its id; a stored colour is honoured if present.
+ * There is exactly ONE scheme — `categoryColor` / `categoryColorFor` are the only
+ * entry points, and both fall back through `categoryDotColor`, so a second can
+ * never creep in. (The user-adjustable identity is the icon — see
+ * `category-icons.tsx`.)
  */
 
 /** The auto half: derive a stable hue from a category id so an un-coloured
@@ -36,25 +37,3 @@ export function categoryColorFor(
   const cat = categories.find((c) => c.id === id);
   return cat ? categoryColor(cat) : categoryDotColor(id);
 }
-
-/**
- * The override palette (§10.1): a fixed, legible set the user picks from when
- * setting a category's colour. Same oklch discipline as the auto dots
- * (`L ≈ 0.65`, `C ≈ 0.15`) so an overridden dot sits beside an auto one without
- * looking like a different system, and mid-toned so it stays visible on `--card`
- * in both themes. Spread around the wheel for distinctness; iris (≈285) is left
- * out so a category can't impersonate the brand spark.
- */
-export const CATEGORY_PALETTE: readonly string[] = [
-  "oklch(0.64 0.17 25)", // red
-  "oklch(0.68 0.16 55)", // orange
-  "oklch(0.74 0.15 90)", // amber
-  "oklch(0.72 0.16 130)", // lime
-  "oklch(0.66 0.15 160)", // green
-  "oklch(0.68 0.11 195)", // teal
-  "oklch(0.65 0.13 230)", // sky
-  "oklch(0.58 0.16 260)", // blue
-  "oklch(0.62 0.17 330)", // magenta
-  "oklch(0.66 0.17 5)", // pink
-  "oklch(0.70 0.03 285)", // slate — a quiet, near-neutral option
-];

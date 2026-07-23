@@ -48,7 +48,8 @@ import {
 } from "@/features/recurring/filter";
 import { useLocalPref } from "@/features/prefs";
 import { FilterBar } from "@/features/FilterBar";
-import { categoryColorFor } from "@/features/category-color";
+import { categoryColor, categoryColorFor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,10 +128,16 @@ export function RecurringView() {
     const m = new Map(containers.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
   }, [containers]);
-  const dotOf = useMemo(
-    () => (id: string | null) => (id ? categoryColorFor(id, categories) : undefined),
-    [categories],
-  );
+  const glyphOf = useMemo(() => {
+    const m = new Map(categories.map((c) => [c.id, c]));
+    return (id: string | null): { color: string | undefined; icon: string | null } => {
+      if (!id) return { color: undefined, icon: null };
+      const c = m.get(id);
+      return c
+        ? { color: categoryColor(c), icon: c.icon }
+        : { color: categoryColorFor(id, categories), icon: null };
+    };
+  }, [categories]);
 
   // What else a rule can be found by: the category and wallets it writes through.
   const labelOf = useMemo(
@@ -261,7 +268,7 @@ export function RecurringView() {
             <RuleRow
               key={r.id}
               rule={r}
-              dot={dotOf(r.template_category_id)}
+              glyph={glyphOf(r.template_category_id)}
               categoryName={catName(r.template_category_id)}
               containerName={contName(r.template_container_id)}
               toContainerName={contName(r.template_to_container_id)}
@@ -366,7 +373,7 @@ export function RecurringView() {
 
 function RuleRow({
   rule,
-  dot,
+  glyph,
   categoryName,
   containerName,
   toContainerName,
@@ -375,8 +382,8 @@ function RuleRow({
   onCancel,
 }: {
   rule: RecurringRule;
-  /** The category's colour (override or auto), resolved by the parent. */
-  dot: string | undefined;
+  /** The category's mark (icon + colour), resolved by the parent. */
+  glyph: { color: string | undefined; icon: string | null };
   categoryName: string | null;
   containerName: string;
   toContainerName: string;
@@ -398,13 +405,11 @@ function RuleRow({
       )}
     >
       {transfer ? (
-        <ArrowRightIcon className="text-muted-foreground size-2.5 shrink-0" aria-hidden />
+        <span className="inline-flex size-4 shrink-0 items-center justify-center">
+          <ArrowRightIcon className="text-muted-foreground size-2.5" aria-hidden />
+        </span>
       ) : (
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: dot }}
-          aria-hidden
-        />
+        <CategoryGlyph icon={glyph.icon} color={glyph.color} />
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{rule.template_vendor_source}</div>

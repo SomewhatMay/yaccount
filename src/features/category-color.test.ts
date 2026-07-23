@@ -3,7 +3,6 @@ import {
   categoryColor,
   categoryColorFor,
   categoryDotColor,
-  CATEGORY_PALETTE,
 } from "@/features/category-color";
 
 describe("categoryDotColor", () => {
@@ -53,19 +52,5 @@ describe("categoryColorFor", () => {
 
   it("falls back to the deterministic hue for an empty id", () => {
     expect(categoryColorFor("", categories)).toBe(categoryDotColor(""));
-  });
-});
-
-describe("CATEGORY_PALETTE", () => {
-  it("offers a fixed, non-empty set of swatches", () => {
-    expect(CATEGORY_PALETTE.length).toBeGreaterThanOrEqual(8);
-  });
-
-  it("has no duplicates — every swatch is a distinct choice", () => {
-    expect(new Set(CATEGORY_PALETTE).size).toBe(CATEGORY_PALETTE.length);
-  });
-
-  it("is expressed in the same oklch discipline as the ramp", () => {
-    for (const c of CATEGORY_PALETTE) expect(c).toMatch(/^oklch\(/);
   });
 });

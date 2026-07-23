@@ -17,6 +17,7 @@ import {
   templatesAtom,
 } from "@/features/store";
 import { categoryColor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
@@ -243,10 +244,7 @@ function QuickAddForm({
                 )}
                 {f.categoriesOfKind.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    <span
-                      className="mr-0.5 size-2 rounded-full"
-                      style={{ backgroundColor: categoryColor(c) }}
-                    />
+                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
                     {c.name}
                   </SelectItem>
                 ))}

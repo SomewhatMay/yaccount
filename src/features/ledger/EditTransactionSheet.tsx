@@ -20,6 +20,7 @@ import {
 } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { categoryColor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { instantFrom, timeInputValue } from "@/features/clock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -251,10 +252,7 @@ function EditForm({
             <SelectContent>
               {active.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
-                  <span
-                    className="mr-0.5 size-2 rounded-full"
-                    style={{ backgroundColor: categoryColor(c) }}
-                  />
+                  <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
                   {c.name}
                   <span className="text-muted-foreground ml-1">· {c.type}</span>
                 </SelectItem>

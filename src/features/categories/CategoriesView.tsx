@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
-  CheckIcon,
-  PaletteIcon,
   PencilIcon,
   PlusIcon,
   ShapesIcon,
@@ -29,8 +27,10 @@ import { budgetOnDate } from "@/core/engine/budgets";
 import { formatCents } from "@/core/money";
 import type { Category, CategoryType } from "@/core/model";
 import { cn } from "@/lib/utils";
-import { categoryColor, CATEGORY_PALETTE } from "@/features/category-color";
+import { categoryColor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { BudgetSheet } from "@/features/categories/BudgetSheet";
+import { CategoryIconSheet } from "@/features/categories/CategoryIconSheet";
 import { CategorySheet } from "@/features/categories/CategorySheet";
 import {
   activeCategoryFilterCount,
@@ -48,7 +48,6 @@ import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
@@ -99,6 +98,7 @@ export function CategoriesView() {
   const dispatch = useSetAtom(dispatchAtom);
   const [creating, setCreating] = useState(false);
   const [budgeting, setBudgeting] = useState<Category | null>(null);
+  const [iconing, setIconing] = useState<Category | null>(null);
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11).
   const [sort, setSort] = useLocalPref(SORT_KEY, "name", isCategorySort);
@@ -138,6 +138,16 @@ export function CategoriesView() {
       description: `${input.name} · ${input.type}`,
     });
     setCreating(false);
+  }
+
+  // §10.1: store the chosen icon name, or clear it (null) to fall back to the
+  // colour dot. The mark updates the moment it lands, everywhere it shows.
+  async function pickIcon(icon: string | null) {
+    const cat = iconing;
+    setIconing(null);
+    if (!cat || icon === cat.icon) return;
+    await dispatch(updateCategory({ ...cat, icon }));
+    toast.success(icon ? "Icon set" : "Icon cleared", { description: cat.name });
   }
 
   if (!ready)
@@ -255,6 +265,7 @@ export function CategoriesView() {
               sort={sort}
               onChange={dispatch}
               onBudget={setBudgeting}
+              onIcon={setIconing}
             />
           )}
           {(incomes.length > 0 || !filtering) && (
@@ -266,6 +277,7 @@ export function CategoriesView() {
               sort={sort}
               onChange={dispatch}
               onBudget={setBudgeting}
+              onIcon={setIconing}
             />
           )}
         </>
@@ -288,11 +300,7 @@ export function CategoriesView() {
                 i > 0 && "border-t border-dashed",
               )}
             >
-              <span
-                className="size-2.5 shrink-0 rounded-full opacity-50"
-                style={{ backgroundColor: categoryColor(c) }}
-                aria-hidden
-              />
+              <CategoryGlyph icon={c.icon} color={categoryColor(c)} muted />
               <span className="text-muted-foreground flex-1 truncate text-sm">
                 {c.name}
               </span>
@@ -323,6 +331,12 @@ export function CategoriesView() {
         onOpenChange={(open) => !open && setBudgeting(null)}
         onDispatch={dispatch}
       />
+
+      <CategoryIconSheet
+        category={iconing}
+        onOpenChange={(open) => !open && setIconing(null)}
+        onPick={pickIcon}
+      />
     </div>
   );
 }
@@ -335,6 +349,7 @@ function CategorySection({
   sort,
   onChange,
   onBudget,
+  onIcon,
 }: {
   title: string;
   items: Category[];
@@ -343,6 +358,7 @@ function CategorySection({
   sort: CategorySort;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
   onBudget: (c: Category) => void;
+  onIcon: (c: Category) => void;
 }) {
   return (
     <section>
@@ -368,6 +384,7 @@ function CategorySection({
               alwaysShowBudget={sort === "budget"}
               onChange={onChange}
               onBudget={() => onBudget(c)}
+              onIcon={() => onIcon(c)}
             />
           ))
         )}
@@ -384,6 +401,7 @@ function CategoryRow({
   alwaysShowBudget,
   onChange,
   onBudget,
+  onIcon,
 }: {
   category: Category;
   siblings: Category[];
@@ -392,9 +410,9 @@ function CategoryRow({
   alwaysShowBudget: boolean;
   onChange: (op: ReturnType<typeof updateCategory>) => Promise<void>;
   onBudget: () => void;
+  onIcon: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [coloring, setColoring] = useState(false);
 
   async function save(name: string) {
     if (name !== category.name) {
@@ -402,17 +420,6 @@ function CategoryRow({
       toast.success("Renamed", { description: name });
     }
     setEditing(false);
-  }
-
-  // §10.1 override: store a chosen colour, or clear it (null) to fall back to
-  // the deterministic hue. The dot updates the moment it lands, everywhere.
-  async function setColor(color: string | null) {
-    setColoring(false);
-    if (color === category.color) return;
-    await onChange(updateCategory({ ...category, color }));
-    toast.success(color ? "Colour set" : "Colour reset to auto", {
-      description: category.name,
-    });
   }
 
   async function archive() {
@@ -437,22 +444,7 @@ function CategoryRow({
         divider && "border-t",
       )}
     >
-      <Popover open={coloring} onOpenChange={setColoring}>
-        <PopoverAnchor asChild>
-          <span
-            className="size-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: categoryColor(category) }}
-            aria-hidden
-          />
-        </PopoverAnchor>
-        <PopoverContent align="start" className="w-auto p-3">
-          <ColorPalette
-            selected={category.color}
-            auto={categoryColor({ id: category.id, color: null })}
-            onPick={setColor}
-          />
-        </PopoverContent>
-      </Popover>
+      <CategoryGlyph icon={category.icon} color={categoryColor(category)} />
       <div className="min-w-0 flex-1">
         {editing ? (
           <RenameField
@@ -482,11 +474,9 @@ function CategoryRow({
           <PencilIcon className="size-4" />
           Rename
         </DropdownMenuItem>
-        {/* Open on the next frame so the menu finishes closing (and restoring
-            focus) before the popover claims it — otherwise the two fight. */}
-        <DropdownMenuItem onSelect={() => requestAnimationFrame(() => setColoring(true))}>
-          <PaletteIcon className="size-4" />
-          Set colour
+        <DropdownMenuItem onClick={onIcon}>
+          <ShapesIcon className="size-4" />
+          Set icon
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onBudget}>
           <TargetIcon className="size-4" />
@@ -497,57 +487,6 @@ function CategoryRow({
           Archive
         </DropdownMenuItem>
       </RowActions>
-    </div>
-  );
-}
-
-/**
- * The §10.1 override palette: a fixed, legible set to pick from, plus Auto to
- * clear the override and fall back to the deterministic hue. Selection is a ring
- * in the ink colour, so it reads on a light swatch and a dark one alike.
- */
-function ColorPalette({
-  selected,
-  auto,
-  onPick,
-}: {
-  selected: string | null;
-  /** The deterministic hue this category shows when it has no override. */
-  auto: string;
-  onPick: (color: string | null) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <Eyebrow as="p">Colour</Eyebrow>
-      <div className="grid grid-cols-6 gap-2">
-        {CATEGORY_PALETTE.map((c, i) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => onPick(c)}
-            aria-label={`Colour ${i + 1}`}
-            aria-pressed={selected === c}
-            className={cn(
-              "focus-visible:ring-ring ring-offset-popover size-7 rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-              selected === c && "ring-foreground ring-2 ring-offset-2",
-            )}
-            style={{ backgroundColor: c }}
-          />
-        ))}
-      </div>
-      <button
-        type="button"
-        onClick={() => onPick(null)}
-        aria-pressed={selected === null}
-        className="hover:bg-muted/60 focus-visible:ring-ring flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <span
-          className="size-4 shrink-0 rounded-full border border-dashed opacity-70"
-          style={{ backgroundColor: auto }}
-        />
-        <span className="flex-1 text-left">Auto</span>
-        {selected === null && <CheckIcon className="text-muted-foreground size-4" />}
-      </button>
     </div>
   );
 }

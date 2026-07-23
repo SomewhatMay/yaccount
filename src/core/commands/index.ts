@@ -47,7 +47,13 @@ function meta(m?: OpMeta): { id: string; ts: string } {
 // ── Categories (§5.1, §5.5) ───────────────────────────────────────────────
 
 export function createCategory(
-  input: { name: string; type: CategoryType; id?: string; color?: string | null },
+  input: {
+    name: string;
+    type: CategoryType;
+    id?: string;
+    color?: string | null;
+    icon?: string | null;
+  },
   m?: OpMeta,
 ): Op {
   return { ...meta(m), type: "category.create", payload: { row: makeCategory(input) } };

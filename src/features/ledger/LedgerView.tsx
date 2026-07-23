@@ -57,6 +57,7 @@ import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryColor, categoryColorFor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { useLocalPref } from "@/features/prefs";
 import {
   EmptyState,
@@ -216,13 +217,19 @@ export function LedgerView() {
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "Transfer");
   }, [categories]);
 
-  // A row's dot wears the category's colour — its override if it has one, its
-  // deterministic hue otherwise (§10.1). Resolved here where the category list
-  // is, and handed to the row like its name is, so the row stays presentational.
-  const dotOf = useMemo(
-    () => (id: string | null) => (id ? categoryColorFor(id, categories) : undefined),
-    [categories],
-  );
+  // A row's mark — the category's chosen icon, or its colour dot (§10.1) —
+  // resolved here where the category list is and handed to the row like its name
+  // is, so the row stays presentational.
+  const glyphOf = useMemo(() => {
+    const m = new Map(categories.map((c) => [c.id, c]));
+    return (id: string | null): { color: string | undefined; icon: string | null } => {
+      if (!id) return { color: undefined, icon: null };
+      const c = m.get(id);
+      return c
+        ? { color: categoryColor(c), icon: c.icon }
+        : { color: categoryColorFor(id, categories), icon: null };
+    };
+  }, [categories]);
 
   // Show which wallet a row moved through only once there is more than one.
   const containerNameOf = useMemo(() => {
@@ -494,7 +501,7 @@ export function LedgerView() {
                   tx={t}
                   flashed={flashed?.id === t.id ? flashed : null}
                   when={showsTime(g.day) ? formatEnteredTime(t.entered_at) : null}
-                  dot={dotOf(t.category_id)}
+                  glyph={glyphOf(t.category_id)}
                   categoryName={nameOf(t.category_id)}
                   containerName={showContainer ? containerNameOf(t.container_id) : ""}
                   toContainerName={containerNameOf(t.to_container_id)}
@@ -516,7 +523,7 @@ export function LedgerView() {
                 tx={t}
                 flashed={flashed?.id === t.id ? flashed : null}
                 when={formatDay(t.date)}
-                dot={dotOf(t.category_id)}
+                glyph={glyphOf(t.category_id)}
                 categoryName={nameOf(t.category_id)}
                 containerName={showContainer ? containerNameOf(t.container_id) : ""}
                 toContainerName={containerNameOf(t.to_container_id)}
@@ -577,7 +584,7 @@ function LedgerRow({
   tx,
   flashed,
   when,
-  dot,
+  glyph,
   categoryName,
   containerName,
   toContainerName,
@@ -591,8 +598,8 @@ function LedgerRow({
   /** The last thing on the row's sub-line: the clock time inside a day
    *  group, the date when the register is ranked by size instead. */
   when: string | null;
-  /** The category's colour (override or auto), resolved by the parent. */
-  dot: string | undefined;
+  /** The category's mark (icon + colour), resolved by the parent. */
+  glyph: { color: string | undefined; icon: string | null };
   categoryName: string;
   containerName: string;
   toContainerName: string;
@@ -639,13 +646,11 @@ function LedgerRow({
       )}
     >
       {transfer ? (
-        <ArrowRightIcon className="text-muted-foreground size-2.5 shrink-0" aria-hidden />
+        <span className="inline-flex size-4 shrink-0 items-center justify-center">
+          <ArrowRightIcon className="text-muted-foreground size-2.5" aria-hidden />
+        </span>
       ) : (
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: dot }}
-          aria-hidden
-        />
+        <CategoryGlyph icon={glyph.icon} color={glyph.color} />
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
