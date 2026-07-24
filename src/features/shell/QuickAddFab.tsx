@@ -1,7 +1,7 @@
 "use client";
 
 import { useSetAtom } from "jotai";
-import { PlusIcon } from "lucide-react";
+import { DollarSignIcon, PlusIcon } from "lucide-react";
 import { quickAddAtom } from "@/features/store";
 
 /**
@@ -25,7 +25,10 @@ export function QuickAddFab() {
       aria-label="Log a transaction"
       className="bg-primary text-primary-foreground focus-visible:ring-ring/60 focus-visible:ring-offset-background fixed right-5 bottom-[calc(4.25rem_+_env(safe-area-inset-bottom))] z-40 inline-flex size-14 items-center justify-center rounded-full shadow-lg transition-transform duration-[var(--dur-1)] ease-[var(--ease-register)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95 lg:right-8 lg:bottom-8"
     >
-      <PlusIcon className="size-6" aria-hidden />
+      <span data-money-add-mark className="relative block size-7" aria-hidden="true">
+        <DollarSignIcon data-money-add-dollar className="absolute top-1 left-0 size-5" />
+        <PlusIcon data-money-add-plus className="absolute top-0 right-0 size-3.5" />
+      </span>
     </button>
   );
 }
