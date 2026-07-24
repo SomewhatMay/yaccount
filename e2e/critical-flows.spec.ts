@@ -143,3 +143,31 @@ test("opens FAB quick-add from the dashboard", async ({ page }) => {
   await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
   await expect(page.getByLabel("Amount")).toBeFocused();
 });
+
+test("places toasts clear of mobile navigation and bottom-right on desktop", async ({
+  page,
+}, testInfo) => {
+  await createCategory(page, "E2E toast placement");
+
+  const toast = page.locator("[data-sonner-toast][data-mounted=true]").last();
+  await expect(toast).toBeVisible();
+
+  if (testInfo.project.name === "mobile") {
+    const nav = page.getByRole("navigation", { name: "Primary" });
+    await expect(nav).toBeVisible();
+    const navBox = await nav.boundingBox();
+    expect(navBox).not.toBeNull();
+    await expect
+      .poll(async () => {
+        const toastBox = await toast.boundingBox();
+        return toastBox ? toastBox.y + toastBox.height : Number.POSITIVE_INFINITY;
+      })
+      .toBeLessThanOrEqual(navBox!.y);
+    return;
+  }
+
+  const toastBox = await toast.boundingBox();
+  expect(toastBox).not.toBeNull();
+  expect(toastBox!.x + toastBox!.width).toBeGreaterThan(page.viewportSize()!.width / 2);
+  expect(toastBox!.y + toastBox!.height).toBeGreaterThan(page.viewportSize()!.height / 2);
+});

@@ -43,7 +43,15 @@ export default function RootLayout({
         >
           <RepoBootstrap>
             <AppShell>{children}</AppShell>
-            <Toaster position="bottom-right" />
+            <Toaster
+              position="bottom-right"
+              mobileOffset={{
+                bottom:
+                  "calc(var(--mobile-tab-bar-height) + env(safe-area-inset-bottom) + 1rem)",
+                right: "1rem",
+                left: "1rem",
+              }}
+            />
           </RepoBootstrap>
         </ThemeProvider>
       </body>
