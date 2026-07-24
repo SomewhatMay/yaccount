@@ -367,6 +367,23 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 - Playwright pins mark composition/placement, hidden decorative SVGs, FAB size/position and keyboard
   expense opening at desktop and 390×844.
 
+### Post-M11 Phase 4 — FAB hold chooser
+**Status:** DONE, merged via PR #13 (`7067f92`); user verified; 817 Vitest + 25 Playwright passing
+(1 expected desktop touch skip).
+
+- Quick pointer or keyboard release opens Expense exactly once. A 500ms hold opens an accessible
+  Expense/Income/Transfer chooser that writes through the existing `quickAddAtom` and
+  `QuickAddSheet`; no create form is duplicated.
+- A shared pure gesture state machine sets a 10px movement tolerance. Excess movement, pointer
+  cancellation, lost capture and Escape cancel without allowing the following release/click to open
+  Expense. Touch, mouse, Enter and Space use the same release rules.
+- The chooser focuses its first item, supports Arrow Up/Down, Home/End and Escape, and returns focus
+  to the FAB on Escape. The money mark, `size-14`, iris treatment, fixed positions, focus classes and
+  `aria-label="Log a transaction"` remain unchanged.
+- Focused Vitest covers thresholds and cancellation state. Playwright covers quick/hold separation,
+  no double-fire, mouse/touch/keyboard activation, movement/pointer/lost-capture/Escape behavior,
+  chooser keyboard navigation and preserved geometry at desktop and 390×844.
+
 ---
 
 ## 5. Testing Strategy (cross-cutting)

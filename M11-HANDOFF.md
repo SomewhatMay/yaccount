@@ -4,9 +4,9 @@
 > **Status:** Phases 1–10 DONE. User passed all 14 desktop + 390×844 Playwright cases on
 > 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
 > touched-file Prettier.
-> **Post-M11:** Phase 3 FAB money mark merged via PR #12 (`d8267ac`), user verified.
-> **Next:** Phase 4 FAB hold menu. M10 Capacitor remains not started.
-> **Last updated:** 2026-07-23, post-M11 Phase 3 complete.
+> **Post-M11:** Phase 4 FAB hold chooser merged via PR #13 (`7067f92`), user verified.
+> **Next:** Phase 5 data tools. M10 Capacitor remains not started.
+> **Last updated:** 2026-07-23, post-M11 Phase 4 complete.
 
 ---
 
@@ -934,8 +934,11 @@ and a concrete list of things for the user to test:
 3. ✅ `post-m11-fab-money-mark` — DONE via PR #12 (`d8267ac`). Compact dollar-plus mark, with the plus
    at the dollar's upper-right; dimensions, iris treatment, accessibility and expense quick-tap
    behavior unchanged. User verified; 810 Vitest + 20 Playwright passed.
-4. `post-m11-fab-hold-menu` — hold FAB for an accessible chooser of other existing create flows;
-   quick tap remains ledger quick-add. Handle touch/mouse/keyboard cancellation and prevent double-fire.
+4. ✅ `post-m11-fab-hold-menu` — DONE via PR #13 (`7067f92`). Quick press opens Expense once; a
+   500ms hold opens the existing Expense/Income/Transfer quick-add paths. Touch, mouse, Enter/Space,
+   10px movement cancellation, pointer cancellation, lost capture, Escape and arrow-key menu
+   navigation are covered. FAB appearance and accessible name remain unchanged. User verified;
+   817 Vitest + 25 Playwright passed (1 expected desktop touch skip).
 5. `post-m11-data-tools` — Settings export/import/clear-all for testing. Version and validate imports,
    preserve journal/replay invariants, make failure atomic, and strongly confirm clear with Drive
    resync consequences stated.

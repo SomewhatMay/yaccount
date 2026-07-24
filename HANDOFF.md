@@ -1,18 +1,19 @@
 # yaccount — Handoff
 
-> ## ✅ **POST-M11 PHASE 3 MERGED — PHASE 4 NEXT**
-> FAB money mark merged via PR #12 (`d8267ac`) on 2026-07-23. The bare plus is now a compact
-> dollar-plus mark, with the plus at the dollar's upper-right. FAB geometry, iris treatment,
-> position, focus, accessible name and quick-tap expense behavior are unchanged.
-> Verification: **810 Vitest + 20 Playwright**, typecheck, lint, static build and touched-file Prettier.
+> ## ✅ **POST-M11 PHASE 4 MERGED — PHASE 5 NEXT**
+> FAB hold chooser merged via PR #13 (`7067f92`) on 2026-07-23. A quick press still opens Expense
+> exactly once; a 500ms hold opens the existing Expense/Income/Transfer quick-add paths. Pointer,
+> touch and keyboard cancellation prevent double activation. FAB appearance and accessible name are
+> unchanged. Verification: **817 Vitest + 25 Playwright passed (1 expected desktop touch skip)**,
+> typecheck, lint, static build and touched-file Prettier.
 >
 > M11 merged to `main` via PR #9 (`bf7d872`) on 2026-07-23. User passed all 14 desktop/mobile
 > Playwright cases. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
 > touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** post-M11 Phase 3 merged via PR #12 (`d8267ac`), 2026-07-23.
-> **Next:** Phase 4, FAB hold menu. M10 Capacitor remains not started.
+> **Last updated:** post-M11 Phase 4 merged via PR #13 (`7067f92`), 2026-07-23.
+> **Next:** Phase 5, data tools. M10 Capacitor remains not started.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
@@ -351,7 +352,7 @@ stable-id registry. Preserve M11 icon placement and sync-banner behavior unless 
 | 1 ✅ | `post-m11-mobile-toast` | **DONE**, PR #10 (`5519bf4`). Initially cleared the bottom tab bar; Phase 2 moved mobile Sonner below the top bar. Desktop remains bottom-right; sync banner untouched. | User verified; superseded placement covered by Phase 2. |
 | 2 ✅ | `post-m11-ledger-notes` | **DONE**, PR #11 (`ea6551f`). Optional notes create/edit/display for expense, income and transfer; blank → `null`; notes persist through full-row ops, IndexedDB, refresh, Drive serialization and shortcuts. Create/edit labels say Vendor for expense, Source for income, Label for transfer. Mobile toasts now enter below the top bar. | User verified; 810 Vitest + 18 Playwright passed. |
 | 3 ✅ | `post-m11-fab-money-mark` | **DONE**, PR #12 (`d8267ac`). Compact dollar-plus mark with plus at upper-right; FAB geometry, iris treatment, position, focus, accessible name and expense quick-tap behavior unchanged. | User verified; 810 Vitest + 20 Playwright passed. |
-| 4 | `post-m11-fab-hold-menu` | Long-press/press-and-hold FAB to choose other create flows; quick tap still creates a ledger entry. Define keyboard/pointer cancellation and avoid firing both actions. Reuse existing create sheets/routes; do not duplicate forms. | Tap behavior unchanged; hold opens an accessible create chooser on touch, mouse and keyboard. |
+| 4 ✅ | `post-m11-fab-hold-menu` | **DONE**, PR #13 (`7067f92`). Quick press opens Expense exactly once; 500ms hold opens an accessible Expense/Income/Transfer chooser reusing `quickAddAtom` + `QuickAddSheet`. 10px movement, pointer cancel, lost capture and Escape cancel without double activation; Enter/Space and arrow-key menu navigation work. FAB mark, geometry, iris, position, focus and name remain unchanged. | User verified; 817 Vitest + 25 Playwright passed (1 expected desktop touch skip). |
 | 5 | `post-m11-data-tools` | Settings tools to export, import and clear all local yaccount data for testing. Version/validate imports; preserve op-log/replay invariants; destructive clear requires explicit confirmation and explains Drive resync consequences. | Round-trip fixture restores identical state; invalid import changes nothing; clear cannot be accidental. |
 
 Each phase branches from freshly pulled `main` after its predecessor and closure docs are merged.
@@ -398,4 +399,5 @@ npm test && npm run typecheck && npm run lint && npm run build && npx prettier -
 - **Design language = "The Standing Register", LOCKED — spec §12 is law.** Fonts Fraunces/Geist/Geist Mono; tinted paper/ink; rare iris; emerald inflow; sheets/register rows/`RowActions`; one category colour scheme plus optional icons. Read §12 before UI work.
 - **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
 - **`HANDOFF.md` is TRACKED in git** (commit `88ebfa8` moved it into the repo so it travels across devices; the old "gitignored/local-only" note is stale). **Commit it at every milestone boundary** as a `docs:` commit on `main` (as was done for M7 → `c4c9992` and now M8) so a fresh clone / new agent sees the current state.
-- UI has 16 Playwright critical-flow cases across desktop/mobile. `next build` remains only a prerender/static-export smoke check.
+- UI has 26 Playwright cases across desktop/mobile; the desktop-only touch case skips by design.
+  `next build` remains only a prerender/static-export smoke check.
