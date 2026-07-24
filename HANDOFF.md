@@ -328,10 +328,25 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 1. Review `m11-design-polish`.
 2. Open a milestone PR against `main` with `gh` when approved; merge only on user instruction.
-3. Pick the next scope explicitly. **Do not automatically start M10 Capacitor or post-M11 widgets.**
+3. After M11 merges, take the post-M11 phases below one at a time. Fresh branch + fresh agent/context
+   per phase; test, commit, push, stop for review. Do not stack phases.
 
 M10 remains skipped. The M8 `AuthProvider` and M9 Drive seam remain its starting points if selected.
 Post-M11 widget reordering/visibility should wrap the existing stable-id registry.
+
+### Post-M11 phases (user-ordered; not started)
+
+| Phase | Branch | Scope | Exit |
+|---|---|---|---|
+| 1 | `post-m11-mobile-toast` | On mobile, place Sonner toasts above the bottom tab bar + safe-area inset. Desktop stays bottom-right. Do not alter the sync banner. | Toast never covers Home/Ledger/Inbox/More at 390×844; desktop unchanged. |
+| 2 | `post-m11-ledger-notes` | Expose optional notes while creating and editing ledger entries; show them quietly in the register/detail surface. `Transaction.notes`, factories and command payloads already ship and sync; preserve that model/op path. | Expense, income and transfer notes save, edit, refresh and sync; empty notes add no row noise. |
+| 3 | `post-m11-fab-money-mark` | Replace the bare FAB plus with a compact dollar-plus mark, keeping its size, iris treatment, tap target and quick-tap behavior. | Purpose reads as “add money entry”; a tap still opens expense quick-add. |
+| 4 | `post-m11-fab-hold-menu` | Long-press/press-and-hold FAB to choose other create flows; quick tap still creates a ledger entry. Define keyboard/pointer cancellation and avoid firing both actions. Reuse existing create sheets/routes; do not duplicate forms. | Tap behavior unchanged; hold opens an accessible create chooser on touch, mouse and keyboard. |
+| 5 | `post-m11-data-tools` | Settings tools to export, import and clear all local yaccount data for testing. Version/validate imports; preserve op-log/replay invariants; destructive clear requires explicit confirmation and explains Drive resync consequences. | Round-trip fixture restores identical state; invalid import changes nothing; clear cannot be accidental. |
+
+Each phase starts from the reviewed/merged predecessor only. Re-read spec §12, invariants and current
+code; add focused Vitest/Playwright coverage; run the full validation suite. M10 Capacitor and movable
+dashboard widgets remain separate.
 
 ---
 

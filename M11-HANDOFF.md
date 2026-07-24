@@ -918,6 +918,24 @@ never batch them (a standing user preference).
   reorder/visibility layer is a wrapper over an existing list instead of a teardown. Per-widget
   `ErrorBoundary` and per-widget period override (§6.1) fall out of the same shape.
 
+**Five isolated phases requested after M11.** Start only after M11 review/merge. Each gets a fresh
+branch and fresh agent/context; finish, verify, commit, push and stop before the next:
+
+1. `post-m11-mobile-toast` — mobile Sonner toasts clear the bottom tab bar + safe area; desktop stays
+   bottom-right. Sync-banner behavior is unchanged.
+2. `post-m11-ledger-notes` — expose optional notes in transaction create/edit and the register/detail
+   UI. The synced model path already exists: `Transaction.notes`, factories and full-row ops carry it.
+3. `post-m11-fab-money-mark` — replace the bare plus with a compact dollar-plus mark; retain the FAB's
+   dimensions, iris treatment, accessibility and quick-tap expense behavior.
+4. `post-m11-fab-hold-menu` — hold FAB for an accessible chooser of other existing create flows;
+   quick tap remains ledger quick-add. Handle touch/mouse/keyboard cancellation and prevent double-fire.
+5. `post-m11-data-tools` — Settings export/import/clear-all for testing. Version and validate imports,
+   preserve journal/replay invariants, make failure atomic, and strongly confirm clear with Drive
+   resync consequences stated.
+
+The detailed scope/exit table lives in `HANDOFF.md`. These phases do not reopen M10 Capacitor, Phase 8
+icon placement, the sync banner, or movable dashboard widgets.
+
 ---
 
 ## 8. Conventions that bit us — don't relearn these the hard way
