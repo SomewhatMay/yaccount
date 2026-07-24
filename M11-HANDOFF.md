@@ -4,7 +4,7 @@
 > **Branch:** `m11-design-polish` (pushed to origin).
 > **Status:** Phases 1–8 are DONE and browser-tested. Phase 8 shipped in `ce3a74f` + `791db71`;
 > the user passed its desktop + 390×844 browser test on 2026-07-23. **Phase 9 is next.**
-> **Last updated:** 2026-07-23, after Phase 8 passed browser testing.
+> **Last updated:** 2026-07-23, after Phase 8 passed and the Phase 9 handoff was prepared.
 
 ---
 
@@ -729,6 +729,24 @@ colors, I want adjustable icons. Give an extensive searchable list to choose fro
 Neither was raised during browser testing. Current behaviour remains; do not change either without the
 user asking.
 
+### 5.7 Next agent: Phase 9 — Playwright e2e
+
+Phase 8 is closed. Build **only Phase 9**, then verify, commit, push and STOP for the user's test.
+
+- Re-read `M11-PLAN.md` Phase 9 and inspect every flow in current code before writing tests.
+- `@playwright/test` is approved but **not yet a direct dev dependency**. There is no Playwright config
+  or e2e directory yet.
+- Add Playwright against `npm run dev`, with desktop + 390×844 mobile projects.
+- Cover the approved critical flows: log expense, transfer, create goal, approve Inbox, view Plan,
+  filter Ledger, and quick-add from the FAB.
+- Tests must isolate browser storage. The app is local-first over IndexedDB/localStorage; do not depend
+  on the user's existing browser profile, Google sign-in, Drive, network sync, or test order.
+- Prefer accessible roles/names and user-visible outcomes over CSS selectors or implementation details.
+- Run the existing 807 Vitest tests plus typecheck, lint, build, touched-file prettier and Playwright.
+- Browser installation may require network/escalation; `--with-deps` may require sudo on WSL. If a
+  browser cannot install, land honest specs/config and report the exact unverified boundary.
+- Do not start Phase 10. Do not change the two optional Phase 8 behaviours in §5.6.
+
 ### 5.1–5.3 — the original plan (code map still useful; strand 1 is now icons, above)
 
 ### Strand 1 — the category-colour override UI (the last deferred SPEC item, §10.1)
@@ -962,8 +980,9 @@ never batch them (a standing user preference).
 ## 9. Git state
 
 ```
-branch: m11-design-polish  (pushed, tracking origin/m11-design-polish — 24 ahead of main)
+branch: m11-design-polish  (pushed, tracking origin/m11-design-polish)
 
+14699b0 docs: record Phase 8 browser pass
 791db71 feat: category icons instead of colour override, + two fixes    (Phase 8 fix 1 — PASS)
 ce3a74f feat: category colours, skeletons, sync banner, a11y            (Phase 8 — PASS)
 2e3434a docs: Phase 7 passed its browser test; hand off Phase 8
