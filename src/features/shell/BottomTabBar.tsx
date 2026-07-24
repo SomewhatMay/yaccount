@@ -55,7 +55,7 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
             </>
           );
           const className = cn(
-            "flex h-14 w-full flex-col items-center justify-center gap-1.5 transition-colors duration-[var(--dur-1)]",
+            "flex h-[var(--mobile-tab-bar-height)] w-full flex-col items-center justify-center gap-1.5 transition-colors duration-[var(--dur-1)]",
             "focus-visible:ring-ring focus-visible:ring-inset focus-visible:ring-2 focus-visible:outline-none",
             current ? "text-primary" : "text-muted-foreground",
           );
