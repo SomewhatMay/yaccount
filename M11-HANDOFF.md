@@ -2,9 +2,9 @@
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
 > **Branch:** `m11-design-polish` (pushed to origin).
-> **Status:** Phases 1–8 are DONE and browser-tested. Phase 8 shipped in `ce3a74f` + `791db71`;
-> the user passed its desktop + 390×844 browser test on 2026-07-23. **Phase 9 is next.**
-> **Last updated:** 2026-07-23, after Phase 8 passed and the Phase 9 handoff was prepared.
+> **Status:** Phases 1–9 are DONE and browser-tested. Phase 9 shipped in `1dcc1d3`;
+> the user passed all 14 desktop + 390×844 Playwright cases on 2026-07-23. **Phase 10 is next.**
+> **Last updated:** 2026-07-23, after Phase 9 passed and the Phase 10 handoff was prepared.
 
 ---
 
@@ -252,7 +252,7 @@ does. Keep that discipline.
 | 6 | Filters + mobile density on the other 5 list views | ✅ **DONE** — `acf8f26` + `3683b74` + `b0483b4` + `7372a80`, user-tested PASS |
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ✅ **DONE** — `bff1dc8` + `432a770` + `7de2c5f` + `cfe1bfb`, user-tested PASS |
 | 8 | Category **icons** (pivoted from colours), empty/loading/error states, a11y | ✅ **DONE** — `ce3a74f` + `791db71`, user-tested PASS |
-| 9 | Playwright e2e | ⬜ |
+| 9 | Playwright e2e | ✅ **DONE** — `1dcc1d3`, 14/14 browser-tested PASS |
 | 10 | Docs (spec §12, impl §4, HANDOFF) | ⬜ |
 
 **Working protocol the user asked for and has been enforcing:**
@@ -729,23 +729,32 @@ colors, I want adjustable icons. Give an extensive searchable list to choose fro
 Neither was raised during browser testing. Current behaviour remains; do not change either without the
 user asking.
 
-### 5.7 Next agent: Phase 9 — Playwright e2e
+### 5.7 Phase 9 — DONE, browser-tested
 
-Phase 8 is closed. Build **only Phase 9**, then verify, commit, push and STOP for the user's test.
+Commit `1dcc1d3` adds `@playwright/test`, `playwright.config.ts`, and
+`e2e/critical-flows.spec.ts`.
 
-- Re-read `M11-PLAN.md` Phase 9 and inspect every flow in current code before writing tests.
-- `@playwright/test` is approved but **not yet a direct dev dependency**. There is no Playwright config
-  or e2e directory yet.
-- Add Playwright against `npm run dev`, with desktop + 390×844 mobile projects.
-- Cover the approved critical flows: log expense, transfer, create goal, approve Inbox, view Plan,
-  filter Ledger, and quick-add from the FAB.
-- Tests must isolate browser storage. The app is local-first over IndexedDB/localStorage; do not depend
-  on the user's existing browser profile, Google sign-in, Drive, network sync, or test order.
-- Prefer accessible roles/names and user-visible outcomes over CSS selectors or implementation details.
-- Run the existing 807 Vitest tests plus typecheck, lint, build, touched-file prettier and Playwright.
-- Browser installation may require network/escalation; `--with-deps` may require sudo on WSL. If a
-  browser cannot install, land honest specs/config and report the exact unverified boundary.
-- Do not start Phase 10. Do not change the two optional Phase 8 behaviours in §5.6.
+- Projects: desktop Chrome and mobile Chrome at 390×844.
+- Seven flows run in both projects: expense, transfer, goal creation, Inbox approval, Plan viewing,
+  Ledger filtering, and FAB quick-add.
+- Every Playwright test gets a fresh browser context. Setup uses the app UI and local IndexedDB only;
+  no Google/Drive, existing profile, network sync, shared state, or test order.
+- Selectors prefer roles, labels, and visible outcomes.
+- `npm run dev` is managed on `127.0.0.1:3100`; `npm run test:e2e` aliases `playwright test`.
+- Verified: 807 Vitest tests, typecheck, lint, static build, touched-file Prettier, and **14/14
+  Playwright cases**. The user independently ran all 14 and passed them on 2026-07-23.
+
+### 5.8 Next agent: Phase 10 — docs and milestone close
+
+Phase 9 is closed. Build **only Phase 10**, then verify, commit, push and STOP.
+
+- Re-read `M11-PLAN.md` Phase 10 plus the docs owed below.
+- Reconcile `yaccount-tech-spec-v3.md` §12 and §10.1 with what Phases 3–9 actually shipped.
+- Reconcile `yaccount-implementation-details.md` §4 M11.
+- Update `HANDOFF.md` from its stale M2/M9 state; preserve all invariants and history.
+- Update this live handoff to mark M11 complete and prepare milestone closure/PR guidance.
+- Do not start post-M11 widget work or M10 Capacitor.
+- Do not change Phase 8’s optional icon-placement or sync-banner behavior.
 
 ### 5.1–5.3 — the original plan (code map still useful; strand 1 is now icons, above)
 
@@ -810,8 +819,8 @@ one of these in Tailwind is forking §12.8. `useLocalPref` is `T extends string`
 `"open"|"closed"`); the repo's ESLint forbids `setState` in an effect — use lazy `useState`,
 `useSyncExternalStore`, or a jotai setter.
 
-Phases 9 (Playwright e2e) and 10 (docs) are specified in `M11-PLAN.md`; don't re-plan them, but re-ground
-each in the code before starting.
+Phase 9 is done. Phase 10 (docs) is specified in `M11-PLAN.md`; don't re-plan it, but re-ground every
+claim in the shipped code before editing.
 
 **Owed to Phase 10 (docs), noted so it isn't lost:**
 - §12.4 has no paragraph on the **navigation shell** (bottom tabs vs. rail, the More sheet,
@@ -834,17 +843,17 @@ each in the code before starting.
 ```bash
 export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
 cd /home/may/github/yaccount
-npm test          # vitest — 807 passing at end of Phase 8
+npm test          # vitest — 807 passing at end of Phase 9
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
 npx prettier --check src
+npx playwright test # 14 cases: 7 flows × desktop/mobile
 npm run dev       # a dev server may ALREADY be running on :3000 — check before starting another
 ```
 
 - **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → 573 (P3) → 608 (P4) → 659 (P5) →
-  715 (P6) → 788 (P7) → **807 (P8)** (+19: 10 icon-catalogue, category-color/icon model tests; −3 the
-  removed colour-palette tests).
+  715 (P6) → 788 (P7) → **807 (P8/P9)**. Phase 9 adds 14 Playwright cases, not Vitest cases.
 - **FRESH MACHINE:** memory does NOT travel (its slug is path-derived) and the Node PATH below is
   WSL-specific — install deps (`npm ci`), confirm your own `node`/`npm`, and re-check the PATH line.
 - **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
@@ -971,7 +980,8 @@ never batch them (a standing user preference).
   (`schemas.test.ts` is usually the only one; everything else builds via model factories).
 - **Never** run `npx prettier --write` across the whole repo; it rewrites pre-existing drift into your
   diff. (Happened once in Phase 1; reverted.)
-- `crypto.randomUUID()` and IndexedDB are browser-only — UI is manual-verify until Playwright (Phase 9).
+- `crypto.randomUUID()` and IndexedDB are browser-only. Phase 9 Playwright now covers the critical UI
+  flows in isolated real browser contexts.
 - Commit messages: extremely concise in style but explain the WHY. **No co-author / Claude mentions.**
 - Use the `gh` CLI for GitHub.
 
@@ -982,6 +992,8 @@ never batch them (a standing user preference).
 ```
 branch: m11-design-polish  (pushed, tracking origin/m11-design-polish)
 
+1dcc1d3 test: protect critical local-first flows in browsers                   (Phase 9 — PASS)
+8c97abe docs: hand off Phase 9 e2e
 14699b0 docs: record Phase 8 browser pass
 791db71 feat: category icons instead of colour override, + two fixes    (Phase 8 fix 1 — PASS)
 ce3a74f feat: category colours, skeletons, sync banner, a11y            (Phase 8 — PASS)

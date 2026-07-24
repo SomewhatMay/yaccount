@@ -1,10 +1,10 @@
 # yaccount — Handoff
 
 > ## 🚧 **M11 IS IN PROGRESS — READ [`M11-HANDOFF.md`](M11-HANDOFF.md) FIRST.**
-> Branch `m11-design-polish` (pushed). Phases 1–8 are done, browser-tested and committed.
-> **Phase 9 (Playwright e2e) is next.** The approved design direction, phase table, Phase 9 handoff,
+> Branch `m11-design-polish` (pushed). Phases 1–9 are done, browser-tested and committed.
+> **Phase 10 (docs and milestone close) is next.** The approved design direction, phase table, handoff,
 > decisions and working protocol live in that file. The approved plan is
-> [`M11-PLAN.md`](M11-PLAN.md). Test count is **807** (was 407 at M9).
+> [`M11-PLAN.md`](M11-PLAN.md). Test count is **807 Vitest + 14 Playwright**.
 >
 > **⚠️ Three things below are now STALE — `M11-HANDOFF.md` and spec §12 win:**
 > 1. **The design language is no longer the M2 shadcn-neutral ramp.** Spec §12 was **edited
