@@ -1,10 +1,12 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 22 commits ahead of `main`).
-> **Status:** Phases 1, 1.5, 2, 3, 4, 5, 6 and 7 of 10 are DONE, **user browser-tested and passed**,
-> committed and pushed. **Phase 8 (category colours, empty/loading/error states, a11y) is next.**
-> **Last updated:** 2026-07-22, after Phase 7 (Dashboard v2) passed its browser test (+ two follow-up fix rounds).
+> **Branch:** `m11-design-polish` (pushed to origin, 24 commits ahead of `main`).
+> **Status:** Phases 1–7 are DONE and browser-tested. **Phase 8 is BUILT and PUSHED but NOT yet
+> browser-tested** — it is in review with the user. Two commits: `ce3a74f` (the phase) + `791db71`
+> (a fix round that **pivoted category colours → category ICONS** on the user's call). **Read §5.5
+> below for exactly what shipped and what is owed before Phase 9.**
+> **Last updated:** 2026-07-23, after building Phase 8 + the icon pivot (awaiting the user's browser test).
 
 ---
 
@@ -251,7 +253,7 @@ does. Keep that discipline.
 | 5 | Ledger v2 (history curve, carried balance, filters/sort) | ✅ **DONE** — `14650d7` + `afaa8de`, user-tested PASS |
 | 6 | Filters + mobile density on the other 5 list views | ✅ **DONE** — `acf8f26` + `3683b74` + `b0483b4` + `7372a80`, user-tested PASS |
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ✅ **DONE** — `bff1dc8` + `432a770` + `7de2c5f` + `cfe1bfb`, user-tested PASS |
-| 8 | Category colours, empty/loading/error states, a11y | ⬜ **NEXT** |
+| 8 | Category **icons** (pivoted from colours), empty/loading/error states, a11y | 🟡 **BUILT, IN REVIEW** — `ce3a74f` + `791db71`, awaiting browser test |
 | 9 | Playwright e2e | ⬜ |
 | 10 | Docs (spec §12, impl §4, HANDOFF) | ⬜ |
 
@@ -657,11 +659,78 @@ URL-timing fix, `cfe1bfb` the Clear button). Tests **715 → 788**.
 
 ---
 
-## 5. Phase 8 — what to do next
+## 5. Phase 8 — BUILT, in review (read 5.5 first)
 
-From `M11-PLAN.md` §9 ("category colours, empty/loading/error states, a11y pass"). Three strands, all UI,
-no new engine. **Re-ground each in the code before you start; do not work from this summary.** The user
-tests each phase in a browser — end your turn with what to test, then STOP.
+From `M11-PLAN.md` §9. Three strands, all UI, no new engine. **The strands below (5.1–5.3) are the
+ORIGINAL plan and describe the code map you still need** — but strand 1 was **pivoted from category
+colours to category ICONS** by the user after their browser test. **§5.5 records what actually shipped,
+what is still owed, and the open questions. Read it before touching anything.**
+
+### 5.5 What Phase 8 actually shipped (commits `ce3a74f` + `791db71`) — NOT yet browser-tested
+
+**Verified green at handoff:** 807 vitest tests, typecheck, lint, `next build`, prettier. Pushed. The
+user has NOT browser-tested it yet — that is the next thing to get from them.
+
+**Strand 1 — category ICONS (pivoted from colours).** The user's words: *"instead of adjustable category
+colors, I want adjustable icons. Give an extensive searchable list to choose from."* So:
+- **`Category.icon`** (nullable string) added to `src/core/model/category.ts`, `makeCategory`, and
+  `createCategory`. Rows are stored whole in `applyOp` (`tx.put`), so **the op log needed no change**.
+  TDD in `schemas.test.ts`. `Category.color` is untouched and still exists.
+- **`src/features/category-icons.tsx`** — a curated, keyworded catalogue of **~178 Lucide icons**
+  (`CATEGORY_ICONS`), `categoryIcon(name)`, `searchCategoryIcons(query)` (AND-match over name +
+  keywords), and **`CategoryGlyph`** (renders the icon tinted in the category's colour, or the colour
+  dot when there's no icon, in a fixed `size-4` slot so mixed rows align). Stored value = the icon's
+  **PascalCase Lucide export name** ("ShoppingCart"). Unknown/newer names fall back to the dot.
+  **`Map` is imported `as MapIcon`** — the bare export shadows the global `Map` constructor (this bit
+  once). **`CategoryGlyph` renders via `createElement`, not `<Icon/>`** — a locally-looked-up component
+  in JSX position trips `react-hooks/static-components`. Catalogue is curated, **not** all ~1,600 Lucide
+  (importing the whole set to offer it defeats tree-shaking). Tests in `category-icons.test.ts`.
+- **Picker** = `src/features/categories/CategoryIconSheet.tsx`, a **`ResponsiveSheet`** (modal — this is
+  also what fixed the popover-flicker bug, see below) off the category `⋯` menu → **Set icon**: search
+  box + grid + a "Colour dot" reset, each icon previewed in the category's colour.
+- **Rendered everywhere the dot was**, via a `glyph` resolver (`{color, icon}`) that replaced the earlier
+  `dot` (colour-string) resolver: the **categories list**, and **ledger / inbox / recurring rows**
+  (`LedgerRow`/`InboxRow`/`RuleRow` now take a `glyph` prop, not `dot`; transfers still show the arrow in
+  a matching `size-4` slot), and the **three category `Select`s** (edit sheet, quick-add, recurring rule).
+- **The colour-override UI is GONE** (the palette popover + `CATEGORY_PALETTE` were removed).
+  `categoryColor(cat) = cat.color ?? categoryDotColor(id)` and `categoryColorFor(id, cats)` **stay** — they
+  are the tint for both the dot and the icon. The 12-call-site migration to those two helpers is still in
+  place and correct.
+
+**Strand 2 — empty/loading/error/sync (unchanged from plan, shipped):**
+- Skeletons replaced plain `Loading…` on all five list views; new **`PageHeaderSkeleton`** primitive
+  (list screens open on a header, not a hero) in `ui/ListSkeleton.tsx`, exported from `@/features/ui`.
+- **First-run onboarding** on the empty **ledger** when there are **no categories** — invites "Add your
+  first category" (Link to `/categories`). (Left OFF the dashboard/other screens — see open questions.)
+- **`src/features/SyncErrorBanner.tsx`** — a persistent, muted (NOT rose) banner in `AppShell`, shown on
+  every screen while `syncStatusAtom === "error"`, surfacing `lastSyncErrorAtom` with a Try-again. Clears
+  when a sync succeeds. Surfaces M9 state; does not re-plumb it.
+
+**Strand 3 — a11y (mostly verification — the prior phases were already disciplined):**
+- Every `size="icon"` control already had an `aria-label`; reduced-motion is already a global kill switch.
+- Added **visible iris focus rings** to the raw `<Link>`s that lacked them: bottom tab bar, sidebar rail,
+  and the dashboard drill-down links (`LinkRow`, calendar day, doughnut legend). Distinct swatch labels.
+
+**Two bug fixes in the same fix round (`791db71`):**
+- **Settings horizontal-scroll on mobile** — the diagnostics facts grid items lacked `min-w-0`, so a
+  nowrap-truncated value (the user-agent string) set the grid track to its full width and scrolled the
+  whole page sideways. One class on `DiagnosticsPanel.tsx`.
+- **Colour popover flickered shut** — it opened from a *closing* `DropdownMenu`, whose focus-restore stole
+  focus and dismissed it. Moot now: the icon picker is a modal sheet, which owns its focus.
+
+### 5.6 What is OWED / OPEN before Phase 8 can close
+
+- **Get the user's browser test.** Then address any fix round, THEN move to Phase 9. Do not start Phase 9
+  until Phase 8 passes.
+- **Open question — icons in Plan + dashboard.** Icons render in rows/selects/categories but **NOT** in
+  the Plan summary (`LeaderRow`) or the dashboard doughnut/legend/budget-table/largest-list — those still
+  show the **colour dot**. This was a deliberate scope line, flagged to the user; they may want icons
+  there too. `LeaderRow` and the reports widgets take a `dot`/colour today, not a glyph.
+- **Open question — sync banner dismissibility.** It is currently **non-dismissible** (shows whenever
+  `status === "error"`, clears on success), read as "persistent." The user may want a per-session `×`.
+- **Test the icon picker on a phone** (the grid at 390px), the first-run onboarding, and the Settings fix.
+
+### 5.1–5.3 — the original plan (code map still useful; strand 1 is now icons, above)
 
 ### Strand 1 — the category-colour override UI (the last deferred SPEC item, §10.1)
 
@@ -748,7 +817,7 @@ each in the code before starting.
 ```bash
 export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
 cd /home/may/github/yaccount
-npm test          # vitest — 788 passing at end of Phase 7
+npm test          # vitest — 807 passing at end of Phase 8 (built, in review)
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
@@ -757,7 +826,10 @@ npm run dev       # a dev server may ALREADY be running on :3000 — check befor
 ```
 
 - **Test counts:** 407 (M9) → 441 (P1) → 456 (P1.5) → 494 (P2) → 573 (P3) → 608 (P4) → 659 (P5) →
-  715 (P6) → **788 (P7)** (+73: 60 engine derivations, 13 deep-link/period-pref/registry/sankey-layout).
+  715 (P6) → 788 (P7) → **807 (P8)** (+19: 10 icon-catalogue, category-color/icon model tests; −3 the
+  removed colour-palette tests).
+- **FRESH MACHINE:** memory does NOT travel (its slug is path-derived) and the Node PATH below is
+  WSL-specific — install deps (`npm ci`), confirm your own `node`/`npm`, and re-check the PATH line.
 - **A dev server was left running on http://localhost:3000** (PID may differ). `curl -s -o /dev/null -w
   "%{http_code}" http://localhost:3000/ledger` to check before launching a second one.
 - **Pre-existing prettier drift** on `src/components/ui/checkbox.tsx`, `progress.tsx`,
@@ -891,8 +963,11 @@ never batch them (a standing user preference).
 ## 9. Git state
 
 ```
-branch: m11-design-polish  (pushed, tracking origin/m11-design-polish — 22 ahead of main)
+branch: m11-design-polish  (pushed, tracking origin/m11-design-polish — 24 ahead of main)
 
+791db71 feat: category icons instead of colour override, + two fixes    (Phase 8 fix 1 — IN REVIEW)
+ce3a74f feat: category colours, skeletons, sync banner, a11y            (Phase 8 — IN REVIEW)
+2e3434a docs: Phase 7 passed its browser test; hand off Phase 8
 cfe1bfb fix: pin the filter Clear button, always in reach beside the rail      (Phase 7 fix 3)
 7de2c5f fix: seed the ledger's deep-link filter from useSearchParams, not window  (Phase 7 fix 2)
 432a770 feat: dashboard drill-downs, and two layout fixes                       (Phase 7 fix 1)
