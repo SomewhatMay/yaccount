@@ -19,7 +19,8 @@ import {
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,17 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { todayIso } from "@/features/clock";
 
-const today = (): string => new Date().toISOString().slice(0, 10);
 const WEEKDAYS = [
   "Sunday",
   "Monday",
@@ -68,28 +63,22 @@ export function RecurringRuleSheet({
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">
-            {rule ? "Edit recurring" : "New recurring transaction"}
-          </SheetTitle>
-          <SheetDescription>
-            It generates one pending transaction each time it comes due — you approve
-            every occurrence in the inbox.
-          </SheetDescription>
-        </SheetHeader>
-        {open && (
-          <RuleForm
-            key={rule?.id ?? "new"}
-            rule={rule}
-            categories={categories}
-            containers={containers}
-            onSubmit={onSubmit}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={rule ? "Edit recurring" : "New recurring transaction"}
+      description="It generates one pending transaction each time it comes due — you approve every occurrence in the inbox."
+    >
+      {open && (
+        <RuleForm
+          key={rule?.id ?? "new"}
+          rule={rule}
+          categories={categories}
+          containers={containers}
+          onSubmit={onSubmit}
+        />
+      )}
+    </ResponsiveSheet>
   );
 }
 
@@ -144,7 +133,7 @@ function RuleForm({
 
   const [frequency, setFrequency] = useState<Frequency>(rule?.frequency ?? "monthly");
   const [cfg, setCfg] = useState<ConfigState>(() => initialConfig(rule));
-  const [startDate, setStartDate] = useState(rule?.start_date ?? today());
+  const [startDate, setStartDate] = useState(rule?.start_date ?? todayIso());
   const [endDate, setEndDate] = useState(rule?.end_date ?? "");
 
   const cat = categories.find((c) => c.id === categoryId);
@@ -242,10 +231,7 @@ function RuleForm({
               <SelectContent>
                 {activeCategories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    <span
-                      className="mr-0.5 size-2 rounded-full"
-                      style={{ backgroundColor: categoryDotColor(c.id) }}
-                    />
+                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
                     {c.name}
                     <span className="text-muted-foreground ml-1">· {c.type}</span>
                   </SelectItem>

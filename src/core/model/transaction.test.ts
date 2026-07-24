@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  makeTemplate,
   makeTransaction,
   makeTransfer,
   makeVoidRow,
@@ -95,6 +96,76 @@ describe("makeTransaction — guards at the entry edge", () => {
 
   it("normalizes -0 like every other amount path", () => {
     expect(Object.is(makeTransaction({ ...base, amount: -0 }).amount, 0)).toBe(true);
+  });
+});
+
+describe("entered_at — the instant a row was recorded (M11)", () => {
+  const base = {
+    date: "2026-07-20",
+    amount: -1000,
+    vendor_source: "Starbucks",
+    category_id: "coffee",
+  };
+
+  it("defaults to null — `date` is the calendar day, this is the wall clock", () => {
+    expect(makeTransaction(base).entered_at).toBeNull();
+    expect(
+      makeTransfer({
+        date: "2026-07-20",
+        amount: 500,
+        container_id: "general",
+        to_container_id: "vacation",
+        fromName: "General",
+        toName: "Vacation",
+      }).entered_at,
+    ).toBeNull();
+    expect(
+      makeTemplate({
+        template_name: "Tims",
+        amount: -400,
+        vendor_source: "Tims",
+        container_id: "general",
+        category_id: "coffee",
+      }).entered_at,
+    ).toBeNull();
+  });
+
+  it("is carried through every factory when supplied", () => {
+    const at = "2026-07-20T14:04:11.000Z";
+    expect(makeTransaction({ ...base, entered_at: at }).entered_at).toBe(at);
+    expect(
+      makeTransfer({
+        date: "2026-07-20",
+        amount: 500,
+        container_id: "general",
+        to_container_id: "vacation",
+        fromName: "General",
+        toName: "Vacation",
+        entered_at: at,
+      }).entered_at,
+    ).toBe(at);
+  });
+
+  it("rejects anything that is not an ISO 8601 instant", () => {
+    expect(() => makeTransaction({ ...base, entered_at: "2026-07-20" })).toThrow();
+    expect(() => makeTransaction({ ...base, entered_at: "yesterday" })).toThrow();
+    expect(() =>
+      makeTransaction({ ...base, entered_at: "2026-13-45T99:99:99Z" }),
+    ).toThrow();
+  });
+
+  it("a void is a NEW event, so it never inherits the original's instant", () => {
+    // Otherwise deleting a row logged last week would file the reversal back
+    // there, and an undo would land ahead of edits the user made since.
+    const orig = makeTransaction({
+      ...base,
+      id: "t1",
+      entered_at: "2026-07-20T09:00:00.000Z",
+    });
+    expect(makeVoidRow(orig, { id: "v1" }).entered_at).toBeNull();
+    expect(
+      makeVoidRow(orig, { id: "v2", entered_at: "2026-07-22T18:00:00.000Z" }).entered_at,
+    ).toBe("2026-07-22T18:00:00.000Z");
   });
 });
 

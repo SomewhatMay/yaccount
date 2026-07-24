@@ -7,7 +7,6 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   LineChartIcon,
-  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   WalletIcon,
@@ -35,7 +34,23 @@ import {
   type ContainerSnapshot,
 } from "@/core/model";
 import { cn } from "@/lib/utils";
+import {
+  ContainerSheet,
+  type ContainerFormInput,
+} from "@/features/containers/ContainerSheet";
 import { LogBalanceSheet } from "@/features/containers/LogBalanceSheet";
+import {
+  activeContainerFilterCount,
+  applyContainerFilter,
+  isContainerSort,
+  sortContainers,
+  type ContainerFilter,
+  type ContainerKind,
+  type ContainerState,
+  type CountedState,
+} from "@/features/containers/filter";
+import { useLocalPref } from "@/features/prefs";
+import { FilterBar } from "@/features/FilterBar";
 import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Badge } from "@/components/ui/badge";
@@ -51,23 +66,51 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DropdownMenu,
   DropdownMenuCheckboxItem,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  CollapsibleSection,
+  EmptyState,
+  ListSkeleton,
+  Money,
+  PageHeader,
+  PageHeaderSkeleton,
+  RowActions,
+} from "@/features/ui";
 
-type Kind = "plain" | "investment";
+/** Device-local: how you like to READ the list, not a fact about your money. */
+const SORT_KEY = "yaccount.containers.sort";
+
+const SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "balance", label: "Balance" },
+] as const;
+
+const KINDS: { value: ContainerKind; label: string }[] = [
+  { value: "plain", label: "Wallet" },
+  { value: "investment", label: "Investment" },
+];
+
+const COUNTED: { value: CountedState; label: string }[] = [
+  { value: "counted", label: "Counted" },
+  { value: "uncounted", label: "Not counted" },
+];
+
+const STATES: { value: ContainerState; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "archived", label: "Archived" },
+];
+
+interface ContainerDraft {
+  text: string;
+  kinds: ContainerKind[];
+  counted: CountedState[];
+  states: ContainerState[];
+}
+
+const NO_FILTER: ContainerDraft = { text: "", kinds: [], counted: [], states: [] };
 
 export function ContainersView() {
   const ready = useAtomValue(readyAtom);
@@ -77,32 +120,32 @@ export function ContainersView() {
   const defaultId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
 
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<Kind>("plain");
+  const [creating, setCreating] = useState(false);
   const [logging, setLogging] = useState<Container | null>(null);
   const [archiving, setArchiving] = useState<Container | null>(null);
   const archivingBalance = archiving ? containerBalance(transactions, archiving.id) : 0;
 
-  const active = useMemo(
-    () =>
-      containers
-        .filter((c) => !c.is_archived)
-        .sort((a, b) =>
-          a.id === GENERAL_CONTAINER_ID
-            ? -1
-            : b.id === GENERAL_CONTAINER_ID
-              ? 1
-              : a.name.localeCompare(b.name),
-        ),
-    [containers],
+  // Sort is remembered; the filters are deliberately not (§12.4 M11).
+  const [sort, setSort] = useLocalPref(SORT_KEY, "name", isContainerSort);
+  const [draft, setDraft] = useState<ContainerDraft>(NO_FILTER);
+  const filter: ContainerFilter = draft;
+  const filtering = activeContainerFilterCount(filter) > 0;
+
+  const balanceOf = useMemo(
+    () => (c: Container) => containerBalance(transactions, c.id),
+    [transactions],
   );
-  const archived = useMemo(
+
+  const shown = useMemo(
     () =>
-      containers
-        .filter((c) => c.is_archived)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [containers],
+      sortContainers(applyContainerFilter(containers, filter), sort, {
+        balance: balanceOf,
+      }),
+    [containers, filter, sort, balanceOf],
   );
+
+  const active = useMemo(() => shown.filter((c) => !c.is_archived), [shown]);
+  const archived = useMemo(() => shown.filter((c) => c.is_archived), [shown]);
 
   const latestSnapshot = useMemo(() => {
     const by = new Map<string, ContainerSnapshot>();
@@ -113,20 +156,16 @@ export function ContainersView() {
     return by;
   }, [snapshots]);
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return toast.error("Name the container.");
-    if (nameTaken(containers, trimmed)) {
-      return toast.error("You already have a container with that name.");
-    }
-    await dispatch(
-      createContainer({ name: trimmed, is_investment: kind === "investment" }),
-    );
+  async function add(input: ContainerFormInput) {
+    await dispatch(createContainer(input));
     toast.success("Container added", {
-      description: `${trimmed} · not counted in your overall balance yet`,
+      description: `${input.name} · ${
+        input.include_in_overall_balance
+          ? "counting toward your overall balance"
+          : "not counted in your overall balance"
+      }`,
     });
-    setName("");
+    setCreating(false);
   }
 
   async function archive(c: Container) {
@@ -150,113 +189,171 @@ export function ContainersView() {
     });
   }
 
-  if (!ready) return <p className="text-muted-foreground py-16 text-sm">Loading…</p>;
+  if (!ready)
+    return (
+      <div className="space-y-6">
+        <PageHeaderSkeleton />
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <ListSkeleton rows={4} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
-      <section className="pt-3 pb-1">
-        <h1 className="font-display text-3xl leading-none">Containers</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Where your money lives. Only the ones you count show up in your overall balance.
-        </p>
-      </section>
-
-      <form
-        onSubmit={add}
-        className="border-primary/15 bg-primary/[0.04] rounded-2xl border p-2"
-      >
-        <div className="grid grid-cols-2 items-center gap-1.5 sm:grid-cols-[1fr_9.5rem_auto]">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Name a container (e.g. Vacation)"
-            aria-label="Container name"
-            className="col-span-2 border-0 bg-transparent shadow-none focus-visible:ring-0 sm:col-span-1"
-          />
-          <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
-            <SelectTrigger
-              aria-label="Container kind"
-              className="border-0 bg-transparent shadow-none focus-visible:ring-0"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="plain">Plain</SelectItem>
-              <SelectItem value="investment">Investment</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            type="submit"
-            size="icon"
-            aria-label="Add container"
-            className="justify-self-end rounded-xl"
-          >
+      <PageHeader
+        eyebrow="Containers"
+        title="Where your money lives"
+        action={
+          <Button className="rounded-full" onClick={() => setCreating(true)}>
             <PlusIcon className="size-4" />
+            New
           </Button>
-        </div>
-      </form>
+        }
+      >
+        Only the ones you count show up in your overall balance.
+      </PageHeader>
+
+      {containers.length > 0 && (
+        <FilterBar
+          search={draft.text}
+          onSearch={(text) => setDraft((d) => ({ ...d, text }))}
+          searchPlaceholder="Search containers"
+          facets={[
+            {
+              id: "kind",
+              label: "Type",
+              selected: draft.kinds,
+              onChange: (kinds) =>
+                setDraft((d) => ({ ...d, kinds: kinds as ContainerKind[] })),
+              options: KINDS,
+            },
+            {
+              id: "counted",
+              label: "Counted",
+              selected: draft.counted,
+              onChange: (counted) =>
+                setDraft((d) => ({ ...d, counted: counted as CountedState[] })),
+              options: COUNTED,
+            },
+            {
+              id: "state",
+              label: "Status",
+              selected: draft.states,
+              onChange: (states) =>
+                setDraft((d) => ({ ...d, states: states as ContainerState[] })),
+              options: STATES,
+            },
+          ]}
+          sort={{ value: sort, options: [...SORT_OPTIONS], onChange: setSort }}
+          activeCount={activeContainerFilterCount(filter)}
+          onClear={() => setDraft(NO_FILTER)}
+        />
+      )}
 
       <div className="bg-card overflow-hidden rounded-2xl border">
-        {active.map((c, i) => (
-          <ContainerRow
-            key={c.id}
-            container={c}
-            divider={i > 0}
-            balance={containerBalance(transactions, c.id)}
-            siblings={containers}
-            contributed={netContributions(transactions, c.id)}
-            snapshot={latestSnapshot.get(c.id)}
-            isDefault={c.id === defaultId}
-            onDispatch={dispatch}
-            onLogBalance={() => setLogging(c)}
-            onArchive={() => setArchiving(c)}
-          />
-        ))}
+        {active.length === 0 ? (
+          filtering ? (
+            <EmptyState
+              title="Nothing matches those filters"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setDraft(NO_FILTER)}
+                >
+                  Clear filters
+                </Button>
+              }
+            >
+              {containers.length} container{containers.length === 1 ? "" : "s"} — widen
+              the filters to see them.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              icon={WalletIcon}
+              title="No containers yet"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setCreating(true)}
+                >
+                  <PlusIcon className="size-4" />
+                  New container
+                </Button>
+              }
+            >
+              Add one for each place your money actually sits — a bank account, a savings
+              pot, a brokerage.
+            </EmptyState>
+          )
+        ) : (
+          active.map((c, i) => (
+            <ContainerRow
+              key={c.id}
+              container={c}
+              divider={i > 0}
+              balance={balanceOf(c)}
+              siblings={containers}
+              contributed={netContributions(transactions, c.id)}
+              snapshot={latestSnapshot.get(c.id)}
+              isDefault={c.id === defaultId}
+              onDispatch={dispatch}
+              onLogBalance={() => setLogging(c)}
+              onArchive={() => setArchiving(c)}
+            />
+          ))
+        )}
       </div>
 
-      {archived.length > 0 && (
-        <section>
-          <div className="text-muted-foreground mb-2 flex items-baseline justify-between px-1">
-            <h2 className="text-xs font-medium tracking-[0.14em] uppercase">Archived</h2>
-            <span className="tnum font-mono text-xs">{archived.length}</span>
-          </div>
-          <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
-            {archived.map((c, i) => (
-              <div
-                key={c.id}
-                className={cn(
-                  "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
-                  i > 0 && "border-t border-dashed",
-                )}
+      {/* Folded away by default (§12.4 M11 responsive density) — an archived
+          container is out of your pickers and out of the balance, so it is never
+          why you opened this screen. The count and Restore stay reachable (§1.1). */}
+      <CollapsibleSection
+        title="Archived"
+        count={archived.length}
+        note="Out of your pickers and out of the overall balance, but nothing was deleted — restore any time."
+      >
+        <div className="bg-card/50 overflow-hidden rounded-2xl border border-dashed">
+          {archived.map((c, i) => (
+            <div
+              key={c.id}
+              className={cn(
+                "group hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors",
+                i > 0 && "border-t border-dashed",
+              )}
+            >
+              <ArchiveIcon
+                className="text-muted-foreground size-4 shrink-0 opacity-60"
+                aria-hidden
+              />
+              <span className="text-muted-foreground flex-1 truncate text-sm">
+                {c.name}
+              </span>
+              <Money cents={balanceOf(c)} tone="quiet" className="text-sm" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground h-8 shrink-0 rounded-lg"
+                onClick={() => restore(c)}
               >
-                <ArchiveIcon
-                  className="text-muted-foreground size-4 shrink-0 opacity-60"
-                  aria-hidden
-                />
-                <span className="text-muted-foreground flex-1 truncate text-sm">
-                  {c.name}
-                </span>
-                <span className="tnum text-muted-foreground font-mono text-sm">
-                  {formatCents(containerBalance(transactions, c.id))}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground h-8 rounded-lg"
-                  onClick={() => restore(c)}
-                >
-                  <ArchiveRestoreIcon className="size-4" />
-                  Restore
-                </Button>
-              </div>
-            ))}
-          </div>
-          <p className="text-muted-foreground mt-2 px-1 text-xs">
-            Out of your pickers and out of the overall balance, but nothing was deleted —
-            restore any time.
-          </p>
-        </section>
-      )}
+                <ArchiveRestoreIcon className="size-4" />
+                Restore
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
+      <ContainerSheet
+        open={creating}
+        siblings={containers}
+        onOpenChange={setCreating}
+        onSubmit={add}
+      />
 
       <LogBalanceSheet
         container={logging}
@@ -404,63 +501,48 @@ function ContainerRow({
           {marginalia.join(" · ")}
         </div>
       </div>
-      <div
-        className={cn(
-          "tnum font-mono text-sm tracking-tight",
-          balance < 0 && "text-destructive",
-        )}
-      >
-        {formatCents(balance)}
-      </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground size-8 rounded-lg opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-            aria-label={`Actions for ${container.name}`}
-          >
-            <MoreHorizontalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditing(true)}>
-            <PencilIcon className="size-4" />
-            Rename
+      <Money
+        cents={balance}
+        tone={balance < 0 ? "alert" : "neutral"}
+        className="text-sm tracking-tight"
+      />
+      <RowActions label={`Actions for ${container.name}`}>
+        <DropdownMenuItem onClick={() => setEditing(true)}>
+          <PencilIcon className="size-4" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuCheckboxItem
+          checked={container.include_in_overall_balance}
+          onCheckedChange={toggleCounted}
+        >
+          Count in overall balance
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={container.is_investment}
+          onCheckedChange={toggleInvestment}
+        >
+          Track as an investment
+        </DropdownMenuCheckboxItem>
+        {!isDefault && (
+          <DropdownMenuItem onClick={makeDefault}>
+            <WalletIcon className="size-4" />
+            Make default wallet
           </DropdownMenuItem>
-          <DropdownMenuCheckboxItem
-            checked={container.include_in_overall_balance}
-            onCheckedChange={toggleCounted}
-          >
-            Count in overall balance
-          </DropdownMenuCheckboxItem>
-          <DropdownMenuCheckboxItem
-            checked={container.is_investment}
-            onCheckedChange={toggleInvestment}
-          >
-            Track as an investment
-          </DropdownMenuCheckboxItem>
-          {!isDefault && (
-            <DropdownMenuItem onClick={makeDefault}>
-              <WalletIcon className="size-4" />
-              Make default wallet
-            </DropdownMenuItem>
-          )}
-          {container.is_investment && (
-            <DropdownMenuItem onClick={onLogBalance}>
-              <LineChartIcon className="size-4" />
-              Reported balances
-            </DropdownMenuItem>
-          )}
-          {container.id !== GENERAL_CONTAINER_ID && <DropdownMenuSeparator />}
-          {container.id !== GENERAL_CONTAINER_ID && (
-            <DropdownMenuItem variant="destructive" onClick={onArchive}>
-              <ArchiveIcon className="size-4" />
-              Archive
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        )}
+        {container.is_investment && (
+          <DropdownMenuItem onClick={onLogBalance}>
+            <LineChartIcon className="size-4" />
+            Reported balances
+          </DropdownMenuItem>
+        )}
+        {container.id !== GENERAL_CONTAINER_ID && <DropdownMenuSeparator />}
+        {container.id !== GENERAL_CONTAINER_ID && (
+          <DropdownMenuItem variant="destructive" onClick={onArchive}>
+            <ArchiveIcon className="size-4" />
+            Archive
+          </DropdownMenuItem>
+        )}
+      </RowActions>
     </div>
   );
 }

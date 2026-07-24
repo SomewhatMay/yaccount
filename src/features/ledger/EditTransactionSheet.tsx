@@ -19,7 +19,9 @@ import {
   type Sign,
 } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import { categoryDotColor } from "@/features/category-color";
+import { categoryColor } from "@/features/category-color";
+import { CategoryGlyph } from "@/features/category-icons";
+import { instantFrom, timeInputValue } from "@/features/clock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,14 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
 
 export function EditTransactionSheet({
   editing,
@@ -56,43 +52,90 @@ export function EditTransactionSheet({
 }) {
   const transfer = editing !== null && isTransfer(editing);
   return (
-    <Sheet open={editing !== null} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">
-            {transfer ? "Edit transfer" : "Edit transaction"}
-          </SheetTitle>
-          <SheetDescription>
-            Changes are recorded as a ledger update — history is never lost.
-          </SheetDescription>
-        </SheetHeader>
-        {editing &&
-          (transfer ? (
-            <TransferForm
-              key={editing.id}
-              tx={editing}
-              containers={containers}
-              onSave={onSave}
-              onDelete={onDelete}
-            />
-          ) : (
-            <EditForm
-              key={editing.id}
-              tx={editing}
-              categories={categories}
-              containers={containers}
-              onSave={onSave}
-              onDelete={onDelete}
-            />
-          ))}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={editing !== null}
+      onOpenChange={onOpenChange}
+      title={transfer ? "Edit transfer" : "Edit transaction"}
+      description="Changes are recorded as a ledger update — history is never lost."
+    >
+      {editing &&
+        (transfer ? (
+          <TransferForm
+            key={editing.id}
+            tx={editing}
+            containers={containers}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        ) : (
+          <EditForm
+            key={editing.id}
+            tx={editing}
+            categories={categories}
+            containers={containers}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        ))}
+    </ResponsiveSheet>
   );
 }
 
 /** Keep an archived container selectable on a row that already uses it (§5.5). */
 function selectableContainers(containers: Container[], ...keep: (string | null)[]) {
   return containers.filter((c) => !c.is_archived || keep.includes(c.id));
+}
+
+/**
+ * The entry's instant after an edit. Left untouched when neither the date nor
+ * the time changed — a `<input type="time">` only carries minutes, so rebuilding
+ * on every save would quietly round the seconds off rows logged seconds apart and
+ * put them back in a tie. Clearing the time leaves the row without an instant,
+ * exactly like one written before the field existed.
+ */
+function resolveEnteredAt(tx: Transaction, date: string, time: string): string | null {
+  const unchanged = date === tx.date && time === timeInputValue(tx.entered_at);
+  return unchanged ? tx.entered_at : instantFrom(date, time);
+}
+
+/** Date and time side by side — one thought, two controls (the time is optional,
+ * so a row that never had one keeps a blank field rather than a made-up midnight). */
+function WhenFields({
+  idPrefix,
+  date,
+  time,
+  onDate,
+  onTime,
+}: {
+  idPrefix: string;
+  date: string;
+  time: string;
+  onDate: (v: string) => void;
+  onTime: (v: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-3">
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${idPrefix}-date`}>Date</Label>
+        <Input
+          id={`${idPrefix}-date`}
+          type="date"
+          value={date}
+          onChange={(e) => onDate(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor={`${idPrefix}-time`}>Time</Label>
+        <Input
+          id={`${idPrefix}-time`}
+          type="time"
+          value={time}
+          onChange={(e) => onTime(e.target.value)}
+          className="tnum font-mono"
+        />
+      </div>
+    </div>
+  );
 }
 
 function DeleteButton({ onClick }: { onClick: () => void }) {
@@ -135,6 +178,7 @@ function EditForm({
   );
 
   const [date, setDate] = useState(tx.date);
+  const [time, setTime] = useState(() => timeInputValue(tx.entered_at));
   const [vendor, setVendor] = useState(tx.vendor_source);
   const [categoryId, setCategoryId] = useState(tx.category_id ?? active[0]?.id ?? "");
   const [containerId, setContainerId] = useState(tx.container_id);
@@ -164,6 +208,7 @@ function EditForm({
       updateTransaction({
         ...tx,
         date,
+        entered_at: resolveEnteredAt(tx, date, time),
         amount: res.signed,
         vendor_source: vendor.trim(),
         category_id: categoryId,
@@ -177,15 +222,13 @@ function EditForm({
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
-        <div className="grid gap-1.5">
-          <Label htmlFor="edit-date">Date</Label>
-          <Input
-            id="edit-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
+        <WhenFields
+          idPrefix="edit"
+          date={date}
+          time={time}
+          onDate={setDate}
+          onTime={setTime}
+        />
         <div className="grid gap-1.5">
           <Label htmlFor="edit-vendor">Payee / source</Label>
           <Input
@@ -209,10 +252,7 @@ function EditForm({
             <SelectContent>
               {active.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
-                  <span
-                    className="mr-0.5 size-2 rounded-full"
-                    style={{ backgroundColor: categoryDotColor(c.id) }}
-                  />
+                  <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
                   {c.name}
                   <span className="text-muted-foreground ml-1">· {c.type}</span>
                 </SelectItem>
@@ -292,6 +332,7 @@ function TransferForm({
   );
 
   const [date, setDate] = useState(tx.date);
+  const [time, setTime] = useState(() => timeInputValue(tx.entered_at));
   const [vendor, setVendor] = useState(tx.vendor_source);
   const [fromId, setFromId] = useState(tx.container_id);
   const [toId, setToId] = useState(tx.to_container_id ?? "");
@@ -322,6 +363,7 @@ function TransferForm({
       updateTransaction({
         ...tx,
         date,
+        entered_at: resolveEnteredAt(tx, date, time),
         amount: -magnitude,
         vendor_source: label || transferLabel(from.name, to.name),
         container_id: from.id,
@@ -335,15 +377,13 @@ function TransferForm({
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
-        <div className="grid gap-1.5">
-          <Label htmlFor="transfer-date">Date</Label>
-          <Input
-            id="transfer-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
+        <WhenFields
+          idPrefix="transfer"
+          date={date}
+          time={time}
+          onDate={setDate}
+          onTime={setTime}
+        />
         <div className="grid gap-1.5">
           <Label>From</Label>
           <Select value={fromId} onValueChange={setFromId}>

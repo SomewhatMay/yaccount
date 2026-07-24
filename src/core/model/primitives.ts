@@ -13,6 +13,8 @@ export type Cents = number;
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const YEAR_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const ISO_DATETIME_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 /**
  * A real calendar day, not just the right shape. "2026-13-45" and "2026-02-30"
@@ -33,6 +35,19 @@ export const zId = z.string().min(1);
 export const zIsoDate = z
   .string()
   .refine(isCalendarDate, "expected a real calendar date YYYY-MM-DD");
+/**
+ * An INSTANT, not a calendar day — a zoned ISO 8601 timestamp like the op-log's
+ * `ts`. `date` says which day the money moved (user-chosen, backdatable); this
+ * says when the row was actually written, which is what orders a day's entries.
+ * The offset is required: a bare local time can't be compared across devices.
+ */
+export function isIsoDateTime(value: string): boolean {
+  return ISO_DATETIME_RE.test(value) && !Number.isNaN(Date.parse(value));
+}
+/** Zoned ISO 8601 instant, e.g. "2026-07-22T18:04:11.123Z". */
+export const zIsoDateTime = z
+  .string()
+  .refine(isIsoDateTime, "expected a zoned ISO 8601 timestamp");
 /** Stored `yearMonth` key, e.g. "2026-07" (§8.3). */
 export const zYearMonth = z.string().regex(YEAR_MONTH_RE, "expected YYYY-MM");
 /** Signed integer cents. */

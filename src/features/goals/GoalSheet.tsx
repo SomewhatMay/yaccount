@@ -15,17 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/features/clock";
 
 export interface GoalFormInput {
   name: string;
@@ -59,28 +52,22 @@ export function GoalSheet({
   onSubmit: (input: GoalFormInput, editingGoal: Goal | null) => Promise<void>;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">
-            {goal ? "Edit goal" : "New savings goal"}
-          </SheetTitle>
-          <SheetDescription>
-            A goal gives a pool of money a purpose and a pace. Contributions are transfers
-            into its container — you always approve them.
-          </SheetDescription>
-        </SheetHeader>
-        {open && (
-          <GoalForm
-            key={goal?.id ?? "new"}
-            goal={goal}
-            containers={containers}
-            defaultFundingId={defaultFundingId}
-            onSubmit={onSubmit}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={goal ? "Edit goal" : "New savings goal"}
+      description="A goal gives a pool of money a purpose and a pace. Contributions are transfers into its container — you always approve them."
+    >
+      {open && (
+        <GoalForm
+          key={goal?.id ?? "new"}
+          goal={goal}
+          containers={containers}
+          defaultFundingId={defaultFundingId}
+          onSubmit={onSubmit}
+        />
+      )}
+    </ResponsiveSheet>
   );
 }
 

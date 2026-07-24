@@ -27,16 +27,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-
-const today = (): string => new Date().toISOString().slice(0, 10);
+import { SheetFooter } from "@/components/ui/sheet";
+import { ResponsiveSheet } from "@/features/ui";
+import { todayIso } from "@/features/clock";
+import { Eyebrow } from "@/features/ui";
 
 /**
  * What an investment container is really worth, over time (§5.6). Market growth
@@ -57,25 +51,21 @@ export function LogBalanceSheet({
   onDispatch: (op: Op) => Promise<void>;
 }) {
   return (
-    <Sheet open={container !== null} onOpenChange={onOpenChange}>
-      <SheetContent className="gap-0 sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="font-display text-xl">Reported balances</SheetTitle>
-          <SheetDescription>
-            What {container?.name ?? "this container"} is actually worth. Growth
-            isn&apos;t a transaction — log a value whenever you check.
-          </SheetDescription>
-        </SheetHeader>
-        {container && (
-          <BalanceHistory
-            key={container.id}
-            container={container}
-            snapshots={snapshots}
-            onDispatch={onDispatch}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+    <ResponsiveSheet
+      open={container !== null}
+      onOpenChange={onOpenChange}
+      title="Reported balances"
+      description={`What ${container?.name ?? "this container"} is actually worth. Growth isn't a transaction — log a value whenever you check.`}
+    >
+      {container && (
+        <BalanceHistory
+          key={container.id}
+          container={container}
+          snapshots={snapshots}
+          onDispatch={onDispatch}
+        />
+      )}
+    </ResponsiveSheet>
   );
 }
 
@@ -98,7 +88,7 @@ function BalanceHistory({
 
   const [editing, setEditing] = useState<ContainerSnapshot | null>(null);
   const [removing, setRemoving] = useState<ContainerSnapshot | null>(null);
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(todayIso());
   const [amountStr, setAmountStr] = useState("");
 
   // One report per day (§5.6): saving onto an occupied day replaces it, so say so
@@ -113,7 +103,7 @@ function BalanceHistory({
 
   function cancelEdit() {
     setEditing(null);
-    setDate(today());
+    setDate(todayIso());
     setAmountStr("");
   }
 
@@ -193,9 +183,9 @@ function BalanceHistory({
       </form>
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <h3 className="text-muted-foreground mb-2 px-1 text-xs font-medium tracking-[0.14em] uppercase">
+        <Eyebrow as="h3" className="mb-2 px-1">
           History
-        </h3>
+        </Eyebrow>
         <div className="bg-card overflow-hidden rounded-2xl border">
           {history.length === 0 ? (
             <p className="text-muted-foreground px-4 py-8 text-center text-sm">

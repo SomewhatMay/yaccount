@@ -4,13 +4,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-body {
-  font-family:
-    system-ui,
-    -apple-system,
-    sans-serif;
-}
-
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
@@ -135,37 +128,246 @@ body {
   }
 }
 
-/* ── yaccount "Quiet register" theme (M2 design pass) ─────────────────────
-   A cool-neutral base with a single iris brand spark and emerald for money-in.
-   Bespoke tokens layered over the shadcn neutral base; M11 formalizes these. */
+/* ═══ yaccount — "The Standing Register" (M11 design system v2) ═══════════════
+   The locked §12 "Quiet Register" language, executed further. Same thesis, same
+   three typefaces, same iris/emerald semantics. Three deliberate moves:
+
+     1. Paper & ink tinted with the brand hue. Every neutral carries a trace of
+        iris (h 285) so the field stops reading as default shadcn grey — and
+        iris itself goes to FULL STRENGTH, used rarely, instead of 4% washes
+        sprinkled everywhere.
+     2. The figure stands on its own history (the hero curve, `Figure`).
+     3. The carried balance rides the day header, like a paper check register.
+
+   Everything below overrides the shadcn `neutral` ramp declared above. Note the
+   cascade: these blocks come later at equal specificity, so `.dark` has to
+   restate every token `:root` sets or the light value would win in dark mode.
+   The ramp is held to WCAG AA in both themes by `src/features/ui/theme.test.ts`
+   — change a value there and the test tells you what it costs. */
 @theme inline {
   --font-display: var(--font-display);
   --font-mono: var(--font-mono);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-positive: var(--positive);
+  --color-rule: var(--rule);
+  --color-surface-sunken: var(--surface-sunken);
+  --ease-register: var(--ease-register);
 }
 
 :root {
-  --brand: oklch(0.54 0.2 280);
-  --brand-foreground: oklch(0.985 0.005 280);
-  --positive: oklch(0.58 0.13 162);
-  /* Retheme the interactive spark to iris — primary buttons, focus rings, nav. */
+  /* Paper & ink ------------------------------------------------------------ */
+  --background: oklch(0.988 0.003 285); /* rag paper */
+  --foreground: oklch(0.18 0.015 285); /* iris-cool ink */
+  --card: oklch(0.998 0.002 285); /* a sheet laid on the desk */
+  --card-foreground: oklch(0.18 0.015 285);
+  --popover: oklch(0.998 0.002 285);
+  --popover-foreground: oklch(0.18 0.015 285);
+  --secondary: oklch(0.958 0.006 285);
+  --secondary-foreground: oklch(0.215 0.016 285);
+  --muted: oklch(0.958 0.006 285);
+  --muted-foreground: oklch(0.525 0.018 285);
+  --accent: oklch(0.955 0.008 285);
+  --accent-foreground: oklch(0.215 0.016 285);
+  --border: oklch(0.9 0.006 285);
+  --input: oklch(0.9 0.006 285);
+  --destructive: oklch(0.545 0.215 27.5);
+
+  /* A recessed plane: day headers, filter rails, anything set into the page. */
+  --surface-sunken: oklch(0.945 0.007 285);
+  /* The rule. Only ever drawn above a total — it means "this sums the above",
+     which is why it reads harder than an ordinary divider. */
+  --rule: oklch(0.76 0.014 285);
+
+  /* The one spark, at full strength — the FAB, the active tab, the focus ring.
+     Rare by design: if iris is everywhere it is nowhere. */
+  --brand: oklch(0.52 0.21 285);
+  --brand-foreground: oklch(0.985 0.005 285);
+  --positive: oklch(0.53 0.14 162); /* emerald — money IN only (§12.2) */
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
   --ring: var(--brand);
+
+  --chart-1: oklch(0.87 0.01 285);
+  --chart-2: oklch(0.556 0.016 285);
+  --chart-3: oklch(0.439 0.018 285);
+  --chart-4: oklch(0.371 0.018 285);
+  --chart-5: oklch(0.269 0.016 285);
+
+  --sidebar: oklch(0.975 0.005 285);
+  --sidebar-foreground: oklch(0.18 0.015 285);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-accent: oklch(0.955 0.008 285);
+  --sidebar-accent-foreground: oklch(0.215 0.016 285);
+  --sidebar-border: oklch(0.9 0.006 285);
+  --sidebar-ring: var(--brand);
+
+  /* Motion budget (§12.5). Three durations, one curve. A register settles; it
+     does not bounce — the curve leaves fast and lands slow, with no overshoot.
+       1 · a colour changing under the pointer
+       2 · a row landing, a value ticking over
+       3 · a surface arriving (the quick-add sheet, the one orchestrated moment) */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 260ms;
+  --ease-register: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dark {
-  --brand: oklch(0.72 0.16 285);
-  --brand-foreground: oklch(0.18 0.03 285);
-  --positive: oklch(0.74 0.15 162);
+  --background: oklch(0.155 0.012 285); /* ink, not black */
+  --foreground: oklch(0.97 0.006 285);
+  --card: oklch(0.195 0.014 285);
+  --card-foreground: oklch(0.97 0.006 285);
+  --popover: oklch(0.205 0.015 285);
+  --popover-foreground: oklch(0.97 0.006 285);
+  --secondary: oklch(0.258 0.016 285);
+  --secondary-foreground: oklch(0.97 0.006 285);
+  --muted: oklch(0.25 0.015 285);
+  --muted-foreground: oklch(0.715 0.018 285);
+  --accent: oklch(0.268 0.018 285);
+  --accent-foreground: oklch(0.97 0.006 285);
+  --border: oklch(0.29 0.016 285);
+  --input: oklch(0.33 0.018 285);
+  --destructive: oklch(0.704 0.191 22.216);
+
+  --surface-sunken: oklch(0.122 0.01 285);
+  --rule: oklch(0.42 0.02 285);
+
+  --brand: oklch(0.735 0.17 285);
+  --brand-foreground: oklch(0.17 0.03 285);
+  --positive: oklch(0.76 0.145 162);
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
   --ring: var(--brand);
+
+  --chart-1: oklch(0.87 0.01 285);
+  --chart-2: oklch(0.7 0.016 285);
+  --chart-3: oklch(0.6 0.018 285);
+  --chart-4: oklch(0.5 0.018 285);
+  --chart-5: oklch(0.4 0.016 285);
+
+  --sidebar: oklch(0.175 0.013 285);
+  --sidebar-foreground: oklch(0.97 0.006 285);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-accent: oklch(0.268 0.018 285);
+  --sidebar-accent-foreground: oklch(0.97 0.006 285);
+  --sidebar-border: oklch(0.29 0.016 285);
+  --sidebar-ring: var(--brand);
 }
 
-/* Old-style hero figures should still line up: tabular where we ask for it. */
-.tnum {
-  font-variant-numeric: tabular-nums;
+/* ── The devices ─────────────────────────────────────────────────────────────
+   Layered as components so a Tailwind utility at the call site still wins. */
+@layer components {
+  /* Tabular figures — money columns line up like a register (§12.3). */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The figure scale. Fraunces, cut for size: the hero runs a large optical
+     size with softened terminals and WONK on (the serif's quirk — the single
+     characterful risk §12.1 allows), smaller figures dial both back so the
+     quirk never turns into noise at label size. */
+  .figure-hero,
+  .figure-lg,
+  .figure-md {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums lining-nums;
+    line-height: 0.92;
+  }
+  .figure-hero {
+    font-size: clamp(2.75rem, 12vw, 4.5rem);
+    letter-spacing: -0.028em;
+    font-variation-settings:
+      "opsz" 120,
+      "SOFT" 45,
+      "WONK" 1;
+  }
+  .figure-lg {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+    letter-spacing: -0.02em;
+    font-variation-settings:
+      "opsz" 48,
+      "SOFT" 30,
+      "WONK" 0;
+  }
+  .figure-md {
+    font-size: clamp(1.25rem, 4vw, 1.5rem);
+    letter-spacing: -0.012em;
+    font-variation-settings:
+      "opsz" 24,
+      "SOFT" 20,
+      "WONK" 0;
+  }
+
+  /* The accountant's pencil note in the margin: an aside about the figure it
+     sits under, never a label and never a number. Fraunces ITALIC — the one
+     place the serif is allowed to run as a line of prose. */
+  .marginalia {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    font-variation-settings:
+      "opsz" 14,
+      "SOFT" 60,
+      "WONK" 1;
+  }
+
+  /* The small caps-ish label that names a figure without competing with it. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* The rule. Draw it ONLY above a total; it is punctuation that means "this
+     sums the above". Double for a final, unallocatable total — the accounting
+     convention, carrying real information about which line is terminal. */
+  .rule {
+    border-top: 1px solid var(--rule);
+  }
+  .rule-double {
+    border-top: 3px double var(--rule);
+  }
+
+  /* Dot leaders — the eye's rail from a name to its amount. For sparse summary
+     tables (the plan, a totals block) only; in the dense register they would
+     turn every row into a ruled line. */
+  .leaders {
+    display: flex;
+    align-items: baseline;
+  }
+  .leaders > :first-child {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .leaders::before {
+    content: "";
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 1.5rem;
+    margin: 0 0.4rem;
+    align-self: center;
+    border-bottom: 1px dotted var(--rule);
+  }
+  .leaders > :last-child {
+    order: 2;
+    flex: 0 0 auto;
+  }
+}
+
+/* Reduced motion is a kill switch, not a suggestion: nothing in this app needs
+   to move for it to be usable, so honour the request everywhere at once. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

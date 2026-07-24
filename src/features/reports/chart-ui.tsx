@@ -83,30 +83,8 @@ export function MoneyTooltip({ active, payload, label }: MoneyTooltipProps) {
   );
 }
 
-/** A titled dashboard panel — the soft card surface every widget sits on (§12.4). */
-export function Panel({
-  title,
-  action,
-  children,
-  className,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`bg-card rounded-2xl border p-5 ${className ?? ""}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="font-display text-base font-semibold tracking-tight">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** Quiet empty state inside a Panel — an invitation, not a dead end (§12.6). */
+/** Quiet empty state inside a widget — an invitation, not a dead end (§12.6).
+ *  (The panel itself is `WidgetShell`, which owns the fold and the window too.) */
 export function EmptyNote({ children }: { children: React.ReactNode }) {
   return <p className="text-muted-foreground py-10 text-center text-sm">{children}</p>;
 }

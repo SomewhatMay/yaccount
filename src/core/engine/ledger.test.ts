@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { activeRows, isVoided, pendingRows, templateRows } from "./ledger";
+import {
+  activeRows,
+  isRegisterSort,
+  isVoided,
+  pendingRows,
+  REGISTER_SORTS,
+  searchTransactions,
+  sortForRegister,
+  sortRegister,
+  templateRows,
+} from "./ledger";
 import { containerBalance } from "./balances";
 import { makeTemplate, makeTransaction, makeVoidRow, type Transaction } from "../model";
 
@@ -182,5 +192,198 @@ describe("pendingRows / templateRows — the Inbox and shortcuts (§5.8)", () =>
     });
     expect(templateRows([t1, tpl]).map((r) => r.id)).toEqual(["tmpl1"]);
     expect(pendingRows([t1, tpl])).toEqual([]); // a template is never pending
+  });
+});
+
+describe("sortForRegister — newest first, and the clock breaks the day's tie (M11)", () => {
+  const on = (id: string, date: string, entered_at: string | null): Transaction => ({
+    ...makeTransaction({ id, date, amount: -100, vendor_source: id, category_id: "c" }),
+    entered_at,
+  });
+
+  it("orders by calendar day, newest day first", () => {
+    const rows = [
+      on("a", "2026-07-18", null),
+      on("b", "2026-07-20", null),
+      on("c", "2026-07-19", null),
+    ];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("within one day, the most recently entered row surfaces first", () => {
+    // The bug this fixes: three entries logged back-to-back today all share a
+    // date, so the old tie-break on a random UUID scattered them arbitrarily.
+    const rows = [
+      on("first", "2026-07-20", "2026-07-20T09:00:00.000Z"),
+      on("third", "2026-07-20", "2026-07-20T17:30:00.000Z"),
+      on("second", "2026-07-20", "2026-07-20T13:15:00.000Z"),
+    ];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["third", "second", "first"]);
+  });
+
+  it("puts rows with no recorded instant last within their day", () => {
+    // Pre-M11 rows whose op never carried one: they are the oldest thing we know
+    // about that day, so they sink rather than jumping the queue.
+    const rows = [
+      on("legacy", "2026-07-20", null),
+      on("timed", "2026-07-20", "2026-07-20T08:00:00.000Z"),
+    ];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["timed", "legacy"]);
+  });
+
+  it("falls back to a deterministic id tie-break so two devices agree (§8.5)", () => {
+    const same = "2026-07-20T09:00:00.000Z";
+    const rows = [on("aaa", "2026-07-20", same), on("bbb", "2026-07-20", same)];
+    expect(sortForRegister(rows).map((r) => r.id)).toEqual(["bbb", "aaa"]);
+    expect(sortForRegister([...rows].reverse()).map((r) => r.id)).toEqual(["bbb", "aaa"]);
+  });
+
+  it("does not mutate the caller's array", () => {
+    const rows = [on("a", "2026-07-18", null), on("b", "2026-07-20", null)];
+    const before = rows.map((r) => r.id);
+    sortForRegister(rows);
+    expect(rows.map((r) => r.id)).toEqual(before);
+  });
+});
+
+describe("sortRegister — the four orders the register offers (M11)", () => {
+  const at = (
+    id: string,
+    date: string,
+    amount: number,
+    entered_at: string | null = null,
+  ): Transaction => ({
+    ...makeTransaction({ id, date, amount, vendor_source: id, category_id: "c" }),
+    entered_at,
+  });
+
+  const rows = [
+    at("small", "2026-07-18", -450),
+    at("big", "2026-07-19", -185000),
+    at("mid", "2026-07-20", 21400),
+  ];
+
+  it("newest is the register order, and the default", () => {
+    expect(sortRegister(rows, "newest").map((r) => r.id)).toEqual([
+      "mid",
+      "big",
+      "small",
+    ]);
+    expect(sortRegister(rows).map((r) => r.id)).toEqual(
+      sortForRegister(rows).map((r) => r.id),
+    );
+  });
+
+  it("oldest is exactly the register order reversed", () => {
+    expect(sortRegister(rows, "oldest").map((r) => r.id)).toEqual([
+      "small",
+      "big",
+      "mid",
+    ]);
+  });
+
+  it("largest and smallest read the SIZE of an entry, not its direction", () => {
+    // A $2,140 paycheck is a big entry. Ranking by signed amount would file
+    // every expense below every income and answer a different question.
+    expect(sortRegister(rows, "largest").map((r) => r.id)).toEqual([
+      "big",
+      "mid",
+      "small",
+    ]);
+    expect(sortRegister(rows, "smallest").map((r) => r.id)).toEqual([
+      "small",
+      "mid",
+      "big",
+    ]);
+  });
+
+  it("breaks a size tie on register order, so two devices agree (§8.5)", () => {
+    const tied = [
+      at("older", "2026-07-18", -500),
+      at("newer", "2026-07-20", 500),
+      at("newest", "2026-07-21", -500),
+    ];
+    expect(sortRegister(tied, "largest").map((r) => r.id)).toEqual([
+      "newest",
+      "newer",
+      "older",
+    ]);
+    expect(sortRegister([...tied].reverse(), "largest").map((r) => r.id)).toEqual([
+      "newest",
+      "newer",
+      "older",
+    ]);
+  });
+
+  it("does not mutate the caller's array, in any order", () => {
+    const before = rows.map((r) => r.id);
+    for (const order of ["newest", "oldest", "largest", "smallest"] as const) {
+      sortRegister(rows, order);
+    }
+    expect(rows.map((r) => r.id)).toEqual(before);
+  });
+
+  it("handles an empty register", () => {
+    expect(sortRegister([], "largest")).toEqual([]);
+  });
+
+  it("recognises exactly the four orders it can render", () => {
+    // A preference is persisted, so a value from another build (or a hand-edited
+    // one) must be rejected rather than putting the register in a state with no
+    // code behind it.
+    for (const order of REGISTER_SORTS) expect(isRegisterSort(order)).toBe(true);
+    expect(isRegisterSort("by-vibes")).toBe(false);
+    expect(isRegisterSort("")).toBe(false);
+  });
+});
+
+describe("searchTransactions — what the ⌘K palette looks through (M11)", () => {
+  const row = (id: string, vendor: string): Transaction =>
+    makeTransaction({
+      id,
+      date: "2026-07-20",
+      amount: -450,
+      vendor_source: vendor,
+      category_id: "coffee",
+    });
+
+  const rows = [
+    row("a", "Blue Bottle"),
+    row("b", "Blue Apron"),
+    row("c", "Metro card"),
+    row("d", "blue bottle again"),
+  ];
+
+  it("finds nothing for a blank query — the palette shows destinations instead", () => {
+    expect(searchTransactions(rows, "")).toEqual([]);
+    expect(searchTransactions(rows, "   ")).toEqual([]);
+  });
+
+  it("matches on any part of the payee, ignoring case", () => {
+    expect(searchTransactions(rows, "bottle").map((r) => r.id)).toEqual(["a", "d"]);
+    expect(searchTransactions(rows, "BLUE").map((r) => r.id)).toEqual(["a", "b", "d"]);
+  });
+
+  it("narrows with every word typed, in any order", () => {
+    expect(searchTransactions(rows, "blue bottle").map((r) => r.id)).toEqual(["a", "d"]);
+    expect(searchTransactions(rows, "bottle blue").map((r) => r.id)).toEqual(["a", "d"]);
+    expect(searchTransactions(rows, "blue metro")).toEqual([]);
+  });
+
+  it("also looks through whatever else the caller can name the row by", () => {
+    // The engine has no idea what a category is called — the view does, so it
+    // passes the label in rather than the engine growing a lookup table.
+    const found = searchTransactions(rows, "coffee", {
+      label: (t) => (t.category_id === "coffee" ? "Coffee" : ""),
+    });
+    expect(found.map((r) => r.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("keeps the caller's order and stops at the limit", () => {
+    // The caller sorts (register order); the palette shows a handful.
+    expect(searchTransactions(rows, "blue", { limit: 2 }).map((r) => r.id)).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });

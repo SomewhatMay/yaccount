@@ -14,6 +14,10 @@ import {
   type Transaction,
 } from "@/core/model";
 import type { Op } from "@/core/oplog";
+import { toast } from "sonner";
+import { todayIso } from "@/features/clock";
+import { markHandled } from "@/lib/errors";
+import { createLogger } from "@/lib/logger";
 import { runSync } from "@/sync";
 import { getDriveFS, describeSyncError } from "@/sync/drive";
 import { getAuthProvider } from "@/auth/web";
@@ -39,7 +43,17 @@ import {
  * so it is a module-level singleton, not an atom or a context.
  */
 
+const log = createLogger("store");
+
 export const readyAtom = atom(false);
+/**
+ * Why the app could not start. Boot opens IndexedDB, and that genuinely fails —
+ * private browsing, a disabled storage setting, a corrupt database, another tab
+ * holding an incompatible version. Before this the failure was invisible: every
+ * screen sat on "Loading…" forever with no way to tell a slow disk from a dead
+ * one. `AppShell` renders this instead of the shell when it is set.
+ */
+export const bootErrorAtom = atom<string | null>(null);
 export const categoriesAtom = atom<Category[]>([]);
 export const containersAtom = atom<Container[]>([]);
 export const transactionsAtom = atom<Transaction[]>([]);
@@ -72,17 +86,52 @@ export const defaultContainerIdAtom = atom((get) => {
 });
 
 /**
- * The unified global reporting-period control (§6.1). One period drives every
- * dashboard widget (per-widget override is deferred to M11). `comparePeriodAtom`
- * holds the optional second range for two-range compare (§6.2); null = compare
- * off. These carry only the period *descriptor* — resolution to a concrete range
- * needs `today`, which the view supplies, keeping the atoms free of clock state.
+ * ── The shell's two pieces of shared UI state (M11) ────────────────────────
+ *
+ * The quick-add sheet is opened from three places — the FAB, the ⌘K palette and
+ * a keyboard shortcut — so which kind of entry it opens on is state, not a prop
+ * threaded through the shell. `null` = closed.
  */
-export const reportingPeriodAtom = atom<ReportingPeriod>({
-  kind: "preset",
-  preset: "last-3-months",
-});
-export const comparePeriodAtom = atom<ReportingPeriod | null>(null);
+export type QuickAddKind = "expense" | "income" | "transfer";
+export const quickAddAtom = atom<QuickAddKind | null>(null);
+
+/** The ⌘K palette. Opened by the shortcut, by the top bar's search affordance,
+ * and from the More sheet — so, likewise, state rather than a prop. */
+export const commandPaletteAtom = atom(false);
+
+/**
+ * The row the register should mark, and whether to bring it into view.
+ *
+ * Two callers, one device: a row just logged lands with a single iris wash
+ * (§12.5's one orchestrated moment — it is already at the top, so no scrolling),
+ * and a row chosen from the ⌘K palette is somewhere down the page, so that one
+ * scrolls. The mark is held for a moment and then released, which is why it
+ * expires here rather than in a component that may have unmounted by then.
+ */
+export type FlashedRow = { id: string; scroll: boolean };
+export const flashedRowAtom = atom<FlashedRow | null>(null);
+const FLASH_MS = 1400;
+let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const flashRowAtom = atom(
+  null,
+  (_get, set, row: { id: string; scroll?: boolean } | null) => {
+    if (flashTimer) clearTimeout(flashTimer);
+    set(flashedRowAtom, row ? { id: row.id, scroll: row.scroll ?? false } : null);
+    if (row) {
+      flashTimer = setTimeout(() => set(flashedRowAtom, null), FLASH_MS);
+    }
+  },
+);
+
+/**
+ * The reporting period (§6.1) used to live here as two plain atoms, which meant
+ * it reset on every refresh — you chose a window, reloaded, and were quietly
+ * looking at a different one. It is a device-local VIEW preference, so M11 moved
+ * it to `features/reports/period-pref.ts` over `prefs.ts` (localStorage,
+ * `useSyncExternalStore`) alongside the per-widget overrides and folds, which are
+ * keyed the same way. Nothing about a period belongs in the synced op log.
+ */
 
 let repoPromise: Promise<Repo> | null = null;
 function getRepo(): Promise<Repo> {
@@ -114,15 +163,31 @@ export const refreshAtom = atom(null, async (_get, set) => {
   set(goalsAtom, goals);
 });
 
-/** Append + apply one op atomically (§0.1), then refresh the caches. The op is
+/**
+ * Append + apply one op atomically (§0.1), then refresh the caches. The op is
  * now queued in the repo outbox, so we also nudge a debounced background sync to
  * push it to Drive promptly (§8.6 — never blocking; the write already landed
- * locally). */
+ * locally).
+ *
+ * Failure is reported HERE, once, rather than at ~40 call sites: a write can fail
+ * for reasons the user can act on (storage full, private-browsing quota, a tab
+ * holding an old DB version) and silently swallowing it would leave them
+ * believing a transaction was recorded. It then RETHROWS, marked as handled, so
+ * the caller skips its success path — the form keeps what was typed instead of
+ * clearing it, and no "Logged" toast fires — while the global handler stays
+ * quiet about an error the user has already been shown.
+ */
 export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
-  const repo = await getRepo();
-  await repo.dispatch(op);
-  await set(refreshAtom);
-  scheduleSync(set);
+  try {
+    const repo = await getRepo();
+    await repo.dispatch(op);
+    await set(refreshAtom);
+    scheduleSync(set);
+  } catch (err) {
+    const summary = log.capture(`dispatch ${op.type} failed`, err);
+    toast.error("Couldn't save that change.", { description: summary });
+    throw markHandled(err);
+  }
 });
 
 /**
@@ -205,9 +270,10 @@ export const syncAtom = atom(null, async (_get, set) => {
     set(lastSyncErrorAtom, null);
     set(syncStatusAtom, "synced");
   } catch (err) {
-    // DriveError / offline — stay usable, surface honestly (§8.6). Log the raw
-    // error (it carries .status/.body) so a failing sync is diagnosable.
-    console.error("[yaccount] Drive sync failed:", err);
+    // DriveError / offline — stay usable, surface honestly (§8.6). The sync seam
+    // knows drivestore's error shape, so it writes the user-facing line; the log
+    // keeps the full stack for whoever has to diagnose it.
+    log.capture("Drive sync failed", err);
     set(lastSyncErrorAtom, describeSyncError(err));
     set(syncStatusAtom, "error");
   } finally {
@@ -238,7 +304,7 @@ export const reconnectAtom = atom(null, async (_get, set) => {
  * never in `core`). Dispatches go through the same op-log path as any mutation.
  */
 export const runRecurringGenerationAtom = atom(null, async (get, set) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const rules = get(recurringRulesAtom).filter((r) => r.status === "active");
   const goals = get(goalsAtom);
   const txns = get(transactionsAtom);
@@ -271,7 +337,7 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
  * generation, over approved contributions only.
  */
 export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const txns = get(transactionsAtom);
   const rules = get(recurringRulesAtom);
   const goals = get(goalsAtom).filter((g) => g.status === "active" && !g.is_archived);
@@ -294,11 +360,31 @@ export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
  * then backfill due recurring occurrences + settle achieved goals in the
  * background (§8.6 instant-open). */
 export const bootstrapAtom = atom(null, async (_get, set) => {
-  await getRepo();
-  await set(refreshAtom);
-  set(readyAtom, true);
-  await set(runRecurringGenerationAtom);
-  await set(runGoalMaintenanceAtom);
+  // Opening the DB and loading it is the ONLY part that can leave the app
+  // unusable, so it is the only part that sets bootError.
+  try {
+    await getRepo();
+    await set(refreshAtom);
+    set(readyAtom, true);
+    log.info("repo ready");
+  } catch (err) {
+    set(bootErrorAtom, log.capture("could not open the local database", err));
+    return;
+  }
+
+  // The two background passes are conveniences. A bug in either used to take the
+  // whole boot down with it; now each fails on its own and the ledger still opens.
+  for (const [what, task] of [
+    ["recurring generation", runRecurringGenerationAtom],
+    ["goal maintenance", runGoalMaintenanceAtom],
+  ] as const) {
+    try {
+      await set(task);
+    } catch (err) {
+      log.capture(`${what} failed`, err);
+    }
+  }
+
   // Kick the first Drive sync in the background — never awaited on the boot path,
   // so the network can't gate the already-rendered UI (§8.6). No-ops if signed out.
   void set(syncAtom);

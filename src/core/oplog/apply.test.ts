@@ -620,8 +620,86 @@ describe("applyOp — transaction ops (the ledger spine, §5.4/§0.3)", () => {
 
     const rows = await readAll<Transaction>(state, STORE.transactions);
     expect(rows).toHaveLength(2);
-    expect(rows.find((r) => r.id === "t1")).toEqual(row); // untouched, byte for byte
+    // Untouched, byte for byte — modulo the `entered_at` the CREATE op stamped
+    // (see the M11 block below); the void writes only its own new row.
+    expect(rows.find((r) => r.id === "t1")).toEqual({ ...row, entered_at: at(1000) });
     expect(rows.reduce((s, r) => s + r.amount, 0)).toBe(0);
+  });
+});
+
+describe("applyOp — entered_at is backfilled from the op timestamp (M11)", () => {
+  const row = makeTransaction({
+    id: "t1",
+    date: "2026-07-20",
+    amount: -1000,
+    vendor_source: "Starbucks",
+    category_id: "coffee",
+  });
+
+  it("stamps a row that arrives without an instant (an older client's op)", async () => {
+    const state = newMemoryState();
+    await applyOp(new MemoryTx(state), {
+      id: "op-t1",
+      ts: at(1000),
+      type: "transaction.create",
+      payload: { row }, // entered_at: null
+    });
+    const [stored] = await readAll<Transaction>(state, STORE.transactions);
+    expect(stored.entered_at).toBe(at(1000));
+  });
+
+  it("leaves a row that already carries its own instant alone", async () => {
+    const state = newMemoryState();
+    const own = "2026-07-20T09:00:00.000Z";
+    await applyOp(new MemoryTx(state), {
+      id: "op-t1",
+      ts: at(1000),
+      type: "transaction.create",
+      payload: { row: { ...row, entered_at: own } },
+    });
+    const [stored] = await readAll<Transaction>(state, STORE.transactions);
+    expect(stored.entered_at).toBe(own);
+  });
+
+  it("is a pure function of the op, so replay stays deterministic (§8.2)", async () => {
+    // The stamp must come from the op, never from a clock — otherwise two devices
+    // replaying the same journal would materialize different state.
+    const ops: Op[] = [
+      { id: "op-t1", ts: at(1000), type: "transaction.create", payload: { row } },
+    ];
+    const a = await readAll<Transaction>(await replay(ops), STORE.transactions);
+    const b = await readAll<Transaction>(await replay(ops), STORE.transactions);
+    expect(a).toEqual(b);
+    expect(a[0].entered_at).toBe(at(1000));
+  });
+
+  it("stamps voids and templates too", async () => {
+    const state = newMemoryState();
+    const tx = new MemoryTx(state);
+    await applyOp(tx, {
+      id: "op-v1",
+      ts: at(5000),
+      type: "transaction.void",
+      payload: { row: makeVoidRow(row, { id: "v1" }) },
+    });
+    await applyOp(tx, {
+      id: "op-tmpl",
+      ts: at(6000),
+      type: "template.create",
+      payload: {
+        row: makeTemplate({
+          id: "tmpl1",
+          template_name: "Tims",
+          amount: -400,
+          vendor_source: "Tims",
+          container_id: "general",
+          category_id: "coffee",
+        }),
+      },
+    });
+    const rows = await readAll<Transaction>(state, STORE.transactions);
+    expect(rows.find((r) => r.id === "v1")!.entered_at).toBe(at(5000));
+    expect(rows.find((r) => r.id === "tmpl1")!.entered_at).toBe(at(6000));
   });
 });
 
@@ -869,7 +947,12 @@ describe("applyOp — goal ops (M7, §5.9)", () => {
   it("cancel/complete/archive of a missing goal is a no-op (idempotent replay)", async () => {
     const state = newMemoryState();
     const tx = new MemoryTx(state);
-    await applyOp(tx, { id: "x", ts: at(1), type: "goal.cancel", payload: { id: "nope" } });
+    await applyOp(tx, {
+      id: "x",
+      ts: at(1),
+      type: "goal.cancel",
+      payload: { id: "nope" },
+    });
     expect(await readAll<Goal>(state, STORE.goals)).toHaveLength(0);
   });
 });

@@ -40,6 +40,7 @@ describe("CategorySchema (§5.1)", () => {
       type: "expense",
       is_archived: false,
       color: null,
+      icon: null,
     });
     expect(c.type).toBe("expense");
   });
@@ -51,6 +52,7 @@ describe("CategorySchema (§5.1)", () => {
         type: "savings",
         is_archived: false,
         color: null,
+        icon: null,
       }),
     ).toThrow();
   });
@@ -62,14 +64,20 @@ describe("CategorySchema (§5.1)", () => {
         type: "income",
         is_archived: false,
         color: null,
+        icon: null,
       }),
     ).toThrow();
   });
-  it("makeCategory fills defaults (color null, not archived) and validates", () => {
+  it("makeCategory fills defaults (color + icon null, not archived) and validates", () => {
     const c = makeCategory({ name: "Salary", type: "income" });
     expect(c.color).toBeNull();
+    expect(c.icon).toBeNull();
     expect(c.is_archived).toBe(false);
     expect(c.id.length).toBeGreaterThan(0);
+  });
+  it("makeCategory carries a chosen icon", () => {
+    const c = makeCategory({ name: "Groceries", type: "expense", icon: "shopping-cart" });
+    expect(c.icon).toBe("shopping-cart");
   });
 });
 
@@ -142,6 +150,7 @@ describe("TransactionSchema (§5.4)", () => {
     recurring_rule_id: null,
     notes: null,
     reverses_id: null,
+    entered_at: null,
     yearMonth: "2026-07",
   };
   it("accepts an expense (negative amount, category set, no destination)", () => {
@@ -323,7 +332,13 @@ describe("schema edges the ledger depends on", () => {
       vendor_source: "Starbucks",
       category_id: "coffee",
     });
-    for (const key of ["reverses_id", "notes", "to_container_id", "template_name"]) {
+    for (const key of [
+      "reverses_id",
+      "notes",
+      "to_container_id",
+      "template_name",
+      "entered_at",
+    ]) {
       const partial = { ...row } as Record<string, unknown>;
       delete partial[key];
       expect(() => TransactionSchema.parse(partial), key).toThrow();

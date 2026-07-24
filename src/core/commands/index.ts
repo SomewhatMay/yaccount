@@ -26,7 +26,7 @@ import {
   type RecurringRule,
   type Transaction,
 } from "../model";
-import type { Op } from "../oplog";
+import type { Op, TransactionCreateOp } from "../oplog";
 
 /**
  * Commands (impl §3): pure builders that turn a UI intent into exactly one Op
@@ -47,7 +47,13 @@ function meta(m?: OpMeta): { id: string; ts: string } {
 // ── Categories (§5.1, §5.5) ───────────────────────────────────────────────
 
 export function createCategory(
-  input: { name: string; type: CategoryType; id?: string; color?: string | null },
+  input: {
+    name: string;
+    type: CategoryType;
+    id?: string;
+    color?: string | null;
+    icon?: string | null;
+  },
   m?: OpMeta,
 ): Op {
   return { ...meta(m), type: "category.create", payload: { row: makeCategory(input) } };
@@ -79,13 +85,21 @@ export function createTransaction(
     id?: string;
     container_id?: string;
     notes?: string | null;
+    entered_at?: string | null; // when the entry happened; defaults to the op's ts
   },
   m?: OpMeta,
-): Op {
+): TransactionCreateOp {
+  const op = meta(m);
+  // The op already holds an authoritative instant (it is the total order's sort
+  // key, §8.2), so it is the DEFAULT — "recorded now" — with no second clock read
+  // and deterministic when tests inject `meta`. A caller-chosen time wins: the
+  // entry time is an editable field, not an immutable audit stamp.
   return {
-    ...meta(m),
+    ...op,
     type: "transaction.create",
-    payload: { row: makeTransaction(input) },
+    payload: {
+      row: makeTransaction({ ...input, entered_at: input.entered_at ?? op.ts }),
+    },
   };
 }
 
@@ -103,8 +117,9 @@ export function voidTransaction(
   original: Transaction,
   m?: OpMeta & { voidId?: string; on?: string },
 ): Op {
-  const row = makeVoidRow(original, { id: m?.voidId, on: m?.on });
-  return { ...meta(m), type: "transaction.void", payload: { row } };
+  const op = meta(m);
+  const row = makeVoidRow(original, { id: m?.voidId, on: m?.on, entered_at: op.ts });
+  return { ...op, type: "transaction.void", payload: { row } };
 }
 
 /**
@@ -117,8 +132,9 @@ export function unvoidTransaction(
   voidRow: Transaction,
   m?: OpMeta & { voidId?: string; on?: string },
 ): Op {
-  const row = makeVoidRow(voidRow, { id: m?.voidId, on: m?.on });
-  return { ...meta(m), type: "transaction.void", payload: { row } };
+  const op = meta(m);
+  const row = makeVoidRow(voidRow, { id: m?.voidId, on: m?.on, entered_at: op.ts });
+  return { ...op, type: "transaction.void", payload: { row } };
 }
 
 // ── Containers (§5.2, §5.5) ───────────────────────────────────────────────
@@ -169,13 +185,15 @@ export function createTransfer(
     vendor_source?: string;
     id?: string;
     notes?: string | null;
+    entered_at?: string | null;
   },
   m?: OpMeta,
-): Op {
+): TransactionCreateOp {
+  const op = meta(m);
   return {
-    ...meta(m),
+    ...op,
     type: "transaction.create",
-    payload: { row: makeTransfer(input) },
+    payload: { row: makeTransfer({ ...input, entered_at: input.entered_at ?? op.ts }) },
   };
 }
 
@@ -266,7 +284,12 @@ export function createTemplate(
   },
   m?: OpMeta,
 ): Op {
-  return { ...meta(m), type: "template.create", payload: { row: makeTemplate(input) } };
+  const op = meta(m);
+  return {
+    ...op,
+    type: "template.create",
+    payload: { row: makeTemplate({ ...input, entered_at: op.ts }) },
+  };
 }
 
 /** Delete a shortcut — a hard remove (housekeeping, not ledger data). */
@@ -283,7 +306,7 @@ export function logTemplate(
   template: Transaction,
   input: { date: string; id?: string },
   m?: OpMeta,
-): Op {
+): TransactionCreateOp {
   if (template.to_container_id !== null) {
     return createTransfer(
       {

@@ -17,6 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import Link from "next/link";
 import { formatCents } from "@/core/money";
 import type { Category } from "@/core/model";
 import type {
@@ -26,7 +27,12 @@ import type {
   MonthlyTotal,
 } from "@/core/engine";
 import { cn } from "@/lib/utils";
-import { categoryDotColor } from "@/features/category-color";
+import {
+  categoryColor,
+  categoryColorFor,
+  categoryDotColor,
+} from "@/features/category-color";
+import { Sparkline } from "@/features/ui";
 import {
   Select,
   SelectContent,
@@ -55,15 +61,31 @@ function spansYears(months: string[]): boolean {
 export function CategoryDoughnut({
   slices,
   emptyLabel,
+  trends,
+  hrefFor,
+  colorOf = categoryDotColor,
 }: {
   slices: CategorySlice[];
   emptyLabel: string;
+  /** Resolve a category's colour (override or auto). Defaults to the auto hue so
+   *  the widget still paints if a caller forgets to thread the override. */
+  colorOf?: (categoryId: string) => string;
+  /** Each category's month-by-month shape (`categoryTrendSeries`), drawn beside
+   *  its total — the share answers "how much", the sparkline "which way". */
+  trends?: Map<string, number[]>;
+  /** A legend row links to the register filtered to that category. The pie
+   *  SEGMENTS deliberately don't: a thin slice is the too-small-to-tap target the
+   *  legend row beside it already solves. */
+  hrefFor?: (categoryId: string) => string;
 }) {
   if (slices.length === 0) return <EmptyNote>{emptyLabel}</EmptyNote>;
   const total = slices.reduce((s, x) => s + x.amount, 0);
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row">
-      <div className="relative shrink-0" style={{ width: 168, height: 168 }}>
+      {/* `isolate` puts the centre label and the tooltip in one stacking context
+          so their z-index compares; without it the label (a later sibling) always
+          painted over the tooltip, hiding it behind the total. */}
+      <div className="relative isolate shrink-0" style={{ width: 168, height: 168 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -76,13 +98,13 @@ export function CategoryDoughnut({
               strokeWidth={0}
             >
               {slices.map((s) => (
-                <Cell key={s.categoryId} fill={categoryDotColor(s.categoryId)} />
+                <Cell key={s.categoryId} fill={colorOf(s.categoryId)} />
               ))}
             </Pie>
-            <Tooltip content={<MoneyTooltip />} />
+            <Tooltip content={<MoneyTooltip />} wrapperStyle={{ zIndex: 20 }} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center">
           <span className="tnum font-mono text-sm font-medium">{formatCents(total)}</span>
           <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
             total
@@ -90,21 +112,48 @@ export function CategoryDoughnut({
         </div>
       </div>
       <ul className="min-w-0 flex-1 space-y-1.5 self-stretch">
-        {slices.map((s) => (
-          <li key={s.categoryId} className="flex items-center gap-2 text-sm">
-            <span
-              className="size-2.5 shrink-0 rounded-full"
-              style={{ background: categoryDotColor(s.categoryId) }}
-            />
-            <span className="min-w-0 flex-1 truncate">{s.name}</span>
-            <span className="text-muted-foreground tnum shrink-0 text-xs">
-              {Math.round((s.amount / total) * 100)}%
-            </span>
-            <span className="tnum shrink-0 font-mono text-sm">
-              {formatCents(s.amount)}
-            </span>
-          </li>
-        ))}
+        {slices.map((s) => {
+          const series = trends?.get(s.categoryId);
+          const href = hrefFor?.(s.categoryId);
+          const inner = (
+            <>
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ background: colorOf(s.categoryId) }}
+              />
+              <span className="min-w-0 flex-1 truncate">{s.name}</span>
+              {series && series.length > 1 && (
+                <Sparkline
+                  values={series}
+                  height={14}
+                  strokeWidth={1.25}
+                  className="w-9 shrink-0 opacity-70"
+                  style={{ color: colorOf(s.categoryId) }}
+                />
+              )}
+              <span className="text-muted-foreground tnum shrink-0 text-xs">
+                {Math.round((s.amount / total) * 100)}%
+              </span>
+              <span className="tnum shrink-0 font-mono text-sm">
+                {formatCents(s.amount)}
+              </span>
+            </>
+          );
+          return (
+            <li key={s.categoryId}>
+              {href ? (
+                <Link
+                  href={href}
+                  className="hover:bg-muted/60 focus-visible:ring-ring -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">{inner}</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -118,7 +167,7 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
-        <CartesianGrid vertical={false} stroke={CHART.grid} strokeDasharray="3 3" />
+        <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
         <YAxis
           tickFormatter={formatAxisCents}
@@ -192,7 +241,7 @@ export function WaterfallChart({
   return (
     <ResponsiveContainer width="100%" height={240}>
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
-        <CartesianGrid vertical={false} stroke={CHART.grid} strokeDasharray="3 3" />
+        <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="name" tick={axisTick} tickLine={false} axisLine={false} />
         <YAxis
           tickFormatter={formatAxisCents}
@@ -246,7 +295,7 @@ export function CategoryDrilldown({
             <SelectItem key={c.id} value={c.id}>
               <span
                 className="size-2.5 rounded-full"
-                style={{ background: categoryDotColor(c.id) }}
+                style={{ background: categoryColor(c) }}
               />
               {c.name}
             </SelectItem>
@@ -260,7 +309,7 @@ export function CategoryDrilldown({
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
-            <CartesianGrid vertical={false} stroke={CHART.grid} strokeDasharray="3 3" />
+            <CartesianGrid vertical={false} stroke={CHART.grid} />
             <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
             <YAxis
               tickFormatter={formatAxisCents}
@@ -277,7 +326,7 @@ export function CategoryDrilldown({
             <Bar
               dataKey="spend"
               name="Spent"
-              fill={selectedId ? categoryDotColor(selectedId) : CHART.expense}
+              fill={selectedId ? categoryColorFor(selectedId, categories) : CHART.expense}
               radius={[3, 3, 0, 0]}
             />
             <Line
@@ -297,68 +346,187 @@ export function CategoryDrilldown({
   );
 }
 
+/**
+ * A table below `sm` becomes a list of cards (§12.4 M11 responsive density).
+ *
+ * Four money columns in a 350px column cannot be made to fit — they either
+ * squeeze the labels to nothing or push the page sideways, and §12.4 forbids
+ * horizontal page scroll outright. So the same rows are rendered twice: as a
+ * table from `sm` up, and as one card per row below it. These are the last two
+ * `Table` consumers in the app; every list view already reads as rows.
+ */
+function CardRow({
+  title,
+  dot,
+  lead,
+  children,
+}: {
+  title: React.ReactNode;
+  dot?: string;
+  /** The figure the row is about, on the title's line. */
+  lead: React.ReactNode;
+  /** The supporting figures, under it. */
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="py-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="inline-flex min-w-0 items-baseline gap-2">
+          {dot && (
+            <span
+              className="size-2 shrink-0 translate-y-px rounded-full"
+              style={{ background: dot }}
+              aria-hidden
+            />
+          )}
+          <span className="truncate text-sm font-medium">{title}</span>
+        </span>
+        {lead}
+      </div>
+      <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-4 text-xs">
+        {children}
+      </div>
+    </li>
+  );
+}
+
 // ── Container Flows table (§5.4) ─────────────────────────────────────────────
 export function ContainerFlowsTable({ flows }: { flows: ContainerFlow[] }) {
   const active = flows.filter((f) => f.inflow !== 0 || f.outflow !== 0);
   if (active.length === 0) return <EmptyNote>No transfers in this period.</EmptyNote>;
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Container</TableHead>
-          <TableHead className="text-right">In</TableHead>
-          <TableHead className="text-right">Out</TableHead>
-          <TableHead className="text-right">Net</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      <ul className="divide-y sm:hidden">
         {active.map((f) => (
-          <TableRow key={f.containerId}>
-            <TableCell className="font-medium">{f.name}</TableCell>
-            <TableCell className="tnum text-positive text-right font-mono">
-              {f.inflow ? formatCents(f.inflow) : "—"}
-            </TableCell>
-            <TableCell className="tnum text-muted-foreground text-right font-mono">
-              {f.outflow ? formatCents(f.outflow) : "—"}
-            </TableCell>
-            <TableCell
-              className={cn(
-                "tnum text-right font-mono font-medium",
-                f.net < 0 && "text-destructive",
-              )}
-            >
-              {formatCents(f.net)}
-            </TableCell>
-          </TableRow>
+          <CardRow
+            key={f.containerId}
+            title={f.name}
+            lead={
+              <span
+                className={cn(
+                  "tnum shrink-0 font-mono text-sm font-medium",
+                  f.net < 0 && "text-destructive",
+                )}
+              >
+                {formatCents(f.net)}
+              </span>
+            }
+          >
+            <span>
+              in{" "}
+              <span className="tnum text-positive font-mono">
+                {f.inflow ? formatCents(f.inflow) : "—"}
+              </span>
+            </span>
+            <span>
+              out{" "}
+              <span className="tnum font-mono">
+                {f.outflow ? formatCents(f.outflow) : "—"}
+              </span>
+            </span>
+          </CardRow>
         ))}
-      </TableBody>
-    </Table>
+      </ul>
+      <Table className="hidden sm:table">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Container</TableHead>
+            <TableHead className="text-right">In</TableHead>
+            <TableHead className="text-right">Out</TableHead>
+            <TableHead className="text-right">Net</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {active.map((f) => (
+            <TableRow key={f.containerId}>
+              <TableCell className="font-medium">{f.name}</TableCell>
+              <TableCell className="tnum text-positive text-right font-mono">
+                {f.inflow ? formatCents(f.inflow) : "—"}
+              </TableCell>
+              <TableCell className="tnum text-muted-foreground text-right font-mono">
+                {f.outflow ? formatCents(f.outflow) : "—"}
+              </TableCell>
+              <TableCell
+                className={cn(
+                  "tnum text-right font-mono font-medium",
+                  f.net < 0 && "text-destructive",
+                )}
+              >
+                {formatCents(f.net)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
 
+/** Over budget is rose, under is emerald — the one place §12.2's accents read as
+ *  a verdict rather than as direction, because a budget IS a verdict. */
+function deltaClass(deltaPct: number | null): string {
+  if (deltaPct === null) return "text-muted-foreground";
+  return deltaPct > 0 ? "text-destructive" : "text-positive";
+}
+
+function deltaText(deltaPct: number | null): string {
+  if (deltaPct === null) return "—";
+  return `${deltaPct > 0 ? "+" : ""}${deltaPct.toFixed(0)}%`;
+}
+
 // ── Budget comparison table, re-scoped to the active period (§6.3) ───────────
-export function BudgetComparisonTable({ rows }: { rows: BudgetComparisonRow[] }) {
+export function BudgetComparisonTable({
+  rows,
+  colorOf = categoryDotColor,
+}: {
+  rows: BudgetComparisonRow[];
+  colorOf?: (categoryId: string) => string;
+}) {
   if (rows.length === 0)
     return <EmptyNote>No budgets or spending in this period.</EmptyNote>;
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Category</TableHead>
-          <TableHead className="text-right">Avg / mo</TableHead>
-          <TableHead className="text-right">Budget</TableHead>
-          <TableHead className="text-right">Δ</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((r) => {
-          const over = r.deltaPct !== null && r.deltaPct > 0;
-          return (
+    <>
+      <ul className="divide-y sm:hidden">
+        {rows.map((r) => (
+          <CardRow
+            key={r.categoryId}
+            title={r.name}
+            dot={colorOf(r.categoryId)}
+            lead={
+              <span className="tnum shrink-0 font-mono text-sm">
+                {formatCents(r.actualMonthlyAvg)}
+                <span className="text-muted-foreground text-xs">/mo</span>
+              </span>
+            }
+          >
+            <span>
+              budget{" "}
+              <span className="tnum font-mono">
+                {r.budget === null ? "—" : formatCents(r.budget)}
+              </span>
+            </span>
+            <span className={cn("tnum font-mono", deltaClass(r.deltaPct))}>
+              {deltaText(r.deltaPct)}
+            </span>
+          </CardRow>
+        ))}
+      </ul>
+      <Table className="hidden sm:table">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Category</TableHead>
+            <TableHead className="text-right">Avg / mo</TableHead>
+            <TableHead className="text-right">Budget</TableHead>
+            <TableHead className="text-right">Δ</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => (
             <TableRow key={r.categoryId}>
               <TableCell className="flex items-center gap-2 font-medium">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: categoryDotColor(r.categoryId) }}
+                  style={{ background: colorOf(r.categoryId) }}
                 />
                 {r.name}
               </TableCell>
@@ -369,24 +537,15 @@ export function BudgetComparisonTable({ rows }: { rows: BudgetComparisonRow[] })
                 {r.budget === null ? "—" : formatCents(r.budget)}
               </TableCell>
               <TableCell
-                className={cn(
-                  "tnum text-right font-mono",
-                  r.deltaPct === null
-                    ? "text-muted-foreground"
-                    : over
-                      ? "text-destructive"
-                      : "text-positive",
-                )}
+                className={cn("tnum text-right font-mono", deltaClass(r.deltaPct))}
               >
-                {r.deltaPct === null
-                  ? "—"
-                  : `${over ? "+" : ""}${r.deltaPct.toFixed(0)}%`}
+                {deltaText(r.deltaPct)}
               </TableCell>
             </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
 
