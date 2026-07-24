@@ -329,7 +329,11 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 1. Take the post-M11 phases below one at a time.
 2. Use a fresh branch + fresh agent/context per phase.
-3. Test, commit, push and stop for review. Do not stack phases.
+3. Build and test only that phase, then stop for user review.
+4. After explicit approval: commit, push, open a PR against `main` with `gh`, merge it, switch to
+   `main`, pull, and update every relevant handoff/spec/implementation document.
+5. Commit/push the closure docs on `main`, then provide the exact prompt for the next fresh agent.
+   Do not stack phases.
 
 Do not start M10 during this pass. If widget reordering/visibility is included, wrap the existing
 stable-id registry. Preserve M11 icon placement and sync-banner behavior unless explicitly changed.
@@ -344,8 +348,10 @@ stable-id registry. Preserve M11 icon placement and sync-banner behavior unless 
 | 4 | `post-m11-fab-hold-menu` | Long-press/press-and-hold FAB to choose other create flows; quick tap still creates a ledger entry. Define keyboard/pointer cancellation and avoid firing both actions. Reuse existing create sheets/routes; do not duplicate forms. | Tap behavior unchanged; hold opens an accessible create chooser on touch, mouse and keyboard. |
 | 5 | `post-m11-data-tools` | Settings tools to export, import and clear all local yaccount data for testing. Version/validate imports; preserve op-log/replay invariants; destructive clear requires explicit confirmation and explains Drive resync consequences. | Round-trip fixture restores identical state; invalid import changes nothing; clear cannot be accidental. |
 
-Each phase starts from the reviewed/merged predecessor only. Re-read spec §12, invariants and current
-code; add focused Vitest/Playwright coverage; run the full validation suite. M10 Capacitor and movable
+Each phase branches from freshly pulled `main` after its predecessor and closure docs are merged.
+Re-read spec §12, invariants and current code; add focused Vitest/Playwright coverage; run the full
+validation suite. Before approval, leave the completed phase on its branch and stop for review. After
+approval, complete the PR/merge/main-pull/docs/prompt sequence above. M10 Capacitor and movable
 dashboard widgets remain separate.
 
 ---

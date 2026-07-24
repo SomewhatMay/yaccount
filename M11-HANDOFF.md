@@ -917,8 +917,11 @@ never batch them (a standing user preference).
   reorder/visibility layer is a wrapper over an existing list instead of a teardown. Per-widget
   `ErrorBoundary` and per-widget period override (§6.1) fall out of the same shape.
 
-**Five isolated phases requested after M11.** Start only after M11 review/merge. Each gets a fresh
-branch and fresh agent/context; finish, verify, commit, push and stop before the next:
+**Five isolated phases requested after M11.** Each gets a fresh branch from freshly pulled `main` and
+a fresh agent/context. Build and verify only that phase, then stop for user review. After explicit
+approval: commit, push, open/merge a PR against `main` with `gh`, switch to `main`, pull, update all
+relevant handoffs/spec/implementation docs, commit/push those closure docs, and provide the exact
+prompt for the next fresh agent:
 
 1. `post-m11-mobile-toast` — mobile Sonner toasts clear the bottom tab bar + safe area; desktop stays
    bottom-right. Sync-banner behavior is unchanged.
