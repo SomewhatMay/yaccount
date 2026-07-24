@@ -315,7 +315,7 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ---
 
 ### M11 — Design System & Polish
-**Status:** DONE on `m11-design-polish`; 807 Vitest + 14 Playwright passing.
+**Status:** DONE, merged via PR #9 (`bf7d872`); 807 Vitest + 14 Playwright passing.
 
 **Delivered:**
 - Entry instants + editable time; register ordering by date, instant, id; local-calendar helpers.

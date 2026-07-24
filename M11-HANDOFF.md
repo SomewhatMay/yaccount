@@ -1,11 +1,10 @@
 # M11 — Design System & Polish — COMPLETE
 
-> **Branch:** `m11-design-polish` (pushed to origin).
+> **Merged:** PR #9 into `main` as `bf7d872` on 2026-07-23.
 > **Status:** Phases 1–10 DONE. User passed all 14 desktop + 390×844 Playwright cases on
 > 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
 > touched-file Prettier.
-> **Next:** review this branch, then open the milestone PR with `gh` when approved. Do not start M10
-> Capacitor or post-M11 widget work.
+> **Next:** user-scoped pre-M10 QOL/feature edits. M10 Capacitor remains not started.
 > **Last updated:** 2026-07-23, M11 complete.
 
 ---
@@ -746,11 +745,11 @@ Commit `1dcc1d3` adds `@playwright/test`, `playwright.config.ts`, and
 - Verified: 807 Vitest tests, typecheck, lint, static build, touched-file Prettier, and **14/14
   Playwright cases**. The user independently ran all 14 and passed them on 2026-07-23.
 
-### 5.8 Phase 10 — DONE; milestone review next
+### 5.8 Phase 10 — DONE; M11 merged
 
 Phase 10 reconciled spec §6.1/§10/§12, implementation §4, `HANDOFF.md` and this file with shipped
 Phases 3–9. Invariants/history remain. Category icons vs. dots and the non-dismissible sync banner are
-unchanged. Review branch, then open the M11 PR against `main` with `gh` only when approved.
+unchanged. PR #9 merged the milestone to `main` as `bf7d872`.
 
 ### 5.1–5.3 — the original plan (code map still useful; strand 1 is now icons, above)
 
@@ -975,10 +974,10 @@ never batch them (a standing user preference).
 
 ---
 
-## 9. Git state
+## 9. Final git history
 
 ```
-branch: m11-design-polish  (pushed, tracking origin/m11-design-polish)
+merged: PR #9 → main (`bf7d872`)
 
 1dcc1d3 test: protect critical local-first flows in browsers                   (Phase 9 — PASS)
 8c97abe docs: hand off Phase 9 e2e
@@ -1011,5 +1010,5 @@ bc6d26a docs: M11 live handoff for a fresh context window
 381d34c docs: M9 merged (PR #8), handoff prepped for M11 (M10 skipped)   ← main
 ```
 
-No PR opened yet. Stop for review. After approval, use `gh` to open one M11 milestone PR against
-`main`; merge only on explicit instruction.
+PR #9 merged to `main` as `bf7d872`. This handoff is now historical. Continue from `HANDOFF.md` for
+the user-scoped pre-M10 QOL/feature pass.

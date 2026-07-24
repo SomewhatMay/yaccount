@@ -1,13 +1,14 @@
 # yaccount — Handoff
 
-> ## ✅ **M11 COMPLETE — milestone review next**
-> Branch `m11-design-polish`. Phases 1–10 complete. User passed all 14 desktop/mobile Playwright
-> cases on 2026-07-23. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
-> touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history and PR guidance.
+> ## ✅ **M11 MERGED — PRE-M10 QOL/FEATURE PASS NEXT**
+> M11 merged to `main` via PR #9 (`bf7d872`) on 2026-07-23. User passed all 14 desktop/mobile
+> Playwright cases. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
+> touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M11 (Design System & Polish) DONE** on `m11-design-polish`, 2026-07-23.
-> M10 Capacitor remains skipped, not started. Post-M11 movable/visibility widget work remains unstarted.
+> **Last updated:** **M11 merged** via PR #9 (`bf7d872`), 2026-07-23.
+> **Next:** user-directed QOL/feature edits before M10. Scope is not locked yet; collect it before
+> planning/building. M10 Capacitor remains not started.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
@@ -80,7 +81,7 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
-**M11 (Design System & Polish) — DONE on `m11-design-polish`, awaiting milestone review/PR.** All 10 phases shipped and browser-tested. **807 Vitest + 14 Playwright** pass. Typecheck/lint/static build/touched-file Prettier clean. M10 Capacitor and post-M11 movable/visibility widget work were not started.
+**M11 (Design System & Polish) — DONE, merged via PR #9 (`bf7d872`).** All 10 phases shipped and browser-tested. **807 Vitest + 14 Playwright** pass. Typecheck/lint/static build/touched-file Prettier clean.
 
 **M9 (Google Drive Sync — the Checkpointer) — DONE, merged to `main` via PR #8 (`a7a4c65`), browser-verified.** Per-device ledgers + checkpointer over drivestore; instant-open + background cadence; merge-holes #33/#34 resolved. Core-first: **380 → 407 tests** (+27). **`DB_VERSION` 2 → 3** (`outbox` store). Typecheck/lint/build/prettier clean + a `/simplify` cleanup pass. See "M9 decisions and delivered code" below.
 
@@ -90,7 +91,7 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M6 (Recurring Rules, Templates & the Inbox) — DONE, merged to `main` via PR #5 (`0e9416e`).** Core-first: **266 → 312 tests** (+46). Typecheck/lint/build/prettier clean. **User browser-verified** all flows (incl. the three post-verify fix rounds + bulk dismiss below). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). See "M6 decisions and delivered code" below.
 
-**Execution order note (historical):** the user chose M3–M7 before M8/M9, then skipped M10 and completed M11. **M0–M9 are merged; M11 awaits milestone review/PR.** The user picks the next milestone explicitly; do not infer M10 or post-M11 work.
+**Execution order note (historical):** the user chose M3–M7 before M8/M9, then skipped M10 and completed M11. **M0–M9 and M11 are merged.** A user-scoped QOL/feature pass comes next; M10 follows only when the user starts it.
 
 Git log (`main`, current — M0–M9 merged):
 ```
@@ -326,12 +327,13 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-1. Review `m11-design-polish`.
-2. Open a milestone PR against `main` with `gh` when approved; merge only on user instruction.
-3. Pick the next scope explicitly. **Do not automatically start M10 Capacitor or post-M11 widgets.**
+1. Collect the user's pre-M10 QOL/feature list.
+2. Reconcile each item against current code/spec; lock scope and acceptance checks.
+3. Create a dedicated branch and handoff/plan once scope is known.
+4. Build and verify one approved slice at a time.
 
-M10 remains skipped. The M8 `AuthProvider` and M9 Drive seam remain its starting points if selected.
-Post-M11 widget reordering/visibility should wrap the existing stable-id registry.
+Do not start M10 during this pass. If widget reordering/visibility is included, wrap the existing
+stable-id registry. Preserve M11 icon placement and sync-banner behavior unless explicitly changed.
 
 ---
 
