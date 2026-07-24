@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Textarea } from "@/components/ui/textarea";
 
 const KINDS: { value: ComposeKind; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -122,6 +123,7 @@ function QuickAddForm({
               container_id: template.container_id,
               category_id: transfer ? null : template.category_id,
               to_container_id: transfer ? template.to_container_id : null,
+              notes: template.notes,
             }),
           ),
       },
@@ -220,12 +222,26 @@ function QuickAddForm({
       </div>
 
       <div className="grid grid-cols-[5.5rem_1fr] items-center gap-x-3 gap-y-2">
-        <FieldLabel>{f.kind === "transfer" ? "Note" : "What was it?"}</FieldLabel>
+        <FieldLabel>
+          {f.kind === "transfer" ? "Label" : f.kind === "income" ? "Source" : "Vendor"}
+        </FieldLabel>
         <Input
           value={f.vendor}
           onChange={(e) => f.setVendor(e.target.value)}
-          placeholder={f.kind === "transfer" ? "Optional" : "e.g. Blue Bottle"}
-          aria-label={f.kind === "transfer" ? "Transfer note" : "Payee or source"}
+          placeholder={
+            f.kind === "transfer"
+              ? "Optional"
+              : f.kind === "income"
+                ? "e.g. Employer"
+                : "e.g. Blue Bottle"
+          }
+          aria-label={
+            f.kind === "transfer"
+              ? "Transfer label"
+              : f.kind === "income"
+                ? "Source"
+                : "Vendor"
+          }
           className="h-9"
         />
 
@@ -284,6 +300,16 @@ function QuickAddForm({
           onChange={(e) => f.setWhen(e.target.value)}
           aria-label="Date and time"
           className="tnum h-9"
+        />
+
+        <FieldLabel>Notes</FieldLabel>
+        <Textarea
+          value={f.notes}
+          onChange={(e) => f.setNotes(e.target.value)}
+          placeholder="Optional"
+          aria-label="Notes"
+          rows={2}
+          className="min-h-16 resize-none"
         />
       </div>
 

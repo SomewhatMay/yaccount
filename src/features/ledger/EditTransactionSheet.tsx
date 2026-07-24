@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { SheetFooter } from "@/components/ui/sheet";
 import { ResponsiveSheet } from "@/features/ui";
+import { Textarea } from "@/components/ui/textarea";
 
 export function EditTransactionSheet({
   editing,
@@ -180,6 +181,7 @@ function EditForm({
   const [date, setDate] = useState(tx.date);
   const [time, setTime] = useState(() => timeInputValue(tx.entered_at));
   const [vendor, setVendor] = useState(tx.vendor_source);
+  const [notes, setNotes] = useState(tx.notes ?? "");
   const [categoryId, setCategoryId] = useState(tx.category_id ?? active[0]?.id ?? "");
   const [containerId, setContainerId] = useState(tx.container_id);
   const [amountStr, setAmountStr] = useState((Math.abs(tx.amount) / 100).toFixed(2));
@@ -213,6 +215,7 @@ function EditForm({
         vendor_source: vendor.trim(),
         category_id: categoryId,
         container_id: containerId,
+        notes: notes.trim() || null,
         yearMonth: date.slice(0, 7),
       }),
     );
@@ -230,7 +233,9 @@ function EditForm({
           onTime={setTime}
         />
         <div className="grid gap-1.5">
-          <Label htmlFor="edit-vendor">Payee / source</Label>
+          <Label htmlFor="edit-vendor">
+            {cat?.type === "income" ? "Source" : "Vendor"}
+          </Label>
           <Input
             id="edit-vendor"
             value={vendor}
@@ -301,6 +306,17 @@ function EditForm({
           </div>
           {warn && <p className="text-xs text-amber-600 dark:text-amber-500">{warn}</p>}
         </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-notes">Notes</Label>
+          <Textarea
+            id="edit-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional"
+            rows={3}
+            className="resize-none"
+          />
+        </div>
       </div>
 
       <SheetFooter className="mt-auto flex-row items-center gap-2">
@@ -334,6 +350,7 @@ function TransferForm({
   const [date, setDate] = useState(tx.date);
   const [time, setTime] = useState(() => timeInputValue(tx.entered_at));
   const [vendor, setVendor] = useState(tx.vendor_source);
+  const [notes, setNotes] = useState(tx.notes ?? "");
   const [fromId, setFromId] = useState(tx.container_id);
   const [toId, setToId] = useState(tx.to_container_id ?? "");
   const [amountStr, setAmountStr] = useState((Math.abs(tx.amount) / 100).toFixed(2));
@@ -368,6 +385,7 @@ function TransferForm({
         vendor_source: label || transferLabel(from.name, to.name),
         container_id: from.id,
         to_container_id: to.id,
+        notes: notes.trim() || null,
         yearMonth: date.slice(0, 7),
       }),
     );
@@ -417,9 +435,9 @@ function TransferForm({
           </Select>
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="transfer-note">Note</Label>
+          <Label htmlFor="transfer-label">Label</Label>
           <Input
-            id="transfer-note"
+            id="transfer-label"
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
           />
@@ -432,6 +450,17 @@ function TransferForm({
             onChange={(e) => setAmountStr(e.target.value)}
             inputMode="decimal"
             className="tnum font-mono"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="transfer-notes">Notes</Label>
+          <Textarea
+            id="transfer-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional"
+            rows={3}
+            className="resize-none"
           />
         </div>
       </div>

@@ -298,6 +298,7 @@ export function LedgerView() {
       container_id: t.container_id,
       category_id: transfer ? null : t.category_id,
       to_container_id: transfer ? t.to_container_id : null,
+      notes: t.notes,
     };
     await dispatch(createTemplate(input));
     toast.success("Saved as shortcut", {
@@ -655,6 +656,11 @@ function LedgerRow({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
         <div className="text-muted-foreground truncate text-xs">{sub}</div>
+        {tx.notes && (
+          <div className="text-muted-foreground/80 mt-0.5 truncate text-xs">
+            {tx.notes}
+          </div>
+        )}
       </div>
       <Money
         cents={tx.amount}

@@ -82,6 +82,16 @@ describe("composeOp — an expense or income entry", () => {
     expect(out.op.payload.row.vendor_source).toBe("Blue Bottle");
   });
 
+  it("keeps non-empty notes and normalizes blank notes", () => {
+    const noted = composeOp(entry({ notes: "  Split with Sam  " }));
+    if (noted.status !== "ready") throw new Error("expected ready");
+    expect(noted.op.payload.row.notes).toBe("Split with Sam");
+
+    const blank = composeOp(entry({ notes: "   " }));
+    if (blank.status !== "ready") throw new Error("expected ready");
+    expect(blank.op.payload.row.notes).toBeNull();
+  });
+
   it("keeps a caller-chosen instant, and otherwise stamps the op's own", () => {
     const chosen = composeOp(entry({ entered_at: "2026-07-22T18:04:11.000Z" }));
     if (chosen.status !== "ready") throw new Error("expected ready");
@@ -177,6 +187,12 @@ describe("composeOp — a transfer", () => {
     const out = composeOp(transfer({ amountStr: "-300" }));
     if (out.status !== "ready") throw new Error("expected ready");
     expect(out.op.payload.row.amount).toBe(-30000);
+  });
+
+  it("keeps a transfer note in Transaction.notes", () => {
+    const out = composeOp(transfer({ notes: "  Emergency fund  " }));
+    if (out.status !== "ready") throw new Error("expected ready");
+    expect(out.op.payload.row.notes).toBe("Emergency fund");
   });
 
   it("carries an optional note as the row's description", () => {

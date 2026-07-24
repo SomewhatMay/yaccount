@@ -25,6 +25,7 @@ export type ComposeDraft =
       /** The instant the entry happened; omitted means "stamp it from the op". */
       entered_at?: string;
       vendor: string;
+      notes?: string;
       amountStr: string;
       sign: Sign;
       category?: Category;
@@ -36,6 +37,7 @@ export type ComposeDraft =
       entered_at?: string;
       /** An optional note; blank falls back to "{source} → {destination}". */
       vendor: string;
+      notes?: string;
       amountStr: string;
       from?: Container;
       to?: Container;
@@ -88,6 +90,7 @@ export function composeOp(
       fromName: from.name,
       toName: to.name,
       vendor_source: draft.vendor.trim() || undefined,
+      notes: draft.notes?.trim() || null,
     });
     return {
       status: "ready",
@@ -126,6 +129,7 @@ export function composeOp(
     vendor_source: vendor,
     category_id: category.id,
     container_id: from.id,
+    notes: draft.notes?.trim() || null,
   });
   return {
     status: "ready",
