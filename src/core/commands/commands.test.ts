@@ -410,6 +410,7 @@ describe("template & recurring commands (M6, §5.8)", () => {
     vendor_source: "Blue Bottle",
     category_id: "coffee",
     container_id: "general",
+    notes: "Oat milk",
   });
 
   it("createTemplate builds a template.create op with an is_template row", () => {
@@ -441,6 +442,7 @@ describe("template & recurring commands (M6, §5.8)", () => {
     expect(op.payload.row.date).toBe("2026-07-21");
     expect(op.payload.row.amount).toBe(-650);
     expect(op.payload.row.category_id).toBe("coffee");
+    expect(op.payload.row.notes).toBe("Oat milk");
   });
 
   it("logTemplate on a transfer template logs a transfer", () => {
@@ -451,12 +453,14 @@ describe("template & recurring commands (M6, §5.8)", () => {
       vendor_source: "to savings",
       container_id: "general",
       to_container_id: "savings",
+      notes: "Emergency fund",
     });
     const op = logTemplate(transferTemplate, { date: "2026-07-21" }, META);
     expect(op.type).toBe("transaction.create");
     if (op.type !== "transaction.create") throw new Error("narrow");
     expect(op.payload.row.to_container_id).toBe("savings");
     expect(op.payload.row.amount).toBe(-20000); // transfer stored negative on source
+    expect(op.payload.row.notes).toBe("Emergency fund");
   });
 
   it("createRecurringRule builds a rule with a computed cursor and active status", () => {

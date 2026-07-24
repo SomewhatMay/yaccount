@@ -316,6 +316,7 @@ export function logTemplate(
         container_id: template.container_id,
         to_container_id: template.to_container_id,
         vendor_source: template.vendor_source,
+        notes: template.notes,
       },
       m,
     );
@@ -328,6 +329,7 @@ export function logTemplate(
       vendor_source: template.vendor_source,
       category_id: template.category_id!,
       container_id: template.container_id,
+      notes: template.notes,
     },
     m,
   );

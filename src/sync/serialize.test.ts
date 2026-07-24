@@ -8,6 +8,7 @@ import {
   deviceIdFromLedgerName,
 } from "./paths";
 import type { Op } from "@/core/oplog";
+import { createTransaction } from "@/core/commands";
 
 const op = (id: string, ts: string): Op =>
   ({ id, ts, type: "category.archive", payload: { id: "x" } }) as Op;
@@ -19,6 +20,22 @@ describe("serialize — JSONL ledgers + JSON snapshot (§8.2)", () => {
       op("b", "2026-01-02T00:00:00.000Z"),
     ];
     expect(parseOps(serializeOps(ops))).toEqual(ops);
+  });
+
+  it("round-trips transaction notes through ledger and snapshot files", () => {
+    const noted = createTransaction(
+      {
+        date: "2026-07-23",
+        amount: -1250,
+        vendor_source: "Market",
+        category_id: "groceries",
+        notes: "Shared groceries",
+      },
+      { id: "noted", ts: "2026-07-23T12:00:00.000Z" },
+    );
+
+    expect(parseOps(serializeOps([noted]))).toEqual([noted]);
+    expect(parseSnapshot(serializeSnapshot([noted]))).toEqual([noted]);
   });
 
   it("serializes an empty op list to an empty string (nothing to append)", () => {

@@ -42,8 +42,9 @@ async function openQuickAdd(page: Page) {
 
 async function logExpense(page: Page, payee: string, amount: string, category: string) {
   await openQuickAdd(page);
+  await expect(page.getByLabel("Vendor")).toBeVisible();
   await page.getByLabel("Amount").fill(amount);
-  await page.getByLabel("Payee or source").fill(payee);
+  await page.getByLabel("Vendor").fill(payee);
   await choose(page, "Category", category);
   await page.getByRole("button", { name: "Log expense" }).click();
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
@@ -70,13 +71,70 @@ test("moves money between containers", async ({ page }) => {
   await openQuickAdd(page);
   await page.getByRole("radio", { name: "Transfer" }).click();
   await page.getByLabel("Amount").fill("25.00");
-  await page.getByLabel("Transfer note").fill("E2E move");
+  await page.getByLabel("Transfer label").fill("E2E move");
   await choose(page, "From container", "General");
   await choose(page, "To container", "E2E savings");
   await page.getByRole("button", { name: "Move money" }).click();
 
   await expect(page.getByText("E2E move", { exact: true })).toBeVisible();
   await expect(page.getByText("$25.00", { exact: true })).toBeVisible();
+});
+
+test("creates, edits, refreshes, and quietly hides ledger notes", async ({ page }) => {
+  await createCategory(page, "E2E notes expense");
+  await createCategory(page, "E2E notes income", "Income");
+  await createContainer(page, "E2E notes savings");
+  await openReady(page, "/ledger", "Overall balance");
+
+  await openQuickAdd(page);
+  await page.getByLabel("Amount").fill("7.50");
+  await page.getByLabel("Vendor").fill("E2E noted expense");
+  await page.getByLabel("Notes").fill("Initial expense detail");
+  await choose(page, "Category", "E2E notes expense");
+  await page.getByRole("button", { name: "Log expense" }).click();
+  await expect(page.getByText("Initial expense detail", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Actions for E2E noted expense" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByLabel("Notes").fill("Edited expense detail");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Edited expense detail", { exact: true })).toBeVisible();
+
+  await openQuickAdd(page);
+  await page.getByRole("radio", { name: "Income" }).click();
+  await page.getByLabel("Amount").fill("20.00");
+  await page.getByLabel("Source").fill("E2E noted income");
+  await page.getByLabel("Notes").fill("Income detail");
+  await choose(page, "Category", "E2E notes income");
+  await page.getByRole("button", { name: "Log income" }).click();
+  await expect(page.getByText("Income detail", { exact: true })).toBeVisible();
+
+  await openQuickAdd(page);
+  await page.getByRole("radio", { name: "Transfer" }).click();
+  await page.getByLabel("Amount").fill("5.00");
+  await page.getByLabel("Transfer label").fill("E2E noted transfer");
+  await page.getByLabel("Notes").fill("Transfer detail");
+  await choose(page, "From container", "General");
+  await choose(page, "To container", "E2E notes savings");
+  await page.getByRole("button", { name: "Move money" }).click();
+  await expect(page.getByText("Transfer detail", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Actions for E2E noted transfer" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByLabel("Notes").fill("Edited transfer detail");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Edited transfer detail", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("Edited expense detail", { exact: true })).toBeVisible();
+  await expect(page.getByText("Income detail", { exact: true })).toBeVisible();
+  await expect(page.getByText("Edited transfer detail", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Actions for E2E noted expense" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByLabel("Notes").fill("   ");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Edited expense detail", { exact: true })).toBeHidden();
 });
 
 test("creates a savings goal", async ({ page }) => {
@@ -144,7 +202,7 @@ test("opens FAB quick-add from the dashboard", async ({ page }) => {
   await expect(page.getByLabel("Amount")).toBeFocused();
 });
 
-test("places toasts clear of mobile navigation and bottom-right on desktop", async ({
+test("places toasts below mobile top navigation and bottom-right on desktop", async ({
   page,
 }, testInfo) => {
   await createCategory(page, "E2E toast placement");
@@ -153,16 +211,15 @@ test("places toasts clear of mobile navigation and bottom-right on desktop", asy
   await expect(toast).toBeVisible();
 
   if (testInfo.project.name === "mobile") {
-    const nav = page.getByRole("navigation", { name: "Primary" });
-    await expect(nav).toBeVisible();
-    const navBox = await nav.boundingBox();
-    expect(navBox).not.toBeNull();
+    const topBar = page.locator("header").first();
+    const topBarBox = await topBar.boundingBox();
+    expect(topBarBox).not.toBeNull();
     await expect
       .poll(async () => {
         const toastBox = await toast.boundingBox();
-        return toastBox ? toastBox.y + toastBox.height : Number.POSITIVE_INFINITY;
+        return toastBox?.y ?? 0;
       })
-      .toBeLessThanOrEqual(navBox!.y);
+      .toBeGreaterThanOrEqual(topBarBox!.y + topBarBox!.height);
     return;
   }
 

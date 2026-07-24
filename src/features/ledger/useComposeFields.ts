@@ -59,6 +59,7 @@ export function useComposeFields({
   const [when, setWhen] = useState(() => nowDateTimeInput());
   const [whenPicked, setWhenPicked] = useState(false);
   const [vendor, setVendor] = useState("");
+  const [notes, setNotes] = useState("");
   const [amountStr, setAmountStr] = useState("");
   // "" = follow the first category of this kind; a pick overrides it. Same shape
   // as the container below, and it means the fields survive an empty first
@@ -113,6 +114,7 @@ export function useComposeFields({
 
   function reset() {
     setVendor("");
+    setNotes("");
     setAmountStr("");
     setPickedSign(null);
     setWarn(null);
@@ -126,8 +128,18 @@ export function useComposeFields({
     const entered_at = whenPicked ? (instantFromNow(date, time) ?? undefined) : undefined;
     const outcome = composeOp(
       kind === "transfer"
-        ? { kind: "transfer", date, entered_at, vendor, amountStr, from, to }
-        : { kind: "entry", date, entered_at, vendor, amountStr, sign, category, from },
+        ? { kind: "transfer", date, entered_at, vendor, notes, amountStr, from, to }
+        : {
+            kind: "entry",
+            date,
+            entered_at,
+            vendor,
+            notes,
+            amountStr,
+            sign,
+            category,
+            from,
+          },
       // A soft warning is armed once and committed by the next submit (§10 #13).
       { confirmed: warn !== null },
     );
@@ -177,6 +189,8 @@ export function useComposeFields({
     },
     vendor,
     setVendor,
+    notes,
+    setNotes,
     amountStr,
     onAmountChange,
     sign,
