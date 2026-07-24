@@ -1,12 +1,10 @@
 # M11 — Design System & Polish — LIVE HANDOFF
 
 > **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
-> **Branch:** `m11-design-polish` (pushed to origin, 24 commits ahead of `main`).
-> **Status:** Phases 1–7 are DONE and browser-tested. **Phase 8 is BUILT and PUSHED but NOT yet
-> browser-tested** — it is in review with the user. Two commits: `ce3a74f` (the phase) + `791db71`
-> (a fix round that **pivoted category colours → category ICONS** on the user's call). **Read §5.5
-> below for exactly what shipped and what is owed before Phase 9.**
-> **Last updated:** 2026-07-23, after building Phase 8 + the icon pivot (awaiting the user's browser test).
+> **Branch:** `m11-design-polish` (pushed to origin).
+> **Status:** Phases 1–8 are DONE and browser-tested. Phase 8 shipped in `ce3a74f` + `791db71`;
+> the user passed its desktop + 390×844 browser test on 2026-07-23. **Phase 9 is next.**
+> **Last updated:** 2026-07-23, after Phase 8 passed browser testing.
 
 ---
 
@@ -253,7 +251,7 @@ does. Keep that discipline.
 | 5 | Ledger v2 (history curve, carried balance, filters/sort) | ✅ **DONE** — `14650d7` + `afaa8de`, user-tested PASS |
 | 6 | Filters + mobile density on the other 5 list views | ✅ **DONE** — `acf8f26` + `3683b74` + `b0483b4` + `7372a80`, user-tested PASS |
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ✅ **DONE** — `bff1dc8` + `432a770` + `7de2c5f` + `cfe1bfb`, user-tested PASS |
-| 8 | Category **icons** (pivoted from colours), empty/loading/error states, a11y | 🟡 **BUILT, IN REVIEW** — `ce3a74f` + `791db71`, awaiting browser test |
+| 8 | Category **icons** (pivoted from colours), empty/loading/error states, a11y | ✅ **DONE** — `ce3a74f` + `791db71`, user-tested PASS |
 | 9 | Playwright e2e | ⬜ |
 | 10 | Docs (spec §12, impl §4, HANDOFF) | ⬜ |
 
@@ -659,17 +657,18 @@ URL-timing fix, `cfe1bfb` the Clear button). Tests **715 → 788**.
 
 ---
 
-## 5. Phase 8 — BUILT, in review (read 5.5 first)
+## 5. Phase 8 — DONE, browser-tested
 
 From `M11-PLAN.md` §9. Three strands, all UI, no new engine. **The strands below (5.1–5.3) are the
 ORIGINAL plan and describe the code map you still need** — but strand 1 was **pivoted from category
 colours to category ICONS** by the user after their browser test. **§5.5 records what actually shipped,
-what is still owed, and the open questions. Read it before touching anything.**
+the remaining optional questions. Read it before touching anything.**
 
-### 5.5 What Phase 8 actually shipped (commits `ce3a74f` + `791db71`) — NOT yet browser-tested
+### 5.5 What Phase 8 actually shipped (commits `ce3a74f` + `791db71`)
 
-**Verified green at handoff:** 807 vitest tests, typecheck, lint, `next build`, prettier. Pushed. The
-user has NOT browser-tested it yet — that is the next thing to get from them.
+**Verified:** 807 vitest tests, typecheck, lint, `next build`, prettier. Pushed. The user passed the
+desktop + 390×844 browser test on 2026-07-23, including the icon picker, first-run onboarding,
+skeletons, sync-error state, Settings overflow fix, keyboard focus, reduced motion, and light/dark.
 
 **Strand 1 — category ICONS (pivoted from colours).** The user's words: *"instead of adjustable category
 colors, I want adjustable icons. Give an extensive searchable list to choose from."* So:
@@ -718,17 +717,17 @@ colors, I want adjustable icons. Give an extensive searchable list to choose fro
 - **Colour popover flickered shut** — it opened from a *closing* `DropdownMenu`, whose focus-restore stole
   focus and dismissed it. Moot now: the icon picker is a modal sheet, which owns its focus.
 
-### 5.6 What is OWED / OPEN before Phase 8 can close
+### 5.6 Optional questions left unchanged
 
-- **Get the user's browser test.** Then address any fix round, THEN move to Phase 9. Do not start Phase 9
-  until Phase 8 passes.
 - **Open question — icons in Plan + dashboard.** Icons render in rows/selects/categories but **NOT** in
   the Plan summary (`LeaderRow`) or the dashboard doughnut/legend/budget-table/largest-list — those still
   show the **colour dot**. This was a deliberate scope line, flagged to the user; they may want icons
   there too. `LeaderRow` and the reports widgets take a `dot`/colour today, not a glyph.
 - **Open question — sync banner dismissibility.** It is currently **non-dismissible** (shows whenever
   `status === "error"`, clears on success), read as "persistent." The user may want a per-session `×`.
-- **Test the icon picker on a phone** (the grid at 390px), the first-run onboarding, and the Settings fix.
+
+Neither was raised during browser testing. Current behaviour remains; do not change either without the
+user asking.
 
 ### 5.1–5.3 — the original plan (code map still useful; strand 1 is now icons, above)
 
@@ -817,7 +816,7 @@ each in the code before starting.
 ```bash
 export PATH="/home/may/.nvm/versions/node/v22.18.0/bin:$PATH"
 cd /home/may/github/yaccount
-npm test          # vitest — 807 passing at end of Phase 8 (built, in review)
+npm test          # vitest — 807 passing at end of Phase 8
 npm run typecheck # tsc --noEmit
 npm run lint      # eslint .
 npm run build     # next build → static out/
@@ -965,8 +964,8 @@ never batch them (a standing user preference).
 ```
 branch: m11-design-polish  (pushed, tracking origin/m11-design-polish — 24 ahead of main)
 
-791db71 feat: category icons instead of colour override, + two fixes    (Phase 8 fix 1 — IN REVIEW)
-ce3a74f feat: category colours, skeletons, sync banner, a11y            (Phase 8 — IN REVIEW)
+791db71 feat: category icons instead of colour override, + two fixes    (Phase 8 fix 1 — PASS)
+ce3a74f feat: category colours, skeletons, sync banner, a11y            (Phase 8 — PASS)
 2e3434a docs: Phase 7 passed its browser test; hand off Phase 8
 cfe1bfb fix: pin the filter Clear button, always in reach beside the rail      (Phase 7 fix 3)
 7de2c5f fix: seed the ledger's deep-link filter from useSearchParams, not window  (Phase 7 fix 2)
