@@ -202,6 +202,148 @@ test("opens FAB quick-add from the dashboard", async ({ page }) => {
   await expect(page.getByLabel("Amount")).toBeFocused();
 });
 
+test("separates FAB quick press, hold chooser, and movement cancellation", async ({
+  page,
+}) => {
+  await openReady(page, "/", "How the money moved");
+  const fab = page.getByRole("button", { name: "Log a transaction" });
+  const box = (await fab.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toHaveCount(1);
+  await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await page.waitForTimeout(300);
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.waitForTimeout(550);
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeVisible();
+  await page.mouse.up();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await page.getByRole("menuitem", { name: "Income" }).click();
+  await expect(page.getByRole("radio", { name: "Income" })).toBeChecked();
+  await page.keyboard.press("Escape");
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 11, y);
+  await page.waitForTimeout(550);
+  await page.mouse.up();
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+
+  await fab.evaluate((button) => {
+    button.addEventListener(
+      "pointerdown",
+      (event) => {
+        button.setAttribute(
+          "data-test-pointer-id",
+          String((event as PointerEvent).pointerId),
+        );
+      },
+      { once: true },
+    );
+  });
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  const capturedPointer = await fab.getAttribute("data-test-pointer-id");
+  expect(capturedPointer).not.toBeNull();
+  await fab.dispatchEvent("lostpointercapture", {
+    pointerId: Number(capturedPointer),
+    pointerType: "mouse",
+    isPrimary: true,
+  });
+  await page.waitForTimeout(550);
+  await page.mouse.up();
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+});
+
+test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  const fab = page.getByRole("button", { name: "Log a transaction" });
+
+  await fab.focus();
+  await page.keyboard.down("Enter");
+  await page.waitForTimeout(550);
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeVisible();
+  await page.keyboard.up("Enter");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
+  await expect(fab).toBeFocused();
+
+  await page.keyboard.down(" ");
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Escape");
+  await page.keyboard.up(" ");
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+
+  await page.keyboard.down(" ");
+  await page.waitForTimeout(550);
+  await page.keyboard.up(" ");
+  await expect(page.getByRole("menuitem", { name: "Expense" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("radio", { name: "Transfer" })).toBeChecked();
+});
+
+test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "touch project only");
+  await openReady(page, "/", "How the money moved");
+  const fab = page.getByRole("button", { name: "Log a transaction" });
+  const box = (await fab.boundingBox())!;
+  const session = await page.context().newCDPSession(page);
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [point],
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toHaveCount(1);
+  await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await page.waitForTimeout(300);
+
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [point],
+  });
+  await page.waitForTimeout(550);
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeVisible();
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await page.keyboard.press("Escape");
+
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [point],
+  });
+  await page.waitForTimeout(200);
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchCancel",
+    touchPoints: [],
+  });
+  await page.waitForTimeout(550);
+  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+});
+
 test("keeps FAB geometry and shows a compact money-add mark", async ({
   page,
 }, testInfo) => {
