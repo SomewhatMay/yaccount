@@ -202,6 +202,53 @@ test("opens FAB quick-add from the dashboard", async ({ page }) => {
   await expect(page.getByLabel("Amount")).toBeFocused();
 });
 
+test("keeps FAB geometry and shows a compact money-add mark", async ({
+  page,
+}, testInfo) => {
+  await openReady(page, "/", "How the money moved");
+
+  const fab = page.getByRole("button", { name: "Log a transaction" });
+  const fabBox = await fab.boundingBox();
+  expect(fabBox).not.toBeNull();
+  expect(fabBox!.width).toBe(56);
+  expect(fabBox!.height).toBe(56);
+
+  const mark = fab.locator("[data-money-add-mark]");
+  await expect(mark).toBeVisible();
+  await expect(mark.locator("svg")).toHaveCount(2);
+  expect(
+    await mark
+      .locator("svg")
+      .evaluateAll((icons) =>
+        icons.every((icon) => icon.getAttribute("aria-hidden") === "true"),
+      ),
+  ).toBe(true);
+
+  const markBox = await mark.boundingBox();
+  expect(markBox).not.toBeNull();
+  expect(markBox!.width).toBeLessThanOrEqual(28);
+  expect(markBox!.height).toBeLessThanOrEqual(28);
+
+  const dollarBox = await mark.locator("[data-money-add-dollar]").boundingBox();
+  const plusBox = await mark.locator("[data-money-add-plus]").boundingBox();
+  expect(dollarBox).not.toBeNull();
+  expect(plusBox).not.toBeNull();
+  expect(plusBox!.x).toBeGreaterThan(dollarBox!.x + dollarBox!.width / 2);
+  expect(plusBox!.y).toBeLessThan(dollarBox!.y + dollarBox!.height / 2);
+
+  const viewport = page.viewportSize()!;
+  expect(viewport.width - fabBox!.x - fabBox!.width).toBe(
+    testInfo.project.name === "mobile" ? 20 : 32,
+  );
+  expect(viewport.height - fabBox!.y - fabBox!.height).toBe(
+    testInfo.project.name === "mobile" ? 68 : 32,
+  );
+
+  await fab.focus();
+  await fab.press("Enter");
+  await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
+});
+
 test("places toasts below mobile top navigation and bottom-right on desktop", async ({
   page,
 }, testInfo) => {
