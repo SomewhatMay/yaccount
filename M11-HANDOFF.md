@@ -4,8 +4,9 @@
 > **Status:** Phases 1–10 DONE. User passed all 14 desktop + 390×844 Playwright cases on
 > 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
 > touched-file Prettier.
-> **Next:** user-scoped pre-M10 QOL/feature edits. M10 Capacitor remains not started.
-> **Last updated:** 2026-07-23, M11 complete.
+> **Post-M11:** Phase 1 mobile toast placement merged via PR #10 (`5519bf4`), user verified.
+> **Next:** Phase 2 optional ledger notes. M10 Capacitor remains not started.
+> **Last updated:** 2026-07-23, post-M11 Phase 1 complete.
 
 ---
 
@@ -923,8 +924,9 @@ approval: commit, push, open/merge a PR against `main` with `gh`, switch to `mai
 relevant handoffs/spec/implementation docs, commit/push those closure docs, and provide the exact
 prompt for the next fresh agent:
 
-1. `post-m11-mobile-toast` — mobile Sonner toasts clear the bottom tab bar + safe area; desktop stays
-   bottom-right. Sync-banner behavior is unchanged.
+1. ✅ `post-m11-mobile-toast` — DONE via PR #10 (`5519bf4`). Mobile Sonner toasts clear the 56px
+   bottom tab bar + safe area + 16px gap; desktop stays bottom-right. Sync banner unchanged. User
+   verified; 807 Vitest + 16 Playwright passed.
 2. `post-m11-ledger-notes` — expose optional notes in transaction create/edit and the register/detail
    UI. The synced model path already exists: `Transaction.notes`, factories and full-row ops carry it.
 3. `post-m11-fab-money-mark` — replace the bare plus with a compact dollar-plus mark; retain the FAB's

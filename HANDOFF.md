@@ -1,14 +1,17 @@
 # yaccount — Handoff
 
-> ## ✅ **M11 MERGED — PRE-M10 QOL/FEATURE PASS NEXT**
+> ## ✅ **POST-M11 PHASE 1 MERGED — PHASE 2 NEXT**
+> Mobile toast placement merged via PR #10 (`5519bf4`) on 2026-07-23. Sonner clears the bottom
+> tab bar + safe area at 390×844; desktop remains bottom-right; sync-banner behavior is unchanged.
+> Verification: **807 Vitest + 16 Playwright**, typecheck, lint, static build and touched-file Prettier.
+>
 > M11 merged to `main` via PR #9 (`bf7d872`) on 2026-07-23. User passed all 14 desktop/mobile
 > Playwright cases. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
 > touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M11 merged** via PR #9 (`bf7d872`), 2026-07-23.
-> **Next:** user-directed QOL/feature edits before M10. Scope is not locked yet; collect it before
-> planning/building. M10 Capacitor remains not started.
+> **Last updated:** post-M11 Phase 1 merged via PR #10 (`5519bf4`), 2026-07-23.
+> **Next:** Phase 2, optional ledger notes. M10 Capacitor remains not started.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
@@ -338,11 +341,11 @@ All in `src/core/` (pure TS; only idb/zod deps):
 Do not start M10 during this pass. If widget reordering/visibility is included, wrap the existing
 stable-id registry. Preserve M11 icon placement and sync-banner behavior unless explicitly changed.
 
-### Post-M11 phases (user-ordered; not started)
+### Post-M11 phases (user-ordered)
 
 | Phase | Branch | Scope | Exit |
 |---|---|---|---|
-| 1 | `post-m11-mobile-toast` | On mobile, place Sonner toasts above the bottom tab bar + safe-area inset. Desktop stays bottom-right. Do not alter the sync banner. | Toast never covers Home/Ledger/Inbox/More at 390×844; desktop unchanged. |
+| 1 ✅ | `post-m11-mobile-toast` | **DONE**, PR #10 (`5519bf4`). Shared 56px tab-bar geometry drives Sonner's mobile offset above the safe area; desktop stays bottom-right. Sync banner untouched. | User verified; 807 Vitest + 16 Playwright passed. |
 | 2 | `post-m11-ledger-notes` | Expose optional notes while creating and editing ledger entries; show them quietly in the register/detail surface. `Transaction.notes`, factories and command payloads already ship and sync; preserve that model/op path. | Expense, income and transfer notes save, edit, refresh and sync; empty notes add no row noise. |
 | 3 | `post-m11-fab-money-mark` | Replace the bare FAB plus with a compact dollar-plus mark, keeping its size, iris treatment, tap target and quick-tap behavior. | Purpose reads as “add money entry”; a tap still opens expense quick-add. |
 | 4 | `post-m11-fab-hold-menu` | Long-press/press-and-hold FAB to choose other create flows; quick tap still creates a ledger entry. Define keyboard/pointer cancellation and avoid firing both actions. Reuse existing create sheets/routes; do not duplicate forms. | Tap behavior unchanged; hold opens an accessible create chooser on touch, mouse and keyboard. |
@@ -392,4 +395,4 @@ npm test && npm run typecheck && npm run lint && npm run build && npx prettier -
 - **Design language = "The Standing Register", LOCKED — spec §12 is law.** Fonts Fraunces/Geist/Geist Mono; tinted paper/ink; rare iris; emerald inflow; sheets/register rows/`RowActions`; one category colour scheme plus optional icons. Read §12 before UI work.
 - **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
 - **`HANDOFF.md` is TRACKED in git** (commit `88ebfa8` moved it into the repo so it travels across devices; the old "gitignored/local-only" note is stale). **Commit it at every milestone boundary** as a `docs:` commit on `main` (as was done for M7 → `c4c9992` and now M8) so a fresh clone / new agent sees the current state.
-- UI has 14 Playwright critical-flow cases across desktop/mobile. `next build` remains only a prerender/static-export smoke check.
+- UI has 16 Playwright critical-flow cases across desktop/mobile. `next build` remains only a prerender/static-export smoke check.

@@ -334,6 +334,17 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 
 ---
 
+### Post-M11 Phase 1 — Mobile toast clearance
+**Status:** DONE, merged via PR #10 (`5519bf4`); user verified; 807 Vitest + 16 Playwright passing.
+
+- `--mobile-tab-bar-height` is the shared 56px shell geometry used by `BottomTabBar` and Sonner.
+- Mobile Sonner offset = tab-bar height + `env(safe-area-inset-bottom)` + 16px. Desktop stays
+  bottom-right.
+- Playwright asserts no toast/nav overlap at 390×844 and preserves desktop placement.
+- Sync-banner behavior is unchanged.
+
+---
+
 ## 5. Testing Strategy (cross-cutting)
 
 - **Engine/logic (the bulk):** Vitest, pure functions in `src/core/`, no DOM. Every worked example in §5.9 and every derivation in §5.9.7/§6.8 becomes a named test. This is where financial correctness is guaranteed.
