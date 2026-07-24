@@ -335,13 +335,27 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ---
 
 ### Post-M11 Phase 1 — Mobile toast clearance
-**Status:** DONE, merged via PR #10 (`5519bf4`); user verified; 807 Vitest + 16 Playwright passing.
+**Status:** DONE, merged via PR #10 (`5519bf4`); Phase 2 superseded mobile placement.
 
-- `--mobile-tab-bar-height` is the shared 56px shell geometry used by `BottomTabBar` and Sonner.
-- Mobile Sonner offset = tab-bar height + `env(safe-area-inset-bottom)` + 16px. Desktop stays
-  bottom-right.
-- Playwright asserts no toast/nav overlap at 390×844 and preserves desktop placement.
+- `--mobile-tab-bar-height` remains the shared 56px bottom-shell geometry.
+- Phase 1 placed mobile Sonner above the bottom tab bar. Phase 2 now places it below the top bar.
 - Sync-banner behavior is unchanged.
+
+---
+
+### Post-M11 Phase 2 — Optional ledger notes
+**Status:** DONE, merged via PR #11 (`ea6551f`); user verified; 810 Vitest + 18 Playwright passing.
+
+- Quick-add and edit sheets expose `Transaction.notes` for expenses, income and transfers; whitespace
+  normalizes to `null`. Vendor/source stays the primary identity; labels read Vendor, Source or Label.
+- Register rows add one quiet truncated note line only when non-empty.
+- Existing factories and full-row create/update ops carry notes through IndexedDB, refresh and sync;
+  JSONL/snapshot tests pin Drive serialization. Saving/logging/removing-and-undoing shortcuts retains
+  notes. No store, schema or op type was added.
+- Mobile Sonner uses responsive top-center placement below the 56px top bar + safe area + 16px.
+  Desktop remains bottom-right. Sync-banner behavior remains unchanged.
+- Playwright covers expense/income/transfer create, edit, blank-note silence, refresh persistence and
+  responsive toast geometry at desktop and 390×844.
 
 ---
 

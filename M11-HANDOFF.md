@@ -4,9 +4,9 @@
 > **Status:** Phases 1–10 DONE. User passed all 14 desktop + 390×844 Playwright cases on
 > 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
 > touched-file Prettier.
-> **Post-M11:** Phase 1 mobile toast placement merged via PR #10 (`5519bf4`), user verified.
-> **Next:** Phase 2 optional ledger notes. M10 Capacitor remains not started.
-> **Last updated:** 2026-07-23, post-M11 Phase 1 complete.
+> **Post-M11:** Phase 2 ledger notes merged via PR #11 (`ea6551f`), user verified.
+> **Next:** Phase 3 FAB money mark. M10 Capacitor remains not started.
+> **Last updated:** 2026-07-23, post-M11 Phase 2 complete.
 
 ---
 
@@ -922,13 +922,15 @@ never batch them (a standing user preference).
 a fresh agent/context. Build and verify only that phase, then stop for user review. After explicit
 approval: commit, push, open/merge a PR against `main` with `gh`, switch to `main`, pull, update all
 relevant handoffs/spec/implementation docs, commit/push those closure docs, and provide the exact
-prompt for the next fresh agent:
+prompt for the next fresh agent. Before review, every agent gives a concise implementation summary
+and a concrete list of things for the user to test:
 
-1. ✅ `post-m11-mobile-toast` — DONE via PR #10 (`5519bf4`). Mobile Sonner toasts clear the 56px
-   bottom tab bar + safe area + 16px gap; desktop stays bottom-right. Sync banner unchanged. User
-   verified; 807 Vitest + 16 Playwright passed.
-2. `post-m11-ledger-notes` — expose optional notes in transaction create/edit and the register/detail
-   UI. The synced model path already exists: `Transaction.notes`, factories and full-row ops carry it.
+1. ✅ `post-m11-mobile-toast` — DONE via PR #10 (`5519bf4`). Phase 2 superseded its mobile placement;
+   desktop remains bottom-right and the sync banner remains unchanged.
+2. ✅ `post-m11-ledger-notes` — DONE via PR #11 (`ea6551f`). Optional notes create/edit/display for
+   expense, income and transfer; blank notes stay quiet; full-row ops, IndexedDB, refresh, Drive
+   serialization and shortcuts retain them. Expense/income fields read Vendor/Source. Mobile Sonner
+   enters below the top bar. User verified; 810 Vitest + 18 Playwright passed.
 3. `post-m11-fab-money-mark` — replace the bare plus with a compact dollar-plus mark; retain the FAB's
    dimensions, iris treatment, accessibility and quick-tap expense behavior.
 4. `post-m11-fab-hold-menu` — hold FAB for an accessible chooser of other existing create flows;

@@ -1,17 +1,18 @@
 # yaccount — Handoff
 
-> ## ✅ **POST-M11 PHASE 1 MERGED — PHASE 2 NEXT**
-> Mobile toast placement merged via PR #10 (`5519bf4`) on 2026-07-23. Sonner clears the bottom
-> tab bar + safe area at 390×844; desktop remains bottom-right; sync-banner behavior is unchanged.
-> Verification: **807 Vitest + 16 Playwright**, typecheck, lint, static build and touched-file Prettier.
+> ## ✅ **POST-M11 PHASE 2 MERGED — PHASE 3 NEXT**
+> Optional ledger notes merged via PR #11 (`ea6551f`) on 2026-07-23. Expense/income/transfer notes
+> create, edit, refresh, sync, display quietly and copy through shortcuts; empty notes add no row
+> noise. Mobile Sonner now enters below the top bar; desktop remains bottom-right.
+> Verification: **810 Vitest + 18 Playwright**, typecheck, lint, static build and touched-file Prettier.
 >
 > M11 merged to `main` via PR #9 (`bf7d872`) on 2026-07-23. User passed all 14 desktop/mobile
 > Playwright cases. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
 > touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** post-M11 Phase 1 merged via PR #10 (`5519bf4`), 2026-07-23.
-> **Next:** Phase 2, optional ledger notes. M10 Capacitor remains not started.
+> **Last updated:** post-M11 Phase 2 merged via PR #11 (`ea6551f`), 2026-07-23.
+> **Next:** Phase 3, FAB money mark. M10 Capacitor remains not started.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
@@ -337,6 +338,8 @@ All in `src/core/` (pure TS; only idb/zod deps):
    `main`, pull, and update every relevant handoff/spec/implementation document.
 5. Commit/push the closure docs on `main`, then provide the exact prompt for the next fresh agent.
    Do not stack phases.
+6. Before stopping for review, give the user a concise implementation summary plus a concrete list
+   of things to test.
 
 Do not start M10 during this pass. If widget reordering/visibility is included, wrap the existing
 stable-id registry. Preserve M11 icon placement and sync-banner behavior unless explicitly changed.
@@ -345,8 +348,8 @@ stable-id registry. Preserve M11 icon placement and sync-banner behavior unless 
 
 | Phase | Branch | Scope | Exit |
 |---|---|---|---|
-| 1 ✅ | `post-m11-mobile-toast` | **DONE**, PR #10 (`5519bf4`). Shared 56px tab-bar geometry drives Sonner's mobile offset above the safe area; desktop stays bottom-right. Sync banner untouched. | User verified; 807 Vitest + 16 Playwright passed. |
-| 2 | `post-m11-ledger-notes` | Expose optional notes while creating and editing ledger entries; show them quietly in the register/detail surface. `Transaction.notes`, factories and command payloads already ship and sync; preserve that model/op path. | Expense, income and transfer notes save, edit, refresh and sync; empty notes add no row noise. |
+| 1 ✅ | `post-m11-mobile-toast` | **DONE**, PR #10 (`5519bf4`). Initially cleared the bottom tab bar; Phase 2 moved mobile Sonner below the top bar. Desktop remains bottom-right; sync banner untouched. | User verified; superseded placement covered by Phase 2. |
+| 2 ✅ | `post-m11-ledger-notes` | **DONE**, PR #11 (`ea6551f`). Optional notes create/edit/display for expense, income and transfer; blank → `null`; notes persist through full-row ops, IndexedDB, refresh, Drive serialization and shortcuts. Create/edit labels say Vendor for expense, Source for income, Label for transfer. Mobile toasts now enter below the top bar. | User verified; 810 Vitest + 18 Playwright passed. |
 | 3 | `post-m11-fab-money-mark` | Replace the bare FAB plus with a compact dollar-plus mark, keeping its size, iris treatment, tap target and quick-tap behavior. | Purpose reads as “add money entry”; a tap still opens expense quick-add. |
 | 4 | `post-m11-fab-hold-menu` | Long-press/press-and-hold FAB to choose other create flows; quick tap still creates a ledger entry. Define keyboard/pointer cancellation and avoid firing both actions. Reuse existing create sheets/routes; do not duplicate forms. | Tap behavior unchanged; hold opens an accessible create chooser on touch, mouse and keyboard. |
 | 5 | `post-m11-data-tools` | Settings tools to export, import and clear all local yaccount data for testing. Version/validate imports; preserve op-log/replay invariants; destructive clear requires explicit confirmation and explains Drive resync consequences. | Round-trip fixture restores identical state; invalid import changes nothing; clear cannot be accidental. |
