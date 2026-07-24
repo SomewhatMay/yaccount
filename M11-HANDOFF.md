@@ -1,10 +1,12 @@
-# M11 — Design System & Polish — LIVE HANDOFF
+# M11 — Design System & Polish — COMPLETE
 
-> **You are picking this up mid-milestone. Read this file first, then `M11-PLAN.md` (the approved plan).**
 > **Branch:** `m11-design-polish` (pushed to origin).
-> **Status:** Phases 1–9 are DONE and browser-tested. Phase 9 shipped in `1dcc1d3`;
-> the user passed all 14 desktop + 390×844 Playwright cases on 2026-07-23. **Phase 10 is next.**
-> **Last updated:** 2026-07-23, after Phase 9 passed and the Phase 10 handoff was prepared.
+> **Status:** Phases 1–10 DONE. User passed all 14 desktop + 390×844 Playwright cases on
+> 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
+> touched-file Prettier.
+> **Next:** review this branch, then open the milestone PR with `gh` when approved. Do not start M10
+> Capacitor or post-M11 widget work.
+> **Last updated:** 2026-07-23, M11 complete.
 
 ---
 
@@ -36,7 +38,7 @@ The user's brief, verbatim in intent:
 5. **Error handling & logging** — errors weren't surfaced or logged; make issues easy to diagnose.
 
 Plus M11's own spec scope (impl §4): motion, empty/loading/error/sync states, `DriveError` surfaces,
-category-colour override UI, a11y pass, responsive density, Playwright e2e.
+category customization (user-pivoted from colours to icons), a11y, responsive density, Playwright e2e.
 
 ---
 
@@ -253,7 +255,7 @@ does. Keep that discipline.
 | 7 | Dashboard v2 (KPIs, pace, Sankey, calendar, payees, upcoming) | ✅ **DONE** — `bff1dc8` + `432a770` + `7de2c5f` + `cfe1bfb`, user-tested PASS |
 | 8 | Category **icons** (pivoted from colours), empty/loading/error states, a11y | ✅ **DONE** — `ce3a74f` + `791db71`, user-tested PASS |
 | 9 | Playwright e2e | ✅ **DONE** — `1dcc1d3`, 14/14 browser-tested PASS |
-| 10 | Docs (spec §12, impl §4, HANDOFF) | ⬜ |
+| 10 | Docs (spec §12, impl §4, HANDOFF) | ✅ **DONE** |
 
 **Working protocol the user asked for and has been enforcing:**
 - **One phase at a time.** Build it, verify it, commit it, then **STOP** and hand back for browser testing.
@@ -744,21 +746,15 @@ Commit `1dcc1d3` adds `@playwright/test`, `playwright.config.ts`, and
 - Verified: 807 Vitest tests, typecheck, lint, static build, touched-file Prettier, and **14/14
   Playwright cases**. The user independently ran all 14 and passed them on 2026-07-23.
 
-### 5.8 Next agent: Phase 10 — docs and milestone close
+### 5.8 Phase 10 — DONE; milestone review next
 
-Phase 9 is closed. Build **only Phase 10**, then verify, commit, push and STOP.
-
-- Re-read `M11-PLAN.md` Phase 10 plus the docs owed below.
-- Reconcile `yaccount-tech-spec-v3.md` §12 and §10.1 with what Phases 3–9 actually shipped.
-- Reconcile `yaccount-implementation-details.md` §4 M11.
-- Update `HANDOFF.md` from its stale M2/M9 state; preserve all invariants and history.
-- Update this live handoff to mark M11 complete and prepare milestone closure/PR guidance.
-- Do not start post-M11 widget work or M10 Capacitor.
-- Do not change Phase 8’s optional icon-placement or sync-banner behavior.
+Phase 10 reconciled spec §6.1/§10/§12, implementation §4, `HANDOFF.md` and this file with shipped
+Phases 3–9. Invariants/history remain. Category icons vs. dots and the non-dismissible sync banner are
+unchanged. Review branch, then open the M11 PR against `main` with `gh` only when approved.
 
 ### 5.1–5.3 — the original plan (code map still useful; strand 1 is now icons, above)
 
-### Strand 1 — the category-colour override UI (the last deferred SPEC item, §10.1)
+### Strand 1 — original colour-override plan (superseded by shipped icons in §5.5)
 
 Spec §10.1 is a **hybrid auto-palette + per-category override**. The auto half shipped at M5
 (`categoryDotColor(id)`); this phase adds the override. **The data already exists** — do not touch the
@@ -822,17 +818,9 @@ one of these in Tailwind is forking §12.8. `useLocalPref` is `T extends string`
 Phase 9 is done. Phase 10 (docs) is specified in `M11-PLAN.md`; don't re-plan it, but re-ground every
 claim in the shipped code before editing.
 
-**Owed to Phase 10 (docs), noted so it isn't lost:**
-- §12.4 has no paragraph on the **navigation shell** (bottom tabs vs. rail, the More sheet,
-  iris-marks-the-active-tab), nor on the **dashboard as a widget registry** (fold, per-widget window,
-  the drill-down deep links). Phases 4 and 7 invented no new *device*, so nothing is out of compliance —
-  but both should be described.
-- §12.4's carried-day-header paragraph should note the **`overflow-clip`** requirement, since the next
-  person to add a sticky header inside a card will hit the same wall.
-- §6.1's **per-widget period override** and period **persistence** are now built (Phase 7) — the spec
-  describes them as intended; confirm the wording matches what shipped.
-- `HANDOFF.md`'s §12 cheat-sheet (invariant #8) still describes the M2 language. Its banner flags this,
-  but Phase 10 should rewrite the cheat-sheet itself.
+**Paid in Phase 10:** §12 now records the shell, widget registry/deep links and `overflow-clip`;
+§6.1 records period persistence/overrides; §10 records the icon pivot; the main handoff cheat-sheet is
+current.
 
 ---
 
@@ -1023,5 +1011,5 @@ bc6d26a docs: M11 live handoff for a fresh context window
 381d34c docs: M9 merged (PR #8), handoff prepped for M11 (M10 skipped)   ← main
 ```
 
-No PR opened yet — the user has been merging at milestone boundaries via `gh`. Open one when M11 is
-complete (Phase 10), not per phase.
+No PR opened yet. Stop for review. After approval, use `gh` to open one M11 milestone PR against
+`main`; merge only on explicit instruction.

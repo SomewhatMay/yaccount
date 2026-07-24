@@ -86,7 +86,7 @@ yaccount/
 
 > **UI convention (M2+):** feature components live in `src/features/`; reusable primitives are **shadcn/ui** components under `src/components/ui/` (regenerate/extend via `npx shadcn@latest add <name>`). Cross-component state = **Jotai** atoms (`src/features/store.ts`). Icons = **Lucide** (`lucide-react`).
 >
-> **⚠️ The visual design language is LOCKED — spec §12 "Quiet Register" is law.** Before building ANY UI, read spec §12 in full. Do not improvise palette, typography, or layout; do not drift from it component-by-component. Quick map of where the law lives in code:
+> **⚠️ The visual design language is LOCKED — spec §12 "The Standing Register" is law.** Before building ANY UI, read spec §12 in full. Do not improvise palette, typography, or layout; do not drift from it component-by-component. Quick map of where the law lives in code:
 > - **Tokens** — `src/app/globals.css`: iris `--brand`/`--primary`/`--ring`, emerald `--positive` (→ `text-positive`), rose `--destructive` for true-negative only; neutral base. `.tnum` = tabular figures. Use **semantic tokens only**, never raw hex.
 > - **Type (3 roles)** — `src/app/layout.tsx`: **Fraunces** display (`font-display`) for hero figures/headings/wordmark, restraint only; **Geist** body; **Geist Mono** (`font-mono`) for **every amount**, always with `.tnum`.
 > - **Category color** — `src/features/category-color.ts` `categoryDotColor(id)`: deterministic hue dot; the only category-swatch scheme (foreshadows §5.1/§10.1 auto-palette, formal at M5).
@@ -96,7 +96,7 @@ yaccount/
 >
 > **Also read spec §12.4-a (M3):** inline rename = explicit ✓/✗, never commit-on-blur; anything loggable repeatedly shows its **history** with per-row `⋯` Edit/Delete (never a write-only form); the money direction is a visible `−`/`+` control (`SignToggle`), not a typing convention; toggle menu entries are checkbox items with a **leading** indicator.
 >
-> M11 executes the finishing pass ON TOP of §12 (motion, empty/error polish, category-color override UI, responsive density) — it must not restart or contradict it.
+> M11 completed the finishing pass ON TOP of §12: motion/states, responsive shell/density, tested contrast and user-directed category icons. Colour customization stayed model/rendering-only; no picker shipped.
 
 **Key structural rule:** `src/core/` never imports React, Next, Capacitor, or `drivestore`. It is pure TypeScript, fully unit-testable in Node with `fake-indexeddb`. This is what lets us validate all product logic before any platform/sync work.
 
@@ -315,18 +315,22 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 ---
 
 ### M11 — Design System & Polish
-**Goal:** Realize the "sleek, minimalist, modern" brief (§1) as concrete tokens, and responsive layout per surface (§2.1).
-**Scope:**
-- **Execute the finishing pass on the LOCKED "Quiet Register" design language (spec §12) — extend it, never restart it.** Refine tokens/typography/spacing on top of the M2 foundation already in `globals.css` + `layout.tsx` (retheme the CSS variables; keep Fraunces/Geist/Geist Mono, iris/emerald semantics, the compose-bar / Sheet / register-row / `⋯`-menu patterns). Add what §12 explicitly defers to M11: purposeful **motion**, empty/loading/error/sync states, `DriveError` surfaces, the accessibility pass, and the **category color user-override UI** (auto-palette default ships M5; here we add per-category picking — §10.1 hybrid). Any change to the design language itself is a deliberate edit to spec §12, not silent drift.
-- **Design system v2 — "The Standing Register" (DONE, phase 3).** The user chose direction A from three illustrated options (2026-07-22); **spec §12 was edited deliberately** per invariant #8 and the changed passages are marked **(M11)** in place. Thesis, typefaces and iris/emerald semantics unchanged. What landed: the whole neutral ramp retinted to the brand hue (h 285, light + dark) with iris moved from 4% washes to full strength used rarely; `--surface-sunken` and `--rule`; the `.figure-hero/-lg/-md` scale over Fraunces' `opsz`/`SOFT`/`WONK` variable axes plus its italic for `.marginalia`; `.eyebrow`; `.rule`/`.rule-double` and `.leaders`; a three-duration/one-curve motion budget and a global `prefers-reduced-motion` kill switch. Shared primitives live in **`src/features/ui/`** (`Figure`, `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`, `ListSkeleton`) — screens compose the language rather than re-deriving it in Tailwind classes.
-  **The ramp is test-enforced:** `src/features/ui/theme.test.ts` parses `globals.css`, converts oklch → sRGB via the pure `features/ui/contrast.ts`, and fails if any read pair drops below WCAG AA in either theme, if the focus ring drops below 3:1, or if a neutral loses its tint. This closes the one thing a visual review reliably misses.
-  *Also fixed here:* an unlayered `body { font-family: system-ui }` left over from the shadcn scaffold outranked every layered rule, so **body copy had never actually been rendering in Geist** despite §12.3 and the `font-sans` class on `<body>`.
-- Responsive layout reorganization per breakpoint/platform (nav patterns, density) — same functionality, different arrangement (§2.1). Sheets are bottom-on-mobile / right-on-`sm+` via `ResponsiveSheet` (all five edit sheets converted in phase 3).
-- Empty states, loading/sync indicators, error surfaces (esp. `DriveError` §4), accessibility pass.
-- Bundle-ID finalization is **not an M11 task** — it must precede M10's real OAuth client registration, so it belongs to the §6 parallel track (lock it by M8 planning at the latest). Listing it in the final milestone was an ordering bug; M11 only *consumes* the already-locked value.
+**Status:** DONE on `m11-design-polish`; 807 Vitest + 14 Playwright passing.
 
-**How to test:** Playwright e2e across key flows at desktop + mobile breakpoints; visual review; a11y audit.
-**Exit criteria:** Ships looking intentional and coherent on all three surfaces.
+**Delivered:**
+- Entry instants + editable time; register ordering by date, instant, id; local-calendar helpers.
+- Structured logging, route/section boundaries, guarded async writes and Settings diagnostics.
+- **"The Standing Register"** (§12): tinted paper/ink, rare full-strength iris, figure scale, marginalia/rules/leaders, tested AA token ramp, fixed motion budget and reduced-motion kill switch.
+- One responsive shell: Home/Ledger/Inbox/More tabs below `lg`, full sidebar from `lg`, global quick-add FAB/sheet and command palette. All create/edit flows use `ResponsiveSheet`; inline compose bars are retired.
+- Register history curve, carried balances, shared filters/sorts; responsive filtered list views.
+- Fixed-order 16-widget dashboard registry with persisted global/per-widget periods, collapsible sections, derivations, charts and selected ledger deep links.
+- User-directed category **icon** customization via a searchable curated Lucide picker. Existing auto/stored category colour rendering remains; no colour-picker UI. Plan/dashboard keep dots by deliberate scope.
+- Skeletons, invitation empty states, first-run category onboarding, persistent sync-error banner, focus/a11y pass.
+- Playwright: seven critical local-first flows on desktop Chrome and 390×844 mobile Chrome.
+
+**Verification:** `npm test` (807), typecheck, lint, static build, touched-file Prettier and `npm run test:e2e` (14/14). User independently passed all 14 on 2026-07-23.
+
+**Exit criteria:** Met. M10 Capacitor and post-M11 movable/visibility widget work remain separate.
 
 ---
 

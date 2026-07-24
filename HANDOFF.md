@@ -1,48 +1,14 @@
 # yaccount — Handoff
 
-> ## 🚧 **M11 IS IN PROGRESS — READ [`M11-HANDOFF.md`](M11-HANDOFF.md) FIRST.**
-> Branch `m11-design-polish` (pushed). Phases 1–9 are done, browser-tested and committed.
-> **Phase 10 (docs and milestone close) is next.** The approved design direction, phase table, handoff,
-> decisions and working protocol live in that file. The approved plan is
-> [`M11-PLAN.md`](M11-PLAN.md). Test count is **807 Vitest + 14 Playwright**.
->
-> **⚠️ Three things below are now STALE — `M11-HANDOFF.md` and spec §12 win:**
-> 1. **The design language is no longer the M2 shadcn-neutral ramp.** Spec §12 was **edited
->    deliberately** (invariant #8's explicit-decision path, user-chosen direction A) and retitled
->    **"The Standing Register"**: every neutral is now tinted with the brand hue, iris is full-strength
->    and rare, and there is a figure scale, a marginalia/eyebrow/rule/leaders device set and a motion
->    budget. The §12 cheat-sheet in "Non-negotiable invariants" below still describes the M2 state.
->    **Read spec §12 itself — the passages marked (M11) are the current law.**
-> 2. **New UI code composes `src/features/ui/` primitives** (`Figure`, `Money`, `Eyebrow`,
->    `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`,
->    `ListSkeleton`, `PageHeader`, `RowActions`, `CollapsibleSection`) rather than hand-rolling Tailwind
->    classes. `theme.test.ts` holds the token ramp to WCAG AA in both themes — if you change a colour
->    token, that test tells you what it costs.
-> 3. **`AppNav.tsx` is gone (Phase 4), and so is `ledger/ComposeBar.tsx` (Phase 5).** Navigation is now
->    `src/features/shell/` — one destination registry (`nav.ts`) behind a bottom tab bar
->    (Home · Ledger · Inbox · More) below `lg`, a sidebar rail from `lg`, a More sheet, a quick-add FAB
->    + sheet, and a ⌘K palette. **Writing a transaction is the FAB + quick-add sheet**, over
->    `ledger/compose.ts` + `useComposeFields`; the ledger no longer carries an inline compose bar
->    (Categories and Containers still do, so the §12.4 pattern stands).
-> 4. **The inline compose bar is RETIRED (Phase 6 fix round, 2026-07-22 — the user's call).**
->    **Creating anything opens a `ResponsiveSheet`**, from a `PageHeader` "New" action or, for a
->    transaction, the quick-add FAB. `ledger/ComposeBar.tsx` was deleted in Phase 5; Categories and
->    Containers lost theirs in Phase 6 (`CategorySheet`/`ContainerSheet`). The cheat-sheet's
->    "create→compose-bar" and "create = inline" lines below are **stale** — spec §12.4 (M11) is the
->    rule now, and `border-primary/15 bg-primary/[0.04]` is not a pattern in this app any more.
->    Single-field **rename stays inline** (§12.4-a) — that exception is unchanged.
-> 5. **One filter predicate, one filter rail (Phase 5).** `core/engine/filter.ts`
->    (`matchesFilter`/`applyFilter`) is the shared rule — `searchTransactions` is now its text half —
->    and `src/features/FilterBar.tsx` is the shared rail, generic over facets so a list view supplies
->    facets rather than forking it. View preferences persist through `src/features/prefs.ts`
->    (`useLocalPref`), never through the op log.
->
-> This file below is the milestone-level history through M9 — still authoritative for invariants,
-> environment and prior-milestone context, but it does NOT know about M11 progress.
+> ## ✅ **M11 COMPLETE — milestone review next**
+> Branch `m11-design-polish`. Phases 1–10 complete. User passed all 14 desktop/mobile Playwright
+> cases on 2026-07-23. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
+> touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history and PR guidance.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** **M9 (Google Drive Sync — the Checkpointer) DONE — merged to `main` via PR #8** (merge commit `a7a4c65`, 2026-07-22). **User browser-verified** the real 2-profile Drive round-trip (sign in → log on A → appears on B; ledger files land in Drive AppData). Core-first TDD: **380 → 407 vitest tests green** (+27: 9 repo-merge/outbox + 18 pure two-client checkpointer over an in-memory fake Drive). Typecheck/lint/build/prettier clean. **`DB_VERSION` 2 → 3** (adds a device-local `outbox` store; guarded upgrade, no data drop). Followed by a 4-agent `/simplify` cleanup pass (commit `e099fad`). **Both merge-path obligations resolved:** #33 buffer/sort remote ops under the total order — DONE via `Repo.applyRemoteOps` (union + full re-replay, early-return when nothing new). #34 snapshot natural-key — **user chose to KEEP the delete-by-key upsert as-is** (merge is deterministic under the total order via #33; the rare erase-unseen-report edge is accepted). **One real bug found & fixed during verify:** drivestore's `fetch` needs binding — pass `globalThis.fetch.bind(globalThis)` (else "Illegal invocation"). **Also:** the Google Cloud project needs the **Drive API enabled** (separate from OAuth setup) — user did this. See "M9 decisions and delivered code".
-> **⚠️ Next up: M11 (Design System & Polish).** **User chose to SKIP M10 (Capacitor native) for now** — do M11 next. M11 is the finishing pass ON TOP of the LOCKED §12 "Quiet Register" language (motion, empty/loading/error/**sync** states, `DriveError` surfaces, category-color override UI, responsive density, Playwright e2e) — **extend §12, never restart it.** Needs no external setup. Confirm the milestone with the user first — ask, don't assume (M10 is still a valid pick if they change their mind). See "Next Steps".
+> **Last updated:** **M11 (Design System & Polish) DONE** on `m11-design-polish`, 2026-07-23.
+> M10 Capacitor remains skipped, not started. Post-M11 movable/visibility widget work remains unstarted.
+> **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
 > **Prior:** **M6 DONE — merged via PR #5** (`0e9416e`), browser-verified, 312 tests. M5 via PR #4; M4 via PR #3; M3 via PR #2; M0–M2 via PR #1.
@@ -83,15 +49,17 @@ v1 ships at **M7** (features + mandatory cloud sync M9). Work ONE milestone at a
 5. **Local-first instant open** (spec §8.6): render from local cache immediately; NEVER block boot on network; sync is always background.
 6. **Per-device Drive ledgers** (spec §8.4): each device writes only its own `ledger_<deviceId>.json`.
 7. **`src/core/` boundary:** pure TS, no React/Next/Capacitor/drivestore imports (enforced by ESLint rule). Fully unit-testable in Node.
-8. **UI obeys the LOCKED design language — spec §12 "Quiet Register" (see cheat-sheet below).** No palette/type/layout improvisation, no per-component drift. Every new screen matches it or you edit §12 by explicit decision first.
+8. **UI obeys the LOCKED design language — spec §12 "The Standing Register" (see cheat-sheet below).** No palette/type/layout improvisation, no per-component drift. Every new screen matches it or you edit §12 by explicit decision first.
 
-### 🎨 Design language — "Quiet Register" (LOCKED M2, canonical spec §12). READ §12 before any UI.
+### 🎨 Design language — "The Standing Register" (LOCKED, M2 + M11; canonical spec §12)
 The thesis: **a paper ledger a designer fell in love with** — calm, exact, columnar; money is quiet by default with ONE iris spark + emerald-for-inflow. Reject the cold fintech dashboard AND the red/green spreadsheet. Restraint is the brand; the numbers are the hero.
-- **Color (semantic tokens only, `globals.css`):** iris `--brand`/`--primary`/`--ring` (the one spark — use sparingly); emerald `--positive`/`text-positive` = money **in** only; rose `--destructive` = true-negative/danger only (expenses are **neutral** — the minus sign carries it); shadcn `neutral` base. Category identity = deterministic **color dots** via `categoryDotColor(id)` (`src/features/category-color.ts`) — the only swatch scheme.
-- **Type (3 roles, `layout.tsx`):** **Fraunces** display (`font-display`) for hero figures/headings/wordmark, restraint only; **Geist** body; **Geist Mono** (`font-mono`) for **every amount**, always `.tnum`. Never mix these up.
-- **Layout/patterns:** single reading column (`max-w-2xl`); soft `rounded-2xl` card surfaces; **balance hero** (big Fraunces figure + tiny uppercase eyebrow + quiet marginalia); **inline iris compose-bar** for create; **date-grouped register rows** (`[dot] [payee+category] … [mono amount] [hover ⋯]`); per-item actions behind a hover **`⋯` DropdownMenu**; **edit opens a right-hand `Sheet`** (NEVER a compose-area mode-swap — that was a real bug, do not reintroduce); confirm-destructive = `AlertDialog`.
-- **Interaction/voice:** motion is a whisper (`transition-colors` + shadcn Sheet/menu/toast only; respect reduced-motion); feedback = `sonner` toasts bottom-right; soft rules (unusual sign) = **inline arm-then-confirm**, never `window.confirm`. Copy = sentence case, user-side voice, blameless specific errors, inviting empty states.
-- **Extending:** shadcn/ui first; semantic tokens only; amounts `font-mono`+`.tnum`; headers Fraunces; create→compose-bar, edit→Sheet, actions→`⋯` menu. When in doubt, make it quieter. M11 polishes ON TOP of §12 (motion, empty/error, color-override UI) — never restarts it.
+- **Color:** tinted paper/ink semantic tokens only. Full-strength iris is rare: FAB, active nav, focus, primary action. Emerald = inflow only; rose = danger/negative balance; expenses stay neutral. `theme.test.ts` enforces AA and tint.
+- **Category identity:** `categoryColor`/`categoryColorFor` are the sole colour scheme. `CategoryGlyph` adds an optional curated Lucide icon and falls back to the dot. Plan/dashboard intentionally keep dots.
+- **Type/devices:** Fraunces figure scale/headings; Geist body; Geist Mono + `.tnum` for money. Compose `src/features/ui/` primitives: figure, money, eyebrow, marginalia, ruled total, leaders, sparkline, page header, rows, sheets, states.
+- **Layout/shell:** one reading column by default; dashboard may widen. Below `lg`: Home/Ledger/Inbox/More tabs. From `lg`: sidebar rail. Quick-add FAB everywhere. Create/edit = `ResponsiveSheet`; rename is the one inline exception. Row actions = `RowActions`; archived/paused groups fold.
+- **Register:** history-grounded figure, date-grouped rows, sticky carried balance hidden under filters. Sticky cards require `overflow-clip`, not `overflow-hidden`.
+- **Motion/voice:** three durations, one curve, one orchestrated quick-add sequence; reduced motion kills all. Blameless sentence-case copy, inviting states, `sonner` feedback.
+- **Dashboard:** fixed ordered widget registry with stable ids, persisted fold/window preferences and honest ledger deep links. Movable/visibility widgets are post-M11.
 
 ### Working style (user prefs — from global CLAUDE.md + memory)
 - **Extremely concise; sacrifice grammar for concision.** No co-author mentions in commits. Prefer `gh` CLI for GitHub.
@@ -112,7 +80,9 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M5 (Reporting & Dashboard Engine + Charts) — DONE, merged to `main` via PR #4.** TDD followed core-first (tests red via missing modules → impl → green). **234 → 266 tests** (+32; all in `src/core/engine`). Typecheck/lint/build/prettier clean. **User browser-verified the full dashboard** against a hand-computed fixture (all widgets, numbers correct). See "M5 decisions and delivered code" below.
 
-**M9 (Google Drive Sync — the Checkpointer) — DONE, merged to `main` via PR #8 (`a7a4c65`), browser-verified.** Per-device ledgers + checkpointer over drivestore; instant-open + background cadence; merge-holes #33/#34 resolved. Core-first: **380 → 407 tests** (+27). **`DB_VERSION` 2 → 3** (`outbox` store). Typecheck/lint/build/prettier clean + a `/simplify` cleanup pass. See "M9 decisions and delivered code" below. **M11 (design polish) is next — user SKIPPED M10 for now.**
+**M11 (Design System & Polish) — DONE on `m11-design-polish`, awaiting milestone review/PR.** All 10 phases shipped and browser-tested. **807 Vitest + 14 Playwright** pass. Typecheck/lint/static build/touched-file Prettier clean. M10 Capacitor and post-M11 movable/visibility widget work were not started.
+
+**M9 (Google Drive Sync — the Checkpointer) — DONE, merged to `main` via PR #8 (`a7a4c65`), browser-verified.** Per-device ledgers + checkpointer over drivestore; instant-open + background cadence; merge-holes #33/#34 resolved. Core-first: **380 → 407 tests** (+27). **`DB_VERSION` 2 → 3** (`outbox` store). Typecheck/lint/build/prettier clean + a `/simplify` cleanup pass. See "M9 decisions and delivered code" below.
 
 **M8 (Authentication — Google OAuth, web flow) — DONE, merged to `main` via PR #7 (`3e384a6`), browser-verified.** First PLATFORM milestone. Core-first: **367 → 380 tests** (+13, all pure token-lifecycle). Typecheck/lint/build/prettier clean. **No DB/schema change** (auth state in `localStorage`). See "M8 decisions and delivered code" below.
 
@@ -120,7 +90,7 @@ The thesis: **a paper ledger a designer fell in love with** — calm, exact, col
 
 **M6 (Recurring Rules, Templates & the Inbox) — DONE, merged to `main` via PR #5 (`0e9416e`).** Core-first: **266 → 312 tests** (+46). Typecheck/lint/build/prettier clean. **User browser-verified** all flows (incl. the three post-verify fix rounds + bulk dismiss below). **No DB/schema change** (`recurring_rules` + `goals` stores existed since M1, DB_VERSION stays 2). See "M6 decisions and delivered code" below.
 
-**Execution order note (historical):** the user chose to do **M3 before M8/M9** (impl §7 order says sync first) and kept going with product milestones (M4–M7) before auth. The impl doc's stated order was `…M3 → M4 → M6 → M5 → M7…`; the user swapped it to `…M4 → M5 → M6 → M7…` (did M5 before M6). **M0–M9 are all now done and merged** (M8 auth + M9 sync shipped after the feature set). The lesson stands: **the user picks the next milestone explicitly — ask, don't assume** the impl doc's default order — e.g. the user chose to skip M10 and do M11 next. Next is **M11 (design polish)**.
+**Execution order note (historical):** the user chose M3–M7 before M8/M9, then skipped M10 and completed M11. **M0–M9 are merged; M11 awaits milestone review/PR.** The user picks the next milestone explicitly; do not infer M10 or post-M11 work.
 
 Git log (`main`, current — M0–M9 merged):
 ```
@@ -158,7 +128,7 @@ eec4db7 M8 auth: Google OAuth web flow (durable-grant AuthProvider seam)
 - **Jotai wiring (`store.ts`):** `syncStatusAtom` (`idle|syncing|synced|disconnected|error`), `lastSyncedAtAtom`, `syncAtom` (pre-gates on `getAccessTokenSilent` — no popup on a background tick; `null` while connected → `disconnected`), `reconnectAtom` (interactive re-consent, user gesture), debounced post-dispatch trigger, boot kick in `bootstrapAtom`. `RepoBootstrap` adds the 45s interval + focus/visibility sync.
 - **UI:** `SyncIndicator.tsx` (quiet §12 header affordance next to `AuthButton`): spinning refresh while syncing, muted cloud when settled (tooltip "Synced Xm ago"), struck cloud on error (tap to retry), a **"Reconnect" pill** when `disconnected` (the one gesture sync needs, §3.3-B — the M8-deferred affordance). `AuthButton` kicks a sync on sign-in and drops status to idle on sign-out.
 - **Tests (+27, all pure):** `repo/repo-sync.test.ts` (merge LWW, idempotent, #33 stale-update-can't-clobber, unknown-op skipped, delta-not-replace, outbox enqueue/clear/no-double-enqueue); `sync/serialize.test.ts` (JSONL round-trip, torn-line tolerance, path guards incl. hyphenated UUID); `sync/checkpointer.test.ts` (two-client convergence, concurrent same-entity LWW, offline-then-merge zero-loss, per-device isolation + no cross-writes, re-sync no re-append, collapse→archive→truncate, fresh-device rebuild, delta-not-replace, fresh-account 404). Real-Drive round-trip is **manual browser verify** (2 profiles, same test account) — can't be Vitest-covered.
-- **Scope note / nothing cut, correctly deferred:** native OAuth + secure token storage → **M10**; design polish of sync/empty/error states, category-color override UI → **M11**. Known acceptable simplifications (documented above): `applyRemoteOps` full-rebuild each tick (fine at ≤ thousands of ops; the `by_container_month` indexes exist for when it matters); snapshot op-set grows with history (archives hold the compaction/audit); #34 delete-by-key kept per user.
+- **Historical M9 scope note:** native OAuth + secure token storage → **M10**. M11 later shipped sync/error-state polish and user-directed category icons instead of a colour picker. Known acceptable simplifications remain: `applyRemoteOps` full-rebuild each tick; snapshot op-set grows with history; #34 delete-by-key kept per user.
 
 ### M8 decisions and delivered code (this session, branch `m8-auth`)
 - **The one seam (§3.4):** `src/auth/AuthProvider.ts` — the `AuthProvider` interface + a **pure, platform-free `TokenManager`** implementing it. This is the file M9 hands to `createDriveStore({ accessToken: getAccessToken })`; drivestore never learns the platform. Deliberately unit-testable in Node (no `window`/GIS) so M9 can test sync against a fake provider. **Not under `src/core`** — auth is a platform seam (impl §2 tree puts `auth/` as a sibling); the ESLint core-boundary rule doesn't apply, but `AuthProvider.ts` stays import-pure anyway.
@@ -188,7 +158,7 @@ eec4db7 M8 auth: Google OAuth web flow (durable-grant AuthProvider seam)
   - **`/goals`** (`goals/GoalsView.tsx` + `GoalSheet.tsx` + `describe.ts`) — active goal cards (progress bar, `basis/target`, % over-100 shown raw, available balance, `$X/mo to stay on pace`, projected date, **replan warning** when past-deadline-and-short), an **Achieved & closed** section (Archive/Resume), and an **Archived** section w/ Restore (§1.1). The Sheet creates+edits: kind toggle (Save&spend ↔ Keep as reserve), mode select (deadline/fixed/passive), target/deadline/monthly (shown per mode), **absorb-leftover** checkbox (create), **auto-contribute** opt-in (create; funding container + day-of-month → builds a linked monthly transfer rule). **Container auto-create/reuse + ≤1-active enforcement is app-level in `GoalsView.handleSubmit`** (§5.9.2): reuse a same-named non-archived container, block if it already has an active goal, create fresh otherwise; absorb sets `opening_contributed = containerBalance`.
   - **`/plan`** (`plan/PlanView.tsx`) — month stepper, Income (recurring or inline-editable manual), Category allowances section, Goal contributions section, and an **Unallocated / Over-committed** footer (rose bg + `text-destructive` when negative). Uses `categoryDotColor` for allowance dots (§12.2 one-swatch rule).
   - **Store** — `goalsAtom` (+ in `refreshAtom`), `expectedIncomeKey`, `runGoalMaintenanceAtom`, goal_derived wiring in `runRecurringGenerationAtom`, both maintenance passes in `bootstrapAtom`.
-- **Scope note / nothing cut:** the whole §5.9 + §6.8 surface is built. **Deferred niceties (not blockers, → M11):** the savings-goal template+reminder convenience layer (§5.9.6/§10.8, explicitly non-blocking); per-widget period override; category-color override UI. **Known minor:** goal auto-completion latches only at boot (not immediately after a mid-session approval) — cosmetic (badge is live-derived, ask/generation already behave as complete). If the user wants instant latch, call `runGoalMaintenanceAtom` after inbox approvals in `InboxView`.
+- **Historical M7 scope note:** the whole §5.9 + §6.8 surface is built. M11 later shipped per-widget period overrides and category icons instead of a colour picker. The savings-goal template/reminder remains optional. **Known minor:** goal auto-completion latches only at boot; badge/ask/generation derive live.
 
 ### M6 decisions and delivered code (this session, branch `m6-recurring`)
 - **No new object store, no `DB_VERSION` bump.** `recurring_rules` (and `goals`) already existed from M1 (schema-only until now). Templates are just `transactions` rows (`is_template=true`), so they need no store either.
@@ -356,37 +326,12 @@ All in `src/core/` (pure TS; only idb/zod deps):
 
 ## Next Steps
 
-**M9 is DONE and merged to `main` (PR #8, `a7a4c65`), browser-verified.** `main` now has M0–M9 (M10 skipped for now). Sync is live: per-device ledgers + checkpointer over drivestore, instant-open, background cadence. 407 tests green. See "M9 decisions and delivered code".
+1. Review `m11-design-polish`.
+2. Open a milestone PR against `main` with `gh` when approved; merge only on user instruction.
+3. Pick the next scope explicitly. **Do not automatically start M10 Capacitor or post-M11 widgets.**
 
-### Up next: **M11 — Design System & Polish** — CONFIRM the milestone with the user first
-**Roadmap:** `M8 (auth) ✔ → M9 (Drive sync) ✔ → [M10 Capacitor native — SKIPPED for now, user's call] → M11 (design polish)`. **The user chose to do M11 next and skip M10.** M11 needs NO external setup. But the user picks the next milestone explicitly — **ask, don't assume** (M10 is still valid if they change their mind).
-
-**M11 scope (impl §4 "M11" + spec §12, READ §12 IN FULL first — EXTEND it, never restart it):**
-- **Execute the finishing pass on the LOCKED "Quiet Register" language (spec §12).** Refine tokens/type/spacing on top of the M2 foundation in `globals.css` + `layout.tsx` (retheme CSS vars; KEEP Fraunces/Geist/Geist Mono, iris/emerald semantics, the compose-bar / Sheet / register-row / `⋯`-menu patterns). Any change to the language itself is a deliberate edit to spec §12, not silent drift.
-- **Add what §12 explicitly defers to M11:** purposeful **motion** (respect reduced-motion), **empty/loading/error/sync states** (incl. `DriveError` surfaces — the M9 `SyncIndicator` already has an error/reconnect affordance to build on; `describeSyncError` in `src/sync/drive.ts` gives a legible message), the **category-color user-override UI** (auto-palette default shipped M5; here add per-category picking — §10.1 hybrid; `categoryDotColor(id)` in `src/features/category-color.ts` is the current scheme), **accessibility pass**, **responsive density** per breakpoint (§2.1).
-- **Playwright e2e** for the critical flows (log expense, transfer, create goal, approve inbox, view plan) — first automated UI coverage (all UI has been manual-verify only through M9).
-
-**M11 How-to-test / exit (impl §M11):** Playwright e2e across key flows at desktop + mobile breakpoints; visual review; a11y audit. Exit: ships looking intentional and coherent on all three surfaces.
-
-**Concrete M11 polish candidates already surfaced (pick up from prior milestones):**
-- **Period atoms aren't persisted** — `reportingPeriodAtom`/`comparePeriodAtom` reset on refresh (persist to `settings` or localStorage).
-- **Per-widget period override (§6.1)** and **category-color user-override UI (§10.1/§5.1)** deferred here as specced.
-- **Sync UX polish:** the M9 `SyncIndicator` is functional but minimal (a cloud icon + reconnect pill); §12 motion/empty/error polish applies. Also consider surfacing "N pending to sync" or a first-run fresh-device state.
-
-**Deferred niceties surfaced during M5 (not blockers):**
-- **Period atoms aren't persisted** — `reportingPeriodAtom`/`comparePeriodAtom` reset on refresh. Fine for now; if wanted, persist to the synced `settings` store or localStorage (localStorage is device-local, which is arguably correct for a view preference). M11 polish candidate.
-- **Cold-period IndexedDB fallback (§8.3)** not built — all aggregation runs over the full in-memory transaction set (fine at current scale; the `by_container_month`/`by_container_category_month` indexes exist for when it matters).
-- **Per-widget period override (§6.1)** and **category-color user-override UI (§10.1/§5.1)** both deferred to M11 as speced.
-
-**Milestone-ownership deferrals to remember (flagged in M1, NOT open decisions):**
-- Recurring `frequency↔interval_config` + `amount_mode↔template_amount` refinements — ✔ **DONE in M6**. Goal `mode`/`kind` invariants — ✔ **DONE in M7** (`GoalSchema` now has 5 `.refine`s + `makeGoal`; the `model/goal.ts` NOTE is resolved). **All model refinements are now closed.**
-
-**Remaining platform milestones (M11 is the active target — see "Up next" above for its full scope):**
-- **M8** (Google OAuth, web flow) — ✔ **DONE, merged** (PR #7, `3e384a6`), browser-verified.
-- **M9** (Drive sync) — ✔ **DONE, merged** (PR #8, `a7a4c65`), browser-verified. Per-device ledgers + checkpointer over drivestore; merge-holes #33/#34 resolved. The `src/sync/` module + `Repo.applyRemoteOps`/`outbox` are the seam any future sync work builds on.
-- **M11** (design polish) — **NEXT (user's pick, skipping M10)**; the finishing pass ON TOP of the locked §12 "Quiet Register" language (motion, empty/error/sync states, category-color override UI, responsive density, Playwright e2e). Needs no external setup.
-- **M10** (Capacitor native) — **SKIPPED for now (user's call)**; do it after M11 (or whenever the user wants). Needs iOS/Android OAuth client IDs + secure token storage (Keychain/Keystore), a native OAuth flow (`src/auth/native.ts`, PKCE via system browser), and `com.yaccount.app://oauth2redirect`. The M8 `AuthProvider` interface + M9 `getDriveFS` seam are ready for it — native just adds a `native.ts` behind the same `AuthProvider`.
-- The impl §6 parallel non-code track (the remaining native OAuth client IDs, privacy policy to leave "Testing") is the **user's** to do; it gates M10, not M11.
+M10 remains skipped. The M8 `AuthProvider` and M9 Drive seam remain its starting points if selected.
+Post-M11 widget reordering/visibility should wrap the existing stable-id registry.
 
 ---
 
@@ -423,7 +368,7 @@ npm test && npm run typecheck && npm run lint && npm run build && npx prettier -
 - **State management = Jotai** (added M2, `src/features/store.ts`). Cross-component UI state → atoms; `src/core` stays React-free. Add new persisted-data atoms there and refresh them in `refreshAtom`.
 - **UI = shadcn/ui first** (added M2). Reach for a shadcn component before hand-rolling; add via `npx shadcn@latest add <name>` (WSL: PATH export first). Radix base, `neutral` theme in `globals.css`, `cn` from `@/lib/utils`. **Icons = Lucide** (`lucide-react`). Toasts = `sonner` (`import { toast } from "sonner"`; `<Toaster/>` in layout). Theme = next-themes (`ThemeProvider`, light/dark). Memory: `shadcn-ui-policy`. Present shadcn components: button, input, label, select, card, table, badge, separator, alert-dialog, sonner, sheet, dropdown-menu, tooltip.
 - **Spec §12.4-a (added M3) covers editing patterns:** inline rename = ✓/✗ never blur-commit; loggable-repeatedly records get a **history list** with `⋯` Edit/Delete, never a write-only form; money direction = visible `SignToggle`; toggle menu entries = checkbox item with a **leading** indicator. shadcn `select`/`dropdown-menu` were edited in-repo (copy-in components) for width/padding/animation — selects are `position="popper"` so they animate.
-- **Design language = "Quiet Register", LOCKED — spec §12 is law** (impl §2 build map; HANDOFF cheat-sheet in invariant #8). Fonts Fraunces/Geist/Geist Mono; iris brand + emerald-positive tokens; compose-bar/Sheet/register-row/`⋯`-menu patterns; `categoryDotColor(id)` swatches. Read §12 before building any UI; do not drift. Memory: `quiet-register-design-language`.
+- **Design language = "The Standing Register", LOCKED — spec §12 is law.** Fonts Fraunces/Geist/Geist Mono; tinted paper/ink; rare iris; emerald inflow; sheets/register rows/`RowActions`; one category colour scheme plus optional icons. Read §12 before UI work.
 - **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
 - **`HANDOFF.md` is TRACKED in git** (commit `88ebfa8` moved it into the repo so it travels across devices; the old "gitignored/local-only" note is stale). **Commit it at every milestone boundary** as a `docs:` commit on `main` (as was done for M7 → `c4c9992` and now M8) so a fresh clone / new agent sees the current state.
-- UI can't be auto-tested until Playwright (M11); `next build` prerendering to "Loading…" is only a smoke check, not runtime verification.
+- UI has 14 Playwright critical-flow cases across desktop/mobile. `next build` remains only a prerender/static-export smoke check.
