@@ -357,6 +357,16 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 - Playwright covers expense/income/transfer create, edit, blank-note silence, refresh persistence and
   responsive toast geometry at desktop and 390×844.
 
+### Post-M11 Phase 3 — FAB money mark
+**Status:** DONE, merged via PR #12 (`d8267ac`); user verified; 810 Vitest + 20 Playwright passing.
+
+- `QuickAddFab` replaces the bare plus with a compact Lucide dollar-plus mark; the plus sits at the
+  dollar's upper-right.
+- The button's `size-14`, iris treatment, fixed mobile/desktop position, focus classes,
+  `aria-label="Log a transaction"` and `quickAddAtom("expense")` click path are unchanged.
+- Playwright pins mark composition/placement, hidden decorative SVGs, FAB size/position and keyboard
+  expense opening at desktop and 390×844.
+
 ---
 
 ## 5. Testing Strategy (cross-cutting)

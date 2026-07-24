@@ -4,9 +4,9 @@
 > **Status:** Phases 1–10 DONE. User passed all 14 desktop + 390×844 Playwright cases on
 > 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
 > touched-file Prettier.
-> **Post-M11:** Phase 2 ledger notes merged via PR #11 (`ea6551f`), user verified.
-> **Next:** Phase 3 FAB money mark. M10 Capacitor remains not started.
-> **Last updated:** 2026-07-23, post-M11 Phase 2 complete.
+> **Post-M11:** Phase 3 FAB money mark merged via PR #12 (`d8267ac`), user verified.
+> **Next:** Phase 4 FAB hold menu. M10 Capacitor remains not started.
+> **Last updated:** 2026-07-23, post-M11 Phase 3 complete.
 
 ---
 
@@ -931,8 +931,9 @@ and a concrete list of things for the user to test:
    expense, income and transfer; blank notes stay quiet; full-row ops, IndexedDB, refresh, Drive
    serialization and shortcuts retain them. Expense/income fields read Vendor/Source. Mobile Sonner
    enters below the top bar. User verified; 810 Vitest + 18 Playwright passed.
-3. `post-m11-fab-money-mark` — replace the bare plus with a compact dollar-plus mark; retain the FAB's
-   dimensions, iris treatment, accessibility and quick-tap expense behavior.
+3. ✅ `post-m11-fab-money-mark` — DONE via PR #12 (`d8267ac`). Compact dollar-plus mark, with the plus
+   at the dollar's upper-right; dimensions, iris treatment, accessibility and expense quick-tap
+   behavior unchanged. User verified; 810 Vitest + 20 Playwright passed.
 4. `post-m11-fab-hold-menu` — hold FAB for an accessible chooser of other existing create flows;
    quick tap remains ledger quick-add. Handle touch/mouse/keyboard cancellation and prevent double-fire.
 5. `post-m11-data-tools` — Settings export/import/clear-all for testing. Version and validate imports,
