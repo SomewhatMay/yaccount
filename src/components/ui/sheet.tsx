@@ -46,14 +46,24 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  bottomBleedStyle,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
+  bottomBleedStyle?: React.CSSProperties;
 }) {
   return (
     <SheetPortal>
       <SheetOverlay />
+      {bottomBleedStyle && (
+        <div
+          data-sheet-bottom-bleed
+          aria-hidden
+          className="bg-popover pointer-events-none fixed inset-x-0 z-50"
+          style={bottomBleedStyle}
+        />
+      )}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}

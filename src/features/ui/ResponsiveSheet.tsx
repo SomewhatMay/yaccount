@@ -11,6 +11,7 @@ import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
 import { useCallback, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import {
+  bottomSheetBleedStyle,
   bottomSheetViewportStyle,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
@@ -22,10 +23,10 @@ function visualViewportSnapshot(): string {
     : "";
 }
 
-function bottomSheetStyle(snapshot: string) {
-  if (!snapshot) return undefined;
+function bottomSheetViewport(snapshot: string) {
+  if (!snapshot) return null;
   const [height, offsetTop, pageTop, scrollY] = snapshot.split(":").map(Number);
-  return bottomSheetViewportStyle({ height, offsetTop, pageTop, scrollY });
+  return { height, offsetTop, pageTop, scrollY };
 }
 
 function useVisualViewport(active: boolean): string {
@@ -86,12 +87,14 @@ export function ResponsiveSheet({
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
   const viewport = useVisualViewport(open && !sideways);
+  const bottomViewport = bottomSheetViewport(viewport);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : bottomSheetStyle(viewport)}
+        style={sideways ? undefined : bottomSheetViewportStyle(bottomViewport)}
+        bottomBleedStyle={sideways ? undefined : bottomSheetBleedStyle(bottomViewport)}
         className={cn(
           "max-w-full min-w-0 touch-pan-y gap-0 overflow-x-hidden overflow-y-auto overscroll-contain",
           // A bottom sheet stops short of the top edge so the screen behind it
