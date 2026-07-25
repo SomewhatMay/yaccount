@@ -55,7 +55,7 @@ export function createCategory(
     icon?: string | null;
   },
   m?: OpMeta,
-): Op {
+): Extract<Op, { type: "category.create" }> {
   return { ...meta(m), type: "category.create", payload: { row: makeCategory(input) } };
 }
 

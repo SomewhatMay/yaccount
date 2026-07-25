@@ -58,6 +58,61 @@ describe("Repo — first-init seeding (§5.2)", () => {
 });
 
 describe("Repo — dispatch writes op-log + materialized state in one transaction", () => {
+  it("dispatchMany commits one intent atomically and is retry-idempotent", async () => {
+    const repo = await Repo.open();
+    const first: Op = {
+      id: "starter-op-1",
+      ts: at(1000),
+      type: "category.create",
+      payload: {
+        row: makeCategory({ id: "starter-1", name: "Groceries", type: "expense" }),
+      },
+    };
+    const second: Op = {
+      id: "starter-op-2",
+      ts: at(1001),
+      type: "category.create",
+      payload: {
+        row: makeCategory({ id: "starter-2", name: "Paycheck", type: "income" }),
+      },
+    };
+
+    await repo.dispatchMany([first, second]);
+    await repo.dispatchMany([first, second]);
+
+    expect(
+      (await repo.getAll<Category>(STORE.categories))
+        .filter((row) => row.id.startsWith("starter-"))
+        .map((row) => row.name)
+        .sort(),
+    ).toEqual(["Groceries", "Paycheck"]);
+    expect(
+      (await repo.listOps()).filter((op) => op.id.startsWith("starter-op-")),
+    ).toHaveLength(2);
+  });
+
+  it("dispatchMany rolls every category back when any op fails", async () => {
+    const repo = await Repo.open();
+    const valid: Op = {
+      id: "starter-op-valid",
+      ts: at(1000),
+      type: "category.create",
+      payload: {
+        row: makeCategory({ id: "starter-valid", name: "Groceries", type: "expense" }),
+      },
+    };
+    const invalid = {
+      id: "starter-op-invalid",
+      ts: at(1001),
+      type: "unknown",
+      payload: {},
+    } as unknown as Op;
+
+    await expect(repo.dispatchMany([valid, invalid])).rejects.toThrow();
+    expect(await repo.get<Category>(STORE.categories, "starter-valid")).toBeUndefined();
+    expect((await repo.listOps()).some((op) => op.id === valid.id)).toBe(false);
+  });
+
   it("dispatch applies the op to the table and records it in the oplog", async () => {
     const repo = await Repo.open();
     const row = makeCategory({ id: "c1", name: "Groceries", type: "expense" });

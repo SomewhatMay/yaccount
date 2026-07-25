@@ -172,14 +172,20 @@ export class Repo {
    * log/state desync the single transaction exists to prevent (impl §3).
    */
   async dispatch(op: Op): Promise<void> {
+    await this.dispatchMany([op]);
+  }
+
+  /**
+   * Append and apply one user intent containing several ops atomically.
+   * Existing op ids are skipped, making an exact retry harmless.
+   */
+  async dispatchMany(ops: Op[]): Promise<void> {
     const tx = this.db.transaction(ALL_STORES, "readwrite");
     try {
       const oplog = tx.objectStore(STORE.oplog);
-      if (!(await oplog.get(op.id))) {
+      for (const op of ops) {
+        if (await oplog.get(op.id)) continue;
         await oplog.put(op);
-        // Enqueue for push to THIS device's ledger (§8.4). Only locally-authored
-        // ops land here — `applyRemoteOps` deliberately skips the outbox, so a
-        // device never re-uploads another device's op to its own ledger.
         await tx.objectStore(STORE.outbox).put({ id: op.id });
         await applyOp(
           new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),

@@ -15,6 +15,7 @@ import {
   budgetTargetsAtom,
   categoriesAtom,
   dispatchAtom,
+  dispatchManyAtom,
   flashRowAtom,
   flashedRowAtom,
   readyAtom,
@@ -34,6 +35,7 @@ import { CategoryGlyph } from "@/features/category-icons";
 import { BudgetSheet } from "@/features/categories/BudgetSheet";
 import { CategoryIconSheet } from "@/features/categories/CategoryIconSheet";
 import { CategorySheet } from "@/features/categories/CategorySheet";
+import { StarterCategoriesSheet } from "@/features/categories/StarterCategoriesSheet";
 import {
   activeCategoryFilterCount,
   applyCategoryFilter,
@@ -98,8 +100,10 @@ export function CategoriesView() {
   const categories = useAtomValue(categoriesAtom);
   const budgetTargets = useAtomValue(budgetTargetsAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const dispatchMany = useSetAtom(dispatchManyAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const [creating, setCreating] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [budgeting, setBudgeting] = useState<Category | null>(null);
   const [iconing, setIconing] = useState<Category | null>(null);
 
@@ -219,15 +223,24 @@ export function CategoriesView() {
             icon={ShapesIcon}
             title="No categories yet"
             action={
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={() => setCreating(true)}
-              >
-                <PlusIcon className="size-4" />
-                New category
-              </Button>
+              <div className="flex flex-col items-center gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setStarting(true)}
+                >
+                  Use a starter set
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setCreating(true)}
+                >
+                  <PlusIcon className="size-4" />
+                  Create one myself
+                </Button>
+              </div>
             }
           >
             Add a few for what your money does — groceries, rent, salary. Every entry you
@@ -324,6 +337,16 @@ export function CategoriesView() {
         siblings={categories}
         onOpenChange={setCreating}
         onSubmit={add}
+      />
+
+      <StarterCategoriesSheet
+        open={starting}
+        siblings={categories}
+        onOpenChange={setStarting}
+        onSubmit={async (ops) => {
+          await dispatchMany(ops);
+          setStarting(false);
+        }}
       />
 
       <BudgetSheet
