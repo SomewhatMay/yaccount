@@ -15,9 +15,11 @@
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
 > **Last updated:** post-M11 Phase 5 merged via PR #14 (`fc3a820`), 2026-07-25.
-> **Next:** nothing queued. **M10 (Capacitor) is the only milestone left** and remains not
-> started — do not begin it without the user's explicit go-ahead. Movable/visibility dashboard
-> widgets also remain unbuilt.
+> **Next:** **Phase 6 — ship it on GitHub Pages** (branch `post-m11-github-pages`). The user has
+> chosen to make the repo **public** and serve a project page at
+> `https://somewhatmay.github.io/yaccount/`, so the build needs `basePath`. See the phase table.
+> **M10 (Capacitor) and movable/visibility dashboard widgets are explicitly deferred — the user
+> said skip both for now.** Do not start either without an explicit go-ahead.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
@@ -424,9 +426,22 @@ stable-id registry. Preserve M11 icon placement and sync-banner behavior unless 
 | 4 ✅ | `post-m11-fab-hold-menu` | **DONE**, PR #13 (`7067f92`). Quick press opens Expense exactly once; 500ms hold opens an accessible Expense/Income/Transfer chooser reusing `quickAddAtom` + `QuickAddSheet`. 10px movement, pointer cancel, lost capture and Escape cancel without double activation; Enter/Space and arrow-key menu navigation work. FAB mark, geometry, iris, position, focus and name remain unchanged. | User verified; 817 Vitest + 25 Playwright passed (1 expected desktop touch skip). |
 | 5 ✅ | `post-m11-data-tools` | **DONE**, PR #14 (`fc3a820`). Settings → Your data: export/import a versioned op-set file, clear everything, roll back to a retired state — across IndexedDB **and** Drive. New Drive files `origin.json`/`backup_*`/`orphan_*`; imports fully validated before any mutation; clear/import/rollback retire the current world first (nothing is deleted); `ConfirmDestructive` type-the-phrase gate. | User verified incl. two-browser offline; 879 Vitest + 33 Playwright passed (1 expected desktop touch skip). |
 
-**All post-M11 phases are complete.** Each branched from freshly pulled `main` after its
-predecessor and closure docs were merged. M10 Capacitor and movable/visibility dashboard widgets
-remain separate and unstarted.
+| 6 | `post-m11-github-pages` | **NEXT.** Deploy the static export to GitHub Pages via Actions. Repo goes **public** (user's call, user does the flip); project page ⇒ `basePath: "/yaccount"`. Needs a build+deploy workflow, the `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` repo **variable**, and `https://somewhatmay.github.io` added to the Google OAuth Authorized JavaScript origins. | Site loads at the Pages URL; every route deep-links and survives refresh; Google sign-in + Drive sync work over HTTPS; local dev and Playwright still pass. |
+
+Phases 1–5 are complete. Each branched from freshly pulled `main` after its predecessor and
+closure docs were merged. **M10 Capacitor and movable/visibility dashboard widgets are deferred
+by explicit user decision — do not start either without a go-ahead.**
+
+**Phase 6 pre-flight (the parts an agent cannot do):**
+1. The user flips repo visibility to **public** (Pages needs it on the Free plan).
+2. The user adds `https://somewhatmay.github.io` as an **Authorized JavaScript origin** on the
+   OAuth client in Google Cloud — sign-in fails with `origin_mismatch` until this is done.
+3. The user sets repo **variable** `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` (a variable, not a secret —
+   it is public by design and is baked into any static build anyway).
+4. The user sets Settings → Pages → Source = **GitHub Actions**.
+Note the OAuth consent screen is still in **Testing**, so only listed test users can sign in and
+grants lapse periodically — fine for personal use, worth remembering when sign-in suddenly asks
+for consent again.
 
 ---
 
