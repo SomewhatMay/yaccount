@@ -18,11 +18,14 @@ import {
   monthKeysInRange,
   monthlyTotals,
   netContributions,
+  overallBalance,
+  overallBalanceSeries,
   overallBalanceAsOf,
   periodSummary,
   precedingRange,
   reconstructedBalance,
   requiredMonthly,
+  recentRows,
   sankeyFlows,
   savingsRateSeries,
   topPayees,
@@ -54,6 +57,7 @@ import {
   LargestList,
   MoneyFlowChart,
   PayeeList,
+  RecentEntriesList,
   SpendingCalendar,
   UpcomingList,
   spendByDay,
@@ -134,6 +138,31 @@ function monthEnd(key: string): string {
 }
 
 // ── Hero: what the period kept ───────────────────────────────────────────────
+
+const BALANCE_CURVE_DAYS = 90;
+
+function BalanceFigure({ today, containers, transactions }: WidgetContext) {
+  const balance = useMemo(
+    () => overallBalance(transactions, containers),
+    [transactions, containers],
+  );
+  const curve = useMemo(
+    () =>
+      overallBalanceSeries(
+        transactions,
+        containers,
+        trailingDays(today, BALANCE_CURVE_DAYS),
+      ),
+    [transactions, containers, today],
+  );
+  return (
+    <Figure
+      label="Overall balance"
+      cents={balance}
+      series={recentRows(transactions, 1).length > 0 ? curve : undefined}
+    />
+  );
+}
 
 function SavedFigure({ range, categories, transactions }: WidgetContext) {
   const monthly = useMemo(
@@ -413,6 +442,26 @@ function Largest({ range, categories, transactions }: WidgetContext) {
   );
 }
 
+function Recent({ categories, containers, transactions }: WidgetContext) {
+  const rows = useMemo(() => recentRows(transactions), [transactions]);
+  const detailOf = useMemo(() => {
+    const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
+    const containerNames = new Map(containers.map((c) => [c.id, c.name]));
+    return (t: Transaction) =>
+      t.to_container_id
+        ? `${containerNames.get(t.container_id) ?? "Unknown"} → ${containerNames.get(t.to_container_id) ?? "Unknown"}`
+        : (categoryNames.get(t.category_id ?? "") ?? "Unknown");
+  }, [categories, containers]);
+  return (
+    <RecentEntriesList
+      rows={rows}
+      detailOf={detailOf}
+      hrefFor={(t) => ledgerHref({ focus: t.id })}
+      colorOf={(id) => categoryColorFor(id, categories)}
+    />
+  );
+}
+
 /** How far ahead "coming up" looks. A month is what a commitment list is for. */
 const UPCOMING_DAYS = 30;
 
@@ -560,10 +609,31 @@ function Budgets({ range, categories, transactions, budgetTargets }: WidgetConte
  */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
+    id: "balance",
+    title: "Overall balance",
+    defaultVisible: true,
+    bare: true,
+    fixedWindow: true,
+    render: (ctx) => <BalanceFigure {...ctx} />,
+  },
+  {
+    id: "pace",
+    title: "Budget pace",
+    defaultVisible: true,
+    fixedWindow: true,
+    render: (ctx) => <Pace {...ctx} />,
+  },
+  {
+    id: "recent",
+    title: "Recent entries",
+    defaultVisible: true,
+    fixedWindow: true,
+    render: (ctx) => <Recent {...ctx} />,
+  },
+  {
     id: "saved",
     title: "Saved this period",
     defaultVisible: true,
-    bare: true,
     render: (ctx) => <SavedFigure {...ctx} />,
   },
   {
@@ -572,13 +642,6 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     defaultVisible: true,
     bare: true,
     render: (ctx) => <Kpis {...ctx} />,
-  },
-  {
-    id: "pace",
-    title: "Budget pace",
-    defaultVisible: true,
-    fixedWindow: true,
-    render: (ctx) => <Pace {...ctx} />,
   },
   {
     id: "flow",

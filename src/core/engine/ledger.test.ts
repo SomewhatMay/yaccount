@@ -5,6 +5,7 @@ import {
   isVoided,
   pendingRows,
   REGISTER_SORTS,
+  recentRows,
   searchTransactions,
   sortForRegister,
   sortRegister,
@@ -66,6 +67,56 @@ describe("activeRows — a void can itself be undone (undo is first-class)", () 
     const other = expense("t2", -250);
     const v1 = makeVoidRow(t1, { id: "v1" });
     expect(activeRows([t1, v1, other]).map((r) => r.id)).toEqual(["t2"]);
+  });
+});
+
+describe("recentRows", () => {
+  it("returns only the three newest active ledger entries", () => {
+    const first = makeTransaction({
+      id: "first",
+      date: "2026-07-20",
+      amount: -100,
+      vendor_source: "First",
+      category_id: "coffee",
+      entered_at: "2026-07-20T10:00:00.000Z",
+    });
+    const second = makeTransaction({
+      id: "second",
+      date: "2026-07-21",
+      amount: -200,
+      vendor_source: "Second",
+      category_id: "coffee",
+      entered_at: "2026-07-21T10:00:00.000Z",
+    });
+    const third = makeTransaction({
+      id: "third",
+      date: "2026-07-22",
+      amount: -300,
+      vendor_source: "Third",
+      category_id: "coffee",
+      entered_at: "2026-07-22T10:00:00.000Z",
+    });
+    const fourth = makeTransaction({
+      id: "fourth",
+      date: "2026-07-23",
+      amount: -400,
+      vendor_source: "Fourth",
+      category_id: "coffee",
+      entered_at: "2026-07-23T10:00:00.000Z",
+    });
+    const pending = makeTransaction({
+      id: "pending",
+      date: "2026-07-24",
+      amount: -500,
+      vendor_source: "Pending",
+      category_id: "coffee",
+      inbox_status: "pending",
+    });
+    const voidRow = makeVoidRow(fourth, { id: "void-fourth" });
+
+    expect(
+      recentRows([second, pending, fourth, first, voidRow, third]).map((r) => r.id),
+    ).toEqual(["third", "second", "first"]);
   });
 });
 

@@ -17,9 +17,11 @@ describe("the dashboard widget registry", () => {
     // Changing this list is changing where people's folds and per-widget periods
     // live. Add freely; rename nothing.
     expect(DASHBOARD_WIDGETS.map((w) => w.id)).toEqual([
+      "balance",
+      "pace",
+      "recent",
       "saved",
       "kpis",
-      "pace",
       "flow",
       "calendar",
       "breakdown",
@@ -48,18 +50,27 @@ describe("the dashboard widget registry", () => {
   });
 
   it("only exempts a widget from the period control when its window is its meaning", () => {
-    // Budget pace is about THIS month and Coming up about the next 30 days; a
-    // period menu on either would be a control that does nothing.
+    // Current/recent facts are not period reports; pace and upcoming carry their
+    // own windows. A period menu on any of them would be a control that lies.
     expect(DASHBOARD_WIDGETS.filter((w) => w.fixedWindow).map((w) => w.id)).toEqual([
+      "balance",
       "pace",
+      "recent",
       "upcoming",
     ]);
   });
 
-  it("keeps the screen to one opening figure (§12.3: never two on a screen)", () => {
+  it("leads with current balance as the sole opening figure", () => {
     const bare = DASHBOARD_WIDGETS.filter((w) => w.bare).map((w) => w.id);
-    expect(bare).toEqual(["saved", "kpis"]);
-    // …and they lead, so the panels below them read as detail.
-    expect(DASHBOARD_WIDGETS.slice(0, bare.length).map((w) => w.id)).toEqual(bare);
+    expect(bare).toEqual(["balance", "kpis"]);
+    expect(DASHBOARD_WIDGETS[0].id).toBe("balance");
+  });
+
+  it("puts budget pace directly below overall balance", () => {
+    expect(DASHBOARD_WIDGETS.slice(0, 3).map((w) => w.id)).toEqual([
+      "balance",
+      "pace",
+      "recent",
+    ]);
   });
 });
