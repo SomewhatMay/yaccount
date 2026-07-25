@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  bottomSheetBleedStyle,
   bottomSheetViewportStyle,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
@@ -16,8 +15,10 @@ describe("iOS bottom-sheet viewport handling", () => {
       }),
     ).toEqual({
       bottom: "auto",
-      maxHeight: "440px",
-      top: "520px",
+      maxHeight: "536px",
+      paddingBottom: "96px",
+      scrollPaddingBottom: "96px",
+      top: "616px",
       translate: "0 -100%",
     });
   });
@@ -30,21 +31,7 @@ describe("iOS bottom-sheet viewport handling", () => {
         pageTop: 180,
         scrollY: 100,
       }),
-    ).toMatchObject({ top: "580px" });
-  });
-
-  it("extends only the sheet background below the visual viewport", () => {
-    expect(
-      bottomSheetBleedStyle({
-        height: 500,
-        offsetTop: 20,
-        pageTop: 120,
-        scrollY: 100,
-      }),
-    ).toEqual({
-      height: "100lvh",
-      top: "520px",
-    });
+    ).toMatchObject({ top: "676px" });
   });
 
   it("uses CSS viewport fallback before visual viewport data is available", () => {

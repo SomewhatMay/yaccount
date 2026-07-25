@@ -34,10 +34,7 @@ describe("iPhone PWA interaction layout", () => {
     expect(sheet).toContain("overflow-y-auto");
     expect(sheet).toContain("touch-pan-y");
     expect(sheet).not.toContain("scrollIntoView");
-
-    const primitive = read("../../components/ui/sheet.tsx");
-    expect(primitive).toContain("data-sheet-bottom-bleed");
-    expect(primitive).toContain("pointer-events-none");
+    expect(sheet).not.toContain("bottomBleedStyle");
   });
 
   it("waits for the FAB click before mounting quick-add", () => {

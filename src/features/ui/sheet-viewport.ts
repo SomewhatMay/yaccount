@@ -10,30 +10,31 @@ export interface BottomSheetViewport {
   scrollY: number;
 }
 
+const IOS_CHROME_OVERLAP = 96;
+
 function visualViewportTop(viewport: BottomSheetViewport): number {
   return Math.max(0, viewport.offsetTop, viewport.pageTop - viewport.scrollY);
 }
 
-export function bottomSheetViewportStyle(
-  viewport: BottomSheetViewport | null,
-): { bottom: "auto"; maxHeight: string; top: string; translate: "0 -100%" } | undefined {
+export function bottomSheetViewportStyle(viewport: BottomSheetViewport | null):
+  | {
+      bottom: "auto";
+      maxHeight: string;
+      paddingBottom: string;
+      scrollPaddingBottom: string;
+      top: string;
+      translate: "0 -100%";
+    }
+  | undefined {
   if (!viewport) return undefined;
-  const bottomEdge = visualViewportTop(viewport) + viewport.height;
+  const bottomEdge = visualViewportTop(viewport) + viewport.height + IOS_CHROME_OVERLAP;
   return {
     bottom: "auto",
-    maxHeight: `${viewport.height * 0.88}px`,
+    maxHeight: `${viewport.height * 0.88 + IOS_CHROME_OVERLAP}px`,
+    paddingBottom: `${IOS_CHROME_OVERLAP}px`,
+    scrollPaddingBottom: `${IOS_CHROME_OVERLAP}px`,
     top: `${bottomEdge}px`,
     translate: "0 -100%",
-  };
-}
-
-export function bottomSheetBleedStyle(
-  viewport: BottomSheetViewport | null,
-): { height: "100lvh"; top: string } | undefined {
-  if (!viewport) return undefined;
-  return {
-    height: "100lvh",
-    top: `${visualViewportTop(viewport) + viewport.height}px`,
   };
 }
 

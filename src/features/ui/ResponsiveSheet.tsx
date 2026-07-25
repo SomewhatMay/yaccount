@@ -11,7 +11,6 @@ import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
 import { useCallback, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import {
-  bottomSheetBleedStyle,
   bottomSheetViewportStyle,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
@@ -94,7 +93,6 @@ export function ResponsiveSheet({
       <SheetContent
         side={sideways ? "right" : "bottom"}
         style={sideways ? undefined : bottomSheetViewportStyle(bottomViewport)}
-        bottomBleedStyle={sideways ? undefined : bottomSheetBleedStyle(bottomViewport)}
         className={cn(
           "max-w-full min-w-0 touch-pan-y gap-0 overflow-x-hidden overflow-y-auto overscroll-contain",
           // A bottom sheet stops short of the top edge so the screen behind it
