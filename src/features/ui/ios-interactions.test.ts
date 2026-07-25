@@ -8,11 +8,13 @@ describe("iPhone PWA interaction layout", () => {
     expect(read("../../app/layout.tsx")).toContain('viewportFit: "cover"');
   });
 
-  it("uses the same nonzero safe-area fallback for nav, page, FAB, and chooser", () => {
-    const fallback = "calc(0.5rem + env(safe-area-inset-bottom, 0px))";
-
-    expect(read("../shell/BottomTabBar.tsx")).toContain(fallback);
-    expect(read("../AppShell.tsx")).toContain(fallback);
+  it("adds bottom spacing only when the device reports a safe-area inset", () => {
+    expect(read("../shell/BottomTabBar.tsx")).toContain(
+      'paddingBottom: "env(safe-area-inset-bottom, 0px)"',
+    );
+    expect(read("../AppShell.tsx")).toContain(
+      "calc(7rem + env(safe-area-inset-bottom, 0px))",
+    );
 
     const fab = read("../shell/QuickAddFab.tsx");
     expect(fab.match(/env\(safe-area-inset-bottom,\s*0px\)/g)).toHaveLength(2);

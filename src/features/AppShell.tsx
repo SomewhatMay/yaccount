@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main
         className={cn("mx-auto px-5 pt-5", maxWidth)}
         style={{
-          paddingBottom: "calc(7rem + calc(0.5rem + env(safe-area-inset-bottom, 0px)))",
+          paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))",
         }}
       >
         {bootError ? (
