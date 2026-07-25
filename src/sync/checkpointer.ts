@@ -8,6 +8,7 @@ import {
   deviceIdFromLedgerName,
 } from "./paths";
 import { parseOps, parseSnapshot, serializeOps, serializeSnapshot } from "./serialize";
+import type { Origin, OriginRead } from "./origin";
 
 /**
  * The minimal Drive surface the Checkpointer needs — a structural subset of
@@ -22,6 +23,22 @@ export interface DriveFS {
   exists(path: string): Promise<boolean>;
   delete(path: string): Promise<void>;
   list(path: string): Promise<{ name: string; type: "file" | "directory" }[]>;
+}
+
+/**
+ * Generation bookkeeping (phase 5) — how a device notices that the store was
+ * deliberately cleared or replaced somewhere else. Injected rather than
+ * implemented here so the checkpointer keeps knowing nothing about IndexedDB.
+ * See `driveGeneration` in `reset.ts` for the real wiring.
+ */
+export interface SyncGeneration {
+  /** The store's generation — including whether we could tell at all. */
+  read: () => Promise<OriginRead>;
+  /** The generation this device last saw. `undefined` = it has never synced. */
+  seen: () => Promise<string | null | undefined>;
+  remember: (resetId: string | null) => Promise<void>;
+  /** Set local data aside and reset to the new generation's empty world. */
+  adopt: (remote: Origin) => Promise<{ path: string; opCount: number }>;
 }
 
 /** Repo callbacks the sync needs — injected so the engine imports no IndexedDB. */
@@ -40,11 +57,22 @@ export interface SyncDeps {
   yearMonth: string;
   /** Collapse when un-snapshotted op count exceeds this (§8.4, ~500). */
   collapseThreshold?: number;
+  /** Phase-5 reset detection. Omitted → the pre-phase-5 behaviour exactly. */
+  generation?: SyncGeneration;
 }
 
 export interface SyncResult {
   pushed: number;
   collapsed: boolean;
+  /** Set only on the cycle where this device adopted a reset made elsewhere. */
+  adopted?: {
+    resetId: string;
+    resetAt: string;
+    kind: Origin["kind"];
+    /** Where this device's previous journal was set aside. */
+    path: string;
+    opCount: number;
+  };
 }
 
 const DEFAULT_COLLAPSE_THRESHOLD = 500;
@@ -152,7 +180,13 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
     clearOutbox,
     yearMonth,
     collapseThreshold = DEFAULT_COLLAPSE_THRESHOLD,
+    generation,
   } = deps;
+
+  // 0 — GENERATION: has this store been deliberately cleared/replaced since we
+  // last looked? This has to run BEFORE the pull, because adopting resets local
+  // state and the pull is what refills it from the new world.
+  const adopted = generation ? await reconcileGeneration(generation) : undefined;
 
   // 1 — PULL snapshot + every live device ledger (independent — fetch together).
   const [snapshotOps, ledgerOps] = await Promise.all([readSnapshot(fs), readLedgers(fs)]);
@@ -182,5 +216,60 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   // 5 — TRUNCATE this device's ledger to ops not already in the snapshot.
   await truncateOwnLedger(fs, deviceId, foldedIds);
 
-  return { pushed: outbox.length, collapsed };
+  return { pushed: outbox.length, collapsed, adopted };
+}
+
+/**
+ * Decide what the store's generation means for this device (phase 5).
+ *
+ * **Only a positive reading is ever acted on.** Adopting means standing this
+ * device's data down, so it may happen only when we have actually held the
+ * marker in our hands and seen an id different from the one we recorded.
+ *
+ * | seen                  | read      | action                        |
+ * |-----------------------|-----------|-------------------------------|
+ * | anything              | `unknown` | nothing — infer nothing       |
+ * | `undefined` (fresh)   | `present` | remember, do not adopt        |
+ * | `undefined`           | `absent`  | remember null, do not adopt   |
+ * | recorded, same id     | `present` | nothing                       |
+ * | recorded, another id  | `present` | **adopt**, then remember      |
+ * | recorded              | `absent`  | nothing — never forget        |
+ *
+ * The last two rows are the fix for a real bug. A device used to forget its
+ * generation whenever the marker looked missing, which an offline tick made it
+ * look constantly; on reconnect the marker came back, compared unequal to the
+ * forgotten `null`, and the device adopted again — toasting and setting its
+ * data aside on **every reconnect**. Refusing to forget makes that unreachable
+ * rather than merely unlikely, and costs only this: if the marker were deleted
+ * by hand, the device stops adopting, which is the non-destructive direction.
+ *
+ * A device that has never synced is likewise never talked into recording a
+ * generation it could not read — staying "never synced" is the state that keeps
+ * its offline work safe.
+ */
+async function reconcileGeneration(
+  generation: SyncGeneration,
+): Promise<SyncResult["adopted"]> {
+  const read = await generation.read();
+  if (read.status === "unknown") return undefined;
+
+  const seen = await generation.seen();
+  const remoteId = read.status === "present" ? read.origin.resetId : null;
+
+  if (seen === undefined) {
+    await generation.remember(remoteId);
+    return undefined;
+  }
+  if (read.status === "absent" || seen === remoteId) return undefined;
+
+  const remote = read.origin;
+  const { path, opCount } = await generation.adopt(remote);
+  await generation.remember(remote.resetId);
+  return {
+    resetId: remote.resetId,
+    resetAt: remote.resetAt,
+    kind: remote.kind,
+    path,
+    opCount,
+  };
 }

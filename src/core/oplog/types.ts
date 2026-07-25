@@ -85,6 +85,60 @@ export type Op =
 export type OpType = Op["type"];
 
 /**
+ * Every op type this build can apply, as VALUES. The union above is erased at
+ * compile time, so anything validating untrusted ops — a hand-edited import file,
+ * a file from a future build — needs a runtime list to check against.
+ *
+ * `satisfies` rejects a name that isn't a real op type; `OP_TYPES_ARE_EXHAUSTIVE`
+ * fails to compile when a NEW op type is added to the union and not listed here.
+ * A silently missing entry would make `validateExport` reject a perfectly good
+ * export, so the guard is the point.
+ */
+export const OP_TYPES = [
+  "category.create",
+  "category.update",
+  "category.archive",
+  "category.unarchive",
+  "container.create",
+  "container.update",
+  "container.archive",
+  "container.unarchive",
+  "transaction.create",
+  "transaction.update",
+  "transaction.void",
+  "transaction.approve",
+  "snapshot.record",
+  "snapshot.update",
+  "snapshot.remove",
+  "setting.set",
+  "budgetTarget.set",
+  "budgetTarget.remove",
+  "template.create",
+  "template.remove",
+  "recurringRule.create",
+  "recurringRule.update",
+  "recurringRule.cancel",
+  "recurringRule.uncancel",
+  "goal.create",
+  "goal.update",
+  "goal.complete",
+  "goal.cancel",
+  "goal.uncancel",
+  "goal.archive",
+  "goal.unarchive",
+] as const satisfies readonly OpType[];
+
+/** Compile-time proof that `OP_TYPES` lists every member of the `Op` union. */
+export type OpTypesAreExhaustive =
+  Exclude<OpType, (typeof OP_TYPES)[number]> extends never ? true : never;
+export const OP_TYPES_ARE_EXHAUSTIVE: OpTypesAreExhaustive = true;
+
+/** Membership test for an untrusted `type` string. */
+export function isKnownOpType(value: unknown): value is OpType {
+  return typeof value === "string" && (OP_TYPES as readonly string[]).includes(value);
+}
+
+/**
  * The op every creation path emits — an expense, an income, a transfer, a
  * quick-logged shortcut, a generated occurrence. Naming it lets a caller read
  * the row it just wrote (to mark it in the register, say) without narrowing the

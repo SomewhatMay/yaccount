@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DataPanel } from "@/features/settings/DataPanel";
 import { DiagnosticsPanel } from "@/features/settings/DiagnosticsPanel";
 import { ErrorBoundary } from "@/features/ErrorBoundary";
 import { PageHeader } from "@/features/ui";
@@ -18,6 +19,10 @@ export function SettingsView() {
         How this copy of yaccount is running, and what to send along when something goes
         wrong.
       </PageHeader>
+
+      <ErrorBoundary label="Data tools">
+        <DataPanel />
+      </ErrorBoundary>
 
       <ErrorBoundary label="Diagnostics">
         <DiagnosticsPanel />
