@@ -55,6 +55,8 @@ import {
   containersAtom,
   defaultContainerIdAtom,
   dispatchAtom,
+  flashRowAtom,
+  flashedRowAtom,
   goalsAtom,
   readyAtom,
   runRecurringGenerationAtom,
@@ -118,6 +120,7 @@ export function GoalsView() {
   const txns = useAtomValue(transactionsAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
   const generate = useSetAtom(runRecurringGenerationAtom);
 
   const [sheet, setSheet] = useState<Goal | "new" | null>(null);
@@ -185,8 +188,8 @@ export function GoalsView() {
         completed_date: editing.completed_date,
       });
       await dispatch(updateGoal(next));
-      toast.success("Goal updated", { description: input.name });
       setSheet(null);
+      flashRow({ id: next.id });
       return;
     }
 
@@ -198,8 +201,7 @@ export function GoalsView() {
     // Against every active goal, not the filtered view: a rule about what may
     // exist can't depend on what happens to be on screen.
     if (existing && activeGoals.some((g) => g.container_id === existing.id)) {
-      toast.error(`You already have an active ${existing.name} goal.`);
-      return;
+      throw new Error(`You already have an active ${existing.name} goal.`);
     }
 
     let containerId: string;
@@ -247,8 +249,8 @@ export function GoalsView() {
       await generate();
     }
 
-    toast.success("Goal created", { description: input.name });
     setSheet(null);
+    flashRow({ id: goalId });
   }
 
   if (!ready)
@@ -468,6 +470,7 @@ function GoalCard({
   onArchive?: () => void;
   onResume?: () => void;
 }) {
+  const flashed = useAtomValue(flashedRowAtom)?.id === goal.id;
   const now = todayIso();
   const contributed = goalContributed(goal, txns);
   const basis = goalBasis(goal, txns);
@@ -481,7 +484,14 @@ function GoalCard({
   const pct = progress === null ? null : Math.min(100, Math.round(progress * 100));
 
   return (
-    <div className="bg-card rounded-2xl border p-5">
+    <div
+      className={cn(
+        "rounded-2xl border p-5 transition-colors ease-[var(--ease-register)]",
+        flashed
+          ? "bg-primary/15 duration-[var(--dur-2)]"
+          : "bg-card duration-[var(--dur-1)]",
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

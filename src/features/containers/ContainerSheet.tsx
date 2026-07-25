@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import type { Container } from "@/core/model";
 import { nameTaken } from "@/features/unique-name";
 import { ResponsiveSheet } from "@/features/ui";
+import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,19 +61,25 @@ function ContainerForm({
   // What changed is that the choice is now ON the form — "why isn't my money in
   // the headline" was a surprise you met later, at the far end of a ⋯ menu.
   const [counted, setCounted] = useState(false);
+  const [error, setError] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return toast.error("Name the container.");
+    setError("");
+    if (!trimmed) return setError("Name the container.");
     if (nameTaken(siblings, trimmed)) {
-      return toast.error("You already have a container with that name.");
+      return setError("You already have a container with that name.");
     }
-    await onSubmit({
-      name: trimmed,
-      is_investment: investment,
-      include_in_overall_balance: counted,
-    });
+    try {
+      await onSubmit({
+        name: trimmed,
+        is_investment: investment,
+        include_in_overall_balance: counted,
+      });
+    } catch {
+      setError("Couldn't create the container. Try again.");
+    }
   }
 
   return (
@@ -87,7 +93,10 @@ function ContainerForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Vacation"
             autoFocus
+            aria-invalid={error ? "true" : undefined}
+            aria-describedby={error ? "ct-name-error" : undefined}
           />
+          {error && <InlineError id="ct-name-error">{error}</InlineError>}
         </div>
 
         <div className="grid gap-1.5">

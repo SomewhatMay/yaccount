@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { removeBudgetTarget, setBudgetTarget } from "@/core/commands";
 import { formatCents, parseDollars } from "@/core/money";
@@ -30,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SheetFooter } from "@/components/ui/sheet";
 import { ResponsiveSheet } from "@/features/ui";
+import { InlineError } from "@/features/ui/InlineError";
 import { todayIso } from "@/features/clock";
 import { Eyebrow } from "@/features/ui";
 
@@ -96,6 +96,7 @@ function BudgetHistory({
   const [removing, setRemoving] = useState<BudgetTarget | null>(null);
   const [startDate, setStartDate] = useState(todayIso());
   const [amountStr, setAmountStr] = useState("");
+  const [error, setError] = useState("");
 
   // Unique per (category_id, start_date) (§5.3): saving onto an occupied date
   // replaces it, so say so before the user commits rather than surprising them.
@@ -115,39 +116,34 @@ function BudgetHistory({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
     let amount: number;
     try {
       amount = parseDollars(amountStr);
     } catch {
-      return toast.error("Enter a valid amount.");
+      return setError("Enter a valid amount.");
     }
-    if (amount < 0) return toast.error("Budgets can't be negative.");
+    if (amount < 0) return setError("Budgets can't be negative.");
 
-    const replaced = clash !== undefined;
-    await onDispatch(
-      setBudgetTarget({
-        id: editing?.id,
-        category_id: category.id,
-        amount,
-        start_date: startDate,
-      }),
-    );
-    toast.success(
-      replaced ? "Budget replaced" : editing ? "Budget updated" : "Budget set",
-      {
-        description: `${formatCents(amount)}/mo from ${startDate}`,
-      },
-    );
-    cancelEdit();
+    try {
+      await onDispatch(
+        setBudgetTarget({
+          id: editing?.id,
+          category_id: category.id,
+          amount,
+          start_date: startDate,
+        }),
+      );
+      cancelEdit();
+    } catch {
+      setError("Couldn't save the budget. Try again.");
+    }
   }
 
   async function remove(b: BudgetTarget) {
     setRemoving(null);
     if (editing?.id === b.id) cancelEdit();
     await onDispatch(removeBudgetTarget(b.id));
-    toast.success("Budget row removed", {
-      description: `${formatCents(b.amount)}/mo from ${b.start_date}`,
-    });
   }
 
   return (
@@ -176,7 +172,10 @@ function BudgetHistory({
             placeholder="0.00"
             inputMode="decimal"
             className="tnum font-mono"
+            aria-invalid={error ? "true" : undefined}
+            aria-describedby={error ? "budget-error" : undefined}
           />
+          {error && <InlineError id="budget-error">{error}</InlineError>}
         </div>
         <div className="flex items-center gap-2">
           <Button type="submit">{editing ? "Save changes" : "Set budget"}</Button>

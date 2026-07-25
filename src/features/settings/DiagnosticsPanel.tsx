@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useAtomValue } from "jotai";
-import { toast } from "sonner";
 import { Trash2Icon } from "lucide-react";
 import { Repo } from "@/core/repo";
 import { DB_NAME, DB_VERSION, STORE } from "@/core/repo/db";
@@ -193,7 +192,6 @@ export function DiagnosticsPanel() {
               onClick={() => {
                 logBuffer.clear();
                 setRecords([]);
-                toast.success("Log cleared");
               }}
             >
               <Trash2Icon className="size-3.5" />

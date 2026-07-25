@@ -26,7 +26,6 @@ import {
 } from "@/features/store";
 import {
   createTemplate,
-  removeTemplate,
   unvoidTransaction,
   voidTransaction,
 } from "@/core/commands";
@@ -301,10 +300,6 @@ export function LedgerView() {
       notes: t.notes,
     };
     await dispatch(createTemplate(input));
-    toast.success("Saved as shortcut", {
-      description: t.vendor_source,
-      action: { label: "Undo", onClick: () => void dispatch(removeTemplate(id)) },
-    });
   }
 
   async function del(t: Transaction) {
@@ -545,6 +540,7 @@ export function LedgerView() {
         onSave={async (op) => {
           await dispatch(op);
           setEditing(null);
+          if (op.type === "transaction.update") flashRow({ id: op.payload.row.id });
         }}
         onDelete={del}
       />

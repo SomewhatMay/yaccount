@@ -15,6 +15,8 @@ import {
   budgetTargetsAtom,
   categoriesAtom,
   dispatchAtom,
+  flashRowAtom,
+  flashedRowAtom,
   readyAtom,
 } from "@/features/store";
 import {
@@ -96,6 +98,7 @@ export function CategoriesView() {
   const categories = useAtomValue(categoriesAtom);
   const budgetTargets = useAtomValue(budgetTargetsAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
   const [creating, setCreating] = useState(false);
   const [budgeting, setBudgeting] = useState<Category | null>(null);
   const [iconing, setIconing] = useState<Category | null>(null);
@@ -129,15 +132,13 @@ export function CategoriesView() {
 
   async function restore(c: Category) {
     await dispatch(unarchiveCategory(c.id));
-    toast.success("Restored", { description: c.name });
   }
 
   async function add(input: { name: string; type: CategoryType }) {
-    await dispatch(createCategory(input));
-    toast.success("Category added", {
-      description: `${input.name} · ${input.type}`,
-    });
+    const op = createCategory(input);
+    await dispatch(op);
     setCreating(false);
+    if (op.type === "category.create") flashRow({ id: op.payload.row.id });
   }
 
   // §10.1: store the chosen icon name, or clear it (null) to fall back to the
@@ -147,7 +148,7 @@ export function CategoriesView() {
     setIconing(null);
     if (!cat || icon === cat.icon) return;
     await dispatch(updateCategory({ ...cat, icon }));
-    toast.success(icon ? "Icon set" : "Icon cleared", { description: cat.name });
+    flashRow({ id: cat.id });
   }
 
   if (!ready)
@@ -413,11 +414,13 @@ function CategoryRow({
   onIcon: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const flashed = useAtomValue(flashedRowAtom)?.id === category.id;
+  const flashRow = useSetAtom(flashRowAtom);
 
   async function save(name: string) {
     if (name !== category.name) {
       await onChange(updateCategory({ ...category, name }));
-      toast.success("Renamed", { description: name });
+      flashRow({ id: category.id });
     }
     setEditing(false);
   }
@@ -440,7 +443,10 @@ function CategoryRow({
   return (
     <div
       className={cn(
-        "group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors",
+        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        flashed
+          ? "bg-primary/15 duration-[var(--dur-2)]"
+          : "hover:bg-muted/40 duration-[var(--dur-1)]",
         divider && "border-t",
       )}
     >

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { parseDollars } from "@/core/money";
 import type { Container, Goal, GoalKind, GoalMode } from "@/core/model";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import { SheetFooter } from "@/components/ui/sheet";
 import { ResponsiveSheet } from "@/features/ui";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { todayIso } from "@/features/clock";
+import { InlineError } from "@/features/ui/InlineError";
 
 export interface GoalFormInput {
   name: string;
@@ -100,6 +100,7 @@ function GoalForm({
   const [auto, setAuto] = useState(false);
   const [fundingId, setFundingId] = useState(defaultFundingId);
   const [contribDay, setContribDay] = useState("1");
+  const [error, setError] = useState("");
 
   const activeContainers = useMemo(
     () => containers.filter((c) => !c.is_archived),
@@ -113,34 +114,35 @@ function GoalForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return toast.error("Name your goal.");
+    setError("");
+    if (!name.trim()) return setError("Name your goal.");
 
     let target: number | null = null;
     if (targetStr.trim()) {
       try {
         target = parseDollars(targetStr);
       } catch {
-        return toast.error("Enter a valid target amount.");
+        return setError("Enter a valid target amount.");
       }
     }
     if (targetRequired && (target === null || target === 0)) {
-      return toast.error("This goal needs a target amount.");
+      return setError("This goal needs a target amount.");
     }
-    if (showDeadline && !deadline) return toast.error("Pick a deadline date.");
+    if (showDeadline && !deadline) return setError("Pick a deadline date.");
 
     let monthly: number | null = null;
     if (showMonthly) {
       try {
         monthly = parseDollars(monthlyStr);
       } catch {
-        return toast.error("Enter a valid monthly amount.");
+        return setError("Enter a valid monthly amount.");
       }
-      if (monthly === 0) return toast.error("Set a monthly contribution.");
+      if (monthly === 0) return setError("Set a monthly contribution.");
     }
 
     const day = Number(contribDay);
     if (auto && canAuto && (!Number.isInteger(day) || day < 1 || day > 31)) {
-      return toast.error("Contribution day must be 1–31.");
+      return setError("Contribution day must be 1–31.");
     }
 
     try {
@@ -160,13 +162,14 @@ function GoalForm({
         goal,
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't save the goal.");
+      setError(err instanceof Error ? err.message : "Couldn't save the goal.");
     }
   }
 
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
+        {error && <InlineError id="goal-error">{error}</InlineError>}
         <div className="grid gap-1.5">
           <Label htmlFor="g-name">Goal name</Label>
           <Input

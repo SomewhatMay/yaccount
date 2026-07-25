@@ -11,6 +11,11 @@ import {
   Loader2Icon,
 } from "lucide-react";
 
+/**
+ * Toast policy: persistence/auth/sync failures, external completion, exceptional
+ * state changes, and destructive actions with Undo. Routine mutations use their
+ * visible result; validation stays beside its form when a stable location exists.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
   const mobile = useSyncExternalStore(

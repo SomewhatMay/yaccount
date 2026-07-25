@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import type { Category, CategoryType } from "@/core/model";
 import { nameTaken } from "@/features/unique-name";
 import { ResponsiveSheet } from "@/features/ui";
+import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,15 +52,21 @@ function CategoryForm({
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<CategoryType>("expense");
+  const [error, setError] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return toast.error("Name the category.");
+    setError("");
+    if (!trimmed) return setError("Name the category.");
     if (nameTaken(siblings, trimmed)) {
-      return toast.error("You already have a category with that name.");
+      return setError("You already have a category with that name.");
     }
-    await onSubmit({ name: trimmed, type });
+    try {
+      await onSubmit({ name: trimmed, type });
+    } catch {
+      setError("Couldn't create the category. Try again.");
+    }
   }
 
   return (
@@ -74,7 +80,10 @@ function CategoryForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Groceries"
             autoFocus
+            aria-invalid={error ? "true" : undefined}
+            aria-describedby={error ? "c-name-error" : undefined}
           />
+          {error && <InlineError id="c-name-error">{error}</InlineError>}
         </div>
 
         <div className="grid gap-1.5">

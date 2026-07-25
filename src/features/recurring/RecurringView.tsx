@@ -32,6 +32,8 @@ import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
+  flashRowAtom,
+  flashedRowAtom,
   readyAtom,
   recurringRulesAtom,
   runRecurringGenerationAtom,
@@ -109,6 +111,7 @@ export function RecurringView() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
   const generate = useSetAtom(runRecurringGenerationAtom);
 
   // `null` = sheet closed; `"new"` = create; a rule = edit.
@@ -352,14 +355,13 @@ export function RecurringView() {
               next_generation_date: firstOccurrenceOnOrAfter(draft, todayIso()),
             };
             await dispatch(updateRecurringRule(next));
-            toast.success("Recurring updated", {
-              description: input.template_vendor_source,
-            });
+            flashRow({ id: editingId });
           } else {
-            await dispatch(createRecurringRule(input));
-            toast.success("Recurring added", {
-              description: input.template_vendor_source,
-            });
+            const op = createRecurringRule(input);
+            await dispatch(op);
+            if (op.type === "recurringRule.create") {
+              flashRow({ id: op.payload.row.id });
+            }
           }
           setSheet(null);
           // Generate right away so due/backfilled occurrences hit the inbox now,
@@ -391,6 +393,7 @@ function RuleRow({
   onEdit: () => void;
   onCancel: () => void;
 }) {
+  const flashed = useAtomValue(flashedRowAtom)?.id === rule.id;
   const transfer = isTransferRule(rule);
   const income = !transfer && (rule.template_amount ?? 0) >= 0;
   const sub = transfer
@@ -400,7 +403,10 @@ function RuleRow({
   return (
     <div
       className={cn(
-        "group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors",
+        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        flashed
+          ? "bg-primary/15 duration-[var(--dur-2)]"
+          : "hover:bg-muted/40 duration-[var(--dur-1)]",
         divider && "border-t",
       )}
     >

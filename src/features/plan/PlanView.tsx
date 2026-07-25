@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import { parseDollars } from "@/core/money";
 import { monthlyPlan } from "@/core/engine/plan";
@@ -33,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayIso } from "@/features/clock";
+import { InlineError } from "@/features/ui/InlineError";
 
 const monthKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -64,6 +64,7 @@ export function PlanView() {
   const [yearMonth, setYearMonth] = useState(() => monthKey(new Date()));
   const [editingIncome, setEditingIncome] = useState(false);
   const [incomeStr, setIncomeStr] = useState("");
+  const [incomeError, setIncomeError] = useState("");
 
   const manualIncome = useMemo(() => {
     const s = settings.find((s) => s.key === expectedIncomeKey(yearMonth));
@@ -86,17 +87,17 @@ export function PlanView() {
   );
 
   async function saveIncome() {
+    setIncomeError("");
     let cents = 0;
     if (incomeStr.trim()) {
       try {
         cents = parseDollars(incomeStr);
       } catch {
-        return toast.error("Enter a valid amount.");
+        return setIncomeError("Enter a valid amount.");
       }
     }
     await dispatch(setSetting(expectedIncomeKey(yearMonth), String(cents)));
     setEditingIncome(false);
-    toast.success("Expected income updated");
   }
 
   if (!ready)
@@ -150,22 +151,29 @@ export function PlanView() {
             </Marginalia>
           </div>
           {editingIncome ? (
-            <div className="flex items-center gap-1.5">
-              <Input
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <Input
                 autoFocus
                 value={incomeStr}
                 onChange={(e) => setIncomeStr(e.target.value)}
                 placeholder="0.00"
                 inputMode="decimal"
                 className="tnum h-8 w-28 font-mono"
+                aria-invalid={incomeError ? "true" : undefined}
+                aria-describedby={incomeError ? "expected-income-error" : undefined}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void saveIncome();
                   if (e.key === "Escape") setEditingIncome(false);
                 }}
-              />
-              <Button size="sm" className="h-8 rounded-lg" onClick={saveIncome}>
-                Save
-              </Button>
+                />
+                <Button size="sm" className="h-8 rounded-lg" onClick={saveIncome}>
+                  Save
+                </Button>
+              </div>
+              {incomeError && (
+                <InlineError id="expected-income-error">{incomeError}</InlineError>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -178,6 +186,7 @@ export function PlanView() {
                   aria-label="Edit expected income"
                   onClick={() => {
                     setIncomeStr(plan.income ? (plan.income / 100).toFixed(2) : "");
+                    setIncomeError("");
                     setEditingIncome(true);
                   }}
                 >

@@ -21,6 +21,7 @@ import { CategoryGlyph } from "@/features/category-icons";
 import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
+import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -98,9 +99,6 @@ function QuickAddForm({
     } catch {
       return; // already logged and toasted by `dispatchAtom`
     }
-    toast.success("Logged", {
-      description: `${template.vendor_source} · ${formatCents(shortcutAmount(template))}`,
-    });
     if (op.type === "transaction.create") flashRow({ id: op.payload.row.id });
     onDone();
   }
@@ -314,6 +312,7 @@ function QuickAddForm({
       </div>
 
       {f.warn && <p className="text-xs text-amber-600 dark:text-amber-500">{f.warn}</p>}
+      {f.error && <InlineError id="quick-add-error">{f.error}</InlineError>}
 
       <Button type="submit" className="h-11 w-full rounded-xl text-sm">
         {submitLabel}

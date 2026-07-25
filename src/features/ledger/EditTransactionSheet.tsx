@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { Trash2Icon } from "lucide-react";
 import { updateTransaction } from "@/core/commands";
 import { isTransfer } from "@/core/engine/balances";
@@ -19,6 +18,7 @@ import {
   type Sign,
 } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
+import { InlineError } from "@/features/ui/InlineError";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { instantFrom, timeInputValue } from "@/features/clock";
@@ -188,17 +188,19 @@ function EditForm({
   // The row's own direction is the starting point — editing a refund keeps it.
   const [pickedSign, setPickedSign] = useState<Sign | null>(tx.amount >= 0 ? "+" : "-");
   const [warn, setWarn] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const cat = categories.find((c) => c.id === categoryId);
   const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!vendor.trim()) return toast.error("Add a payee or source.");
-    if (!cat) return toast.error("Pick a category.");
+    setError("");
+    if (!vendor.trim()) return setError("Add a payee or source.");
+    if (!cat) return setError("Pick a category.");
 
     const res = resolveAmount(amountStr, cat.type, sign);
-    if (!res.ok) return toast.error(res.error);
+    if (!res.ok) return setError(res.error);
     if (res.unusual && warn === null) {
       setWarn(
         `${formatCents(res.signed)} is money ${sign === "+" ? "in" : "out"} on a ${cat.type} category. Save again to confirm.`,
@@ -219,12 +221,12 @@ function EditForm({
         yearMonth: date.slice(0, 7),
       }),
     );
-    toast.success("Transaction updated");
   }
 
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
+        {error && <InlineError id="edit-transaction-error">{error}</InlineError>}
         <WhenFields
           idPrefix="edit"
           date={date}
@@ -354,6 +356,7 @@ function TransferForm({
   const [fromId, setFromId] = useState(tx.container_id);
   const [toId, setToId] = useState(tx.to_container_id ?? "");
   const [amountStr, setAmountStr] = useState((Math.abs(tx.amount) / 100).toFixed(2));
+  const [error, setError] = useState("");
 
   const from = containers.find((c) => c.id === fromId);
   const to = containers.find((c) => c.id === toId);
@@ -362,15 +365,16 @@ function TransferForm({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!from || !to) return toast.error("Pick where the money goes.");
-    if (from.id === to.id) return toast.error("Pick two different containers.");
+    setError("");
+    if (!from || !to) return setError("Pick where the money goes.");
+    if (from.id === to.id) return setError("Pick two different containers.");
     let magnitude: number;
     try {
       magnitude = Math.abs(parseDollars(amountStr));
     } catch {
-      return toast.error("Enter a valid amount.");
+      return setError("Enter a valid amount.");
     }
-    if (magnitude === 0) return toast.error("Amount can't be zero.");
+    if (magnitude === 0) return setError("Amount can't be zero.");
 
     // Keep an auto-generated label in step with the containers; a label the user
     // wrote is theirs to keep (§5.4).
@@ -389,12 +393,12 @@ function TransferForm({
         yearMonth: date.slice(0, 7),
       }),
     );
-    toast.success("Transfer updated");
   }
 
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
+        {error && <InlineError id="edit-transfer-error">{error}</InlineError>}
         <WhenFields
           idPrefix="transfer"
           date={date}
