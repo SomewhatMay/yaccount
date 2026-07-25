@@ -31,7 +31,9 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
     >
       <ul
         className="mx-auto flex max-w-2xl items-stretch"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{
+          paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
+        }}
       >
         {TAB_SLOTS.map((slot) => {
           const current = active === (slot.href ?? "more");

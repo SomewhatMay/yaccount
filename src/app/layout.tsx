@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,12 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "yaccount",
   description: "Local-first personal finance",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

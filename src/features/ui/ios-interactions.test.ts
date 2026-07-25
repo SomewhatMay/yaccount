@@ -1,0 +1,29 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+
+describe("iPhone PWA interaction layout", () => {
+  it("opts the viewport into safe-area insets", () => {
+    expect(read("../../app/layout.tsx")).toContain('viewportFit: "cover"');
+  });
+
+  it("uses the same nonzero safe-area fallback for nav, page, FAB, and chooser", () => {
+    const fallback = "calc(0.5rem + env(safe-area-inset-bottom, 0px))";
+
+    expect(read("../shell/BottomTabBar.tsx")).toContain(fallback);
+    expect(read("../AppShell.tsx")).toContain(fallback);
+
+    const fab = read("../shell/QuickAddFab.tsx");
+    expect(fab.match(/env\(safe-area-inset-bottom,\s*0px\)/g)).toHaveLength(2);
+  });
+
+  it("prevents selection and native touch gestures only on the FAB interaction", () => {
+    const fab = read("../shell/QuickAddFab.tsx");
+
+    expect(fab).toContain("select-none");
+    expect(fab).toContain("[-webkit-user-select:none]");
+    expect(fab).toContain("touch-none");
+    expect(read("../../app/globals.css")).not.toContain("* { user-select: none");
+  });
+});
