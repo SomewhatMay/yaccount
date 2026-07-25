@@ -8,19 +8,19 @@ repeat them — it says where things stand and what will bite you.
 ## State
 
 - `main` is clean and deployed. Live at <https://somewhatmay.github.io/yaccount/>.
-- M0–M9 and M11 are shipped, plus seven post-M11 quality passes: mobile toast placement, ledger
+- M0–M9 and M11 are shipped, plus eight post-M11 quality passes: mobile toast placement, ledger
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
-  blocking clear/import/rollback operations.
-- 55 Vitest files, 889 tests passing. 33 Playwright cases pass with 1 expected desktop-touch skip.
+  blocking clear/import/rollback operations, plus iPhone PWA interaction fixes.
+- 57 Vitest files, 895 tests passing. 33 Playwright cases pass with 1 expected desktop-touch skip.
 - `DB_VERSION = 3`. The Drive layout is `snapshot.json`, `ledger_<id>.json`,
   `ledger_<id>_<YYYY-MM>.json`, `origin.json`, and inert `backup_*` / `orphan_*` worlds.
 
 ## Next
 
-Next planned work is Phase 2, iPhone PWA interaction fixes. Take one scoped change at a time on a
-fresh branch off freshly pulled `main`, build and test only that, then stop for user review before
-committing. After approval: commit, push, open and merge a PR with `gh`, then update the docs on
-`main`.
+Next planned work is Phase 3, deliberate feedback with fewer toasts. Take one scoped change at a
+time on a fresh branch off freshly pulled `main`, build and test only that, then stop for user
+review before committing. After approval: commit, push, open and merge a PR with `gh`, then update
+the docs on `main`.
 
 **Deferred — do not start either without an explicit go-ahead:**
 
