@@ -195,12 +195,17 @@ test("filters the ledger by visible text", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Clear 1/ })).toBeVisible();
 });
 
-test("opens FAB quick-add from the dashboard", async ({ page }) => {
+test("FAB hold hints how to create the first shortcut", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
-  await openQuickAdd(page);
+  const fab = page.getByRole("button", { name: "Log a transaction" });
+  await fab.focus();
+  await page.keyboard.down("Enter");
+  await page.waitForTimeout(550);
+  await page.keyboard.up("Enter");
 
-  await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
-  await expect(page.getByLabel("Amount")).toBeFocused();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
+  await expect(page.getByText("No shortcuts yet", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Save as shortcut/)).toBeVisible();
 });
 
 test("separates FAB quick press, hold chooser, and movement cancellation", async ({
@@ -216,8 +221,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   await page.mouse.down();
   await page.waitForTimeout(300);
   await page.mouse.up();
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toHaveCount(1);
-  await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
   await page.waitForTimeout(300);
@@ -225,11 +229,8 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.waitForTimeout(550);
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
   await page.mouse.up();
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
-  await page.getByRole("menuitem", { name: "Income" }).click();
-  await expect(page.getByRole("radio", { name: "Income" })).toBeChecked();
   await page.keyboard.press("Escape");
 
   await page.mouse.move(x, y);
@@ -237,8 +238,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   await page.mouse.move(x + 11, y);
   await page.waitForTimeout(550);
   await page.mouse.up();
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 
   await fab.evaluate((button) => {
     button.addEventListener(
@@ -263,8 +263,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   });
   await page.waitForTimeout(550);
   await page.mouse.up();
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 });
 
 test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
@@ -274,26 +273,22 @@ test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
   await fab.focus();
   await page.keyboard.down("Enter");
   await page.waitForTimeout(550);
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
   await page.keyboard.up("Enter");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
   await expect(fab).toBeFocused();
 
   await page.keyboard.down(" ");
   await page.waitForTimeout(200);
   await page.keyboard.press("Escape");
   await page.keyboard.up(" ");
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 
   await page.keyboard.down(" ");
   await page.waitForTimeout(550);
   await page.keyboard.up(" ");
-  await expect(page.getByRole("menuitem", { name: "Expense" })).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("radio", { name: "Transfer" })).toBeChecked();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeFocused();
 });
 
 test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
@@ -312,8 +307,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     type: "touchEnd",
     touchPoints: [],
   });
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toHaveCount(1);
-  await expect(page.getByRole("radio", { name: "Expense" })).toBeChecked();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
   await page.waitForTimeout(300);
@@ -323,12 +317,11 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     touchPoints: [point],
   });
   await page.waitForTimeout(550);
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
   await session.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
     touchPoints: [],
   });
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
   await page.keyboard.press("Escape");
 
   await session.send("Input.dispatchTouchEvent", {
@@ -341,8 +334,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     touchPoints: [],
   });
   await page.waitForTimeout(550);
-  await expect(page.getByRole("menu", { name: "Choose what to add" })).toBeHidden();
-  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 });
 
 test("keeps FAB geometry and shows a compact money-add mark", async ({

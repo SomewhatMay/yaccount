@@ -1,15 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSetAtom } from "jotai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
-  ArrowDownLeftIcon,
   ArrowRightLeftIcon,
-  ArrowUpRightIcon,
+  BookmarkIcon,
   DollarSignIcon,
   PlusIcon,
 } from "lucide-react";
-import { quickAddAtom } from "@/features/store";
+import { logTemplate } from "@/core/commands";
+import { rankShortcutsByUsage } from "@/core/engine/usage-ranking";
+import { formatCents } from "@/core/money";
+import { todayIso } from "@/features/clock";
+import {
+  dispatchAtom,
+  flashRowAtom,
+  quickAddAtom,
+  templatesAtom,
+  transactionsAtom,
+} from "@/features/store";
 import {
   FAB_HOLD_MS,
   cancelFabPress,
@@ -32,13 +41,21 @@ import {
  * wash (`--dur-2`). The press itself is the whisper the rest of the app is
  * limited to — a colour and a hair of scale, on `--dur-1`.
  *
- * A release before 500ms opens Expense. Holding for 500ms opens the existing
- * expense/income/transfer paths; moving more than 10px or losing the press
+ * A release before 500ms opens Expense. Holding for 500ms opens saved
+ * shortcuts; moving more than 10px or losing the press
  * cancels. Pointer and keyboard share the same state machine so release can
  * never fire the quick action after the chooser action.
  */
 export function QuickAddFab() {
   const openQuickAdd = useSetAtom(quickAddAtom);
+  const templates = useAtomValue(templatesAtom);
+  const transactions = useAtomValue(transactionsAtom);
+  const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
+  const rankedTemplates = useMemo(
+    () => rankShortcutsByUsage(templates, transactions),
+    [templates, transactions],
+  );
   const [chooserOpen, setChooserOpen] = useState(false);
   const press = useRef<FabPress | null>(null);
   const input = useRef<"pointer" | "keyboard" | null>(null);
@@ -89,6 +106,20 @@ export function QuickAddFab() {
     if (action === "expense") openQuickAdd("expense");
   }, [clearHoldTimer, openQuickAdd, suppressNativeClick]);
 
+  const quickLog = useCallback(
+    async (template: (typeof templates)[number]) => {
+      const op = logTemplate(template, { date: todayIso() });
+      try {
+        await dispatch(op);
+      } catch {
+        return;
+      }
+      if (op.type === "transaction.create") flashRow({ id: op.payload.row.id });
+      setChooserOpen(false);
+    },
+    [dispatch, flashRow],
+  );
+
   const cancelPress = useCallback(() => {
     if (!press.current) return;
     const source = input.current;
@@ -127,7 +158,10 @@ export function QuickAddFab() {
   }, [cancelPress, chooserOpen, clearHoldTimer, finishPress]);
 
   useEffect(() => {
-    if (chooserOpen) chooser.current?.querySelector("button")?.focus();
+    if (chooserOpen) {
+      const menu = chooser.current;
+      (menu?.querySelector("button") ?? menu)?.focus();
+    }
   }, [chooserOpen]);
 
   return (
@@ -204,7 +238,8 @@ export function QuickAddFab() {
           ref={chooser}
           id="fab-create-chooser"
           role="menu"
-          aria-label="Choose what to add"
+          tabIndex={-1}
+          aria-label="Quick shortcuts"
           onKeyDown={(event) => {
             const items = [
               ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
@@ -228,44 +263,43 @@ export function QuickAddFab() {
           className="bg-popover text-popover-foreground ring-foreground/10 fixed right-5 bottom-[calc(8.5rem_+_env(safe-area-inset-bottom,0px))] z-50 w-48 touch-manipulation rounded-xl p-1.5 shadow-lg ring-1 select-none [-webkit-user-select:none] lg:right-8 lg:bottom-24"
         >
           <p className="text-muted-foreground px-1.5 py-1 text-xs font-medium">
-            Add an entry
+            Shortcuts
           </p>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setChooserOpen(false);
-              openQuickAdd("expense");
-            }}
-            className="focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none"
-          >
-            <ArrowUpRightIcon />
-            Expense
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setChooserOpen(false);
-              openQuickAdd("income");
-            }}
-            className="focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none"
-          >
-            <ArrowDownLeftIcon className="text-positive" />
-            Income
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setChooserOpen(false);
-              openQuickAdd("transfer");
-            }}
-            className="focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none"
-          >
-            <ArrowRightLeftIcon />
-            Transfer
-          </button>
+          {rankedTemplates.length === 0 ? (
+            <div className="px-2.5 pt-1 pb-2">
+              <p className="text-sm font-medium">No shortcuts yet</p>
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                Open an entry&apos;s actions in the ledger, then choose Save as
+                shortcut.
+              </p>
+            </div>
+          ) : (
+            rankedTemplates.map((template) => {
+              const transfer = template.to_container_id !== null;
+              const amount = transfer ? Math.abs(template.amount) : template.amount;
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void quickLog(template)}
+                  className="focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm outline-none"
+                >
+                  {transfer ? (
+                    <ArrowRightLeftIcon className="size-4 shrink-0" />
+                  ) : (
+                    <BookmarkIcon className="size-4 shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">
+                    {template.template_name ?? template.vendor_source}
+                  </span>
+                  <span className="text-muted-foreground tnum shrink-0 font-mono text-xs">
+                    {formatCents(amount)}
+                  </span>
+                </button>
+              );
+            })
+          )}
         </div>
       )}
     </>

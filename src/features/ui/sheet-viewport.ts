@@ -12,6 +12,14 @@ export interface BottomSheetViewport {
 
 const IOS_CHROME_OVERLAP = 96;
 
+export function retainVisualViewportSnapshot(
+  previous: string,
+  current: string,
+  active: boolean,
+): string {
+  return active ? current || previous : previous;
+}
+
 function visualViewportTop(viewport: BottomSheetViewport): number {
   return Math.max(0, viewport.offsetTop, viewport.pageTop - viewport.scrollY);
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   bottomSheetViewportStyle,
+  retainVisualViewportSnapshot,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
 
@@ -36,6 +37,13 @@ describe("iOS bottom-sheet viewport handling", () => {
 
   it("uses CSS viewport fallback before visual viewport data is available", () => {
     expect(bottomSheetViewportStyle(null)).toBeUndefined();
+  });
+
+  it("retains the last viewport position through the close animation", () => {
+    const open = "500:20:120:100";
+
+    expect(retainVisualViewportSnapshot("", open, true)).toBe(open);
+    expect(retainVisualViewportSnapshot(open, "", false)).toBe(open);
   });
 
   it("subscribes to viewport resize and scroll, then removes both listeners", () => {

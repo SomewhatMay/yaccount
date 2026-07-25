@@ -8,10 +8,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import {
   bottomSheetViewportStyle,
+  retainVisualViewportSnapshot,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
 
@@ -29,34 +30,45 @@ function bottomSheetViewport(snapshot: string) {
 }
 
 function useVisualViewport(active: boolean): string {
+  const lastSnapshot = useRef("");
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!active) return () => undefined;
+      const update = () => {
+        lastSnapshot.current = visualViewportSnapshot();
+        onChange();
+      };
+      update();
       const unsubscribeViewport = subscribeVisualViewport(
         window.visualViewport,
-        onChange,
+        update,
       );
-      window.addEventListener("resize", onChange);
-      window.addEventListener("scroll", onChange);
+      window.addEventListener("resize", update);
+      window.addEventListener("scroll", update);
 
       // WebKit may update visualViewport late or omit the expected event while
       // animating the keyboard. Poll only while a mobile sheet is open.
       let frame = requestAnimationFrame(function poll() {
-        onChange();
+        update();
         frame = requestAnimationFrame(poll);
       });
 
       return () => {
         unsubscribeViewport();
-        window.removeEventListener("resize", onChange);
-        window.removeEventListener("scroll", onChange);
+        window.removeEventListener("resize", update);
+        window.removeEventListener("scroll", update);
         cancelAnimationFrame(frame);
       };
     },
     [active],
   );
   const getSnapshot = useCallback(
-    () => (active ? visualViewportSnapshot() : ""),
+    () =>
+      retainVisualViewportSnapshot(
+        lastSnapshot.current,
+        visualViewportSnapshot(),
+        active,
+      ),
     [active],
   );
   return useSyncExternalStore(subscribe, getSnapshot, () => "");
