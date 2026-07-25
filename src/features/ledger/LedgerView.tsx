@@ -24,11 +24,7 @@ import {
   transactionsAtom,
   type FlashedRow,
 } from "@/features/store";
-import {
-  createTemplate,
-  unvoidTransaction,
-  voidTransaction,
-} from "@/core/commands";
+import { createTemplate, unvoidTransaction, voidTransaction } from "@/core/commands";
 import {
   isLiveLedgerRow,
   isTransfer,
@@ -44,6 +40,10 @@ import {
 import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
 import { parseLedgerQuery } from "@/features/ledger/deep-link";
 import { activeRows, isRegisterSort, sortRegister } from "@/core/engine/ledger";
+import {
+  rankCategoriesByUsage,
+  rankContainersByUsage,
+} from "@/core/engine/usage-ranking";
 import { trailingDays } from "@/core/engine/period";
 import {
   formatEnteredTime,
@@ -254,6 +254,22 @@ export function LedgerView() {
   // shown is then the shared predicate (`applyFilter`), so the rail, the ⌘K
   // palette and every M11 list view narrow rows by one rule.
   const live = useMemo(() => activeRows(transactions), [transactions]);
+  const rankedCategories = useMemo(
+    () =>
+      rankCategoriesByUsage(
+        categories.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [categories, transactions],
+  );
+  const rankedContainers = useMemo(
+    () =>
+      rankContainersByUsage(
+        containers.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [containers, transactions],
+  );
   const rows = useMemo(
     () => sortRegister(applyFilter(live, filter, { label: labelOf }), sort),
     [live, filter, labelOf, sort],
@@ -390,22 +406,18 @@ export function LedgerView() {
               label: "Category",
               selected: draft.categoryIds,
               onChange: (categoryIds) => setDraft((d) => ({ ...d, categoryIds })),
-              options: categories
-                .filter((c) => !c.is_archived)
-                .map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                  dot: categoryColor(c),
-                })),
+              options: rankedCategories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                dot: categoryColor(c),
+              })),
             },
             {
               id: "container",
               label: "Wallet",
               selected: draft.containerIds,
               onChange: (containerIds) => setDraft((d) => ({ ...d, containerIds })),
-              options: containers
-                .filter((c) => !c.is_archived)
-                .map((c) => ({ value: c.id, label: c.name })),
+              options: rankedContainers.map((c) => ({ value: c.id, label: c.name })),
             },
             {
               id: "kind",
@@ -536,6 +548,7 @@ export function LedgerView() {
         editing={editing}
         categories={categories}
         containers={containers}
+        transactions={transactions}
         onOpenChange={(open) => !open && setEditing(null)}
         onSave={async (op) => {
           await dispatch(op);

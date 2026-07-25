@@ -445,6 +445,7 @@ export function GoalsView() {
         open={sheet !== null}
         goal={sheet === "new" ? null : sheet}
         containers={containers}
+        transactions={txns}
         defaultFundingId={defaultContainerId}
         onOpenChange={(open) => !open && setSheet(null)}
         onSubmit={handleSubmit}

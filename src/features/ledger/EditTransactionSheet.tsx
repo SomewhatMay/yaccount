@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import { Trash2Icon } from "lucide-react";
 import { updateTransaction } from "@/core/commands";
 import { isTransfer } from "@/core/engine/balances";
+import {
+  rankCategoriesByUsage,
+  rankContainersByUsage,
+} from "@/core/engine/usage-ranking";
 import { formatCents, parseDollars } from "@/core/money";
 import {
   transferLabel,
@@ -40,6 +44,7 @@ export function EditTransactionSheet({
   editing,
   categories,
   containers,
+  transactions,
   onOpenChange,
   onSave,
   onDelete,
@@ -47,6 +52,7 @@ export function EditTransactionSheet({
   editing: Transaction | null;
   categories: Category[];
   containers: Container[];
+  transactions: Transaction[];
   onOpenChange: (open: boolean) => void;
   onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
@@ -65,6 +71,7 @@ export function EditTransactionSheet({
             key={editing.id}
             tx={editing}
             containers={containers}
+            transactions={transactions}
             onSave={onSave}
             onDelete={onDelete}
           />
@@ -74,6 +81,7 @@ export function EditTransactionSheet({
             tx={editing}
             categories={categories}
             containers={containers}
+            transactions={transactions}
             onSave={onSave}
             onDelete={onDelete}
           />
@@ -157,25 +165,32 @@ function EditForm({
   tx,
   categories,
   containers,
+  transactions,
   onSave,
   onDelete,
 }: {
   tx: Transaction;
   categories: Category[];
   containers: Container[];
+  transactions: Transaction[];
   onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const active = useMemo(
     () =>
-      categories
-        .filter((c) => !c.is_archived || c.id === tx.category_id)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [categories, tx.category_id],
+      rankCategoriesByUsage(
+        categories.filter((c) => !c.is_archived || c.id === tx.category_id),
+        transactions,
+      ),
+    [categories, transactions, tx.category_id],
   );
   const wallets = useMemo(
-    () => selectableContainers(containers, tx.container_id),
-    [containers, tx.container_id],
+    () =>
+      rankContainersByUsage(
+        selectableContainers(containers, tx.container_id),
+        transactions,
+      ),
+    [containers, transactions, tx.container_id],
   );
 
   const [date, setDate] = useState(tx.date);
@@ -336,17 +351,23 @@ function EditForm({
 function TransferForm({
   tx,
   containers,
+  transactions,
   onSave,
   onDelete,
 }: {
   tx: Transaction;
   containers: Container[];
+  transactions: Transaction[];
   onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const wallets = useMemo(
-    () => selectableContainers(containers, tx.container_id, tx.to_container_id),
-    [containers, tx.container_id, tx.to_container_id],
+    () =>
+      rankContainersByUsage(
+        selectableContainers(containers, tx.container_id, tx.to_container_id),
+        transactions,
+      ),
+    [containers, transactions, tx.container_id, tx.to_container_id],
   );
 
   const [date, setDate] = useState(tx.date);

@@ -37,6 +37,7 @@ import {
   readyAtom,
   recurringRulesAtom,
   runRecurringGenerationAtom,
+  transactionsAtom,
 } from "@/features/store";
 import { describeRule } from "@/features/recurring/describe";
 import { RecurringRuleSheet } from "@/features/recurring/RecurringRuleSheet";
@@ -110,6 +111,7 @@ export function RecurringView() {
   const rules = useAtomValue(recurringRulesAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
+  const transactions = useAtomValue(transactionsAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const generate = useSetAtom(runRecurringGenerationAtom);
@@ -336,6 +338,7 @@ export function RecurringView() {
         rule={sheet === "new" ? null : sheet}
         categories={categories}
         containers={containers}
+        transactions={transactions}
         onOpenChange={(open) => !open && setSheet(null)}
         onSubmit={async (input, editingId) => {
           if (editingId) {

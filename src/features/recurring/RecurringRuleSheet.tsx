@@ -9,12 +9,17 @@ import {
   type Frequency,
   type IntervalConfig,
   type RecurringRule,
+  type Transaction,
   type AnnuallyConfig,
   type BiweeklyConfig,
   type CustomConfig,
   type MonthlyConfig,
   type WeeklyConfig,
 } from "@/core/model";
+import {
+  rankCategoriesByUsage,
+  rankContainersByUsage,
+} from "@/core/engine/usage-ranking";
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
@@ -52,6 +57,7 @@ export function RecurringRuleSheet({
   rule,
   categories,
   containers,
+  transactions,
   onOpenChange,
   onSubmit,
 }: {
@@ -59,6 +65,7 @@ export function RecurringRuleSheet({
   rule: RecurringRule | null;
   categories: Category[];
   containers: Container[];
+  transactions: Transaction[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
@@ -75,6 +82,7 @@ export function RecurringRuleSheet({
           rule={rule}
           categories={categories}
           containers={containers}
+          transactions={transactions}
           onSubmit={onSubmit}
         />
       )}
@@ -86,29 +94,35 @@ function RuleForm({
   rule,
   categories,
   containers,
+  transactions,
   onSubmit,
 }: {
   rule: RecurringRule | null;
   categories: Category[];
   containers: Container[];
+  transactions: Transaction[];
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
   const activeCategories = useMemo(
     () =>
-      categories
-        .filter((c) => !c.is_archived || c.id === rule?.template_category_id)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [categories, rule],
+      rankCategoriesByUsage(
+        categories.filter((c) => !c.is_archived || c.id === rule?.template_category_id),
+        transactions,
+      ),
+    [categories, rule, transactions],
   );
   const activeContainers = useMemo(
     () =>
-      containers.filter(
-        (c) =>
-          !c.is_archived ||
-          c.id === rule?.template_container_id ||
-          c.id === rule?.template_to_container_id,
+      rankContainersByUsage(
+        containers.filter(
+          (c) =>
+            !c.is_archived ||
+            c.id === rule?.template_container_id ||
+            c.id === rule?.template_to_container_id,
+        ),
+        transactions,
       ),
-    [containers, rule],
+    [containers, rule, transactions],
   );
 
   const editingTransfer = rule ? isTransferRule(rule) : false;
