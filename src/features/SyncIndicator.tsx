@@ -17,6 +17,9 @@ import {
   reconnectAtom,
 } from "@/features/store";
 
+export const SYNC_ATTENTION_CLASS =
+  "bg-destructive text-white hover:bg-destructive/85 focus-visible:ring-destructive/40 dark:bg-destructive dark:text-background dark:hover:bg-destructive/85";
+
 /**
  * The Drive-sync status affordance (§8.6 "non-intrusive indicator", §12 quiet
  * voice). Signed out → renders nothing (the sign-in control speaks). Otherwise a
@@ -49,7 +52,7 @@ export function SyncIndicator() {
       <Button
         variant="outline"
         size="sm"
-        className="rounded-full"
+        className={`${SYNC_ATTENTION_CLASS} rounded-full`}
         onClick={() => void reconnect()}
       >
         <CloudOffIcon className="size-4" />
@@ -71,16 +74,20 @@ export function SyncIndicator() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant="ghost"
+            variant={error ? "destructive" : "ghost"}
             size="icon"
-            className="text-muted-foreground rounded-full"
+            className={
+              error
+                ? `${SYNC_ATTENTION_CLASS} rounded-full`
+                : "text-muted-foreground rounded-full"
+            }
             onClick={() => void sync()}
             aria-label={label}
           >
             {syncing ? (
               <RefreshCwIcon className="size-4 animate-spin motion-reduce:animate-none" />
             ) : error ? (
-              <CloudOffIcon className="text-destructive size-4" />
+              <CloudOffIcon className="size-4" />
             ) : (
               <CloudIcon className="size-4" />
             )}

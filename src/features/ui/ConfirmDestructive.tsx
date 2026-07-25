@@ -86,8 +86,8 @@ export function ConfirmDestructive({
             onKeyDown={(e) => {
               if (e.key === "Enter" && ready) {
                 e.preventDefault();
-                handleOpenChange(false);
                 onConfirm();
+                handleOpenChange(false);
               }
             }}
             aria-describedby={hintId}
