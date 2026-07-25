@@ -29,6 +29,12 @@ import {
   restoreBackupAtom,
   type DataFile,
 } from "@/features/store";
+import { BlockingOperationOverlay } from "@/features/settings/BlockingOperationOverlay";
+import {
+  createBlockingOperation,
+  shouldWarnBeforeUnload,
+  type BlockingOperationState,
+} from "@/features/settings/blocking-operation";
 
 const log = createLogger("data-tools");
 
@@ -86,9 +92,21 @@ export function DataPanel() {
 
   const fileInput = useRef<HTMLInputElement>(null);
   const [connected, setConnected] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [blocking, setBlocking] = useState<BlockingOperationState>(null);
   const [problems, setProblems] = useState<string[] | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [replacementError, setReplacementError] = useState<{
+    summary: string;
+    job: Pending;
+  } | null>(null);
+  const blockingOperation = useRef<ReturnType<typeof createBlockingOperation> | null>(
+    null,
+  );
+  if (blockingOperation.current === null) {
+    blockingOperation.current = createBlockingOperation(setBlocking);
+  }
+  const busy = working || blocking !== null;
 
   useEffect(() => {
     let cancelled = false;
@@ -105,15 +123,25 @@ export function DataPanel() {
     };
   }, [loadBackups]);
 
+  useEffect(() => {
+    if (!shouldWarnBeforeUnload(blocking)) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [blocking]);
+
   async function run(what: string, task: () => Promise<void>): Promise<void> {
-    setBusy(true);
+    setWorking(true);
     try {
       await task();
     } catch (err) {
       const summary = log.capture(`${what} failed`, err);
       toast.error(`Couldn't ${what}.`, { description: summary });
     } finally {
-      setBusy(false);
+      setWorking(false);
     }
   }
 
@@ -131,36 +159,53 @@ export function DataPanel() {
     setPending({ kind: "import", ops: result.ops, fileName: file.name });
   }
 
-  function confirmPending(): void {
-    const job = pending;
-    setPending(null);
-    if (!job) return;
-    void run(
+  function beginReplacement(job: Pending): void {
+    setReplacementError(null);
+    const what =
       job.kind === "clear"
         ? "clear your data"
         : job.kind === "import"
           ? "import that file"
-          : "roll back",
-      async () => {
-        if (job.kind === "clear") {
-          await clearAll();
-          toast.success("Everything cleared", {
-            description: connected
-              ? "Your previous data is saved on Drive as a restore point."
-              : "This device only — you're not connected to Google.",
-          });
-        } else if (job.kind === "import") {
-          await importData(job.ops);
-          toast.success("Import complete", {
-            description: `${job.ops.length} changes restored.`,
-          });
-        } else {
-          await restoreBackup(job.backup.name);
-          toast.success("Rolled back", { description: when(job.backup.at) });
-        }
-        await loadBackups();
-      },
-    );
+          : "roll back";
+    const running = blockingOperation.current!.start(job.kind, async () => {
+      let success: { message: string; description: string };
+      if (job.kind === "clear") {
+        await clearAll();
+        success = {
+          message: "Everything cleared",
+          description: connected
+            ? "Your previous data is saved on Drive as a restore point."
+            : "This device only — you're not connected to Google.",
+        };
+      } else if (job.kind === "import") {
+        await importData(job.ops);
+        success = {
+          message: "Import complete",
+          description: `${job.ops.length} changes restored.`,
+        };
+      } else {
+        await restoreBackup(job.backup.name);
+        success = {
+          message: "Rolled back",
+          description: when(job.backup.at),
+        };
+      }
+      await loadBackups();
+      toast.success(success.message, { description: success.description });
+    });
+
+    // `start` publishes busy synchronously. Only then close the confirmation.
+    setPending(null);
+    void running.then((result) => {
+      if (!result.ok && result.reason === "failed") {
+        const summary = log.capture(`${what} failed`, result.error);
+        setReplacementError({ summary, job });
+      }
+    });
+  }
+
+  function confirmPending(): void {
+    if (pending) beginReplacement(pending);
   }
 
   const driveLine = connected
@@ -320,6 +365,41 @@ export function DataPanel() {
         </div>
       ) : null}
 
+      {replacementError ? (
+        <div
+          role="alert"
+          className="border-destructive/40 bg-destructive/5 space-y-3 rounded-2xl border p-5"
+        >
+          <div className="space-y-1">
+            <p className="text-sm font-medium">The replacement didn&apos;t finish.</p>
+            <p className="text-muted-foreground text-sm">
+              {replacementError.summary} Check your connection, keep yaccount open, then
+              try again.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              className="rounded-full"
+              disabled={busy}
+              onClick={() => beginReplacement(replacementError.job)}
+            >
+              Try again
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground rounded-full"
+              disabled={busy}
+              onClick={() => setReplacementError(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <CollapsibleSection title="Restore points" count={backups?.length ?? 0}>
         <div className="bg-card divide-y rounded-2xl border">
           {(backups ?? []).map((backup) => (
@@ -435,6 +515,7 @@ export function DataPanel() {
           </>
         )}
       </ConfirmDestructive>
+      {blocking ? <BlockingOperationOverlay operation={blocking} /> : null}
     </section>
   );
 }
