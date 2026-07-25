@@ -1,728 +1,862 @@
-# yaccount — Technical Specification (Living Document, v3)
+# yaccount — Technical Specification (v3)
 
-> **Status:** Third compaction checkpoint. Supersedes v2. Consolidates every decision locked in through three grilling rounds into a single coherent document: the full MVP source spec ("The Measure of a Plan v5"), the Capacitor/Next.js platform pivot, the OAuth architecture, the local-storage/sync design, and the complete **Savings Goals** system (§5.9) with its unified monthly allocation plan (§6.8). Open questions are collected in §10 so future sessions know exactly where to resume. Nothing below should be treated as final until implementation begins — this is the current shared understanding, not a frozen contract.
-
----
-
-## 1. Product Overview
-
-**Name:** yaccount (working bundle ID placeholder: `com.yaccount.app` — not yet finalized, see §9).
-
-**What it is:** A personal finance / budgeting application that replaces an existing spreadsheet tool, "The Measure of a Plan Budgeting Tool v5" (full source spec folded into this document — see §7). Runs identically across desktop browser, iOS, and Android from a single codebase.
-
-**Origin constraint:** The author has already built an npm library, **drivestore**, which treats a user's hidden **Google Drive `appDataFolder`** as a path-based file store. This is the entire backend — there is no traditional server. Data lives in the user's own Drive, tied to their Google account, and is free to operate.
-
-**MVP mandate:** Faithfully replicate the existing spreadsheet's functionality first (§7 is the literal checklist), engineered from day one so the following roadmap features never require re-architecture:
-- Savings/investment **containers** (tracker accounts) money can be routed into — realized in full as **Savings Goals** (§5.9), coordinated with category budgets through the unified monthly allocation plan (§6.8).
-- Dynamic (user-defined, **uncapped**) categories.
-- Recurring transactions (§5.8).
-- Quick-add shortcuts (§6.6) as the near-term stand-in for home-screen widgets.
-- An "overall balance" concept that can meaningfully differ from raw bank balance (§5.7).
-
-**Product thesis:** yaccount is more than a record of where money went — it aims to give **every dollar a purpose before it is even earned**. Income is allocated forward across steady spending categories and accumulating savings goals until nothing is left unassigned; the savings system (§5.9) and the monthly allocation plan (§6.8) are the machinery that makes this concrete.
-
-**Design tenets:**
-- Sleek, minimalist, modern visual direction; category-level color coding used throughout charts and UI (concrete design tokens/wireframes: not yet designed, see §10).
-- Fully decentralized / zero-infrastructure: no app server, no database server. Google Drive AppData + on-device storage are the only persistence layers.
-- Bulletproof financial data integrity: never silently lose, move, or overwrite a transaction, especially across offline/multi-device use.
-- Every artificial scale limit in the original spreadsheet (category counts, transaction row counts, month counts — all a byproduct of spreadsheet mechanics, not intentional product design) is removed by default in the rebuild unless explicitly stated otherwise.
+> **This document is the product contract:** what yaccount does and which rules may never
+> regress. It describes current, shipped behavior. Architecture and code layout live in
+> [`yaccount-implementation-details.md`](yaccount-implementation-details.md); current state and
+> operational hazards live in [`HANDOFF.md`](HANDOFF.md). Where they disagree with this document,
+> this document wins — except on shipped mechanics, where the code and tests are the truth.
+>
+> Every rule below is settled. Shortening or rephrasing one must not weaken it.
 
 ---
 
-### 1.1 Reversibility — the core design philosophy (LOCKED, read this before designing anything)
+## 1. Product
 
-**yaccount is a git-style ledger: every action is an append-only event, and every action the user can take, they can take back.** This is not a safety net bolted onto the side — it is the product's spine, and it outranks convenience whenever the two collide.
+**yaccount** is a personal finance app that replaces a budgeting spreadsheet ("The Measure of a
+Plan v5"). It is more than a record of where money went: it exists to give **every dollar a
+purpose before it is earned**. Income is allocated forward across steady spending categories and
+accumulating savings goals until nothing is unassigned (§6.5).
 
-Three rules follow from it, and no feature may violate them:
+It is fully decentralized: no app server, no database server. Data lives in the user's own Google
+Drive `appDataFolder`, reached through the author's `drivestore` library, plus on-device
+IndexedDB. Single currency.
 
-1. **Nothing is one-way.** If the UI offers an action, it offers its inverse. Archive ⇄ **unarchive** (categories §5.1, containers §5.2 — with a visible **Archived list and a Restore control**, not a hidden flag). Delete a transaction ⇄ **undo the delete** (§5.4: the delete appends a reversing row; the undo appends a row reversing *that*, so the original is live again). A reported balance can be **edited or removed** (§5.6). A soft delete with no way back is just a slow hard delete, and shipping one is a bug.
-2. **The undo is itself an event, never an erasure.** Undo never rewrites or removes an existing record — it appends the compensating op. State is the replay of the journal under the total order (§8.2), so *both* the delete and its undo remain visible in history, exactly like a `git revert` rather than a `git reset`. This is what makes the op-log the audit trail and lets multi-device merge stay correct: two devices replaying the same ops reach the same state whatever order they arrive in.
-3. **Reversibility is visible, not just possible.** Being able to reconstruct something from the journal in principle does not satisfy this. The user must be able to *see* what they put away and click one control to bring it back: an Archived section, a Restore button, an **Undo action in the confirmation toast**. If a user has to ask "how do I get that back?", the design failed.
+Design tenets: never silently lose, move or overwrite a transaction, especially across
+offline/multi-device use; no artificial scale limits (the spreadsheet's category, row and month
+caps were column artifacts and are gone); a calm, exact visual language (§9).
 
-Consequences for the model: state-bearing flags are two-way ops (`archive`/`unarchive`), corrections are compensating rows (never in-place edits of financial history), and the only hard delete anywhere is for non-financial housekeeping (templates, a superseded budget target, a mistyped `container_snapshot` — and even those removals are journaled ops).
+### 1.1 Reversibility — the spine
 
-## 2. Platform & Framework Architecture (locked)
+**yaccount is a git-style ledger: every action is an append-only event, and every action the user
+can take, they can take back.** This outranks convenience whenever the two collide. Three rules,
+and no feature may violate them:
 
-### 2.1 The pivot: Capacitor instead of PWA
+1. **Nothing is one-way.** If the UI offers an action, it offers its inverse. Archive ⇄
+   unarchive. Delete a transaction ⇄ undo the delete. A reported balance can be edited or
+   removed. A soft delete with no way back is a slow hard delete, and shipping one is a bug.
+2. **The undo is itself an event, never an erasure.** Undo appends the compensating op; it never
+   rewrites or removes a record. State is the replay of the journal under the total order (§7.1),
+   so both the delete and its undo stay in history — `git revert`, not `git reset`. This is also
+   what makes multi-device merge correct.
+3. **Reversibility is visible, not merely possible.** Reconstructible-in-principle does not
+   count. The user must see what they put away and click one control to bring it back: an
+   Archived section, a Restore control, an **Undo action in the confirmation toast**.
 
-Originally scoped as an installable PWA. **Superseded.** The author wants one app that runs as:
-1. A normal web app, unwrapped, in a desktop browser tab.
-2. A true native-installed app on iOS and Android, via **Capacitor** (wraps a web build in a native WKWebView/Android WebView shell, unlocking native plugins — secure storage, system-browser OAuth, and potentially native widget bridges down the line — that a plain PWA can't get on iOS).
-
-**Locked:** it is the *same build* across all three surfaces — not a separate desktop-optimized codebase. UI **layout** reorganizes responsively per platform/breakpoint (e.g. nav patterns, information density), but functionality, data model, and business logic remain identical everywhere.
-
-### 2.2 Framework: Next.js, static export mode
-
-Considered dropping Next.js for plain Vite + React (lower overhead, since a Capacitor-wrapped app can't use Next's server features anyway). **Decision: keep Next.js**, specifically configured with **static export** (`output: 'export'` in `next.config.js`), which compiles the app down to plain static HTML/JS/CSS — exactly what Capacitor wraps and what a plain browser can serve with no server involved.
-
-**Why keep Next.js over Vite despite not using SSR/API routes today:** the author explicitly wants to preserve the *option* — acknowledged as a slim but non-zero possibility — of later migrating to a full backend-integrated architecture (SSR, API routes, server actions) without a framework rewrite. Static export today, full Next.js server features later if ever needed, is a strict superset path; Vite would not offer this without a separate migration.
-
-**Web delivery (post-M11, locked):** the browser build is deployed as the GitHub Pages project
-site `https://somewhatmay.github.io/yaccount/`. Pages builds opt into
-`basePath`/`assetPrefix: "/yaccount"` via `YACCOUNT_GITHUB_PAGES=true`; local development,
-Playwright and Capacitor remain rooted at `/`. `trailingSlash: true` emits a directory index for
-every static route so extensionless deep links and hard refreshes work on static hosting. Pushes to
-`main` deploy only after Vitest, typecheck, lint and the static build pass. A Pages build must fail
-before compilation if `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` is unset.
-
-### 2.3 Cross-platform data-layer consequence
-
-Because the same static build runs in three environments, **all storage must be available in a plain browser context** — no native-only storage APIs. This confirms IndexedDB (§8) as correct for all three targets (available in desktop browsers, and inside Capacitor's WebView on both iOS and Android). Capacitor's native secure-storage plugin is used *only* for the native OAuth refresh token (§3), not for app data.
+Consequently: state-bearing flags are two-way ops, financial corrections are compensating rows
+(never in-place edits of history), and the only hard deletes are non-financial housekeeping
+(templates, a superseded budget target, a mistyped snapshot) — and even those are journaled ops.
 
 ---
 
-## 3. Authentication & Authorization (locked)
+## 2. Platform
 
-### 3.1 Problem statement
+**One build, three surfaces.** The same static export runs unwrapped in a desktop browser and,
+later, inside Capacitor on iOS and Android. Layout reorganizes responsively; functionality, data
+model and business logic are identical everywhere. There is no platform fork.
 
-Standard OAuth2 "Web Application" flows assume a server-held client secret. Yaccount has no server, so Google Cloud Console must register yaccount as **Native Application (iOS/Android)** and **Single Page Application (Web)** client types — both are genuine public clients; **no client secret is ever generated or required**.
+**Next.js in static-export mode** (`output: "export"`). Static export is what Capacitor wraps and
+what a plain browser serves with no server. Next is kept over Vite to preserve the option of a
+later server-integrated architecture without a framework rewrite.
 
-Key unlocking fact: `drivestore`'s `createDriveStore()` accepts `accessToken` as either a raw string **or an async function** (`() => Promise<string>`). The `.env`/`AUTH_GOOGLE_SECRET` pattern seen in drivestore's own docs is just its demo/server-side default — not a requirement. Token acquisition is fully decoupled from drivestore; yaccount owns this independently and simply hands drivestore a callback.
+**All storage must work in a plain browser context**, which fixes IndexedDB as the app-data store
+on all three surfaces. Native secure storage is reserved for the native OAuth refresh token only.
 
-### 3.2 Scope classification (researched, locked)
+### 2.1 Web delivery (current)
 
-`https://www.googleapis.com/auth/drive.appdata` is officially classified by Google as a **Recommended / Non-sensitive** scope — Google's Drive API scope reference lists it explicitly, and Google's own Drive documentation confirms an app must request this non-sensitive scope specifically to access the AppData folder.
+The browser build is deployed as the GitHub Pages project site
+`https://somewhatmay.github.io/yaccount/`.
 
-**Practical consequence:** yaccount only needs **basic verification** (standard OAuth consent screen — app name, logo, support email, privacy policy link, verified domain). It does **not** need the heavier sensitive-scope review (demo video, detailed justification) or the restricted-scope security assessment (CASA audit, annual re-verification) — those only apply to scopes with much broader access (e.g. full Drive/Gmail content), and specifically to apps that store/transmit that data through a server they control, which yaccount structurally does not have.
-
-**Local development/testing:** requires zero payment or approval wait. Create a free Google Cloud project, configure the OAuth consent screen, and keep it in **"Testing"** publishing status (up to 100 test users added by email, e.g. your own account) — this is a fully functional real OAuth flow, not a mock, just gated to explicitly added testers.
-
-### 3.3 Two distinct token-acquisition flows (locked)
-
-**A. Native (iOS/Android, inside Capacitor):**
-- OAuth client type: **iOS** and **Android** (separate client IDs), registered in Google Cloud Console — true public clients, no secret.
-- Flow: **Authorization Code + PKCE**, launched via the **system browser** (ASWebAuthenticationSession on iOS / Custom Tabs on Android) — never an embedded webview, which Google blocks for OAuth.
-- Suggested implementation: a Capacitor OAuth plugin (e.g. `@capacitor-community/generic-oauth2`) to drive the system-browser round trip.
-- This flow **can** return a real `refresh_token` (installed-app/native clients are eligible for offline access) → **persistent login** on native. Refresh token stored in native secure storage (Keychain on iOS / Keystore on Android via a Capacitor secure-storage plugin) — never in IndexedDB/localStorage.
-- Requires a **custom URL scheme redirect** registered both in Google Cloud Console and in Capacitor's native config — see §3.5 for what this is and why.
-
-**B. Desktop, unwrapped browser:**
-- OAuth client type: **Web application**, separate client ID from the native ones.
-- Flow: Google Identity Services' JS token client (`google.accounts.oauth2.initTokenClient`), `ux_mode: 'popup'`. Returns a short-lived access token directly to client JS, no secret involved.
-- **No refresh token** — browsers cannot hold one safely without a backend. Session needs periodic silent re-authorization (`prompt: ''`) before expiry; if silent renewal is blocked (e.g. Safari's third-party storage partitioning), falls back to a quick re-consent popup.
-
-**Locked trade-off:** it's acceptable that native users get persistent login while desktop-browser users must periodically re-approve a popup. This asymmetry is inherent to what each platform can safely do, not a compromise worth engineering around.
-
-### 3.4 Unified interface into drivestore
-
-A single `AuthProvider` abstraction exposes `getAccessToken(): Promise<string>`, backed internally by whichever flow (§3.3-A or §3.3-B) is active for the current platform. This is the function handed to `createDriveStore({ accessToken: getAccessToken })` — drivestore itself never needs to know which platform or flow is in play.
-
-### 3.5 What a "custom URL scheme redirect" actually is (reference note, for continuity)
-
-Native apps have no `https://` address the OS can route a browser redirect back to. The fix: register a private URL prefix unique to the app (reverse-DNS convention, e.g. `com.yaccount.app://oauth2redirect`) with both the OS (via Capacitor config) and Google Cloud Console (as an allowed redirect URI for the native OAuth clients). After the user approves access in the system browser, Google redirects to that custom-scheme URL; the OS recognizes it belongs to yaccount and routes control (plus the auth code) back into the app. This identifier is also what later becomes the iOS Bundle ID / Android Package Name when the app is actually registered with Apple/Google for distribution — see §9 for current naming status.
-
-### 3.6 Registration vs. distribution (reference note, for continuity)
-
-Two separate concerns, only one of which is needed right now:
-- **Google Cloud OAuth client (needed now, free, no approval wait):** required even for local device testing — without it, Google's login page won't talk to the app at all. Set up at [console.cloud.google.com](https://console.cloud.google.com); keep the app in "Testing" status during development.
-- **Apple Developer Program ($99/yr) / Google Play Console ($25 one-time) — not needed yet.** Not required to build and run on your own physical device (Xcode + free Apple ID, with a 7-day signing-cert refresh cycle; Android Studio + USB debugging, no account at all). Only needed later for TestFlight/Play-internal sharing or public store submission.
+- Pages builds opt into `basePath`/`assetPrefix: "/yaccount"` via `YACCOUNT_GITHUB_PAGES=true`.
+  Local development, Playwright and Capacitor stay rooted at `/`.
+- `trailingSlash: true` emits a directory index per route, so extensionless deep links and hard
+  refreshes work on static hosting.
+- Pushes to `main` deploy only after Vitest, typecheck, lint and the static build pass.
+- A Pages build **must fail before compilation** if `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` is unset.
 
 ---
 
-## 4. drivestore — Reference (external dependency, already built)
+## 3. Authentication
 
-`drivestore` treats Google Drive's hidden `appDataFolder` as a path-based file store (`folder/file.txt`). Requires an OAuth 2.0 access token with the `drive.appdata` scope (§3.2).
+There is no server, so yaccount registers as a **public OAuth client** — SPA (web) now, native
+iOS/Android later. **No client secret is ever generated or required.** The only scope is
+`https://www.googleapis.com/auth/drive.appdata`, which Google classifies as non-sensitive, so
+only basic consent-screen verification applies — no sensitive-scope review, no CASA assessment.
 
-```ts
-import { createDriveStore } from "drivestore";
+**One seam.** An `AuthProvider` exposes `getAccessToken(): Promise<string>` and a silent-only
+`getAccessTokenSilent()`. That callback is what `createDriveStore({ accessToken })` receives;
+`drivestore` never learns the platform.
 
-const store = createDriveStore({
-  accessToken: getAccessToken, // string OR async () => Promise<string> — see §3.4
-  rootName: "my-app",          // optional, defaults to "drive-store"
-  timeoutMs: 5000,              // optional
-  maxRetries: 3,                // optional
-});
-```
+### 3.1 Web flow (current)
 
-| Method | Signature | Notes |
+Google Identity Services' token client, `ux_mode: "popup"`. The browser has **no refresh token**,
+and the GIS token client always needs a user gesture — there is no hidden-iframe silent renewal.
+So auth state splits in two:
+
+- A **durable `granted` flag** — the fact that the user connected their Google account. Persisted
+  indefinitely; this is the user-facing "signed in" state.
+- A **short-lived access token** (~1h), cached, renewed silently on demand during user activity,
+  with an interactive re-consent fallback.
+
+Net effect: connect once, stay connected. The popup returns only on explicit sign-out or genuine
+session loss/revocation. Auth state lives in `localStorage` (durable grant + short-lived token
+only — **never a refresh token**, which the web flow does not have), degrading to in-memory when
+storage is blocked.
+
+A background sync tick must use the silent-only call, so it can never raise a popup; a
+**Reconnect** affordance is the one gesture that re-consents.
+
+### 3.2 Native flow (deferred with M10)
+
+iOS/Android client IDs, Authorization Code + PKCE through the **system browser** (never an
+embedded webview, which Google blocks), redirecting to the custom scheme
+`com.yaccount.app://oauth2redirect`. Native clients can hold a real refresh token, stored in
+Keychain/Keystore — never in IndexedDB or `localStorage`. The resulting asymmetry (persistent
+native login, periodic web re-approval) is accepted, not engineered around.
+
+Bundle ID / package name / redirect scheme: **`com.yaccount.app` — locked final.**
+
+---
+
+## 4. Data model
+
+The pattern is **Global Budgets / Local Containers**, plus a purpose layer. **Categories** carry
+budgets — *what money does*. **Containers** are asset buckets — *where money lives*. **Goals**
+are a purpose + plan over a container — *what a pool accumulates toward*. **These three axes are
+independent and no code path may collapse them.**
+
+Money persists as **integer cents** everywhere (stores, op payloads, snapshots). Dates are ISO
+`YYYY-MM-DD` calendar strings. All ids are UUIDs.
+
+### 4.1 `categories`
+
+| Field | Type | Notes |
 |---|---|---|
-| `read` | `(path) => Promise<string>` | Throws 404 if missing |
-| `write` | `(path, content) => Promise<void>` | Overwrites/creates with string data |
-| `readBytes` | `(path) => Promise<Uint8Array>` | Throws 404 if missing |
-| `writeBytes` | `(path, data) => Promise<void>` | Overwrites/creates with binary data |
-| `append` | `(path, content) => Promise<void>` | Appends string; **non-atomic** |
-| `exists` | `(path) => Promise<boolean>` | Never throws |
-| `delete` | `(path) => Promise<void>` | Throws 404 if missing |
-| `list` | `(path) => Promise<DriveEntry[]>` | Returns `{ name, type: "file" \| "directory" }[]`; use `""` for root |
+| id | TEXT (UUID) | PK |
+| name | TEXT | unique, non-empty (trimmed, case-insensitive, NFC-normalized) |
+| type | TEXT | `expense` \| `income` |
+| is_archived | BOOLEAN | soft delete only (§4.4) |
+| color | TEXT nullable | `null` = deterministic auto-palette at render; non-null = stored override |
+| icon | TEXT nullable | a curated Lucide glyph name; absent/unknown falls back to the colour dot |
 
-Errors throw `DriveError` with `.status` (HTTP code) and `.body` (raw API response string).
+No category count cap.
 
----
+### 4.2 `containers`
 
-## 5. Data Model (locked)
+| Field | Type | Notes |
+|---|---|---|
+| id | TEXT (UUID) | PK; `'general'` is auto-created on first init as the default wallet |
+| name | TEXT | unique, same rule as categories |
+| is_investment | BOOLEAN | offers reported-value tracking (§4.5). Editable at any time. Orthogonal to whether a goal is attached |
+| include_in_overall_balance | BOOLEAN | default **false**, except `'general'` (true) |
+| is_archived | BOOLEAN | soft delete only |
 
-The core architectural pattern is **Global Budgets / Local Containers**, extended with a purpose layer:
-- **Categories** carry budgets globally — *what money does* per transaction.
-- **Containers** are pure asset-allocation buckets — *where money lives* — decoupled from category.
-- **Goals** (§5.9) are a *purpose + plan* overlay on a container — *what a pool of money is being saved toward* — decoupled from both of the above.
+- Balances may go negative; the UI renders them in rose rather than blocking the transaction.
+- One container is the global **Default Spending Container** (a synced setting, default
+  `'general'`), so routine logging never requires picking a container.
+- Uniqueness is enforced at the point of entry, on create **and** rename — never in the reducer,
+  because a merge must never throw.
+- Archived containers stay valid FK targets, so historical charts and past goal cycles never
+  break.
+- A container may carry no goal, one active goal, or a history of completed goals.
 
-These three axes are independent: a category answers "what kind of spend is this," a container answers "which pool did it move through," and a goal answers "what is this pool accumulating toward." Keeping them separate is what lets each vary freely without disturbing the others.
+### 4.3 `budget_targets` (time-variant, no end date)
 
-### 5.1 `categories`
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | |
-| name | TEXT | UNIQUE, NOT NULL | |
-| type | TEXT | NOT NULL, CHECK IN ('expense','income') | |
-| is_archived | BOOLEAN | DEFAULT false | Soft delete only — never hard-deleted (§5.5) |
-| color | TEXT | nullable | Hex/token for chart & UI color-coding. **Locked (hybrid):** `null` = auto-assigned deterministically from a fixed palette at render time; a non-null value = explicit user override. Auto default ships with charts; the override UI is deferred to the design system (§10.6). |
+| Field | Type | Notes |
+|---|---|---|
+| id | TEXT (UUID) | PK |
+| category_id | TEXT | FK → categories |
+| amount | cents | ≥ 0 |
+| start_date | ISO date | effective until the next row for that category |
 
-**No category count cap** (the spreadsheet's 80-expense/15-income limit was a spreadsheet-column artifact, not a design intent — explicitly removed).
+**Unique per `(category_id, start_date)`:** setting a budget on a date that already has a row
+**upserts**. The reducer enforces this by natural key, so it survives device merges and "latest
+row ≤ X" resolution stays unambiguous.
 
-### 5.2 `containers`
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | `'general'` auto-created on first init as the default wallet |
-| name | TEXT | UNIQUE, NOT NULL | |
-| is_investment | BOOLEAN | DEFAULT false | Flags containers tracking decoupled long-term assets (§5.6). Orthogonal to whether the container carries a goal (§5.9.2). |
-| include_in_overall_balance | BOOLEAN | **DEFAULT false**, except `'general'` which defaults **true** | Drives the "Current Overall Balance" metric (§5.7). Opt-in, not opt-out — see §5.7 rationale. |
-| is_archived | BOOLEAN | DEFAULT false | Soft delete only — never hard-deleted, identical policy to categories (§5.5). |
+**Resolution:** the budget on date X is the latest row with `start_date ≤ X`. Historical reports
+must evaluate against the budget active *at that time*, never the current one. Implicit end dates
+support both permanent shifts and one-off anomalies with no end-date bookkeeping.
 
-- Container balances **can go negative**; the UI renders negative-balance containers in red rather than blocking the transaction.
-- One container is the global **Default Spending Container** in settings (defaults to `'general'`) — what quick-log shortcuts use implicitly so routine spending never requires picking a container.
-- **`is_investment` is editable at any time** (M3) — a plain bucket can become an investment container later and back again; the flag only decides whether reported-value tracking (§5.6) is offered.
-- **Names are UNIQUE, checked in the UI on create *and* rename** (same for categories, §5.1), compared case-insensitively on the trimmed name. IndexedDB can't express uniqueness and a hard constraint would be wrong anyway — a merge must never throw — so a collision is prevented at the point of entry, not enforced in the reducer.
-- Containers are **archived, never hard-deleted** (`is_archived = true`). An archived container leaves active selection UI but remains a valid FK target, so historical charts, the Container Flows view (§5.4), and past goal cycles (§5.9) never break.
-- A container may exist with no goal (a plain bucket), with an active goal, or with a history of completed goals. Every goal, conversely, belongs to exactly one container (§5.9.2).
+A budget target is a **flow** allowance; a goal contribution is a **stock** accumulation. They
+are separate tables and meet only in the monthly plan (§6.5).
 
-### 5.3 `budget_targets` (time-variant, no `end_date`)
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | |
-| category_id | TEXT | FK → categories.id, ON DELETE RESTRICT | |
-| amount | REAL | NOT NULL, CHECK ≥ 0 | |
-| start_date | TEXT (ISO YYYY-MM-DD) | NOT NULL | Effective until the next row for the same category. **Unique per `(category_id, start_date)` (locked):** setting a budget for a date that already has a row **upserts** (replaces) it — the `setBudgetTarget` op upserts by that natural key in `apply()`, so no duplicate survives even across device merges, keeping "latest row ≤ X" resolution unambiguous. |
+### 4.4 `transactions` — the unified ledger
 
-A budget row's effective end is implicit: either never, or the day before the next row for that category begins. This supports both permanent shifts (e.g. Groceries $300→$600/mo after a lifestyle change) and one-off anomalies (e.g. a single elevated month that reverts once a following row exists) without redundant/error-prone explicit end-date bookkeeping.
+Expenses, income, transfers, templates and recurring-pending rows all live here.
 
-**Resolution logic (IndexedDB-native, superseding the earlier SQL-window-function sketch):** keep each category's budget rows sorted by `start_date` in memory; to resolve "what was the budget on date X," binary/linear-search for the latest row with `start_date <= X`. Historical reports must always evaluate against the budget active *at that time*, never against the current/latest value.
+| Field | Type | Notes |
+|---|---|---|
+| id | TEXT (UUID) | PK |
+| date | ISO date | |
+| amount | cents | **negative = outflow, positive = inflow** |
+| vendor_source | TEXT | payee or funding source; for transfers it defaults to a synthesized `"{source} → {dest}"` label, user-editable |
+| category_id | TEXT nullable | null **only** for transfers |
+| container_id | TEXT | source container / the account for a normal row |
+| to_container_id | TEXT nullable | set **only** for transfers — the destination |
+| is_template | BOOLEAN | true = a saved 1-tap shortcut, not a live ledger entry |
+| template_name | TEXT nullable | shortcut display name |
+| inbox_status | TEXT | `pending` \| `approved` (default) |
+| recurring_rule_id | TEXT nullable | set on rows generated from a rule |
+| notes | TEXT nullable | optional freeform detail, separate from `vendor_source`; blank normalizes to null |
+| reverses_id | TEXT nullable | set **only on a reversing row** → the id of the row it cancels |
+| yearMonth | TEXT | stored `YYYY-MM`, derived from `date` at write time, for the compound indexes |
 
-A `budget_target` is a **flow** allowance (steady monthly spend), distinct from a **goal** contribution (accumulation toward a target). The two live in separate tables but surface together in the monthly allocation plan (§6.8), where the flow-vs-stock distinction is spelled out.
+**Three shapes** share the table: **expense/income** (`category_id` set, `to_container_id` null,
+sign distinguishes them) and **transfer** (`category_id` null, `to_container_id` set).
 
-### 5.4 `transactions` (unified ledger — expenses, income, transfers, templates, recurring-pending)
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | |
-| date | TEXT (ISO YYYY-MM-DD) | NOT NULL | |
-| amount | REAL | NOT NULL | **Sign convention: negative = expense/outflow, positive = income/inflow**, so balance = `SUM(amount)` trivially. Refunds/credits are simply smaller-magnitude negative expense rows — no separate concept needed. |
-| vendor_source | TEXT | NOT NULL | Payee or funding source. **For Transfers** (no external payee) it auto-defaults to a synthesized `"{source} → {dest}"` label from the container names, user-editable — so `NOT NULL` holds with no friction. Same rule for `recurring_rules.template_vendor_source` (§5.8) on transfer rules. |
-| category_id | TEXT | FK → categories.id, **nullable** | NULL only for Transfers |
-| container_id | TEXT | FK → containers.id, NOT NULL | Source container (or the account for a normal transaction) |
-| to_container_id | TEXT | FK → containers.id, nullable | Only set for Transfers — destination container |
-| is_template | BOOLEAN | DEFAULT false | True = saved 1-tap quick-log shortcut, not a live ledger entry |
-| template_name | TEXT | nullable | Shortcut display name, e.g. "Tim Hortons" |
-| inbox_status | TEXT | DEFAULT 'approved', CHECK IN ('pending','approved') | Used by the recurring-transaction approval flow (§5.8) |
-| recurring_rule_id | TEXT | FK → recurring_rules.id, nullable | Set only on rows auto-generated from a recurring rule |
-| notes | TEXT | nullable | **(Post-M11 Phase 2)** Optional freeform detail, separate from `vendor_source`. Create/edit exposes it for expense, income and transfer; blank input normalizes to NULL; non-empty notes render quietly under the register marginalia and copy through saved shortcuts. |
-| reverses_id | TEXT (UUID) | FK → transactions.id, nullable | **Void mechanism (design decision, added M2 — not in the original spreadsheet).** Set **only on a reversing row** → the id of the transaction it cancels. A "delete" appends this opposite-sign row rather than removing anything (append-only, §5.5 spirit / no destructive delete). "Transaction X is voided" is *derived*: some row has `reverses_id = X.id`. The original is never mutated; both rows stay in the ledger so `balance = SUM(amount)` remains exact and auditable, while the UI hides the voided pair. Distinguishes an intentional void from a genuine refund (a refund has `reverses_id = NULL`). |
+**Balance — the load-bearing formula.** A transfer is a *single* row keyed to the source, so a
+naive `SUM(amount)` debits the source and never credits the destination:
 
-**Three transaction shapes** share this one table, distinguished by their fields:
-- **Expense / income** — `category_id` set, `to_container_id` null; sign of `amount` distinguishes the two.
-- **Transfer** — `category_id` null, `to_container_id` set; moves money between two owned containers.
-
-**UI display rule:** expenses are always rendered with an explicit negative sign (e.g. "Starbucks: −$10"), not just implied by color, for unambiguous clarity.
-
-**Balance computation (clarifies the "trivial" shorthand above):** because a Transfer is a *single* row keyed to the **source** `container_id` (with `to_container_id` naming the destination), a container's balance is **not** literally `SUM(amount)` filtered on `container_id` alone — that would debit the source but never credit the destination. The destination credit must be added back, and non-ledger rows excluded:
 ```
-balance(c) = SUM(amount WHERE container_id = c)            // outflows + normal expense/income
-           − SUM(amount WHERE to_container_id = c)          // credit the transfer destination (amount is negative → subtracting adds)
+balance(c) = SUM(amount WHERE container_id    = c)
+           − SUM(amount WHERE to_container_id = c)
    over rows WHERE inbox_status = 'approved' AND is_template = false
 ```
-The "`balance = SUM(amount)` trivially" phrasing holds only for the expense/income rows of one container; **transfers** (destination leg) and the **template / pending** exclusions are the standing caveats, and every downstream balance/contribution/report derivation must apply them. This is consistent with the Net Contributions primitive (§5.6), which already credits via "Transfers *into*" (i.e. `to_container_id`).
 
-**Sign vs. category type (locked, soft):** the sign convention is a **UI default**, not a schema constraint. The entry form pre-signs by category type (expense → negative, income → positive) and asks for confirmation on an unusual sign, but the data layer **permits either sign on any category** — because voids/reversals (a +$100 row cancelling a −$100 expense) and refunds/credits legitimately carry the opposite sign and must net *within* their category. Reports stay correct because everything is a signed sum. (So a refund may be recorded either as a magnitude reduction of the original or as a separate opposite-sign credit row — both net identically.)
+**Every derivation — balance, contributed, container flows, reconstructed balance — must apply
+both caveats: the destination leg, and the approved/non-template filter.**
 
-**Void / correction (design decision, M2):** there is no destructive delete of a transaction. "Deleting" a row appends a **reversing row** — same fields, opposite-sign `amount`, `reverses_id` pointing at the original — so the pair nets to zero in `balance = SUM(amount)` while the full history is preserved and auditable. The UI hides both rows of a voided pair from the active ledger; a genuine refund (opposite-sign row with `reverses_id = NULL`) stays visible as two real events. This generalizes the signed-amount convention above (a void is just a correcting credit that also records *what* it corrects).
+**Sign is a UI default, not a schema constraint.** The entry form pre-signs by category type and
+confirms an unusual sign inline, but the data layer permits either sign on any category, because
+voids and refunds legitimately carry the opposite sign and must net *within* their category. The
+direction of money is a **visible `−`/`+` control**, never a typing convention; a typed sign
+moves into that control rather than being silently absorbed.
 
-**A void is undoable too (§1.1, locked).** "Undo delete" appends a row reversing the *reversing* row, so the pair nets back out and the original is live again; deleting once more appends another reversal. A row is therefore live iff no **still-live** row reverses it — a chain walk (`activeRows`, `src/core/engine/ledger.ts`), not a one-step check. Balances need none of this: every reversal is a real signed amount, so the arithmetic nets out on its own. The delete toast carries an **Undo** action.
+**Expenses always render with an explicit minus sign**, not colour alone.
 
-**Transfers are structurally distinct:** no category, they move money between owned containers and are explicitly excluded from category-based Expense/Income dashboards (nothing left the user's real-world possession). A dedicated **Container Flows** view reports net inflow/outflow per container over the active reporting period, fully decoupled from category charts. The transfer-vs-expense distinction is load-bearing for savings goals: a transfer into a goal's container is a *contribution*, whereas an expense out of it is *spending on purpose* — the two are accounted for completely differently (§5.9.3).
+**Void = a reversing row.** There is no destructive delete of a transaction, and transactions
+have **no `is_archived` field**. "Deleting" appends a same-fields, opposite-sign row whose
+`reverses_id` points at the original. The pair nets to zero, the balance stays exact and
+auditable, and the UI hides both. A genuine refund (`reverses_id = null`) stays visible as two
+real events.
 
-### 5.5 Deletion policy (categories & containers) — soft, and **reversible**
-Soft delete only (`is_archived = true`) — never hard-deleted, never nullified/orphaned. Archived rows vanish from active selection UI but remain valid FK targets so historical charts, Container Flows, and past goal cycles never break. Goals follow the same never-hard-delete principle via their own lifecycle states (§5.9.6).
+**A void is undoable** (§1.1): undo appends a row reversing the reversing row. A row is live iff
+no **still-live** row reverses it — a chain walk, not a one-step check, and cyclic
+`reverses_id` must resolve deterministically so two devices agree about what is on screen. A
+pending or template row can never hide a live row. Balances need none of this: every reversal is
+a real signed amount.
 
-**Archiving is always reversible (§1.1, locked).** Every screen that can archive must also (a) **list what is archived** and (b) offer a one-click **Restore** (`category.unarchive` / `container.unarchive` — their own ops, so the journal records putting-away and bringing-back as two events), plus an **Undo action in the archive toast**. Restoring is lossless: only `is_archived` flips, every other field is untouched, and a restored container that was opted into the overall balance (§5.7) starts counting again.
+**Transfers are structurally distinct** and excluded from category expense/income reporting —
+nothing left the user's possession. A dedicated Container Flows view reports net in/out per
+container. This distinction is load-bearing for goals: a transfer into a goal container is a
+*contribution*; an expense out of it is *spending on purpose* (§4.6).
 
-### 5.6 Container investment / asset tracking
+### 4.5 Deletion policy, and container asset tracking
 
-**`container_snapshots`:**
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | |
-| container_id | TEXT | FK → containers.id | Expected to be an `is_investment = true` container |
-| date | TEXT (ISO YYYY-MM-DD) | NOT NULL | **Unique per `(container_id, date)`** — one report per container per day; a repeat upserts (see below). |
-| reported_balance | REAL | NOT NULL | Real-world value at that moment. Integer cents on disk (§ impl 1). Correctable — see the note below the formulas. |
+**Categories, containers and goals are archived, never hard-deleted**, and archiving is always
+reversible: every screen that archives must list what is archived, offer one-click Restore, and
+put an Undo in the toast. Restoring is lossless — only the flag flips.
 
-Only actual cash movement into/out of an investment container is logged as a normal Transfer (no category, doesn't touch Income/Expense graphs). Market growth is never logged as a transaction.
+**`container_snapshots`** record the real-world value of an investment container:
+
+| Field | Type | Notes |
+|---|---|---|
+| id | TEXT (UUID) | PK |
+| container_id | TEXT | FK → containers |
+| date | ISO date | **unique per `(container_id, date)`** — one report per container per day |
+| reported_balance | cents | the value at that moment |
+
+Only actual cash movement in or out is logged, as an ordinary transfer. **Market growth is never
+a transaction.**
 
 ```
-Net Contributions    = SUM(Transfer amounts into that container)  − SUM(Transfer amounts out)
-Current Value        = latest container_snapshots.reported_balance
+Net Contributions    = Σ transfers into the container − Σ transfers out
+Current Value        = latest reported_balance
 Unrealized Gain/Loss = Current Value − Net Contributions
 ```
 
-**Net Contributions is the general savings-progress primitive.** It is not investment-specific: it is the exact quantity a `spend_down` goal measures progress against (§5.9.3). For an `is_investment` container it additionally underlies Unrealized Gain/Loss above; for a plain spend-down goal it is simply the progress numerator, with the snapshot/market-growth machinery inert. This is why the savings system adds essentially no new accounting concept — it generalizes one that already existed here.
+**Net Contributions is the general savings-progress primitive**, not an investment-only one: it
+is exactly what a `spend_down` goal measures against (§4.6). This is why the goal system adds
+almost no new accounting concept.
 
-**One report per container per day (locked, M3).** `container_snapshots` is **unique per `(container_id, date)`** — the same natural-key upsert rule as `budget_targets` (§5.3). Logging (or editing onto) a day that already has a report **replaces** it; two readings of the same account on the same day are a mistake, not history, and "Current Value = latest reported_balance" must never be ambiguous. Enforced in the reducer (`snapshot.record`/`snapshot.update` delete any other row holding that key before writing), so the rule also survives a device merge — the later op in the total order wins and every device converges on the same row. No hard IndexedDB unique index (it could throw on replay).
+**One report per container per day.** Logging or editing onto an occupied day replaces it; two
+readings of one account on one day are a mistake, not history, and "current value = latest
+report" must never be ambiguous. Enforced by natural-key upsert in the reducer so it survives
+merges. No hard IndexedDB unique index — it could throw on replay.
 
-**Snapshots are correctable observations (design decision, M3 — locked).** A snapshot is a value the *user typed after looking at their account*, not a money movement: no balance, contribution, or ledger sum depends on it, and a mistyped figure is simply wrong data. So unlike transactions (§5.4, never destructively deleted) a snapshot may be **edited in place or removed outright** — `snapshot.update` (entity-LWW) and `snapshot.remove` — and the app shows a per-container **history** of every reported value with those two actions. This does **not** weaken the never-lose-data invariant: both corrections are themselves **ops in the append-only journal (§8.2)**, so the full sequence (record → update → remove) is preserved and materialized state is just its replay under the total order — a git-style history where the working tree shows current truth and the log holds every version. (Deep history migrates into the archived `ledger_<deviceId>_YYYY-MM.json` files after an op-log collapse, §8.4.)
+**Snapshots are correctable observations.** A snapshot is a value the user typed after looking at
+their account, not a money movement — nothing derives a balance from it — so unlike a
+transaction it may be edited in place or removed, and each container shows the full history of
+its reports with Edit/Delete. This does not weaken the never-lose-data rule: record, update and
+remove are all journaled ops, and state is their replay.
 
-**Historical chart gap-filling — Reconstructed Balance Engine (locked):**
-```
-Balance(month) = Nearest known snapshot ± SUM(Transfers in the gap to target date)
-```
-Chosen over simple carry-forward, which would ignore any transfers during un-snapshotted periods and produce false "cliff" jumps whenever the next snapshot is logged.
+**Reconstructed balance** fills historical gaps as `nearest known snapshot ± transfers in the
+gap`, using the same two-directional crediting as the balance formula. Rolls forward from a past
+snapshot or backward from a future one. Chosen over carry-forward, which ignores transfers during
+un-snapshotted periods and produces false cliffs.
 
-### 5.7 "Current Overall Balance" definition (locked, opt-in model)
+### 4.6 Savings goals
 
-```
-Current Overall Balance = SUM(containers.balance WHERE include_in_overall_balance = true AND is_archived = false)
-```
+A goal is a purpose + plan layered onto a container. Containers stay dumb buckets; a goal is the
+intention that fills one.
 
-**Archived containers are excluded too (locked, M3).** A container the user has put away must not sit invisibly inside the headline figure; its own balance stays queryable, and un-archiving restores it to the total. Archiving one that still holds money warns first, naming the amount.
+**Progress is contributions, not balance.** Buying a $20 shirt from a fully funded $200 clothing
+fund must not conclude "you are $20 short." Only **transfers** move progress: in is a
+contribution, out is a reallocation away. **Expenses never affect progress** — spending on the
+purpose fulfills the goal. Spendable balance is always shown *alongside* contributed, never as
+the driver ("set aside $200 · $180 available").
 
-**Default is exclude, not include** — deliberately inverted from the naive "sum everything non-investment" approach. Rationale (user's own framing): most containers represent money the user is *saving up toward* something (e.g. new clothes), and should not silently inflate a headline "you have $X to spend" number. Only the default `'general'` spending container is included out of the box; any other container must be explicitly opted in by the user if they want it counted (independent of its `is_investment` flag — the two are separate concerns, since a non-investment container like a "Vacation Fund" should typically still be excluded by default). Because goal containers inherit this default, money being saved toward a goal never inflates the headline spendable balance unless the user opts it in.
+#### `goals`
 
-### 5.8 Recurring / quick transactions
+| Field | Type | Notes |
+|---|---|---|
+| id | TEXT (UUID) | PK |
+| container_id | TEXT | FK → containers. **At most one `active` goal per container** (app-level); unlimited historical ones |
+| name | TEXT nullable | cycle label; defaults to the container name |
+| kind | TEXT | `spend_down` (default) \| `reserve` |
+| mode | TEXT | `deadline` \| `fixed` \| `passive` |
+| target_amount | cents nullable | required for `deadline` and `reserve`; optional for `fixed`/`passive` |
+| deadline | ISO date nullable | required when `mode = deadline` |
+| planned_monthly | cents nullable | the committed monthly M for `fixed`; **null for non-fixed modes** |
+| opening_contributed | cents | head-start basis at cycle creation (absorb-leftover) |
+| status | TEXT | `active` \| `completed` \| `cancelled` |
+| is_archived | BOOLEAN | soft-hide only |
+| created_date | ISO date | cycle start; the anchor for contribution windowing |
+| completed_date | ISO date nullable | |
 
-**Templates (1-tap quick log):** rows with `is_template = true`, created via a **"save as shortcut"** action available from any transaction's detail view. **No cap** on how many templates a user can have.
+**Cardinality:** a container has 0-or-1 active goal and any number of historical ones; a goal has
+exactly one container. Creating a goal may **auto-create its container**. On name collision,
+**reuse** the existing container as the next cycle — unless it already has an active goal, in
+which case block. Rejected: N active goals per container (a transfer into the shared bucket
+cannot be attributed), and one goal spanning N containers (deferred).
 
-**`recurring_rules`** formalizes scheduled/recurring generation. A rule can express any of the three transaction shapes (§5.4) — income, expense, or **transfer** — the last of which is what powers goal auto-contributions (§5.9.5).
+#### Two kinds
 
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | |
-| frequency | TEXT | CHECK IN ('daily','weekly','biweekly','monthly','annually','custom') | |
-| interval_config | JSON | shape depends on `frequency` (see below) | |
-| template_amount | REAL | NOT NULL when `amount_mode = 'fixed'`; ignored/recomputed when `'goal_derived'` | The occurrence amount |
-| template_vendor_source | TEXT | NOT NULL | |
-| template_category_id | TEXT | FK → categories.id, nullable | Null for transfer rules |
-| template_container_id | TEXT | FK → containers.id, NOT NULL | Source container (funding source for a transfer rule) |
-| template_to_container_id | TEXT | FK → containers.id, nullable | **Destination**; set only for **transfer** rules — enables recurring transfers, including goal auto-contributions (§5.9.5) |
-| amount_mode | TEXT | CHECK IN ('fixed','goal_derived'), DEFAULT 'fixed' | `'goal_derived'` → the pending amount is computed from `linked_goal_id`'s `required_monthly` **at generation time** (§5.9.5), so a deadline goal's drifting ask never logs stale |
-| linked_goal_id | TEXT | FK → goals.id, nullable | Set when this rule is a goal's auto-contribution; completing/cancelling the goal cancels the rule (§5.9.5) |
-| start_date | TEXT (ISO) | NOT NULL | |
-| end_date | TEXT (ISO) | nullable | null = indefinite |
-| next_generation_date | TEXT (ISO) | computed/cached | drives scheduling |
+**`spend_down` — progress = contributions.** The money exists to be spent on its purpose;
+spending fulfills the goal and must never reopen it.
 
-**`interval_config` shape per frequency (locked):**
-- `daily` — no extra config
-- `weekly` — `{ day_of_week }`
-- `biweekly` — **"twice a month," using the same day-of-month mechanism as `monthly`, just with two anchor days** (e.g. 1st & 15th) — deliberately **not** a strict every-14-days cadence. A user who needs a true 14-day cadence uses `custom` (`every 2 Week`) instead.
-- `monthly` — `{ day_of_month }`
-- `annually` — `{ month, day }`
-- `custom` — `{ every: <positive integer>, unit: 'day' | 'week' | 'month' | 'year' }`
-
-**Generation / approval flow:** due rules generate a single pending transaction (`inbox_status = 'pending'`) one at a time as each occurrence comes due — not a batch of future rows — since real-world prices drift and a monthly charge shouldn't silently auto-log at a stale amount. Pending rows are excluded from all dashboard/budget calculations until approved. A **Pending/Inbox** queue supports 1-tap approval and **multi-select bulk approval**. For `amount_mode = 'goal_derived'` transfer rules the "one occurrence at a time" behavior is load-bearing rather than incidental: `required_monthly` is recomputed per occurrence so the self-correcting deadline ask is always captured fresh (§5.9.5). **One-at-a-time is now confirmed (locked), not merely recommended.**
-
-**Backfill of missed occurrences (locked):** because a static app only runs when opened, occurrences can come due while it is closed. On next open, backfill depends on `amount_mode`:
-- **`fixed`** → generate **every** missed occurrence, oldest-first, each dated to its own due date (those charges/owed contributions really happened — never silently skipped).
-- **`goal_derived`** → generate a **single** current occurrence at the present (already-self-corrected) `required_monthly`. Stacking one per missed month would double-count, since the deadline ask already rose to absorb the misses.
-
-### 5.9 Savings Goals
-
-A **goal** is a *purpose + plan* layered onto a container: it names what a pool of money is accumulating toward and how fast, decoupled from both "where money lives" (the container) and "what money does per-transaction" (the category). Containers stay dumb asset buckets; a goal is the intention that fills one.
-
-#### 5.9.1 Central primitive — progress is *contributions*, not *balance*
-
-The naive design — goal progress = container balance — breaks the instant you spend *on the goal's own purpose*. Buying a $20 shirt from a fully-funded $200 clothing fund drops the balance to $180, and a balance-based goal wrongly concludes "you're $20 short, contribute more," re-inflating the monthly ask even though the $200 was already set aside.
-
-**Resolution: a goal's progress tracks cumulative net contributions** — money *committed* into the container's purpose — never its spendable balance. This is a direct generalization of the Net Contributions primitive already defined for investment containers (§5.6), now applied to every goal. Only **Transfers** move progress: a transfer *in* is a contribution, a transfer *out* is an un-contribution (the commitment was reallocated to another purpose). **Expenses never affect progress** — an expense is spending the money on its purpose, which fulfills the goal rather than undoing it, and touches container *balance* only.
-
-Spendable **balance** is always shown *alongside* contributed, never as the driver — e.g. "set aside $200 · $180 available."
-
-#### 5.9.2 `goals` table
-
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| id | TEXT (UUID) | PK | |
-| container_id | TEXT | FK → containers.id, NOT NULL | The bucket this goal fills. **At most one goal with `status = 'active'` per container** (enforced at app level — IndexedDB cannot express a partial-unique constraint); unlimited historical (completed/cancelled) goals — this is what makes irregular recurrence work (§5.9.6). |
-| name | TEXT | nullable | Cycle label, e.g. "Black Friday 2026"; defaults to the container name. |
-| kind | TEXT | NOT NULL, CHECK IN ('spend_down','reserve'), DEFAULT 'spend_down' | Progress semantics (§5.9.3). |
-| mode | TEXT | NOT NULL, CHECK IN ('deadline','fixed','passive') | Planning driver (§5.9.4). |
-| target_amount | REAL | CHECK ≥ 0, nullable | Required for `deadline` and `reserve`; optional for `fixed` (open-ended allowed) and `passive` (drives the progress bar if set). |
-| deadline | TEXT (ISO YYYY-MM-DD) | nullable | Required when `mode = 'deadline'`; advisory or null otherwise. |
-| planned_monthly | REAL | CHECK ≥ 0, nullable | Committed monthly amount M for `mode = 'fixed'`; null for `deadline` (derived) and `passive`. |
-| opening_contributed | REAL | NOT NULL, DEFAULT 0 | Head-start basis at cycle creation: 0 for a fresh cycle, or the container's current balance when "absorb leftover" is chosen (§5.9.6). Counts toward `target_amount`. |
-| status | TEXT | NOT NULL, CHECK IN ('active','completed','cancelled'), DEFAULT 'active' | Lifecycle (§5.9.6). |
-| is_archived | BOOLEAN | DEFAULT false | Soft-hide only — an achieved/abandoned goal leaves active UI but is never hard-deleted. |
-| created_date | TEXT (ISO) | NOT NULL | Cycle start; the accounting anchor for contribution windowing (§5.9.3). |
-| completed_date | TEXT (ISO) | nullable | Set when `status → 'completed'`. |
-
-**Cardinality (locked):** one container has **0-or-1 active goal** and any number of historical goals; each goal has **exactly one** container. Creating a goal may **auto-create its container** ("New goal: House" spins up a House container) so the user never has to think of the two as separate objects, even though they are separate records underneath. **Name-collision rule (locked):** if a container with that name already exists, **reuse it** (attach the new goal as its next cycle) rather than auto-renaming or duplicating — *unless* it already has an active goal, in which case block with "you already have an active {name} goal" (the 0-or-1-active-goal rule). A fresh container is created only when no same-named one exists. Rejected alternatives: *N active goals per container* (a transfer into the shared bucket can't be attributed to one of several goals — ambiguous) and *one goal spanning N containers* (real but rare, e.g. a house fund split across cash + investment accounts; deferred, not architected for now).
-
-#### 5.9.3 Progress semantics — two kinds (locked)
-
-A single flag, `kind`, flips every downstream calculation (progress, remaining, monthly ask, completion). Everything else is identical between the two.
-
-**`spend_down` (default) — progress = contributions.** The money exists to be spent on its purpose; spending *fulfills* the goal and must never reopen it.
 ```
 contributed = opening_contributed
-            + SUM(Transfer amounts INTO  container)      // contributions
-            − SUM(Transfer amounts OUT of container)      // reallocations away
-              over Transfers dated ≥ created_date
-progress    = contributed / target_amount
+            + Σ transfers INTO the container − Σ transfers OUT,
+              over approved transfers dated ≥ created_date
+progress    = contributed / target_amount        (may exceed 100%)
 ```
-Worked example (the canonical clothing scenario, $200 target by November):
-- Jan–Jun: transfer $200 in → contributed $200, balance $200 → 100%, monthly ask → $0.
-- Jul: −$20 expense (shirt, category = Clothing) → balance $180, **contributed still $200** → still 100%, ask still $0.
-- Half-saved variant: contributed $100 by Jun, then −$20 shirt → balance $80, contributed $100, remaining = target − contributed = $100 — the spend never touched the schedule.
 
-**`reserve` — progress = balance.** The money exists to *stay* (emergency fund, minimum buffer); here spending *should* reopen the goal, so progress deliberately follows the container's live balance.
-```
-progress = container.balance / target_amount        (display capped at 100%)
-```
-Worked example (emergency fund, $10,000 target):
-- Build to $10,000 → 100%, monthly ask → $0.
-- Crisis: −$3,000 expense → balance $7,000 → progress 70% → the monthly plan silently re-claims the $3,000 shortfall until refilled (§6.8).
+**`reserve` — progress = balance.** The money exists to *stay* (emergency fund, buffer), so
+spending *should* reopen the goal and progress follows live balance, display-capped at 100%. No
+windowing, no `opening_contributed`: it is a set-point, not a cycle.
 
-No windowing, no `opening_contributed` accounting for a reserve — it is a set-point, not a cycle. This is the deliberate mirror image of `spend_down`: the same withdrawal that leaves a spend-down goal complete reopens a reserve goal, because one is money meant to be spent and the other is money meant to be kept.
+The same withdrawal that leaves a spend-down goal complete reopens a reserve goal. `is_investment`
+is orthogonal to `kind`.
 
-`is_investment` (§5.2) is **orthogonal** to `kind`: an investment container can carry a `spend_down` goal ("save $50k for a house, parked in index funds"), a `reserve` goal, or none. Market growth stays handled entirely by §5.6 snapshots and is never counted as a contribution.
+#### Three planning modes
 
-*Rejected:* progress = balance as the universal default — precisely the bug above for every spend-down case; retained only as the deliberate `reserve` behavior.
+`mode` holds one quantity fixed and lets the complementary one flex. A goal may never commit to a
+hard monthly *and* a hard date at once; the complementary figure is shown but advisory.
 
-#### 5.9.4 Planning modes — three (locked)
+- **`deadline` (recommended) — the date is sacred, the ask flexes.**
+  `required_monthly = max(0, (target − basis) / whole_months_until_deadline)`, current month
+  inclusive, where `basis = contributed` for spend_down and `balance` for reserve. Money rounds
+  **up**, so the target is never reached a cent short. Miss a month → next month's ask rises
+  automatically. Overshoot → the ask falls to $0 early. **Guard:** at or past the deadline
+  (`whole_months ≤ 0`) the ask is the full remaining `max(0, target − basis)` — never a division
+  by zero — plus an explicit **re-plan** prompt. The app never silently smooths the number and
+  never auto-moves the goalpost.
+- **`fixed` — the ask is sacred, the date flexes.** M is constant; under/overpaying slides the
+  projected completion date. Target optional (open-ended). Open-ended shows a running total only:
+  no projected date, no progress bar, since both need a target.
+- **`passive` — tracked, claims nothing.** No ask, $0 in the monthly plan, a progress bar if a
+  target is set.
 
-`mode` is a **single driver**: it holds one quantity fixed and lets the complementary one flex. It is orthogonal to `kind`, so all combinations are valid (a reserve fund can be planned by deadline or by fixed monthly). A goal is never permitted to commit to a hard monthly *and* a hard date at once (over-determined / self-contradictory); the complementary figure is always shown but **advisory-only**.
+The self-correcting deadline ask *is* the accountability; a separate frozen adherence baseline
+was considered and cut as redundant. Granularity is whole-month, current month inclusive; there
+is no sub-monthly goal type.
 
-- **`deadline` (primary / recommended) — the date is sacred; the ask flexes.** Given `target_amount` + `deadline`:
-  ```
-  required_monthly = max(0, (target_amount − basis) / whole_months_until_deadline)
-      where basis = contributed (spend_down) | balance (reserve)   // see §5.9.7
-  ```
-  Current month inclusive. Miss a month → next month's ask rises automatically (built-in catch-up and time pressure — see accountability note below). Overshoot → the ask falls, reaching $0 early (= done early). Past the deadline and still short (`whole_months_until_deadline ≤ 0`) → ask = full remaining `max(0, target_amount − basis)` (no divide-by-zero), plus an explicit **re-plan** prompt. Whenever the recomputed ask becomes untenable, the app surfaces re-plan (push the date or lower the target) — it never silently smooths the number and never auto-moves the goalpost.
-- **`fixed` — the ask is sacred; the date flexes.** `planned_monthly` (M) is constant; underpaying slides the *projected completion date* later, overpaying earlier. No surprise catch-up demand. Target optional (open-ended contribution allowed).
-- **`passive` — tracked, claims nothing.** No ask; contributes $0 to the monthly plan (§6.8); never nags; just a progress bar against `target_amount` if set. Effectively `fixed` with M unset — for the "saving loosely, no firm plan yet" case.
+#### Contributions and automation
 
-**Accountability by construction (no separate metric).** In `deadline` mode the self-correcting ask *is* the accountability: a slip makes next month visibly harder, which is exactly the pressure the design wants. An earlier proposal for a separate frozen "adherence baseline / over-under-contribution" line was **cut** as redundant to this and needlessly complex — nothing is frozen to store, and editing a deadline goal's target or date needs no re-basing logic, since the forward number simply recalculates from wherever contributions currently stand.
+A contribution **is** a transfer into the goal's container — no new transaction type — and
+automation **reuses `recurring_rules`** rather than adding a parallel scheduler.
 
-**Granularity: whole-month, current month inclusive** — consistent with the monthly allocation plan being the canonical unit (§6.8). A sub-monthly contribution cadence (e.g. "$5/day") is presentation/automation sugar that rolls up to the monthly line; there is **no** sub-monthly goal type, and cycles recur monthly-or-longer only.
+- A goal may opt in to auto-contribution, creating a linked recurring **transfer** rule.
+- `fixed` goal → `amount_mode = 'fixed'`, `template_amount = M`.
+- `deadline` goal → `amount_mode = 'goal_derived'`: the rule resolves `required_monthly` from the
+  linked goal **at generation time**, so a drifting ask never logs stale. This is the one
+  genuinely new engine behavior the goal system introduces.
+- Every generated contribution lands **pending** and moves money only on approval — never a
+  silent auto-transfer.
+- Completing or cancelling the goal cancels the rule; a resolved ask of $0 generates nothing but
+  still advances the cursor. No orphaned auto-transfers.
 
-#### 5.9.5 Contributions & automation (locked)
+#### Lifecycle
 
-A contribution *is* a Transfer into the goal's container (§5.4) — no new transaction type. Automation **reuses `recurring_rules`** (§5.8) rather than introducing a parallel scheduler:
+**Recurrence is emergent, not scheduled.** The container is the persistent theme; each goal row
+is one independent cycle, so cycles may differ arbitrarily or be skipped with no reconciliation
+and no lost history. That is precisely why goals are a separate table rather than fields on the
+container. There is no auto-spawn cadence.
 
-- A goal may **opt in** to auto-contribution, which creates a linked recurring **transfer** rule (`template_to_container_id` = the goal's container, `linked_goal_id` set).
-- **`fixed` goal** → `amount_mode = 'fixed'`, `template_amount = M`.
-- **`deadline` goal** → `amount_mode = 'goal_derived'`: the rule computes `required_monthly` from the linked goal **at generation time**, so the amount tracks the self-correcting number instead of going stale. This is the single genuinely new engine behavior the savings system introduces, and it fits §5.8's existing "generate one occurrence at a time, never a stale batch" principle exactly.
-- Every generated contribution lands as a **pending** transfer in the inbox (§5.8) and moves money only on approval — never a silent auto-transfer draining the source container. Bulk-approve applies.
-- The rule is **linked** to the goal: completing or cancelling the goal cancels the rule, and a `deadline` goal reaching $0 required stops generating. No orphaned auto-transfers.
-
-*Rejected:* a dedicated contribution scheduler — it would be `recurring_rules` rebuilt under a new name.
-
-#### 5.9.6 Lifecycle & recurrence (locked)
-
-**Recurrence is emergent, not scheduled.** The *container* is the persistent theme ("Clothing"); each *goal row* is one independent cycle. Because targets live on the goal, not the container, cycles are free to differ arbitrarily — $200 one year, $50 the next, skipped for three years, or compressed into a few months — with no reconciliation and no lost history. This is precisely why goals are a separate table and not fields on the container: fields would be overwritten each cycle, destroying the record of past cycles. There is **no rigid auto-spawn cadence** (it would fight "not always recurring / values change / skip years"); an optional, deferrable **template + reminder** convenience layer (pre-fill last cycle's params, nudge "start this year's?") is documented but non-blocking (§10). The core system does not depend on it.
-
-**Completion** diverges by `kind`:
-- **`spend_down` completes and closes** (terminal) once `contributed ≥ target_amount`. The ask drops to $0, the linked recurring rule cancels, and it stops nagging the plan; it stays **visible as achieved** (the motivating moment) until the user manually archives it. The container may then sit empty or be repurposed for the next cycle.
-- **`reserve` completes but oscillates** (never terminal) once `balance ≥ target_amount`. It hovers at 100%; any withdrawal silently reopens the shortfall (replenish). A set-point, not a finish line.
-
-**Over-contribution** past target is allowed and shown above 100% (e.g. "$220 / $200 · 110%") — never blocked or auto-capped for `spend_down` (an intentional buffer). `reserve` goals naturally don't over-fill, since their ask is already $0 at target.
-
-**Cancellation** ends the goal only (`status = 'cancelled'`: stops the ask, cancels the linked rule) and **never moves money** — the balance stays in the container for the user to transfer out or repurpose, upholding the "never silently lose or move a transaction" tenet (§1). Goals are soft-ended, never hard-deleted.
-
-**Leftover absorb.** When a new cycle starts on a container that still holds a prior balance, the user is offered **"absorb leftover as head-start"** (default **on**): `opening_contributed` is set to the current container balance, so the residue counts toward the new target. Declining leaves the residue as balance in excess of goal-contributed (honest and unattributed) — it is never auto-swept.
-
-#### 5.9.7 Derived quantities (reference)
-
-None of these are stored; all are computed on demand from the ledger and the goal row:
-
-| Quantity | Definition |
-|---|---|
-| `contributed` | `spend_down`: `opening_contributed` + net Transfers into the container since `created_date`. `reserve`: not used (progress is balance). |
-| `balance` | `SUM(amount)` over all transactions for the container (spendable now). |
-| `progress` | `spend_down`: `contributed / target_amount`. `reserve`: `balance / target_amount` (display-capped at 100%). |
-| `required_monthly` | `deadline`: `max(0, (target_amount − basis) / whole_months_until_deadline)`. `fixed`: `planned_monthly`. `passive`: `0`. **`basis = contributed` for `spend_down`, `basis = balance` for `reserve`** (a reserve measures its gap against live balance, so a withdrawal re-opens the ask). **Guard:** `whole_months_until_deadline ≤ 0` (at/after the deadline) ⇒ ask = `max(0, target_amount − basis)` plus a re-plan prompt — never divide by zero (§5.9.4). |
-| `projected_completion` | `fixed` **with target**: date at which `contributed` reaches `target_amount` at rate M. Advisory. **Open-ended `fixed` (no target):** none — the goal shows as **"Open-ended"** (running total contributed only; no projected date, no progress-percentage bar, since both need a target). |
-
-### 5.10 Edge cases resolved
-| Edge case | Resolution |
-|---|---|
-| Investment growth vs. income | §5.6 — Transfers + snapshots, never logged as Income |
-| Container balance goes negative | Allowed; UI flags in red |
-| Transfers invisible to category reports | By design; compensated by the Container Flows view (§5.4) |
-| Refunds/credits | Folded into the unified sign convention — a refund is just a smaller-magnitude negative expense row, always displayed with an explicit minus sign |
-| Overlapping `budget_targets` rows | Structurally moot once `end_date` was dropped — a new row always cleanly supersedes the prior one at its `start_date` |
-| Category count limits | Removed entirely — was a spreadsheet artifact, not a design intent |
-| Spend on-purpose vs. goal progress | §5.9.3 — expenses cut *balance*, never `contributed`; only Transfers move goal progress |
-| Reserve fund depleted by a withdrawal | §5.9.3 / §6.8 — reserve progress = balance, so a withdrawal reopens the shortfall and the monthly plan re-claims it |
-| Goal over-contributed past target | §5.9.6 — allowed, shows >100%, never blocked or auto-capped (`spend_down`) |
-| Cancelling a goal with money still in it | §5.9.6 — ends the goal only; money is never moved, it stays in the container |
-| Many recurrence cycles on one container | §5.9.2 / §5.9.6 — each cycle is an independent goal row; ≤1 active, N historical; per-cycle targets free to differ |
-| Leftover at a cycle's end | §5.9.6 — offered as head-start (`opening_contributed`; absorb default on) |
+- **`spend_down` completes and closes** once `contributed ≥ target`: the ask drops to $0, the
+  linked rule cancels, and it stays visible as achieved until the user archives it.
+- **`reserve` completes but oscillates** — never terminal. Any withdrawal silently reopens the
+  shortfall.
+- **Over-contribution** past target is allowed and shown above 100%, never blocked or capped.
+- **Cancellation ends the goal only and never moves money**; the balance stays in the container.
+- **Leftover absorb** (default on): starting a cycle on a container that still holds a balance
+  offers to set `opening_contributed` to it. Declining leaves the residue unattributed; it is
+  never auto-swept.
 
 ---
 
-## 6. Reporting & Dashboard System (locked)
+## 5. Persistence and sync
 
-### 6.1 Unified reporting-period control
+### 5.1 The op-log
 
-The original spreadsheet had **three fully independent time-window pickers** (Dashboard, Historical Comparison, Comparison to Budget Targets) with no shared state — explicitly flagged in the source spec as a decision a rebuild should make deliberately. **Locked: one shared global reporting-period control**, with the standard preset menu carried over from the source tool (Last month / Last 3 months / Last 6 months / Last 12 months / Year to date / All / Custom), plus **optional per-widget override** where a specific report needs its own window. **(M11 shipped)** The global period, comparison and each widget override persist as device-local view preferences in `localStorage`; they never enter the financial op log.
+**Every persisted mutation is an idempotent op** `{ id, ts, type, payload }`, appended to an
+append-only journal **and** applied to IndexedDB materialized state **in a single IndexedDB
+transaction**. Replaying an op twice is a no-op. State *is* `replay(listOps())` under the
+canonical total order (`ts`, then `id`), with last-writer-wins for concurrent edits to the same
+entity.
 
-### 6.2 Historical Comparison — folded in, not a separate page
+Ops are not commutative — convergence depends on that total order, not on id-keying alone.
 
-The spreadsheet's dedicated "compare two arbitrary periods side by side" report is **not** kept as a standalone page. Instead, "pick two ranges to compare" becomes a capability of the unified reporting-period control itself (§6.1).
+Materialized tables are a cache of the journal. Persisted tables are only: `categories`,
+`containers`, `budget_targets`, `transactions`, `container_snapshots`, `recurring_rules`, `goals`
+plus a synced `settings` key/value store. **Balances, contributions, progress, dashboards and the
+monthly plan are computed on demand and never stored.** Caching a balance as state is a bug.
 
-### 6.3 Budget Targets "Monthly Average" — re-scoped
+### 5.2 Local-first boot
 
-The source tool's Budget Targets sheet always computed "Monthly Average" against **all-time** transaction history, never the currently-selected period — flagged in the source spec as likely unintended. **Locked: re-scope this to the active reporting period**, consistent with every other metric in the app, rather than preserving the spreadsheet's quirk.
+**The app opens instantly from the local IndexedDB cache and never blocks boot on the network.**
+Logging a transaction or checking a balance must work in the first frame. Sync is always a
+background task behind a non-intrusive indicator, never a blocking spinner.
 
-### 6.4 Category charts — true zero-filtering
+Only a genuinely fresh install (no local cache) shows a one-time download state.
 
-The spreadsheet's pie-chart data-prep claimed to filter out $0 categories but, per the source spec's own internal audit, didn't actually do so. **Locked: implement genuine zero-filtering** in the rebuilt category-breakdown charts — categories with no spend in the active period are omitted from the legend/chart entirely, for cleaner visuals.
+Edits made *during* a sync go to local state and this device's queue as normal. Arriving remote
+ops apply as a **delta on top of live state** — idempotent by id, replayed under the canonical
+order — **never a wholesale replace**. The UI re-derives reactively when sync settles.
 
-### 6.5 Chart inventory (MVP, inherited + updated from source tool)
+### 5.3 The Drive protocol — per-device ledgers
 
-Kept as **distinct chart types** (not collapsed into fewer/simpler charts):
-- Category breakdown doughnut/pie charts (expense + income, zero-filtered, period-total and period-monthly-average variants).
-- Monthly bar charts (income, expenses, savings) with budget-target reference overlay.
-- Single-category drill-down bar chart (month-by-month spend in one selected category vs. its budget target).
-- **Income → Expenses → Savings waterfall chart**, kept as its own distinct chart type per explicit instruction, not simplified into a plain grouped bar chart.
+**Why per-device:** Drive AppData offers no atomic primitive that makes a single shared ledger
+safe — no conditional write, no compare-and-swap, no guaranteed create-if-absent, and `append` is
+non-atomic. The only design with a hard never-lose-a-write guarantee is to ensure **no two
+devices ever write the same file.**
 
-### 6.6 Quick-add shortcuts (near-term widget substitute)
+Drive layout:
 
-Native home-screen widgets (both a quick-log widget and a balance-display widget) are explicitly **deferred post-MVP** — building real WidgetKit-based native widgets is a significant scope jump (actual Swift/native code) that doesn't fit the current cross-platform-from-one-codebase approach. For now, the **in-app "save as shortcut" quick-log flow** (§5.8) is the mechanism for fast repeat-transaction logging; true native widgets remain a documented but unscheduled roadmap item.
+- **`snapshot.json`** — a consolidated replayable **op set**, not a row dump. Derived, so a
+  botched or raced write is never data loss.
+- **`ledger_<deviceId>.json`** — one append-only JSONL op log per device. **Each device appends
+  only to its own file.** A torn trailing line from an interrupted append is skipped, not thrown
+  on.
+- **`ledger_<deviceId>_<YYYY-MM>.json`** — dated pre-collapse archives, the permanent audit trail.
+- **`origin.json`** — the reset generation (§5.5).
+- **`backup_*` / `orphan_*`** — inert retired worlds (§5.5), listed by Settings, never read by
+  sync.
 
-### 6.7 Unused-category dimming — not applicable
+**Sync cycle:** pull the snapshot and all live ledgers → merge → push this device's queued ops to
+its own ledger → collapse when un-snapshotted ops exceed the threshold (~500) → truncate this
+device's ledger to post-snapshot ops. Collapse archives every live ledger and writes a fresh
+snapshot. **Any device may collapse opportunistically** — the snapshot is derived, so a double
+collapse is redundant work, never data loss. A missing root (a fresh account) reads as empty.
 
-The spreadsheet's greyed-out "unused category slot" styling was purely a fixed-width-array artifact (§2.2 of the source spec). **Confirmed not applicable** — dynamic, uncapped categories make this concept moot.
+**The local IndexedDB op-log is never truncated on collapse** — only the Drive ledgers are. This
+keeps the replay invariant and a full local audit trail.
 
-### 6.8 Monthly Allocation Plan — "every dollar a purpose" (locked)
+### 5.4 Merge rules
 
-The savings system's payoff surface, and the product thesis (§1) made mechanical. A live, entirely view-time-derived statement for the active month that forces every earned dollar to be claimed by a *flow* (category allowance) or a *stock* (goal contribution):
+- **The merge replays the union of local and remote ops under the canonical order**, rebuilding
+  materialized state. Sorting by arrival order would let a late older update clobber a newer local
+  edit. Because the union includes local ops, it behaves as a delta on live state, not a replace.
+- **A device writes only its own ledger.** Remote ops merged in are never re-queued for push.
+- **An unknown op type from a newer client is dropped, not journaled**, so it cannot wedge sync.
+- Concurrent edits to the same entity resolve last-writer-wins by (`ts`, `id`). A rare visible
+  overwrite of a just-made edit is the accepted trade-off.
+
+### 5.5 Data tools: export, import, clear, rollback
+
+**The portable format is an op set**: `{format:"yaccount.export", version:1, exportedAt,
+appDbVersion, deviceId, opCount, ops}`. Since state *is* the replay of the journal, the journal is
+the only representation that restores identical state while preserving the replay invariant — and
+it is the same primitive the snapshot uses, so export, import, merge and collapse all speak one
+language. `deviceId` is provenance only and is **never imported**: two devices sharing a ledger
+name would break the no-lost-write guarantee. Device-local view preferences are deliberately not
+exported — a sort order is not a fact about the user's money.
+
+**An import is validated in full before anything is mutated, anywhere.** Envelope → every op's
+shape (id, ISO `ts`, a *known* op type, object payload, no duplicate ids) → a complete replay into
+throwaway memory → every resulting row against its table schema. A file failing any stage changes
+nothing locally and nothing on Drive, and the failure names the offending row. A file declaring a
+newer format version is refused rather than guessed at.
+
+**Nothing is deleted; the app stops reading it.** Clear, import and rollback each retire the
+entire current world (snapshot + all live ledgers) to `backup_<ts>_<kind>.json` *before*
+overwriting, and **abort if the store cannot be fully enumerated** — a transient failure must
+never read as an empty store and skip the backup. The only removals are live ledgers whose ops
+were just copied into that backup; dated archives are never touched. Retired worlds are offered
+back in Settings, and a rollback retires the present world first, so it too has an inverse.
+
+**Ordering:** Drive first (retire → new snapshot → drop live ledgers → `origin.json` last as the
+commit point), then the local half in a single IndexedDB transaction. Every intermediate state is
+non-lossy — a crash mid-way leaves other devices merging a superset, never a hole — so **retry is
+the recovery**, and a crash after the Drive commit self-heals when that device adopts its own
+reset.
+
+**The reset generation — `origin.json`.** A reset is a deliberate discontinuity, and Drive cannot
+express one: an emptied store looks exactly like a brand-new Google account, which is a legitimate
+first connect. So a reset writes `origin.json = {v, resetId, resetAt, kind}` and each device
+records the last id it saw in device-local metadata.
+
+- A device that **has synced before** and reads a *different* `resetId` **adopts** it: its own
+  journal is set aside to `orphan_<deviceId>_<ts>.json`, local state is reset, and the ordinary
+  pull refills it. Offline edits are preserved, not replayed — replaying would resurrect what was
+  discarded — and are surfaced as a persistent Settings notice with Download and Roll back.
+- A device that has **never synced** merges as always: nothing was reset out from under it.
+
+**Only a positive reading may ever be acted on.** A failed Drive read resolves to *"could not
+tell"*, never *"absent"*, and **a device never forgets a generation it holds.** This is not
+hypothetical: conflating the two shipped briefly and made every offline tick forget the
+generation and every reconnect re-adopt, setting the device's data aside each time. The same rule
+covers enumeration before a backup: probe, then abort rather than guess. **In a store with no
+atomic primitives, silence is not an answer.**
+
+**These acts have no toast-sized undo, so they are confirmed by typing a word.** The Drive
+consequence is stated in the copy before execution, and reads differently when the account is not
+connected.
+
+> Retired files live in the hidden `appDataFolder`, which the user cannot browse. Retired data is
+> recoverable *through the app*; the export file is the only copy they can open themselves.
+
+---
+
+## 6. Reporting
+
+### 6.1 One reporting period
+
+A single shared global period control — Last month / 3 / 6 / 12 months / Year to date / All /
+Custom — with a **per-widget override** where a report needs its own window, and **two-range
+compare** folded into the same control rather than a separate page. Presets are rolling from
+today. The global period, the comparison and every widget override persist as **device-local view
+preferences**; they never enter the financial op log.
+
+### 6.2 Rules the spreadsheet got wrong
+
+- **Genuine zero-filtering:** categories with no spend in the active period are omitted from
+  category charts entirely.
+- **"Monthly Average" is scoped to the active period**, not all-time.
+- Unused-category dimming does not apply — it was a fixed-width-array artifact.
+
+### 6.3 Chart inventory
+
+Kept as distinct types: category breakdown doughnuts (expense + income, zero-filtered, period
+total and monthly average); monthly bars (income/expense/savings) with a budget-target overlay; a
+single-category drill-down against its time-variant budget; and an **Income → Expenses → Savings
+waterfall**, kept as its own chart type.
+
+Category colour in charts reuses the one category swatch scheme; all other chart colour comes
+from semantic tokens.
+
+### 6.4 Quick-add shortcuts
+
+Native home-screen widgets are deferred. The in-app "save as shortcut" 1-tap quick-log flow is the
+near-term substitute.
+
+### 6.5 The Monthly Allocation Plan
+
+The product thesis made mechanical — a live, entirely view-time-derived statement for the active
+month:
+
 ```
   Income expected
-− Σ category allowances   (active budget_targets this month)      ← flow: steady, recurs monthly
-− Σ goal asks             (per-mode, per §5.9.4)                  ← stock: blinks in/out per cycle
+− Σ category allowances   (active budget targets this month)     ← flow
+− Σ goal asks             (per mode)                             ← stock
 = Unallocated
 ```
-**`Income expected` (source, locked):** if the month is covered by one or more active **income** `recurring_rules` (§5.8), it is the **sum of those rules' occurrences** scheduled for the month; otherwise it is a **user-entered** expected-income figure for the month. Recurring income rules take precedence when present; the manual figure is the fallback when none exist.
 
-Per-mode goal ask: `deadline` → `required_monthly` (self-correcting); `fixed` → M; `passive` → $0. **`reserve` goals use the same per-mode formulas but computed against `balance`, not `contributed` (§5.9.7):** `deadline` spreads the refill `(target − balance)/months_left`, `fixed` refills at M until `balance ≥ target`, `passive` asks $0 — and a withdrawal re-opens the ask automatically. (The intuitive "current shortfall" is just the degenerate deadline-now case; `mode` still governs how fast a reserve refills.) Nothing here is stored — the plan is a single live query.
+**Income expected:** if active **income** recurring rules cover the month, it is the sum of their
+scheduled occurrences; otherwise a user-entered figure for the month. Recurring wins when
+present; manual is the fallback.
 
-**Flow vs. stock** is the distinction that keeps category budgets and goals as separate entities yet unites them in this one view. A category budget is *flow*: a steady monthly allowance, spent as earned, with no accumulation, no target lump, and no completion (groceries, gas, utilities). A goal is *stock*: it accumulates toward a target, discharges in a burst, completes, and may recur irregularly (§5.9). The tell is **accumulation**. A sinking fund for an irregular or annual expense is therefore a *goal*, not a category budget — e.g. $1,200 of car insurance due each June is $100/mo into a container; modeled as a category budget it would misread the June payment as a 12× overspend, whereas as a goal that payment is simply "spending down what was saved" (§5.9.3).
+Goal asks are per mode: `deadline` → the self-correcting `required_monthly`; `fixed` → M;
+`passive` → $0. Reserve goals use the same formulas against `balance`, so a withdrawal reopens
+the ask.
 
-- **Over-allocation** (asks + allowances > income) → Unallocated goes negative and renders red ("committed $X more than you earn") — **flagged, never blocked**, consistent with §5.2's negative-balance stance.
-- **Unallocated is a computed number, not a container** — leftover sits in `general` as genuinely uncommitted money; the red/nag prompts *the user* to give it a job (raise a goal, start a cycle, or leave it). It is **never auto-swept** — auto-assigning would violate "you decide every dollar's purpose."
-- Visualized by the existing Income → Expenses → Savings **waterfall** and the savings **monthly-bar** charts (§6.5); requires no new chart type.
+**Flow vs. stock** is what keeps budgets and goals separate entities yet unites them here. A
+category budget is *flow*: a steady allowance, spent as earned, no accumulation, no completion. A
+goal is *stock*: it accumulates, discharges in a burst, completes, and may recur irregularly. The
+tell is accumulation — a sinking fund for an annual expense is a **goal**, not a category budget,
+because as a budget the payment month would misread as a 12× overspend.
 
----
+- **Over-allocation** drives Unallocated negative and renders it in rose — **flagged, never
+  blocked**.
+- **Unallocated is a computed number, not a container.** Leftover sits in `general` as genuinely
+  uncommitted money and is **never auto-swept** — auto-assigning would violate "you decide every
+  dollar's purpose."
 
-## 7. MVP Source Spec — "The Measure of a Plan v5" (reference, condensed)
+### 6.6 Recurring generation
 
-Full original document (`TMOAP_Budget_Tool_v5_FULL_SPEC.md`) has been supplied and read in full; retained by reference as the literal MVP feature checklist. Key structural facts folded into this spec, superseding the spreadsheet's own constraints:
+**One pending occurrence at a time, as it comes due** — never a batch of future rows, because
+real prices drift and a monthly charge must not silently auto-log at a stale amount. Pending rows
+are excluded from every dashboard, balance and budget calculation until approved, and live only
+in the **Inbox**, which supports 1-tap and multi-select bulk approve (and bulk dismiss, with a
+batch undo).
 
-- **Two atomic source-of-truth tables** in the original (`Expenses`, `Income`) map onto yaccount's single unified `transactions` table (§5.4); the spreadsheet's **one atomic settings table** (per-category monthly target) maps onto `budget_targets` (§5.3); its **one atomic taxonomy table** (compacted category lists) maps onto `categories` (§5.1). Every other original sheet (Dashboard, Historical Comparison, Comparison to Budget Targets, and all internal engine sheets — Selected Time Period Data/Total, Chart Backup, Date Info) was a **pure, re-derivable view** over those tables — meaning yaccount only needs to persist the core tables (`categories`, `budget_targets`, `transactions`, `containers`) plus `container_snapshots`, `recurring_rules`, and `goals`; everything else is computed on demand.
-- **Caps explicitly removed in the rebuild:** 80/15 category caps (§5.1), the 5,000-transaction-row cap (naturally superseded — a real per-device/cloud database has no such ceiling), and the 400-month reporting-window cap (naturally superseded for the same reason).
-- **Negative amounts** were already permitted in the source ledgers (for refunds/credits) — carried forward and unified under yaccount's signed-amount convention (§5.4, §5.10).
-- **No recurring-transaction automation, no receipts/attachments, no bank-feed integration, single category per transaction (no splitting/tagging)** in the source tool — recurring automation is now a first-class yaccount feature (§5.8); receipts/attachments, bank-feed integration, and transaction splitting remain **out of scope / not yet discussed** for yaccount (not confirmed as roadmap items — flag if desired).
-- **Single currency, no user accounts/multi-device sync** in the source tool (each user just made their own spreadsheet copy) — yaccount's entire architecture (§8) exists specifically to solve real multi-device sync via a real account (Google), while remaining single-currency for now (multi-currency not yet discussed).
-- Known internal inconsistencies in the source tool (stale named range for income categories; mismatched dropdown wiring) are spreadsheet implementation bugs with no equivalent concept in a real data-modeled app — no action needed.
+**`recurring_rules`** can express any of the three transaction shapes. `interval_config` is
+discriminated by frequency:
 
----
+- `daily` — no config
+- `weekly` — `{ day_of_week }`
+- `biweekly` — **twice a month**, two day-of-month anchors (e.g. 1st and 15th) — deliberately not
+  a strict 14-day cadence; use `custom` for that
+- `monthly` — `{ day_of_month }`
+- `annually` — `{ month, day }`
+- `custom` — `{ every, unit }`
 
-## 8. Local Storage & Sync Architecture (locked, unaffected by the Capacitor pivot)
+Monthly and annual rules **anchor on the configured day and clamp per month** (Jan 31 → Feb 28 →
+recovers to Mar 31) rather than chaining clamped dates. `next_generation_date` is a lower-bound
+cursor only; the engine snaps it onto the occurrence grid.
 
-### 8.1 Rejected alternatives (for context/continuity)
-- **SQLite → WASM + OPFS:** rejected — iOS Safari kills OPFS in Private Browsing and silently evicts it after 7–14 days of inactivity; requires COOP/COEP headers that break third-party asset loading; exclusive worker lock causes `SQLITE_BUSY` on concurrent access (e.g. future widget + main app).
-- **SQLite Session Extension (binary changesets):** rejected — conflict resolution (`sqlite3changeset_apply()`) expects an interactive callback; `drivestore` has no live database engine on the other end to sequence/resolve patches against.
-- **`sqlite-sync` (CRDT-based):** rejected — requires a live network endpoint (SQLite Cloud/Postgres/Supabase) to route CRDT blobs; fundamentally incompatible with `drivestore`'s flat-file, serverless model.
+**Backfill of occurrences missed while the app was closed** depends on `amount_mode`:
 
-### 8.2 Final architecture: Native IndexedDB + JSON Transaction Journaling Stream
+- **`fixed`** → every missed occurrence, oldest first, each at its own due date. Those charges
+  really happened and are never silently skipped.
+- **`goal_derived`** → a **single** current occurrence at the already-self-corrected ask. Stacking
+  one per missed month would double-count.
 
-IndexedDB for local storage (works identically across desktop browser and Capacitor's WebView on iOS/Android — see §2.3), synced via plain-text, append-only JSON operation logs (one **per device**, §8.4) streamed through `drivestore.append()`. Entries are timestamped and UUID-keyed, so replaying a line twice is a no-op — merges are "apply every op across all device logs under a total order (`ts`, then `id`)." Precedent cited (paraphrased, general pattern only): Actual Budget's move toward JSON changesets over whole-file syncing to avoid lock/overwrite errors; Linear's local-log-then-replay model for offline multi-device sync; Excalidraw's plain-text/JSON-only sync for crash resistance.
+Generation is idempotent: an occurrence row's id is deterministic from its rule and due date, so
+regeneration never duplicates.
 
-Trade-off accepted: no native SQL aggregation — all reporting logic is hand-written in JS. (§5.3's budget-lookup logic has already been translated to its IndexedDB-native form; general dashboard aggregation, and the goal/monthly-plan derivations of §5.9 and §6.8, are likewise implemented as JS map/reduce over indexed data.)
+**Editing a rule is forward-looking:** the cursor resets to the first occurrence on or after
+today rather than being preserved, since a preserved past cursor could mass-backfill on a
+frequency change. Already-generated rows are left as independent proposals.
 
-### 8.3 IndexedDB compound index
+**Cancelling a rule is soft and reversible** (`status: active | cancelled`), with a Paused section
+and a Resume control.
 
-```
-Index name: 'by_container_category_month'
-Key path: ['container_id', 'category_id', 'yearMonth']   // yearMonth e.g. "2026-07"; a STORED field on each transaction (derived from date at write time — IndexedDB indexes stored props, it can't compute at index time)
-```
-Enables near-instant lookups via `IDBKeyRange.only([...])` without full-store scans. The active reporting period's dataset is additionally held in an in-memory JS cache at app boot so dashboard widgets hit memory, not disk, for common aggregations; falls back to IndexedDB queries for historical/non-active periods or after a new transaction is appended.
-
-### 8.4 Sync protocol: Checkpointer (snapshot + **per-device** ledgers)
-
-**Why per-device, not one shared ledger (locked):** Google Drive AppData exposes **no atomic primitive** to make a single shared `ledger.json` safe — `drivestore` offers no conditional/if-match write (its `append` is documented non-atomic, and `write` is unconditional last-writer-wins), Drive v3 has no compare-and-swap update precondition, and it doesn't even guarantee create-if-absent (duplicate sibling names are allowed, so a lock file is not a reliable mutex either). The limitation is Drive's, not the wrapper's — extending `drivestore` cannot fix it. The only design with a hard "never lose a write" guarantee (§1) is to ensure **no two devices ever write the same file.**
-
-- **`snapshot.json`** — full consolidated state dump, downloaded once on fresh install/new device. It is *derived* (rebuildable from the ledgers), so a botched/raced snapshot write is never data loss — the ledgers remain the source of truth.
-- **`ledger_<deviceId>.json`** — one append-only op log **per device**; each device writes **only its own** file, so concurrent writers never touch the same object → no interleave, no lost update. `<deviceId>` is a stable per-install UUID.
-- **Boot / sync flow:** on a returning device this runs **in the background** behind an already-rendered UI (§8.6), not as a boot gate — load `snapshot.json` → list and replay **all** `ledger_<deviceId>.json` files (ops after the snapshot), merged under a **total order** (op `ts`, `id` as tiebreak) with a last-writer-wins policy for concurrent edits to the same entity, applied as a delta on top of live local state → flush locally-queued pending writes to *this device's own* ledger.
-- **Collapse / rotation (locked):** the trigger is an **op-count threshold** — on boot, if the count of un-snapshotted ops exceeds ~N (tunable, order ~500), the device consolidates the snapshot + all device ledgers into a fresh `snapshot.json`. Op count is a cheap running counter / IndexedDB `.count()` (chosen over a byte-size trigger, which drivestore can't measure without fetching files — `list()` returns no size, §4). **Any device performs it** opportunistically during its normal background sync — no leader election, because the snapshot is *derived*, so a rare double-collapse is redundant work, never data loss. After a fresh snapshot, each device (on seeing it) truncates **only its own** ledger to ops after the cutoff — race-free, touching no other device's file. Pre-collapse ledgers may be archived to dated `ledger_<deviceId>_YYYY-MM.json` for a permanent audit trail.
-
-**(post-M11) The reset generation — `origin.json`.** Clearing, importing or rolling back (§8.7) is a deliberate *discontinuity*, and Drive cannot express one on its own: an emptied store looks exactly like a brand-new Google account, which is a legitimate first-connect. So a reset writes `origin.json` = `{v, resetId, resetAt, kind}`, and each device records the last id it saw in `app_meta` (device-local, never synced). A device that **has completed a sync before** and now reads a *different* `resetId` knows the store was deliberately replaced and **adopts** it: its own journal is set aside to `orphan_<deviceId>_<ts>.json` first, local state is reset, and the ordinary pull refills it. A device that has **never synced** merges as it always did — its local work has never been anywhere else and nothing was reset out from under it.
-
-**Only a positive reading may be acted on (locked, and load-bearing).** A failed Drive read must resolve to *"could not tell"*, never *"absent"*, and a device must **never forget a generation it holds**. Conflating the two is not hypothetical: it shipped briefly and caused a device to forget its generation on every offline sync tick and then re-adopt on every reconnect, setting its data aside each time. `origin.json` is also the **commit point** of a reset — it is written last, after the retirement and the new snapshot.
-
-### 8.5 Offline conflict resolution
-
-Every local create/update/delete is appended as an event to a local write queue. On reconnect, the app fetches **all remote device ledgers**, merges them with the local queue under the total order (§8.4), and appends its own new ops **only to this device's own ledger** — an offline-logged transaction (e.g. made with no signal) is never silently discarded, even if other data changed elsewhere (e.g. categories edited on another device) in the meantime. Concurrent edits to the same entity resolve last-writer-wins by (`ts`, `id`); because each device owns its file, no append can ever clobber another's.
-
-**⚠️ Open obligation for M9 (found by an adversarial audit at M3, not yet solved).** The reducer applies whatever op it is handed, in the order it is handed them, and rows carry no version/timestamp of their own. Replay sorts (`compareOps`), so a *local* sequence is always correct — but a naive delta-merge that hands remote ops straight to `dispatch` as they arrive would let an **older** `*.update` / `setting.set` clobber a newer local edit, an older `snapshot.record` displace the winner for its day, and a stale `snapshot.update` resurrect a removed report. M9 must therefore either (a) buffer incoming remote ops and apply them under the total order (re-replaying affected entities), or (b) give rows an `updated_ts` so the reducer can enforce LWW per entity. Option (a) preserves the current model and is preferred; whichever is chosen, the "delta on top of live state" wording in §8.6 is only safe once it exists.
-
-**Related open question (M9):** the `(container_id, date)` snapshot upsert deletes any *other* row holding that key, so a merge can destroy a report the deleting device never saw (device A records day D; device B, offline, records and then removes its own report for D → replay leaves no report for D). Decide before M9 whether the natural key should instead be **derived into the row id** (`container_id + date`), which makes the collision a plain LWW `put` with nothing to delete.
-
-### 8.6 Instant-open (local-first boot) & background reconciliation (locked, UX requirement)
-
-The per-device-ledger model means a cold sync must fetch and merge N device logs — potentially slow. That must **never** gate the UI. **Hard requirement: the app opens instantly from the local cache and never blocks boot on the network.** Logging a quick transaction or checking a balance must be usable in the first frame, never behind a multi-second sync screen.
-
-- **Returning device (local cache present):** render immediately from the local IndexedDB materialized state (§8.3); kick off the sync (§8.4/§8.5 — fetch `snapshot.json` + all `ledger_<deviceId>.json`, merge deltas) **in the background**; show a **non-intrusive "Syncing…" indicator** (a small status affordance, never a blocking spinner/modal). The user has full read **and write** access throughout.
-- **Fresh install / new device (no local cache):** the one-time `snapshot.json` download is unavoidable — show a first-run loading state; every subsequent open is instant.
-- **Reconciliation (no lost local edits):** ops the user makes *during* the background sync go straight to local state + this device's ledger/queue as normal. When the sync's remote ops arrive, they are applied as a **delta on top of current local state** — only op `id`s not already applied, idempotent by `id` (§8.2) — **never a wholesale state replace**, so in-session edits are preserved and remote changes merge under the total order (§8.4). Concurrent edits to the *same entity* resolve LWW by (`ts`, `id`); a rare visible overwrite of a just-made edit by a newer remote edit is the accepted trade-off, surfaced honestly as the indicator settles.
-- The UI **re-derives reactively** from the updated materialized state when the sync finishes, so newly-merged remote data appears without a manual refresh.
-
-### 8.7 Data tools: export, import, clear, rollback (post-M11)
-
-**The portable format is an op set, not a row dump.** `{format:"yaccount.export", version:1, exportedAt, appDbVersion, deviceId, opCount, ops}`. State *is* `replay(listOps())` (§8.2), so the journal is the only representation that restores identical state while preserving the replay invariant — and it is the same primitive `snapshot.json` uses, so export, import, sync merge and collapse all speak one language. `deviceId` is provenance only and is **never restored**: two devices sharing a ledger name would break §8.4's no-lost-write guarantee. Device-local view preferences are deliberately *not* exported — they are not facts about the user's money.
-
-**An import is validated in full before anything is mutated, anywhere.** Envelope → every op's shape (id, zoned ISO `ts`, a *known* op type, object payload, no duplicate ids) → a **complete replay into throwaway memory** → every resulting row against its table schema (§5). A file that fails any stage changes nothing locally and nothing on Drive, and the failure names the offending row. A file declaring a *newer* format version is refused outright rather than guessed at.
-
-**Nothing is deleted — the app stops reading it (§1.1).** Clear, import and rollback each retire the entire current world (snapshot + all live ledgers) to `backup_<ts>_<kind>.json` *before* overwriting, and **abort if the store cannot be fully enumerated**, so a transient failure can never be mistaken for an empty store and skip the backup. The only removals are live ledgers whose ops were just copied into that backup; dated archives are never touched. Retired worlds are offered back in Settings, and a rollback retires the present world first — so it, too, has an inverse.
-
-**Ordering:** Drive first (retire → new snapshot → drop live ledgers → `origin.json`), then the local half in a single IndexedDB transaction. Every intermediate state is non-lossy — a crash mid-way leaves other devices merging a *superset*, never a hole — so **retry is the recovery**, and a crash after the Drive commit self-heals when that device adopts its own reset (§8.4).
-
-**These acts have no toast-sized undo, so they are confirmed by typing a word** — the §12.4 rule that a destructive confirm is an `AlertDialog` still holds; the phrase gate is what makes it impossible by reflex. The Drive consequence is stated in the copy *before* execution, and says something different when the account is not connected.
-
-> Note: these files live in the hidden `appDataFolder` (§3.3), which the user cannot browse. Retired data is recoverable *through the app*; the export file is the only copy they can open themselves.
+**Templates** (`is_template = true`) are saved 1-tap shortcuts created from any transaction. They
+are uncapped and are not ledger entries.
 
 ---
 
-## 9. Naming & Identifiers
+## 7. Storage internals
 
-- App name: **yaccount**.
-- Bundle ID / package name / OAuth redirect scheme: **`com.yaccount.app` — LOCKED FINAL.** Used consistently as the iOS Bundle ID, Android Package Name, and custom URL scheme (`com.yaccount.app://oauth2redirect`, §3.5). Safe to register real OAuth clients and store listings against it. (Store-uniqueness is all Apple/Google require; domain ownership of yaccount.com is not needed.)
+### 7.1 IndexedDB
 
----
+Nine object stores: the seven tables plus synced `settings`, and infra stores `oplog`,
+`app_meta` (device-local, never synced — holds the `deviceId` and the last-seen reset generation)
+and `outbox` (device-local op ids authored here and pending push). **`DB_VERSION = 3`.**
 
-## 10. Open Items / Not Yet Grilled
+Two transaction indexes: `by_container_category_month` and `by_container_month`. The first
+**excludes transfers** — their `category_id` is null and IndexedDB drops records with a null
+key-path component — so Container Flows reads the second.
 
-1. ~~Category identity mechanism~~ **RESOLVED:** colour remains hybrid in the model/rendering (`Category.color`: `null` → deterministic auto-palette; non-null → stored override), but M11's user-facing customization pivoted by explicit user decision from colour picking to **icons**. `Category.icon` stores a curated Lucide name; no icon falls back to the colour dot. Icons ship in category/ledger/inbox/recurring rows and category selects; Plan and dashboard intentionally retain dots. There is no colour-picker UI.
-2. ~~Recurring-generation lead time~~ **RESOLVED (locked):** one pending occurrence at a time (not a batch). Backfill of missed occurrences is by mode — `fixed` generates every missed month oldest-first; `goal_derived` collapses to a single current occurrence (avoids double-counting the self-correcting ask). See §5.8.
-3. ~~Bundle ID / package name finalization~~ **RESOLVED:** `com.yaccount.app` locked final (§9). Safe to register OAuth clients / store listings.
-4. **Receipts/attachments, bank-feed integration, transaction splitting/multi-category tagging** — all explicitly out of scope in the source spreadsheet; not yet discussed as potential yaccount roadmap items one way or the other (§7).
-5. **Multi-currency** — not discussed; source tool was single-currency only (§7).
-6. ~~Frontend visual design system~~ **RESOLVED:** M11 deliberately extended "Quiet Register" into **"The Standing Register"** (§12): tinted paper/ink, full-strength rare iris, figure scale, structural ledger devices, responsive shell/density, motion budget, states, category icons and accessibility. Foundation remains shadcn/ui + Tailwind v4 + Lucide + Fraunces/Geist/Geist Mono.
-7. **Multi-account/household support** — not discussed; current auth design (§3) assumes a single Google account per install.
-8. **Savings-goal template + reminder layer** — the optional, deferrable convenience wrapper over emergent goal cycles (pre-fill last cycle's params; nudge to start the next) is speced as non-blocking but not yet designed (§5.9.6). The core goal system does not depend on it.
-9. **Sub-monthly contribution cadence UI** — contributions may be logged at any cadence but always roll up to the canonical monthly line; the UI should steer very-short cadences toward category budgets rather than surfacing "daily goals" (§5.9.4). Minor.
-10. ~~Snapshot-collapse cadence & collapsing-device election~~ **RESOLVED:** trigger = **op-count threshold** (~500 un-snapshotted ops), checked on boot — cheap running counter, vs a byte-size trigger drivestore can't measure without fetching files (§4 `list()` has no size). **Any device** collapses opportunistically during background sync; no election (snapshot is derived → double-collapse is harmless). See §8.4.
+**Every schema upgrade must be guarded per store**, so bumping the version never drops a
+populated local cache.
 
-*The Savings Goals system itself — §5.9 (data model, kinds, modes, contribution automation, lifecycle) and §6.8 (monthly plan) — is now locked and no longer an open item.*
+### 7.2 Rejected storage alternatives
 
----
-
-## 11. Session Log Note
-
-Compiled across three grilling sessions (per the user's `grilling` interview pattern: one question at a time, a recommendation offered per question, no implementation until explicit shared understanding is confirmed).
-
-- **Rounds 1–2** locked the platform/framework architecture (§2), OAuth design (§3), the core data model (§5.1–§5.8), reporting system (§6.1–§6.7), and local-storage/sync architecture (§8).
-- **Round 3** locked the **Savings Goals** system end to end — the progress-is-contributions primitive, the `spend_down` / `reserve` kinds, the `deadline` / `fixed` / `passive` modes, `recurring_rules`-based contribution automation, and the emergent-cycle lifecycle — captured in §5.9, with the unified monthly allocation plan in §6.8 and supporting touches in §5.2, §5.4–§5.8, and §5.10.
-
-This v3 consolidation is a full rewrite of v2 for coherence and completeness; no locked decision was changed, only integrated and, in a few places, made explicit (goal-creation auto-creating its container; rejected cardinality alternatives; a reserve worked example; a derived-quantities reference). No code has been implemented yet. Continue grilling from §10 before beginning implementation.
+Recorded so they are not revisited: **SQLite WASM + OPFS** (iOS Safari kills OPFS in private
+browsing and evicts it after 7–14 days; needs COOP/COEP; exclusive worker lock causes
+`SQLITE_BUSY`), the **SQLite session extension** (conflict resolution expects an interactive
+callback and a live engine on the far end), and **CRDT sync libraries** (all require a live
+network endpoint, incompatible with a flat-file serverless store).
 
 ---
 
-## 12. Visual Design Language — "The Standing Register" (LOCKED, M2; extended M11)
+## 8. Out of scope / deferred
 
-> **This is law, not a mood board.** Every screen yaccount ships — today's Ledger and Categories, and every future feature (containers, budgets, goals, the monthly plan, charts) — obeys this section. If a new design instinct conflicts with what's written here, the design language wins; change *this section by explicit decision*, never drift silently in a component. **Read this before writing any UI.**
->
-> **M11 edited this section deliberately (2026-07-22, direction A "The Standing Register", chosen by the user from three illustrated options).** This is the explicit-decision path invariant #8 requires, not drift. The thesis, the three typefaces and the iris/emerald semantics are **unchanged**; M11 extends the language with a tinted neutral ramp, a figure scale, three new structural devices (the rule, dot leaders, the carried day header) and a motion budget. Sections carrying M11 content are marked **(M11)**. Everything M2 locked and M11 did not touch stands as written.
+- **M10 Capacitor native packaging** and the native OAuth flow (§3.2).
+- **Movable / hideable dashboard widgets.** The fixed ordered registry of stable widget ids is
+  the seam for this work; keep the ids stable.
+- **Native home-screen widgets** (WidgetKit and equivalent).
+- Receipts and attachments, bank-feed integration, transaction splitting / multi-category tagging.
+- Multi-currency. Multi-account / household support.
+- A goal spanning multiple containers.
+- The optional savings-goal template + reminder convenience layer. The core goal system does not
+  depend on it.
+- Store distribution and paid developer-program enrollment.
 
-### 12.1 The thesis
-yaccount is a **paper ledger a designer fell in love with** — the calm, exact, columnar feel of a hand-kept account book, rendered as a soft modern app. Money is **quiet and precise by default**, with exactly **one warm spark of personality** (iris) and a single **positive/emerald** accent for money coming in. It is the deliberate opposite of two clichés we reject: (a) the cold blue-grey fintech dashboard, and (b) the alarm-clock red/green spreadsheet. **Restraint is the brand.** Numbers are the hero; chrome recedes.
+---
 
-**(M11) Where the boldness goes.** A louder re-cut was considered and rejected: a new display face, a second accent hue, filled accent cards and big radii — bolder in volume, weaker in identity, and exactly the generic fintech card-stack §12.1 was written to reject. The language spends its boldness on **three things no other budgeting app does**, and stays quiet everywhere else:
+## 9. Visual design language — "The Standing Register"
 
-1. **Paper and ink tinted with the brand hue.** The neutral field is not neutral — every grey carries a trace of iris, so the app stops reading as default shadcn grey. Iris itself moves from 4% washes sprinkled everywhere to **full strength, used rarely**.
-2. **The figure standing on its own history.** The hero balance sits on a faint area curve of its own trailing series. The number has literal ground under it (extends §12.7 signature #1).
-3. **The carried balance.** Sticky day headers in the register print the running overall balance as of that day, the way a paper check register carries a balance down the page. Information, not decoration.
+> **This is law, not a mood board.** Every screen obeys it. If a design instinct conflicts with
+> what is written here, the language wins — change *this section by explicit decision*, never
+> drift in a component.
 
-### 12.2 Color tokens (locked — defined in `src/app/globals.css`)
-Palette is **tinted paper & ink + one iris brand + emerald-for-inflow**, expressed in `oklch`. Semantic tokens, never raw hex in components:
+### 9.1 The thesis
 
-| Token | Light | Dark | Job |
-|---|---|---|---|
-| `--brand` / `--primary` / `--ring` | `oklch(0.52 0.21 285)` | `oklch(0.735 0.17 285)` | **Iris, at full strength.** The single spark: the quick-add FAB, the active tab, focus rings, primary buttons. **(M11)** Rare by design — if iris is everywhere it is nowhere. Do **not** re-introduce low-opacity iris washes as a general surface treatment. |
-| `--positive` (`text-positive`) | `oklch(0.53 0.14 162)` | `oklch(0.76 0.145 162)` | **Emerald.** Money **in** only (income amounts, "in" stat). Never used decoratively. |
-| `--destructive` | `oklch(0.545 0.215 27.5)` | `oklch(0.704 0.191 22.216)` | **Rose.** Reserved for genuine danger/negative: a **negative balance**, destructive menu items. Never the default color of an expense. |
-| neutral base (`background`/`card`/`muted`/`border`/`foreground`) | tinted paper, h≈285 | tinted ink, h≈285 | **(M11)** Everything else. Every neutral carries chroma at the brand hue — `--background` `oklch(0.988 0.003 285)` on paper, `oklch(0.155 0.012 285)` in the dark (ink, not black). |
-| `--surface-sunken` | `oklch(0.945 0.007 285)` | `oklch(0.122 0.01 285)` | **(M11)** A recessed plane: day headers, filter rails, a totals footer — anything set *into* the page rather than laid on it. |
-| `--rule` | `oklch(0.76 0.014 285)` | `oklch(0.42 0.02 285)` | **(M11)** The hairline above a total, and the dots of a leader. Reads harder than `--border` on purpose: a rule is punctuation, not a divider. |
+yaccount is **a paper ledger a designer fell in love with** — calm, exact, columnar. Money is
+quiet and precise by default, with exactly **one warm spark** (iris) and a single positive accent
+(emerald) for money coming in. It is the deliberate opposite of two clichés it rejects: the cold
+blue-grey fintech dashboard, and the alarm-clock red/green spreadsheet. **Restraint is the
+brand.** Numbers are the hero; chrome recedes.
 
-**(M11) Legibility is enforced, not eyeballed.** Every pair a user reads must clear **WCAG AA (4.5:1)** in *both* themes, and the focus ring must clear 3:1. `src/features/ui/theme.test.ts` parses `globals.css`, converts oklch → sRGB and asserts it — change a token and the test tells you what it costs. It also asserts the ramp is *tinted*, so an untinted grey can't creep back in.
+The boldness is spent on exactly three things and nowhere else:
 
-**(M11) Category identity = one colour scheme, optionally carrying an icon.** `categoryColor(category)` uses the stored `Category.color` when present and otherwise the deterministic golden-angle hue from `categoryDotColor(id)`; never invent a second swatch scheme. `Category.icon` may name one curated Lucide glyph, rendered in that colour by `CategoryGlyph`; no icon or an unknown icon falls back to the dot. The icon picker is a searchable `ResponsiveSheet`. Icons appear in category/ledger/inbox/recurring rows and category selects; the Plan and dashboard keep dots by deliberate M11 scope.
+1. **Paper and ink tinted with the brand hue** — every neutral carries a trace of iris, so the
+   app never reads as default grey. Iris itself is used at full strength and rarely.
+2. **The figure standing on its own history** — the hero balance sits on a faint area curve of its
+   trailing series.
+3. **The carried balance** — sticky day headers print the running balance as of that day, the way
+   a paper check register carries a balance down the page.
 
-**Hard rules:** expenses are **neutral** (they are the norm — the explicit minus sign carries the meaning, §5.4), only **inflow is emerald**, only **true-negative is rose**. Do not color the whole ledger green/red. Do not introduce a third accent hue without editing this table. **(M11)** Tone is always chosen by the caller, never inferred from a number's sign — a positive figure can be a refund, a transfer leg or a balance, and colouring those emerald turns the one meaningful accent into decoration (`Money`'s `tone` prop exists for exactly this).
+### 9.2 Colour
 
-### 12.3 Typography (locked — three roles, wired in `src/app/layout.tsx`)
-| Role | Face | CSS var / class | Where |
-|---|---|---|---|
-| **Display** | **Fraunces** (soft serif, **(M11)** variable: `opsz` / `SOFT` / `WONK`, plus italic) | `--font-display` / `font-display` | The one characterful risk. Balance hero, page headings, the wordmark. **Used with restraint** — display moments only, never body copy or labels. |
-| **Body / UI** | **Geist** (sans) | `--font-sans` (default) | All labels, inputs, buttons, secondary text. |
-| **Numerals** | **Geist Mono** | `--font-mono` / `font-mono` | **Every monetary amount, everywhere**, plus counts. Pair with `.tnum` (tabular figures) so columns of money align like a register. |
+Semantic tokens only, defined in `src/app/globals.css`, expressed in `oklch`. Never raw hex in a
+component.
 
-A serif in a finance app is intentional — it is the "designer's ledger" thesis made visible. Money always reads in mono. **Never** set an amount in the body sans, and **never** set body copy in Fraunces.
+| Token | Job |
+|---|---|
+| `--brand` / `--primary` / `--ring` | **Iris at full strength.** The quick-add FAB, the active tab, focus rings, primary buttons. Rare by design — if iris is everywhere it is nowhere. |
+| `--positive` (`text-positive`) | **Emerald. Money in only.** Never decorative. |
+| `--destructive` | **Rose.** Genuine danger and true-negative only — never the default colour of an expense. |
+| neutral base | Tinted paper (light) and tinted ink, not black (dark), at the brand hue. |
+| `--surface-sunken` | A recessed plane: day headers, filter rails, a totals footer. |
+| `--rule` | The hairline above a total and the dots of a leader. Reads harder than `--border`: a rule is punctuation, not a divider. |
 
-**(M11) The figure scale.** Fraunces is *cut for size*, not merely scaled: each step sets its own optical size, softness and letter-spacing, and the quirky `WONK` alternates are allowed only at hero size, where they read as character rather than noise. All three are fluid (`clamp`) and tabular.
+**Hard rules:** expenses are **neutral** — they are the norm, and the explicit minus sign carries
+the meaning. Only inflow is emerald; only true-negative is rose. Do not colour the ledger
+green/red, and do not add a third accent hue without editing this table. **Tone is chosen by the
+caller, never inferred from a number's sign** — a positive figure may be a refund, a transfer leg
+or a balance, and colouring those emerald turns the one meaningful accent into decoration.
 
-| Class | Size | Where |
+**Legibility is enforced, not eyeballed.** Every pair a user reads clears WCAG AA (4.5:1) in both
+themes and the focus ring clears 3:1; a test parses the token ramp and asserts it, and also
+asserts the ramp stays tinted.
+
+**Category identity is one colour scheme, optionally carrying an icon.** Colour comes from the
+stored `Category.color` when present, otherwise a deterministic hue from the id; never invent a
+second swatch scheme. `Category.icon` may name one curated Lucide glyph rendered in that colour,
+picked from a searchable sheet; no icon falls back to the dot. Icons appear in category, ledger,
+inbox and recurring rows and in category selects. The Plan and dashboard keep dots. **There is no
+colour-picker UI.**
+
+### 9.3 Typography
+
+Three roles, and only three:
+
+| Role | Face | Where |
 |---|---|---|
-| `.figure-hero` | `clamp(2.75rem, 12vw, 4.5rem)`, `opsz` 120 / `SOFT` 45 / `WONK` 1 | The one balance moment per screen. Never two on a screen. |
-| `.figure-lg` | `clamp(1.75rem, 6vw, 2.5rem)`, `opsz` 48 / `WONK` 0 | Page titles, a secondary figure. |
-| `.figure-md` | `clamp(1.25rem, 4vw, 1.5rem)`, `opsz` 24 / `WONK` 0 | A total, a card headline. |
+| Display | **Fraunces** (variable: `opsz`/`SOFT`/`WONK`, plus italic) | Balance hero, page headings, the wordmark. Display moments only — never body copy or labels. |
+| Body / UI | **Geist** | All labels, inputs, buttons, secondary text. |
+| Numerals | **Geist Mono** + `.tnum` | **Every monetary amount, everywhere**, plus counts. |
 
-**(M11) `.marginalia` — the accountant's pencil note.** Fraunces **italic**, between light guillemets `‹ … ›`. It is a short aside about the figure it sits under, saying something the figure cannot say about itself ("up $312 on last month", "on pace · $412 left"). It is **never a label**, never a heading, and never holds a value you need to read precisely — if a screen has more than two, they have become labels and one of them is wrong.
+Never set an amount in the body sans; never set body copy in Fraunces.
 
-**(M11) `.eyebrow` — the one label style.** Uppercase, `0.6875rem`, `0.18em` tracking, muted. It names a figure without competing with it. One tracking everywhere: an eyebrow that varies per screen is noise wearing a label's clothes.
+**The figure scale** cuts Fraunces for size rather than scaling it — each step sets its own
+optical size, softness and tracking, all fluid and tabular. `.figure-hero` is the one balance
+moment per screen (never two); `.figure-lg` is a page title or secondary figure; `.figure-md` is a
+total or card headline. `WONK` alternates are allowed only at hero size.
 
-### 12.4 Layout & shape language
-- **Column, not dashboard.** One centered reading column (`max-w-2xl`), generous vertical rhythm. yaccount is a focused ledger you scan top-to-bottom, not a grid of widgets. (Later multi-metric screens may widen, but the calm single-column instinct is the default.)
-- **Soft containers.** Grouped content sits in `rounded-2xl` bordered `card` surfaces; controls are `rounded-xl`/`rounded-lg`; pills (`rounded-full`) for nav and toggles. Corners are soft — no hard-edged broadsheet rules.
-- **The balance hero.** Each primary screen opens with a **big Fraunces figure + a tiny uppercase eyebrow label**, with quiet supporting marginalia (e.g. "this month · $X in · $Y out") — never a busy stat-card row. The number is the thesis.
-- **(M11) Creating opens a sheet — the compose bar is RETIRED.** Every "new" flow (a transaction, a category, a container, a goal, a recurring rule) opens a **`ResponsiveSheet`** from a single **New** action in the page header — or, for a transaction, from the quick-add FAB. One surface for making things, on every screen and at every width. *M2 through M11 phase 6 used an inline iris-tinted compose bar pinned above the list; the user retired it on 2026-07-22 after using both side by side.* Two reasons it lost: a screen where some records are made in a bar and others in a sliding panel teaches the reader nothing about either, and a one-line bar can never hold the third field a real record needs, so it was always going to be the flow that got left behind. **`border-primary/15 bg-primary/[0.04]` is no longer a pattern in this app** — §12.2's "no low-opacity iris washes" rule now holds with no exception at all.
-- **(M11) The page header.** A list screen opens with an **eyebrow naming it**, a `.figure-lg` **title** saying what it is in the interface's voice, one line of lede, and — **on the eyebrow's line, never the title's** — that screen's single **New** action (`PageHeader`). Beside a fluid serif heading and a paragraph, a button competes with both for the same 350px: the title wraps, the lede squeezes into two thirds of the column, and the block reads as cramped. Next to a short uppercase label it has room to spare at every width.
-- **Register rows, date-grouped.** Lists render as **flat rows grouped by day** ("Today / Yesterday / Mon D, YYYY"), each row: `[color dot] [payee + category] ……… [mono amount] [hover ⋯]`. Quiet dividers, hover tint, right-aligned mono money.
-- **(M11) The day header carries the balance.** The day header is an eyebrow on `--surface-sunken`, **sticky**, printing the running overall balance as of that day — the paper check register's carried balance. **Hide the carried figure whenever a filter is active:** a filtered list's rows no longer explain the number, and a balance you cannot reconcile against what you're looking at is worse than no balance.
-- **(M11) Sticky rows require `overflow-clip`.** A rounded card containing a sticky child uses `overflow-clip`, not `overflow-hidden`: `hidden` creates a scroll container and traps the sticky header against a box that never scrolls. Change a card only when it gains a sticky child.
-- **(M11) The rule — punctuation, not decoration.** A hairline (`.rule`, `--rule`) is drawn **only immediately above a total**, where it means *"this sums the above"*. A **double rule** (`.rule-double`) marks a terminal total — the accounting convention for a line nothing further is added to. Never use either as a divider; a rule that sometimes means addition and sometimes means nothing teaches the reader to ignore it. A total is printed **under** the rows it sums; a figure above its own addends is a heading, not a total.
-- **(M11) Dot leaders (`.leaders`) — the eye's rail** from a name to its amount. **Sparse summary lists only** (the monthly plan, a totals block). Never in the dense register: every row becoming a ruled line is a page of noise.
-- **(M11) Responsive density.** One reading column at every width. Below `sm` a sheet **rises from the bottom** (thumb reach); from `sm` up it **slides in from the right** (beside the list you were reading) — same component, one rule, `ResponsiveSheet`. Tables collapse to card rows below `sm`; no horizontal page scroll ever.
-- **(M11) One navigation registry, two shells.** Below `lg`, the fixed bottom tabs are **Home · Ledger · Inbox · More**, with the pending count on Inbox; More opens the remaining destinations and Settings. From `lg`, a sidebar rail shows every destination. The active destination is marked by full-strength iris on icon and label, never a tinted plate. The quick-add FAB remains available at every width.
-- **(M11) Dashboard = ordered widget registry.** The wider dashboard maps a fixed ordered registry of stable widget ids. Secondary widgets fold; fold state and optional period override persist per id. Numbers that identify an honest ledger subset use real `/ledger` deep links; summaries and ambiguous chart marks do not pretend to be links. This registry is the seam for later reordering/visibility work, not that work itself.
-- **Row actions hide until hover.** Per-row edit/delete/etc. live behind a single Lucide `⋯` (`MoreHorizontal`) **DropdownMenu** revealed on hover/focus — the resting state is clean. **(M11) Only where there is a hover to reveal them.** A touch device has none, so the same rule read literally left a phone with *no row actions at all*. The hiding is scoped to pointers that can hover (`pointer-coarse:opacity-100`), and the whole control lives in one place, `RowActions` — six hand-copied variants of this class list is how one screen quietly ends up unusable.
-- **Editing opens a side `Sheet`, never a mode-swap.** Editing an existing record slides in a right-hand `Sheet` with the full form + Save + a quiet Delete. **Never** repurpose a create surface into an edit form in place (this was a real bug we fixed — do not reintroduce it). Rule of thumb **(M11, revised)**: **create = Sheet; edit = Sheet; confirm-destructive = AlertDialog** — with single-field rename the one deliberate inline exception (§12.4-a). **(post-M11) A destructive act with no undo waiting in the toast asks the user to type a word first** — `ConfirmDestructive`, an `AlertDialog` whose action stays disabled until the phrase matches. Reserved for acts that replace or stand down the whole account (§8.7); everything reversible keeps the ordinary two-button confirm, because a phrase gate on a recoverable act is friction pretending to be safety.
-- **(M11) Secondary sections fold.** Archived and paused sections are `CollapsibleSection`, closed by default: they grow forever, they are never what you came for, and on a phone they push the live list off the bottom of the screen. The **count stays visible in the header** — §1.1 requires the inverse of an action to remain on the screen, and "Archived · 3" satisfies that while three rows of it do not earn the space.
+**`.marginalia`** — the accountant's pencil note, Fraunces italic between light guillemets. A
+short aside saying something the figure cannot say about itself ("up $312 on last month"). Never
+a label, never a heading, never a value you must read precisely. More than two on a screen means
+they have become labels.
 
-### 12.4-a Editing existing records (locked, M3)
-- **Inline rename** (a single-field edit like a category or container name) uses an explicit **✓ / ✗ pair** plus Enter/Escape — `RenameField` (`src/features/RenameField.tsx`). **Blur never commits**; leaving the field keeps the editor open, and an empty name cancels. Committing by accident is worse than one extra click.
-- **A record with history gets a history list, not a write-only form.** Anything the user can log repeatedly (reported balances today; future: budget-target history) shows its past entries in the same Sheet, each row with the `⋯` menu (Edit / Delete). Never ship a form whose past input the user can't see or fix.
-- **The direction of money is a visible control, never a typing convention.** Amount fields carry a `−`/`+` toggle (`SignToggle`) defaulting to the category's direction — muted for out, `text-positive` for in. A typed `+`/`-` moves *into* that control rather than being silently absorbed. This is what makes a refund/rebate discoverable (§5.4 soft sign rule).
-- **Toggleable menu entries use a checkbox item**, with the indicator in the **leading** icon column (same column as every other item's icon) and its space reserved so the label never shifts. Never fake it with an always-on check icon.
+**`.eyebrow`** — the one label style. Uppercase, muted, one tracking everywhere. An eyebrow that
+varies per screen is noise wearing a label's clothes.
 
-### 12.5 Interaction & motion
-- **Motion is a whisper.** Only `transition-colors` on hover, the shadcn Sheet/menu/select enter/exit (`popper`-positioned so they animate — `item-aligned` suppresses motion; ~150ms fade+zoom), and toast slide-ins. No parallax, no scroll-reveal, no decorative animation — extra motion reads as AI-generated and breaks the calm. Respect `prefers-reduced-motion`.
-- **(M11) The motion budget: three durations, one curve.** `--dur-1` 120ms (a colour changing under the pointer) · `--dur-2` 200ms (a row landing, a value ticking over) · `--dur-3` 260ms (a surface arriving). All on `--ease-register` `cubic-bezier(0.32, 0.72, 0, 1)` — a register **settles**; it does not bounce, so the curve leaves fast, lands slow, and never overshoots. Anything that needs a fourth duration or a second curve is asking for motion the language doesn't have.
-- **(M11) Exactly ONE orchestrated moment, and it is quick-add:** tap the **money-add FAB** → the sheet rises (`--dur-3`) → you log → the new row lands in the register with a single iris wash (`--dur-2`). **(Post-M11 Phase 3)** The FAB uses a compact dollar-plus mark, with the plus at the dollar's upper-right; its accessible name remains "Log a transaction." **(Post-M11 Phase 4)** A quick press opens Expense exactly once; a 500ms touch/mouse/keyboard hold opens the existing Expense/Income/Transfer quick-add paths. Movement beyond 10px, pointer cancellation, lost capture and Escape cancel the press, and release after a hold never also fires Expense. That sequence is the app's one piece of choreography; everywhere else motion stays a whisper. A second orchestrated moment would make both of them ordinary.
-- **(M11) Reduced motion is a kill switch, not a suggestion.** `prefers-reduced-motion: reduce` zeroes every transition and animation globally in `globals.css`. Nothing in yaccount needs to move to be usable, so nothing has to be exempted.
-- **Feedback = `sonner` toasts,** in the interface's voice (see §12.6). **(Post-M11 Phase 2)** Below `lg`, they enter from the top, offset below the 56px top bar, safe-area inset and a 16px gap; desktop remains bottom-right. Every create/update/delete confirms with a toast.
-- **Soft rules stay soft, inline.** The unusual-sign check (§5.4/§10 #13) is an **inline arm-then-confirm** ("… looks like a refund or void. Add again to confirm."), *not* a blocking `window.confirm` or a modal. Warnings guide; they never block.
-- **Quality floor (non-negotiable):** responsive to mobile, visible keyboard focus (iris ring), every icon-only control has an `aria-label`.
+### 9.4 Layout and shape
 
-### 12.6 Voice & copy
-Sentence case everywhere. Plain verbs. Write from the user's side of the screen, name things by what the user controls. A control says what it does and keeps that word through the flow ("Save changes" → toast "Transaction updated"). Empty states are **invitations, not mood** ("Nothing logged yet. Add your first entry above."). Errors are specific and blameless ("Add a payee or source."). No filler, no cleverness over clarity, no system vocabulary ("row", "op", "dispatch") in the UI.
+- **Column, not dashboard.** One centred reading column at every width, generous vertical rhythm.
+  The dashboard is the one multi-metric screen permitted to widen.
+- **Soft containers.** `rounded-2xl` bordered card surfaces, `rounded-xl`/`lg` controls, pills for
+  nav and toggles.
+- **The balance hero.** Each primary screen opens with a big Fraunces figure, a tiny eyebrow, and
+  quiet marginalia — never a busy stat-card row.
+- **Creating opens a sheet. The compose bar is retired.** Every "new" flow opens a
+  `ResponsiveSheet` from a single **New** action in the page header, or from the quick-add FAB for
+  a transaction. One surface for making things, on every screen and at every width. *An inline
+  iris-tinted compose bar was used through M11 and retired after the user ran both side by side:
+  a screen where some records are made in a bar and others in a panel teaches the reader nothing
+  about either, and a one-line bar can never hold the third field a real record needs.*
+  `border-primary/15 bg-primary/[0.04]` is no longer a pattern in this app.
+- **The page header.** An eyebrow naming the screen, a `.figure-lg` title, one line of lede, and
+  the screen's single **New** action **on the eyebrow's line, never the title's** — beside a fluid
+  serif heading a button competes for the same 350px and the block reads as cramped.
+- **Register rows, date-grouped.** `[dot or icon] [payee + category] ……… [mono amount] [⋯]`, with
+  quiet dividers and right-aligned mono money.
+- **The day header carries the balance** — an eyebrow on `--surface-sunken`, sticky, printing the
+  running overall balance as of that day. **Hide the carried figure whenever a filter is active:**
+  a filtered list's rows no longer explain the number.
+- **Sticky rows require `overflow-clip`, not `overflow-hidden`** — `hidden` creates a scroll
+  container and traps the sticky child against a box that never scrolls.
+- **The rule is punctuation.** A hairline is drawn **only immediately above a total**, meaning
+  "this sums the above"; a double rule marks a terminal total. Never a divider. A total is printed
+  **under** the rows it sums.
+- **Dot leaders** rail the eye from a name to its amount in **sparse summary lists only** — never
+  in the dense register.
+- **Responsive density.** Below `sm` a sheet rises from the bottom; from `sm` it slides in from
+  the right — same component, one rule. Tables collapse to card rows below `sm`. No horizontal
+  page scroll, ever.
+- **One navigation registry, two shells.** Below `lg`, fixed bottom tabs: **Home · Ledger · Inbox
+  · More**, with the pending count on Inbox; More holds the remaining destinations and Settings.
+  From `lg`, a sidebar rail shows every destination with Settings in its footer. The active
+  destination is marked by full-strength iris on icon and label, never a tinted plate. **Routes
+  are stable at every breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add
+  FAB is present at every width.
+- **Dashboard = an ordered widget registry** of stable ids. Secondary widgets fold; fold state and
+  any period override persist per id. Numbers identifying an honest ledger subset use real
+  `/ledger` deep links; summaries and ambiguous chart marks do not pretend to be links. **This
+  registry is the seam for later reordering/visibility work, not that work itself.**
+- **Row actions hide until hover — but only where there is a hover.** A touch device has none, so
+  the hiding is scoped to hover-capable pointers, and the whole control lives in one place
+  (`RowActions`). Reading this rule literally once left phones with no row actions at all.
+- **Editing opens a sheet, never a mode-swap.** Rule of thumb: **create = sheet, edit = sheet,
+  confirm-destructive = AlertDialog** — with single-field rename the one inline exception (§9.5).
+  Never repurpose a create surface into an edit form in place. **A destructive act with no undo
+  waiting in the toast asks the user to type a word first** (`ConfirmDestructive`) — reserved for
+  acts that replace or stand down the whole account (§5.5); everything reversible keeps the
+  ordinary two-button confirm, because a phrase gate on a recoverable act is friction pretending
+  to be safety.
+- **Secondary sections fold.** Archived and paused sections are collapsed by default, with the
+  **count visible in the header** — §1.1 requires the inverse to stay on screen, and "Archived · 3"
+  satisfies that while three rows of it do not earn the space.
+- **Shortcuts live in the quick-add sheet only** — not as a strip on the ledger.
 
-### 12.7 The signature elements (spend boldness only here)
-1. **The Fraunces balance moment** — the serif hero figure is the thing the app is remembered by. **(M11)** It now stands on a faint area curve of its own trailing series: a balance is the end of a story, and the curve is that story.
-2. **The deterministic category color dots** — the one recurring spot of playful color in an otherwise disciplined neutral field.
-3. **(M11) The carried balance in the day header** — the register carries its running total down the page, like the paper book it descends from (§12.4).
+### 9.5 Editing existing records
 
-Everything else stays quiet. Before adding any new decoration, remove one thing first (Chanel's rule). If a screen has two loud ideas, one of them is wrong.
+- **Inline rename** uses an explicit ✓/✗ pair plus Enter/Escape. **Blur never commits**; an empty
+  name cancels. Committing by accident is worse than one extra click.
+- **A record with history gets a history list, not a write-only form.** Anything loggable
+  repeatedly shows its past entries in the same sheet, each with an Edit/Delete menu.
+- **The direction of money is a visible `−`/`+` control** defaulting to the category's direction.
+  A typed sign moves into the control. This is what makes a refund discoverable.
+- **Toggleable menu entries are checkbox items** with the indicator in the **leading** icon
+  column, its space reserved so the label never shifts. Never an always-on check icon.
+- **Every field on a create sheet reads: label → segmented pair → one line of meaning**, default
+  option leftmost. A container's counted-in-overall-balance choice is made at create time this
+  way, defaulting to **not counted** — the opt-in model is untouched, only the visibility of the
+  choice changed.
 
-### 12.8 How to extend (for every future feature)
-Reach for a **shadcn/ui** component first (add via `npx shadcn@latest add …`); hand-roll only when none exists, and match this language when you do. Use the **semantic tokens** (`primary`, `positive`, `destructive`, `muted-foreground`) — never raw colors. Amounts in **`font-mono` + `.tnum`**. New section headers in **Fraunces**. **(M11)** New create flows AND new edit flows both use a **`ResponsiveSheet`**; new per-item actions use the **`⋯` DropdownMenu** via `RowActions`. When in doubt, make it quieter.
+### 9.6 Interaction and motion
 
-**(M11) Compose the language; don't re-derive it.** Every device above exists as a primitive in **`src/features/ui/`** — `Figure`, `Money`, `Eyebrow`, `Marginalia`, `RuledTotal`, `LeaderRow`, `Sparkline`, `ResponsiveSheet`, `EmptyState`, `ListSkeleton`, and (phase 6) `PageHeader`, `RowActions`, `CollapsibleSection`, plus (post-M11) **`ConfirmDestructive`** — the type-the-word confirmation for an act with no undo (§12.4, §8.7). If you find yourself hand-rolling an eyebrow, a total, a money span, a page header or a row's `⋯` menu out of Tailwind classes, the primitive already exists and you are forking the language. Extending the system means adding a primitive **and** the sentence in this section that says what it is for.
+- **Motion is a whisper**, and it has a budget: **three durations, one curve**. 120ms for a colour
+  under the pointer, 200ms for a row landing, 260ms for a surface arriving, all on one
+  register-settling easing that leaves fast, lands slow and never overshoots. Anything needing a
+  fourth duration or a second curve is asking for motion the language does not have. Press
+  feedback is a colour change, not a scale.
+- **Exactly one orchestrated moment, and it is quick-add:** tap the FAB → the sheet rises → you
+  log → the row lands in the register with a single iris wash. A second orchestrated moment would
+  make both ordinary. The FAB carries a compact dollar-plus mark, keeps the accessible name "Log a
+  transaction", opens Expense on a quick press, and on a 500ms hold opens an
+  Expense/Income/Transfer chooser. Movement beyond 10px, pointer cancellation, lost capture and
+  Escape all cancel the press, and a release after a hold never also fires Expense.
+- **Reduced motion is a kill switch, not a suggestion** — `prefers-reduced-motion: reduce` zeroes
+  every transition and animation globally. Nothing here needs to move to be usable.
+- **Feedback is toasts**, one per create/update/delete. Below `lg` they enter from the top,
+  offset below the top bar with safe-area inset; desktop keeps bottom-right.
+- **Soft rules stay soft and inline.** The unusual-sign check is an inline arm-then-confirm, never
+  a blocking modal. Warnings guide; they never block.
+- **Quality floor:** responsive to mobile, visible keyboard focus, an `aria-label` on every
+  icon-only control.
+
+### 9.7 Voice
+
+Sentence case everywhere. Plain verbs. Write from the user's side of the screen. A control keeps
+its word through the flow ("Save changes" → "Transaction updated"). Empty states are invitations,
+not mood. Errors are specific and blameless. No system vocabulary ("row", "op", "dispatch") in
+the UI.
+
+### 9.8 How to extend
+
+Reach for a **shadcn/ui** component first; hand-roll only when none exists, and match this
+language when you do. Semantic tokens only. Amounts in `font-mono` + `.tnum`. New section headers
+in Fraunces.
+
+**Compose the language; do not re-derive it.** Every device above exists as a primitive in
+`src/features/ui/`. If you are hand-rolling an eyebrow, a total, a money span, a page header or a
+row's `⋯` menu out of Tailwind classes, the primitive already exists and you are forking the
+language. Extending the system means adding a primitive **and** the sentence here that says what
+it is for. Before adding decoration, remove one thing first. If a screen has two loud ideas, one
+of them is wrong.
