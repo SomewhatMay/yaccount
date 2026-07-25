@@ -202,6 +202,20 @@ export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
   }
 });
 
+/** Commit a multi-op user intent in one IndexedDB transaction. */
+export const dispatchManyAtom = atom(null, async (_get, set, ops: Op[]) => {
+  try {
+    const repo = await getRepo();
+    await repo.dispatchMany(ops);
+    await set(refreshAtom);
+    scheduleSync(set);
+  } catch (err) {
+    const summary = log.capture("dispatch batch failed", err);
+    toast.error("Couldn't save that change.", { description: summary });
+    throw markHandled(err);
+  }
+});
+
 /**
  * ── Drive sync status (M9, §8.4/§8.6) ──────────────────────────────────────
  * `idle` — not connected (nothing to sync); `syncing` — a cycle is in flight;
