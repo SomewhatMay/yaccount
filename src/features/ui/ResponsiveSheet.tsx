@@ -8,20 +8,26 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import {
-  bottomSheetMaxHeight,
-  revealFocusedControl,
+  bottomSheetViewportStyle,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
 
-function visualViewportHeight(): number | null {
-  return typeof window === "undefined" ? null : (window.visualViewport?.height ?? null);
+function visualViewportSnapshot(): string {
+  const viewport = window.visualViewport;
+  return viewport ? `${viewport.height}:${viewport.offsetTop}:${window.innerHeight}` : "";
 }
 
 function subscribe(onChange: () => void): () => void {
   return subscribeVisualViewport(window.visualViewport, onChange);
+}
+
+function bottomSheetStyle(snapshot: string) {
+  if (!snapshot) return undefined;
+  const [height, offsetTop, layoutHeight] = snapshot.split(":").map(Number);
+  return bottomSheetViewportStyle({ height, offsetTop, layoutHeight });
 }
 
 /**
@@ -47,40 +53,15 @@ export function ResponsiveSheet({
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
-  const content = useRef<HTMLDivElement | null>(null);
-  const viewportHeight = useSyncExternalStore(
-    subscribe,
-    visualViewportHeight,
-    () => null,
-  );
-
-  useEffect(() => {
-    if (!open || sideways) return;
-    let secondFrame = 0;
-    const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => {
-        if (content.current) {
-          revealFocusedControl(
-            content.current,
-            document.activeElement instanceof HTMLElement ? document.activeElement : null,
-          );
-        }
-      });
-    });
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-    };
-  }, [open, sideways, viewportHeight]);
+  const viewport = useSyncExternalStore(subscribe, visualViewportSnapshot, () => "");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        ref={content}
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : { maxHeight: bottomSheetMaxHeight(viewportHeight) }}
+        style={sideways ? undefined : bottomSheetStyle(viewport)}
         className={cn(
-          "gap-0 overflow-y-auto",
+          "max-w-full min-w-0 touch-pan-y gap-0 overflow-x-hidden overflow-y-auto overscroll-contain",
           // A bottom sheet stops short of the top edge so the screen behind it
           // stays visible — you are editing a row, not leaving the ledger.
           "data-[side=bottom]:max-h-[88svh] data-[side=bottom]:rounded-t-2xl",

@@ -1,14 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  bottomSheetMaxHeight,
-  revealFocusedControl,
+  bottomSheetViewportStyle,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
 
 describe("iOS bottom-sheet viewport handling", () => {
-  it("limits a bottom sheet to 88% of the visual viewport", () => {
-    expect(bottomSheetMaxHeight(500)).toBe("440px");
-    expect(bottomSheetMaxHeight(null)).toBeUndefined();
+  it("anchors a bottom sheet above the keyboard with a visible top gap", () => {
+    expect(
+      bottomSheetViewportStyle({
+        height: 500,
+        offsetTop: 20,
+        layoutHeight: 800,
+      }),
+    ).toEqual({
+      bottom: "280px",
+      maxHeight: "440px",
+    });
+  });
+
+  it("uses CSS viewport fallback before visual viewport data is available", () => {
+    expect(bottomSheetViewportStyle(null)).toBeUndefined();
   });
 
   it("subscribes to viewport resize and scroll, then removes both listeners", () => {
@@ -24,22 +35,5 @@ describe("iOS bottom-sheet viewport handling", () => {
     cleanup();
     expect(removeEventListener).toHaveBeenCalledWith("resize", onChange);
     expect(removeEventListener).toHaveBeenCalledWith("scroll", onChange);
-  });
-
-  it("reveals only a focused control contained by the bottom sheet", () => {
-    const scrollIntoView = vi.fn();
-    const focused = { scrollIntoView };
-    const sheet = { contains: vi.fn(() => true) };
-
-    expect(revealFocusedControl(sheet, focused)).toBe(true);
-    expect(scrollIntoView).toHaveBeenCalledWith({
-      block: "nearest",
-      inline: "nearest",
-      behavior: "instant",
-    });
-
-    sheet.contains.mockReturnValue(false);
-    expect(revealFocusedControl(sheet, focused)).toBe(false);
-    expect(revealFocusedControl(sheet, null)).toBe(false);
   });
 });

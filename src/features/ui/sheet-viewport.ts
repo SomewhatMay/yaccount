@@ -3,16 +3,24 @@ export interface VisualViewportEvents {
   removeEventListener(type: "resize" | "scroll", listener: () => void): void;
 }
 
-interface SheetRegion {
-  contains(node: unknown): boolean;
+export interface BottomSheetViewport {
+  height: number;
+  offsetTop: number;
+  layoutHeight: number;
 }
 
-interface FocusedControl {
-  scrollIntoView(options: ScrollIntoViewOptions): void;
-}
-
-export function bottomSheetMaxHeight(height: number | null): string | undefined {
-  return height === null ? undefined : `${height * 0.88}px`;
+export function bottomSheetViewportStyle(
+  viewport: BottomSheetViewport | null,
+): { bottom: string; maxHeight: string } | undefined {
+  if (!viewport) return undefined;
+  const bottom = Math.max(
+    0,
+    viewport.layoutHeight - viewport.offsetTop - viewport.height,
+  );
+  return {
+    bottom: `${bottom}px`,
+    maxHeight: `${viewport.height * 0.88}px`,
+  };
 }
 
 export function subscribeVisualViewport(
@@ -26,17 +34,4 @@ export function subscribeVisualViewport(
     viewport.removeEventListener("resize", onChange);
     viewport.removeEventListener("scroll", onChange);
   };
-}
-
-export function revealFocusedControl(
-  sheet: SheetRegion,
-  focused: FocusedControl | null,
-): boolean {
-  if (!focused || !sheet.contains(focused)) return false;
-  focused.scrollIntoView({
-    block: "nearest",
-    inline: "nearest",
-    behavior: "instant",
-  });
-  return true;
 }

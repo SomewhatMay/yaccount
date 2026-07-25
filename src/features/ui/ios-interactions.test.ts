@@ -26,4 +26,13 @@ describe("iPhone PWA interaction layout", () => {
     expect(fab).toContain("touch-none");
     expect(read("../../app/globals.css")).not.toContain("* { user-select: none");
   });
+
+  it("contains bottom-sheet scrolling to the vertical axis", () => {
+    const sheet = read("./ResponsiveSheet.tsx");
+
+    expect(sheet).toContain("overflow-x-hidden");
+    expect(sheet).toContain("overflow-y-auto");
+    expect(sheet).toContain("touch-pan-y");
+    expect(sheet).not.toContain("scrollIntoView");
+  });
 });
