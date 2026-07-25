@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { parseDollars } from "@/core/money";
 import {
   isTransferRule,
@@ -33,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { SheetFooter } from "@/components/ui/sheet";
 import { ResponsiveSheet } from "@/features/ui";
+import { InlineError } from "@/features/ui/InlineError";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { todayIso } from "@/features/clock";
 
@@ -135,29 +135,29 @@ function RuleForm({
   const [cfg, setCfg] = useState<ConfigState>(() => initialConfig(rule));
   const [startDate, setStartDate] = useState(rule?.start_date ?? todayIso());
   const [endDate, setEndDate] = useState(rule?.end_date ?? "");
+  const [error, setError] = useState("");
 
   const cat = categories.find((c) => c.id === categoryId);
   const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!vendor.trim()) return toast.error("Add a name — what is this transaction?");
+    setError("");
+    if (!vendor.trim()) return setError("Add a name — what is this transaction?");
 
     let magnitude: number;
     try {
       magnitude = Math.abs(parseDollars(amountStr));
     } catch {
-      return toast.error("Enter a valid amount.");
+      return setError("Enter a valid amount.");
     }
-    if (magnitude === 0) return toast.error("Amount can't be zero.");
+    if (magnitude === 0) return setError("Amount can't be zero.");
 
     let interval_config: IntervalConfig;
     try {
       interval_config = buildConfig(frequency, cfg);
     } catch (err) {
-      return toast.error(
-        err instanceof Error ? err.message : "Check the schedule fields.",
-      );
+      return setError(err instanceof Error ? err.message : "Check the schedule fields.");
     }
 
     const input: RuleFormInput = {
@@ -173,22 +173,23 @@ function RuleForm({
       template_to_container_id: mode === "transfer" ? toId : null,
     };
 
-    if (mode === "entry" && !categoryId) return toast.error("Pick a category.");
+    if (mode === "entry" && !categoryId) return setError("Pick a category.");
     if (mode === "transfer") {
-      if (!toId || !fromId) return toast.error("Pick both containers.");
-      if (toId === fromId) return toast.error("Pick two different containers.");
+      if (!toId || !fromId) return setError("Pick both containers.");
+      if (toId === fromId) return setError("Pick two different containers.");
     }
 
     try {
       await onSubmit(input, rule?.id);
     } catch {
-      toast.error("Couldn't save — check the fields.");
+      setError("Couldn't save — check the fields.");
     }
   }
 
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
+        {error && <InlineError id="recurring-error">{error}</InlineError>}
         <ToggleGroup
           type="single"
           value={mode}

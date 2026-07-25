@@ -15,6 +15,8 @@ import {
   containersAtom,
   defaultContainerIdAtom,
   dispatchAtom,
+  flashRowAtom,
+  flashedRowAtom,
   readyAtom,
   snapshotsAtom,
   transactionsAtom,
@@ -119,6 +121,7 @@ export function ContainersView() {
   const snapshots = useAtomValue(snapshotsAtom);
   const defaultId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
 
   const [creating, setCreating] = useState(false);
   const [logging, setLogging] = useState<Container | null>(null);
@@ -157,15 +160,10 @@ export function ContainersView() {
   }, [snapshots]);
 
   async function add(input: ContainerFormInput) {
-    await dispatch(createContainer(input));
-    toast.success("Container added", {
-      description: `${input.name} · ${
-        input.include_in_overall_balance
-          ? "counting toward your overall balance"
-          : "not counted in your overall balance"
-      }`,
-    });
+    const op = createContainer(input);
+    await dispatch(op);
     setCreating(false);
+    if (op.type === "container.create") flashRow({ id: op.payload.row.id });
   }
 
   async function archive(c: Container) {
@@ -184,9 +182,6 @@ export function ContainersView() {
 
   async function restore(c: Container) {
     await dispatch(unarchiveContainer(c.id));
-    toast.success("Restored", {
-      description: `${c.name} is back${c.include_in_overall_balance ? " and counting again" : ""}`,
-    });
   }
 
   if (!ready)
@@ -422,11 +417,13 @@ function ContainerRow({
   onArchive: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const flashed = useAtomValue(flashedRowAtom)?.id === container.id;
+  const flashRow = useSetAtom(flashRowAtom);
 
   async function rename(name: string) {
     if (name !== container.name) {
       await onDispatch(updateContainer({ ...container, name }));
-      toast.success("Renamed", { description: name });
+      flashRow({ id: container.id });
     }
     setEditing(false);
   }
@@ -436,24 +433,18 @@ function ContainerRow({
     await onDispatch(
       updateContainer({ ...container, include_in_overall_balance: counted }),
     );
-    toast.success(counted ? "Counted in overall balance" : "No longer counted", {
-      description: container.name,
-    });
+    flashRow({ id: container.id });
   }
 
   async function toggleInvestment() {
     const investment = !container.is_investment;
     await onDispatch(updateContainer({ ...container, is_investment: investment }));
-    toast.success(investment ? "Tracked as an investment" : "No longer an investment", {
-      description: investment
-        ? `Report ${container.name}'s real-world value anytime`
-        : container.name,
-    });
+    flashRow({ id: container.id });
   }
 
   async function makeDefault() {
     await onDispatch(setDefaultContainer(container.id));
-    toast.success("Default wallet", { description: container.name });
+    flashRow({ id: container.id });
   }
 
   const marginalia = [
@@ -467,7 +458,10 @@ function ContainerRow({
   return (
     <div
       className={cn(
-        "group hover:bg-muted/40 flex items-center gap-3 px-5 py-3 transition-colors",
+        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        flashed
+          ? "bg-primary/15 duration-[var(--dur-2)]"
+          : "hover:bg-muted/40 duration-[var(--dur-1)]",
         divider && "border-t",
       )}
     >

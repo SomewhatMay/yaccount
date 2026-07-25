@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { recordSnapshot, removeSnapshot, updateSnapshot } from "@/core/commands";
 import { formatCents, parseDollars } from "@/core/money";
@@ -29,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SheetFooter } from "@/components/ui/sheet";
 import { ResponsiveSheet } from "@/features/ui";
+import { InlineError } from "@/features/ui/InlineError";
 import { todayIso } from "@/features/clock";
 import { Eyebrow } from "@/features/ui";
 
@@ -90,6 +90,7 @@ function BalanceHistory({
   const [removing, setRemoving] = useState<ContainerSnapshot | null>(null);
   const [date, setDate] = useState(todayIso());
   const [amountStr, setAmountStr] = useState("");
+  const [error, setError] = useState("");
 
   // One report per day (§5.6): saving onto an occupied day replaces it, so say so
   // before the user commits rather than surprising them after.
@@ -109,14 +110,14 @@ function BalanceHistory({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
     let reported: number;
     try {
       reported = parseDollars(amountStr);
     } catch {
-      return toast.error("Enter a valid amount.");
+      return setError("Enter a valid amount.");
     }
 
-    const replaced = clash !== undefined;
     if (editing) {
       await onDispatch(updateSnapshot({ ...editing, date, reported_balance: reported }));
     } else {
@@ -124,10 +125,6 @@ function BalanceHistory({
         recordSnapshot({ container_id: container.id, date, reported_balance: reported }),
       );
     }
-    toast.success(
-      replaced ? "Report replaced" : editing ? "Report corrected" : "Balance reported",
-      { description: `${date} · ${formatCents(reported)}` },
-    );
     cancelEdit();
   }
 
@@ -135,7 +132,6 @@ function BalanceHistory({
     setRemoving(null);
     if (editing?.id === s.id) cancelEdit();
     await onDispatch(removeSnapshot(s.id));
-    toast.success("Report removed", { description: `${s.date} · ${container.name}` });
   }
 
   return (
@@ -165,7 +161,10 @@ function BalanceHistory({
             placeholder="0.00"
             inputMode="decimal"
             className="tnum font-mono"
+            aria-invalid={error ? "true" : undefined}
+            aria-describedby={error ? "snapshot-error" : undefined}
           />
+          {error && <InlineError id="snapshot-error">{error}</InlineError>}
         </div>
         <div className="flex items-center gap-2">
           <Button type="submit">{editing ? "Save changes" : "Save report"}</Button>

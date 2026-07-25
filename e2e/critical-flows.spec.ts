@@ -396,6 +396,10 @@ test("places toasts below mobile top navigation and bottom-right on desktop", as
   page,
 }, testInfo) => {
   await createCategory(page, "E2E toast placement");
+  await page
+    .getByRole("button", { name: "Actions for E2E toast placement" })
+    .click();
+  await page.getByRole("menuitem", { name: "Archive" }).click();
 
   const toast = page.locator("[data-sonner-toast][data-mounted=true]").last();
   await expect(toast).toBeVisible();

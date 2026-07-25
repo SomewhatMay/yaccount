@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
-import { toast } from "sonner";
 import type { Category, Container } from "@/core/model";
 import { dispatchAtom, flashRowAtom } from "@/features/store";
 import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
@@ -71,6 +70,7 @@ export function useComposeFields({
   // Null = follow the category's usual direction; a tap (or a typed +/−) pins it.
   const [pickedSign, setPickedSign] = useState<Sign | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const { date, time } = splitDateTime(when);
   const categoriesOfKind = useMemo(
@@ -91,6 +91,7 @@ export function useComposeFields({
     setKindState(next);
     setPickedSign(null);
     setWarn(null);
+    setError("");
     if (next !== "transfer" && category && category.type !== next)
       setPickedCategoryId("");
   }
@@ -100,6 +101,7 @@ export function useComposeFields({
   function setCategoryId(id: string) {
     setPickedCategoryId(id);
     setWarn(null);
+    setError("");
     const picked = activeCategories.find((c) => c.id === id);
     if (picked && picked.type !== kind) setKindState(picked.type);
   }
@@ -110,6 +112,7 @@ export function useComposeFields({
     if (typed) setPickedSign(typed);
     setAmountStr(rest);
     setWarn(null);
+    setError("");
   }
 
   function reset() {
@@ -118,6 +121,7 @@ export function useComposeFields({
     setAmountStr("");
     setPickedSign(null);
     setWarn(null);
+    setError("");
     // Roll "when" forward to now for the next entry, unless the user deliberately
     // set one — logging several things for the same past evening shouldn't make
     // them re-pick it every time.
@@ -125,6 +129,7 @@ export function useComposeFields({
   }
 
   async function submit() {
+    setError("");
     const entered_at = whenPicked ? (instantFromNow(date, time) ?? undefined) : undefined;
     const outcome = composeOp(
       kind === "transfer"
@@ -145,7 +150,7 @@ export function useComposeFields({
     );
 
     if (outcome.status === "error") {
-      toast.error(outcome.message);
+      setError(outcome.message);
       return;
     }
     if (outcome.status === "confirm") {
@@ -161,7 +166,6 @@ export function useComposeFields({
       // fires for a row that was never written.
       return;
     }
-    toast.success(outcome.toast.title, { description: outcome.toast.description });
     // §12.5's one orchestrated moment ends here: the row lands in the register
     // carrying a single iris wash.
     flashRow({ id: outcome.row.id });
@@ -199,6 +203,7 @@ export function useComposeFields({
       setWarn(null);
     },
     warn,
+    error,
     submit,
   };
 }

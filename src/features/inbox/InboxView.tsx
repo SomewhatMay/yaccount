@@ -14,6 +14,8 @@ import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
+  flashRowAtom,
+  flashedRowAtom,
   readyAtom,
   recurringRulesAtom,
   transactionsAtom,
@@ -80,6 +82,7 @@ export function InboxView() {
   const containers = useAtomValue(containersAtom);
   const rules = useAtomValue(recurringRulesAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const flashRow = useSetAtom(flashRowAtom);
 
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -160,7 +163,6 @@ export function InboxView() {
   async function approve(ids: string[]) {
     for (const id of ids) await dispatch(approveTransaction(id));
     setSelected(new Set());
-    toast.success(ids.length === 1 ? "Approved" : `Approved ${ids.length}`);
   }
 
   // Dismiss one or many pending rows (each a void, undoable). Undo un-dismisses
@@ -369,9 +371,7 @@ export function InboxView() {
         onSave={async (op) => {
           await dispatch(op);
           setEditing(null);
-          toast.message("Saved — still pending", {
-            description: "Approve it below to make it live.",
-          });
+          if (op.type === "transaction.update") flashRow({ id: op.payload.row.id });
         }}
         onDelete={dismiss}
       />
@@ -405,6 +405,7 @@ function InboxRow({
   onEdit: () => void;
   onDismiss: () => void;
 }) {
+  const flashed = useAtomValue(flashedRowAtom)?.id === tx.id;
   const transfer = isTransfer(tx);
   const income = !transfer && tx.amount >= 0;
   const sub = transfer
@@ -417,7 +418,10 @@ function InboxRow({
         // Tighter gaps below `sm`: this row carries a checkbox and an approve
         // control the register hasn't got, and at 390px those 20px are the
         // difference between a readable payee and three characters of one.
-        "group hover:bg-muted/40 active:bg-muted/60 flex items-center gap-2 px-5 py-3 transition-colors duration-[var(--dur-1)] ease-[var(--ease-register)] sm:gap-3",
+        "group flex items-center gap-2 px-5 py-3 transition-colors ease-[var(--ease-register)] sm:gap-3",
+        flashed
+          ? "bg-primary/15 duration-[var(--dur-2)]"
+          : "hover:bg-muted/40 active:bg-muted/60 duration-[var(--dur-1)]",
         divider && "border-t",
       )}
     >
