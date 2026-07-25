@@ -35,4 +35,11 @@ describe("iPhone PWA interaction layout", () => {
     expect(sheet).toContain("touch-pan-y");
     expect(sheet).not.toContain("scrollIntoView");
   });
+
+  it("waits for the FAB click before mounting quick-add", () => {
+    const fab = read("../shell/QuickAddFab.tsx");
+
+    expect(fab).toContain("pendingPointerQuickAdd");
+    expect(fab).toContain("if (pendingPointerQuickAdd.current)");
+  });
 });

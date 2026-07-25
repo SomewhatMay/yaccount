@@ -10,12 +10,26 @@ describe("iOS bottom-sheet viewport handling", () => {
       bottomSheetViewportStyle({
         height: 500,
         offsetTop: 20,
-        layoutHeight: 800,
+        pageTop: 120,
+        scrollY: 100,
       }),
     ).toEqual({
-      bottom: "280px",
+      bottom: "auto",
       maxHeight: "440px",
+      top: "520px",
+      translate: "0 -100%",
     });
+  });
+
+  it("uses page position when WebKit under-reports offsetTop", () => {
+    expect(
+      bottomSheetViewportStyle({
+        height: 500,
+        offsetTop: 0,
+        pageTop: 180,
+        scrollY: 100,
+      }),
+    ).toMatchObject({ top: "580px" });
   });
 
   it("uses CSS viewport fallback before visual viewport data is available", () => {

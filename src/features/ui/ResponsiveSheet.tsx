@@ -8,7 +8,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import {
   bottomSheetViewportStyle,
@@ -17,17 +17,49 @@ import {
 
 function visualViewportSnapshot(): string {
   const viewport = window.visualViewport;
-  return viewport ? `${viewport.height}:${viewport.offsetTop}:${window.innerHeight}` : "";
-}
-
-function subscribe(onChange: () => void): () => void {
-  return subscribeVisualViewport(window.visualViewport, onChange);
+  return viewport
+    ? `${viewport.height}:${viewport.offsetTop}:${viewport.pageTop}:${window.scrollY}`
+    : "";
 }
 
 function bottomSheetStyle(snapshot: string) {
   if (!snapshot) return undefined;
-  const [height, offsetTop, layoutHeight] = snapshot.split(":").map(Number);
-  return bottomSheetViewportStyle({ height, offsetTop, layoutHeight });
+  const [height, offsetTop, pageTop, scrollY] = snapshot.split(":").map(Number);
+  return bottomSheetViewportStyle({ height, offsetTop, pageTop, scrollY });
+}
+
+function useVisualViewport(active: boolean): string {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!active) return () => undefined;
+      const unsubscribeViewport = subscribeVisualViewport(
+        window.visualViewport,
+        onChange,
+      );
+      window.addEventListener("resize", onChange);
+      window.addEventListener("scroll", onChange);
+
+      // WebKit may update visualViewport late or omit the expected event while
+      // animating the keyboard. Poll only while a mobile sheet is open.
+      let frame = requestAnimationFrame(function poll() {
+        onChange();
+        frame = requestAnimationFrame(poll);
+      });
+
+      return () => {
+        unsubscribeViewport();
+        window.removeEventListener("resize", onChange);
+        window.removeEventListener("scroll", onChange);
+        cancelAnimationFrame(frame);
+      };
+    },
+    [active],
+  );
+  const getSnapshot = useCallback(
+    () => (active ? visualViewportSnapshot() : ""),
+    [active],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => "");
 }
 
 /**
@@ -53,7 +85,7 @@ export function ResponsiveSheet({
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
-  const viewport = useSyncExternalStore(subscribe, visualViewportSnapshot, () => "");
+  const viewport = useVisualViewport(open && !sideways);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

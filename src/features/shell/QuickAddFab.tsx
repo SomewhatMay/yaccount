@@ -44,6 +44,7 @@ export function QuickAddFab() {
   const input = useRef<"pointer" | "keyboard" | null>(null);
   const pointerId = useRef<number | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPointerQuickAdd = useRef(false);
   const suppressClick = useRef(false);
   const chooser = useRef<HTMLDivElement | null>(null);
   const fab = useRef<HTMLButtonElement | null>(null);
@@ -80,7 +81,11 @@ export function QuickAddFab() {
     press.current = null;
     input.current = null;
     pointerId.current = null;
-    if (source === "pointer") suppressNativeClick();
+    if (source === "pointer") {
+      if (action === "expense") pendingPointerQuickAdd.current = true;
+      else suppressNativeClick();
+      return;
+    }
     if (action === "expense") openQuickAdd("expense");
   }, [clearHoldTimer, openQuickAdd, suppressNativeClick]);
 
@@ -135,6 +140,7 @@ export function QuickAddFab() {
             return;
           event.preventDefault();
           event.currentTarget.focus();
+          pendingPointerQuickAdd.current = false;
           suppressClick.current = false;
           pointerId.current = event.pointerId;
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -168,6 +174,11 @@ export function QuickAddFab() {
           if (!event.repeat) beginPress("keyboard");
         }}
         onClick={() => {
+          if (pendingPointerQuickAdd.current) {
+            pendingPointerQuickAdd.current = false;
+            openQuickAdd("expense");
+            return;
+          }
           if (suppressClick.current) {
             suppressClick.current = false;
             return;

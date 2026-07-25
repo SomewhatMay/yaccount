@@ -6,20 +6,20 @@ export interface VisualViewportEvents {
 export interface BottomSheetViewport {
   height: number;
   offsetTop: number;
-  layoutHeight: number;
+  pageTop: number;
+  scrollY: number;
 }
 
 export function bottomSheetViewportStyle(
   viewport: BottomSheetViewport | null,
-): { bottom: string; maxHeight: string } | undefined {
+): { bottom: "auto"; maxHeight: string; top: string; translate: "0 -100%" } | undefined {
   if (!viewport) return undefined;
-  const bottom = Math.max(
-    0,
-    viewport.layoutHeight - viewport.offsetTop - viewport.height,
-  );
+  const topOffset = Math.max(0, viewport.offsetTop, viewport.pageTop - viewport.scrollY);
   return {
-    bottom: `${bottom}px`,
+    bottom: "auto",
     maxHeight: `${viewport.height * 0.88}px`,
+    top: `${topOffset + viewport.height}px`,
+    translate: "0 -100%",
   };
 }
 
