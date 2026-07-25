@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
-import type { Category, Container } from "@/core/model";
+import type { Category, Container, Transaction } from "@/core/model";
+import {
+  rankCategoriesByUsage,
+  rankContainersByUsage,
+} from "@/core/engine/usage-ranking";
 import { dispatchAtom, flashRowAtom } from "@/features/store";
 import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
 import { composeOp } from "@/features/ledger/compose";
@@ -23,12 +27,14 @@ export type ComposeKind = "expense" | "income" | "transfer";
 export function useComposeFields({
   categories,
   containers,
+  transactions,
   defaultContainerId,
   initialKind = "expense",
   onLogged,
 }: {
   categories: Category[];
   containers: Container[];
+  transactions: Transaction[];
   defaultContainerId: string;
   /** What the surface opens on. The bar starts on an expense; the sheet starts
    * on whatever asked it to open. */
@@ -41,14 +47,19 @@ export function useComposeFields({
 
   const activeCategories = useMemo(
     () =>
-      categories
-        .filter((c) => !c.is_archived)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [categories],
+      rankCategoriesByUsage(
+        categories.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [categories, transactions],
   );
   const activeContainers = useMemo(
-    () => containers.filter((c) => !c.is_archived),
-    [containers],
+    () =>
+      rankContainersByUsage(
+        containers.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [containers, transactions],
   );
 
   const [kind, setKindState] = useState<ComposeKind>(initialKind);

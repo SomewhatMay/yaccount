@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { parseDollars } from "@/core/money";
-import type { Container, Goal, GoalKind, GoalMode } from "@/core/model";
+import type { Container, Goal, GoalKind, GoalMode, Transaction } from "@/core/model";
+import { rankContainersByUsage } from "@/core/engine/usage-ranking";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ export function GoalSheet({
   open,
   goal,
   containers,
+  transactions,
   defaultFundingId,
   onOpenChange,
   onSubmit,
@@ -47,6 +49,7 @@ export function GoalSheet({
   open: boolean;
   goal: Goal | null; // null = create
   containers: Container[];
+  transactions: Transaction[];
   defaultFundingId: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: GoalFormInput, editingGoal: Goal | null) => Promise<void>;
@@ -63,6 +66,7 @@ export function GoalSheet({
           key={goal?.id ?? "new"}
           goal={goal}
           containers={containers}
+          transactions={transactions}
           defaultFundingId={defaultFundingId}
           onSubmit={onSubmit}
         />
@@ -74,11 +78,13 @@ export function GoalSheet({
 function GoalForm({
   goal,
   containers,
+  transactions,
   defaultFundingId,
   onSubmit,
 }: {
   goal: Goal | null;
   containers: Container[];
+  transactions: Transaction[];
   defaultFundingId: string;
   onSubmit: (input: GoalFormInput, editingGoal: Goal | null) => Promise<void>;
 }) {
@@ -103,8 +109,12 @@ function GoalForm({
   const [error, setError] = useState("");
 
   const activeContainers = useMemo(
-    () => containers.filter((c) => !c.is_archived),
-    [containers],
+    () =>
+      rankContainersByUsage(
+        containers.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [containers, transactions],
   );
 
   const targetRequired = mode === "deadline" || kind === "reserve";

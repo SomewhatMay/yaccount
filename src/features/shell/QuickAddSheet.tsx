@@ -15,6 +15,7 @@ import {
   flashRowAtom,
   quickAddAtom,
   templatesAtom,
+  transactionsAtom,
 } from "@/features/store";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
@@ -80,6 +81,7 @@ function QuickAddForm({
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const templates = useAtomValue(templatesAtom);
+  const transactions = useAtomValue(transactionsAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
@@ -87,6 +89,7 @@ function QuickAddForm({
   const f = useComposeFields({
     categories,
     containers,
+    transactions,
     defaultContainerId,
     initialKind,
     onLogged: onDone,

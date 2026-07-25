@@ -24,6 +24,10 @@ import { approveTransaction, unvoidTransaction, voidTransaction } from "@/core/c
 import { isTransfer } from "@/core/engine/balances";
 import { activeFilterCount, applyFilter, isFilterActive } from "@/core/engine/filter";
 import { isRegisterSort, pendingRows, sortRegister } from "@/core/engine/ledger";
+import {
+  rankCategoriesByUsage,
+  rankContainersByUsage,
+} from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
@@ -94,6 +98,22 @@ export function InboxView() {
   const filtering = isFilterActive(filter);
 
   const pending = useMemo(() => pendingRows(transactions), [transactions]);
+  const rankedCategories = useMemo(
+    () =>
+      rankCategoriesByUsage(
+        categories.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [categories, transactions],
+  );
+  const rankedContainers = useMemo(
+    () =>
+      rankContainersByUsage(
+        containers.filter((c) => !c.is_archived),
+        transactions,
+      ),
+    [containers, transactions],
+  );
 
   const nameOf = useMemo(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
@@ -237,22 +257,18 @@ export function InboxView() {
               label: "Wallet",
               selected: draft.containerIds,
               onChange: (containerIds) => setDraft((d) => ({ ...d, containerIds })),
-              options: containers
-                .filter((c) => !c.is_archived)
-                .map((c) => ({ value: c.id, label: c.name })),
+              options: rankedContainers.map((c) => ({ value: c.id, label: c.name })),
             },
             {
               id: "category",
               label: "Category",
               selected: draft.categoryIds,
               onChange: (categoryIds) => setDraft((d) => ({ ...d, categoryIds })),
-              options: categories
-                .filter((c) => !c.is_archived)
-                .map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                  dot: categoryColor(c),
-                })),
+              options: rankedCategories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                dot: categoryColor(c),
+              })),
             },
           ]}
           ranges={[
@@ -367,6 +383,7 @@ export function InboxView() {
         editing={editing}
         categories={categories}
         containers={containers}
+        transactions={transactions}
         onOpenChange={(open) => !open && setEditing(null)}
         onSave={async (op) => {
           await dispatch(op);
