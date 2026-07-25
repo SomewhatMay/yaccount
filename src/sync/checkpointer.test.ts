@@ -6,6 +6,7 @@ import { STORE } from "@/core/repo/db";
 import type { Op } from "@/core/oplog";
 import { makeCategory, type Category } from "@/core/model";
 import { runSync, type DriveFS, type SyncResult } from "./checkpointer";
+import { FakeDriveFS } from "./fake-drive";
 import { SNAPSHOT_PATH, ledgerPath, archivePath } from "./paths";
 
 const at = (ms: number): string => new Date(ms).toISOString();
@@ -21,37 +22,6 @@ const updateCat = (id: string, name: string, ts: number): Op => ({
   type: "category.update",
   payload: { row: makeCategory({ id, name, type: "expense" }) },
 });
-
-/** Pure in-memory Drive (a flat file map) — the subset of drivestore the
- * checkpointer uses. All paths are flat filenames at the store root. */
-class FakeDriveFS implements DriveFS {
-  files = new Map<string, string>();
-  /** When true, `list("")` throws like a fresh account with no root folder yet. */
-  listThrows = false;
-
-  async read(path: string): Promise<string> {
-    const v = this.files.get(path);
-    if (v === undefined) throw new Error(`404 ${path}`);
-    return v;
-  }
-  async write(path: string, content: string): Promise<void> {
-    this.files.set(path, content);
-  }
-  async append(path: string, content: string): Promise<void> {
-    this.files.set(path, (this.files.get(path) ?? "") + content);
-  }
-  async exists(path: string): Promise<boolean> {
-    return this.files.has(path);
-  }
-  async delete(path: string): Promise<void> {
-    if (!this.files.has(path)) throw new Error(`404 ${path}`);
-    this.files.delete(path);
-  }
-  async list(): Promise<{ name: string; type: "file" | "directory" }[]> {
-    if (this.listThrows) throw new Error("404 root");
-    return [...this.files.keys()].map((name) => ({ name, type: "file" as const }));
-  }
-}
 
 /** Bind a repo's callbacks to `runSync` — one device's sync tick. */
 function syncOf(repo: Repo, fs: DriveFS) {

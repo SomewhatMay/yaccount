@@ -1,5 +1,5 @@
 import { atom, type Setter } from "jotai";
-import { Repo } from "@/core/repo";
+import { Repo, withGeneralWallet } from "@/core/repo";
 import { STORE } from "@/core/repo/db";
 import {
   GENERAL_CONTAINER_ID,
@@ -18,8 +18,20 @@ import { toast } from "sonner";
 import { todayIso } from "@/features/clock";
 import { markHandled } from "@/lib/errors";
 import { createLogger } from "@/lib/logger";
-import { runSync } from "@/sync";
+import {
+  runSync,
+  runDriveReset,
+  driveGeneration,
+  listBackups,
+  readBackupOps,
+  ORIGIN_META_KEY,
+  ORPHAN_META_KEY,
+  type OrphanNote,
+  type ResetKind,
+  type RetiredFile,
+} from "@/sync";
 import { getDriveFS, describeSyncError } from "@/sync/drive";
+import { buildExport, exportFileName, serializeExport } from "@/core/data";
 import { getAuthProvider } from "@/auth/web";
 import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
@@ -255,17 +267,41 @@ export const syncAtom = atom(null, async (_get, set) => {
     set(syncStatusAtom, "syncing");
     const repo = await getRepo();
     const deviceId = await repo.getDeviceId();
+    const fs = getDriveFS();
     const yearMonth = new Date().toISOString().slice(0, 7);
-    await runSync({
-      fs: getDriveFS(),
+    const result = await runSync({
+      fs,
       deviceId,
       listOps: () => repo.listOps(),
       applyRemoteOps: (ops) => repo.applyRemoteOps(ops),
       getOutboxOps: () => repo.getOutboxOps(),
       clearOutbox: (ids) => repo.clearOutbox(ids),
       yearMonth,
+      generation: driveGeneration({
+        fs,
+        repo,
+        deviceId,
+        now: () => new Date().toISOString(),
+      }),
     });
     await set(refreshAtom); // re-derive the UI from the merged state (§8.6)
+
+    // This device just discovered the account was cleared or replaced somewhere
+    // else. Its own data was set aside rather than dropped, and saying so is not
+    // optional — a silent set-aside reads exactly like a silent loss (§0.3).
+    if (result.adopted) {
+      set(orphanNoteAtom, {
+        path: result.adopted.path,
+        at: result.adopted.resetAt,
+        kind: result.adopted.kind,
+        opCount: result.adopted.opCount,
+      });
+      toast.message("This account was reset on another device.", {
+        description:
+          "What was on this device has been set aside — you can download or restore it from Settings.",
+        duration: 12_000,
+      });
+    }
     set(lastSyncedAtAtom, Date.now());
     set(lastSyncErrorAtom, null);
     set(syncStatusAtom, "synced");
@@ -294,6 +330,133 @@ export const reconnectAtom = atom(null, async (_get, set) => {
     return;
   }
   await set(syncAtom);
+});
+
+/**
+ * ── Data tools (Settings → Your data, post-M11 phase 5) ────────────────────
+ *
+ * Export, import, clear and roll back — across BOTH stores, because a tool that
+ * only clears this device would be undone by the next sync tick pulling Drive
+ * back down. The ordering rule is the same everywhere: Drive is committed first
+ * (`runDriveReset`, whose own last write is the generation marker), then local
+ * state is replaced in one IndexedDB transaction. A failure on the Drive side
+ * therefore changes nothing anywhere, and a failure after it self-heals — this
+ * device simply adopts its own reset on the next tick.
+ */
+
+/** Set when this device adopted a reset made elsewhere and its data was set
+ * aside. Surfaces the §1.1 visible inverse: the notice carries the way back. */
+export const orphanNoteAtom = atom<OrphanNote | null>(null);
+
+/** Retired worlds on Drive, newest first. `null` until loaded. */
+export const backupsAtom = atom<RetiredFile[] | null>(null);
+
+export interface DataFile {
+  name: string;
+  text: string;
+}
+
+/** Everything this device holds, in the versioned portable format. */
+export const exportDataAtom = atom(null, async (): Promise<DataFile> => {
+  const repo = await getRepo();
+  const [ops, deviceId] = await Promise.all([repo.listOps(), repo.getDeviceId()]);
+  const exportedAt = new Date().toISOString();
+  return {
+    name: exportFileName(exportedAt),
+    text: serializeExport(buildExport({ ops, exportedAt, deviceId })),
+  };
+});
+
+/**
+ * Install `ops` as the entire world, on Drive and on this device.
+ *
+ * When the account is connected, Drive is authoritative and goes first — if it
+ * throws, this returns having changed nothing at all, which is what makes an
+ * invalid or interrupted import a no-op rather than a half-state.
+ *
+ * When it is NOT connected we deliberately record no generation. This device has
+ * still never synced, so a later first connect must MERGE its data into whatever
+ * is on Drive rather than adopt-and-discard it — the same rule that protects the
+ * long-standing "work offline, then connect" flow.
+ */
+async function installWorld(set: Setter, ops: Op[], kind: ResetKind): Promise<void> {
+  const repo = await getRepo();
+  const world = withGeneralWallet(ops);
+  const auth = getAuthProvider();
+  const connected = auth.isConnected();
+
+  const meta: { key: string; value: unknown }[] = [];
+  if (connected) {
+    // Always reached from a click, so an interactive re-consent is legitimate
+    // here — unlike a background tick, which must stay silent (§3.3-B).
+    await auth.getAccessToken();
+    const resetId = crypto.randomUUID();
+    await runDriveReset({
+      fs: getDriveFS(),
+      ops: world,
+      kind,
+      resetId,
+      now: new Date().toISOString(),
+    });
+    meta.push({ key: ORIGIN_META_KEY, value: { resetId } });
+  }
+
+  await repo.resetTo(world, { meta });
+  await set(refreshAtom);
+  if (connected) {
+    set(lastSyncedAtAtom, Date.now());
+    set(lastSyncErrorAtom, null);
+    set(syncStatusAtom, "synced");
+  }
+  set(backupsAtom, null); // the list just gained an entry — reload it on demand
+}
+
+/** Stop using everything. Nothing is destroyed: the previous world is retired to
+ * Drive first and stays restorable from the backup list. */
+export const clearAllDataAtom = atom(null, async (_get, set) => {
+  await installWorld(set, [], "clear");
+});
+
+/** Replace everything with a validated export's ops (never call with unchecked
+ * input — `validateExport` is the gate, and it runs before anything is written). */
+export const importDataAtom = atom(null, async (_get, set, ops: Op[]) => {
+  await installWorld(set, ops, "import");
+});
+
+/** Roll the account back to a retired world. The rollback is itself backed up
+ * first, so it too has an inverse (§1.1). */
+export const restoreBackupAtom = atom(null, async (_get, set, name: string) => {
+  const ops = await readBackupOps(getDriveFS(), name);
+  await installWorld(set, ops, "restore");
+});
+
+/** Load the restore points. Silent-token gated: this runs on panel mount, which
+ * is not a user gesture, so it must never be able to raise a popup. */
+export const loadBackupsAtom = atom(null, async (_get, set) => {
+  const auth = getAuthProvider();
+  if (!auth.isConnected()) return set(backupsAtom, []);
+  const token = await auth.getAccessTokenSilent().catch(() => null);
+  if (!token) return set(backupsAtom, []);
+  set(backupsAtom, await listBackups(getDriveFS()));
+});
+
+/** A retired world as a downloadable file, in the same importable envelope. */
+export const readBackupAtom = atom(
+  null,
+  async (_get, _set, name: string): Promise<DataFile> => {
+    const ops = await readBackupOps(getDriveFS(), name);
+    return {
+      name: `yaccount-${name.replace(/\.json$/, "")}.json`,
+      text: serializeExport(buildExport({ ops, exportedAt: new Date().toISOString() })),
+    };
+  },
+);
+
+/** Acknowledge the set-aside notice. The orphan file itself stays on Drive. */
+export const dismissOrphanAtom = atom(null, async (_get, set) => {
+  const repo = await getRepo();
+  await repo.setMeta(ORPHAN_META_KEY, null);
+  set(orphanNoteAtom, null);
 });
 
 /**
@@ -363,9 +526,12 @@ export const bootstrapAtom = atom(null, async (_get, set) => {
   // Opening the DB and loading it is the ONLY part that can leave the app
   // unusable, so it is the only part that sets bootError.
   try {
-    await getRepo();
+    const repo = await getRepo();
     await set(refreshAtom);
     set(readyAtom, true);
+    // A set-aside from a previous session must survive a reload — the notice is
+    // the only route back to that data, so it persists until acknowledged.
+    set(orphanNoteAtom, (await repo.getMeta<OrphanNote>(ORPHAN_META_KEY)) ?? null);
     log.info("repo ready");
   } catch (err) {
     set(bootErrorAtom, log.capture("could not open the local database", err));

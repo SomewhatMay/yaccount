@@ -23,6 +23,37 @@ const MIGRATION_ENTERED_AT = "migration:entered_at";
 const SEED_GENERAL_OP_ID = "seed:general";
 const EPOCH_ISO = new Date(0).toISOString();
 
+/**
+ * The deterministic op that brings the default wallet into existence. Same id and
+ * same epoch `ts` on every device, so two fresh (or two freshly cleared) installs
+ * converge on ONE wallet rather than minting duplicates, and it always sorts
+ * first in the total order.
+ */
+export function seedGeneralOp(): Op {
+  return {
+    id: SEED_GENERAL_OP_ID,
+    ts: EPOCH_ISO,
+    type: "container.create",
+    payload: { row: makeGeneralContainer() },
+  };
+}
+
+/**
+ * An op set guaranteed to materialize a 'general' wallet.
+ *
+ * Used by BOTH sides of a reset — the op set written to Drive and the one
+ * replayed locally — so the two are byte-identical and every device that adopts
+ * the reset lands on exactly the same world. Containers are never hard-deleted,
+ * so "some op creates it" is equivalent to "it exists after replay"; an archived
+ * wallet is deliberately left archived rather than resurrected.
+ */
+export function withGeneralWallet(ops: Op[]): Op[] {
+  const hasWallet = ops.some(
+    (o) => o.type === "container.create" && o.payload.row.id === GENERAL_CONTAINER_ID,
+  );
+  return hasWallet ? ops : [seedGeneralOp(), ...ops];
+}
+
 /** `Tx` backed by a live IndexedDB transaction — the same reducer runs here. */
 class IdbTx implements Tx {
   constructor(private readonly tx: IDBPTransaction<unknown, StoreName[], "readwrite">) {}
@@ -72,14 +103,7 @@ export class Repo {
     }
     // Seed the 'general' wallet as an op so it rides the ledger like any mutation.
     const general = await this.db.get(STORE.containers, GENERAL_CONTAINER_ID);
-    if (!general) {
-      await this.dispatch({
-        id: SEED_GENERAL_OP_ID,
-        ts: EPOCH_ISO,
-        type: "container.create",
-        payload: { row: makeGeneralContainer() },
-      });
-    }
+    if (!general) await this.dispatch(seedGeneralOp());
     await this.backfillEnteredAt();
   }
 
@@ -187,6 +211,70 @@ export class Repo {
       { value: string } | undefined;
     if (!rec) throw new Error("deviceId missing — init did not run");
     return rec.value;
+  }
+
+  /** A device-local metadata value (`app_meta`) — never synced, never an op (§8.4). */
+  async getMeta<T>(key: string): Promise<T | undefined> {
+    const rec = (await this.db.get(STORE.appMeta, key)) as { value: T } | undefined;
+    return rec?.value;
+  }
+
+  async setMeta(key: string, value: unknown): Promise<void> {
+    await this.db.put(STORE.appMeta, { key, value });
+  }
+
+  /**
+   * Replace this device's entire world with `ops`, in ONE IndexedDB transaction.
+   *
+   * This is the local half of a clear / import / restore. Unlike `applyRemoteOps`
+   * — which unions a delta on top of what is already here (§8.6) — a reset is a
+   * deliberate discontinuity: the previous journal, materialized state and outbox
+   * all go, and `ops` becomes the whole history. That is only ever correct when
+   * the caller has already committed the same op set to Drive, because the outbox
+   * is emptied: nothing here will be pushed, since the new world is written to
+   * Drive wholesale rather than replayed op-by-op through a ledger.
+   *
+   * `app_meta` is deliberately preserved — the `deviceId` names this device's
+   * ledger file, and minting a fresh one on every clear would litter Drive with
+   * orphan ledgers and break the §8.4 one-file-per-device guarantee. `meta` lets
+   * the caller stamp the new sync generation inside the same transaction, so a
+   * crash can never leave the data reset but the generation unrecorded.
+   *
+   * Atomic in the strong sense: if any op fails to apply the transaction is
+   * ABORTED and this device is exactly as it was — the same guarantee `dispatch`
+   * gives, which is what lets an import be "all or nothing" locally.
+   */
+  async resetTo(
+    ops: Op[],
+    opts?: { meta?: { key: string; value: unknown }[] },
+  ): Promise<void> {
+    const sorted = [...ops].sort(compareOps);
+    const tx = this.db.transaction(ALL_STORES, "readwrite");
+    try {
+      for (const store of STATE_STORES) await tx.objectStore(store).clear();
+      await tx.objectStore(STORE.oplog).clear();
+      await tx.objectStore(STORE.outbox).clear();
+
+      const oplog = tx.objectStore(STORE.oplog);
+      for (const op of sorted) await oplog.put(op);
+      await applyInOrder(
+        new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),
+        sorted,
+      );
+
+      const appMeta = tx.objectStore(STORE.appMeta);
+      for (const { key, value } of opts?.meta ?? []) await appMeta.put({ key, value });
+
+      await tx.done;
+    } catch (err) {
+      try {
+        tx.abort();
+      } catch {
+        // already settled — the original error is what matters
+      }
+      await tx.done.catch(() => {});
+      throw err;
+    }
   }
 
   /** The full op-log in canonical total order (§8.2). */

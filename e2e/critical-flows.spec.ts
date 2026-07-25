@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 async function openReady(page: Page, path: string, marker: string | RegExp) {
   await page.goto(path);
@@ -416,4 +417,95 @@ test("places toasts below mobile top navigation and bottom-right on desktop", as
   expect(toastBox).not.toBeNull();
   expect(toastBox!.x + toastBox!.width).toBeGreaterThan(page.viewportSize()!.width / 2);
   expect(toastBox!.y + toastBox!.height).toBeGreaterThan(page.viewportSize()!.height / 2);
+});
+
+test("exports every change as a versioned file", async ({ page }) => {
+  await createCategory(page, "E2E export me");
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E exported", "9.99", "E2E export me");
+
+  await openReady(page, "/settings", "Under the hood");
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export", exact: true }).click(),
+  ]);
+
+  expect(download.suggestedFilename()).toMatch(
+    /^yaccount-export-\d{4}-\d{2}-\d{2}\.json$/,
+  );
+  const path = await download.path();
+  const file = JSON.parse(await readFile(path, "utf8")) as {
+    format: string;
+    version: number;
+    opCount: number;
+    ops: { type: string }[];
+  };
+  expect(file.format).toBe("yaccount.export");
+  expect(file.version).toBe(1);
+  expect(file.opCount).toBe(file.ops.length);
+  // The journal, not a row dump — the category and the expense are both in it.
+  expect(file.ops.map((o) => o.type)).toContain("category.create");
+  expect(file.ops.map((o) => o.type)).toContain("transaction.create");
+});
+
+test("refuses an invalid import and changes nothing", async ({ page }) => {
+  await createCategory(page, "E2E keep me");
+  await openReady(page, "/settings", "Under the hood");
+
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByRole("button", { name: "Choose file", exact: true }).click(),
+  ]);
+  await chooser.setFiles({
+    name: "broken.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"format":"something.else","ops":[]}'),
+  });
+
+  await expect(page.getByText("That file wasn't imported.")).toBeVisible();
+  await expect(page.getByText("That file is not a yaccount export.")).toBeVisible();
+  await openReady(page, "/categories", "What your money does");
+  await expect(page.getByText("E2E keep me", { exact: true })).toBeVisible();
+});
+
+test("clear-all cannot be triggered by accident", async ({ page }) => {
+  await createCategory(page, "E2E clear me");
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E doomed", "4.50", "E2E clear me");
+
+  await openReady(page, "/settings", "Under the hood");
+  await page.getByRole("button", { name: "Clear everything", exact: true }).click();
+
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm).toContainText("Clear everything?");
+  const action = confirm.getByRole("button", { name: "Clear everything", exact: true });
+  await expect(action).toBeDisabled();
+
+  // A near miss stays disabled — only the exact word arms it.
+  await confirm.getByRole("textbox").fill("eras");
+  await expect(action).toBeDisabled();
+  await confirm.getByRole("textbox").fill("erase");
+  await expect(action).toBeEnabled();
+
+  await action.click();
+  await expect(page.getByText("Everything cleared", { exact: true })).toBeVisible();
+
+  await openReady(page, "/ledger", "Overall balance");
+  await expect(page.getByText("E2E doomed", { exact: true })).toBeHidden();
+  await openReady(page, "/categories", "What your money does");
+  await expect(page.getByText("E2E clear me", { exact: true })).toBeHidden();
+});
+
+test("clear-all can be abandoned without touching anything", async ({ page }) => {
+  await createCategory(page, "E2E survivor");
+  await openReady(page, "/settings", "Under the hood");
+
+  await page.getByRole("button", { name: "Clear everything", exact: true }).click();
+  const confirm = page.getByRole("alertdialog");
+  await confirm.getByRole("textbox").fill("erase");
+  await confirm.getByRole("button", { name: "Keep it" }).click();
+  await expect(confirm).toBeHidden();
+
+  await openReady(page, "/categories", "What your money does");
+  await expect(page.getByText("E2E survivor", { exact: true })).toBeVisible();
 });

@@ -6,6 +6,7 @@
  * rolling an eyebrow, a total or a money span, the primitive already exists.
  */
 export { CollapsibleSection } from "@/features/ui/CollapsibleSection";
+export { ConfirmDestructive } from "@/features/ui/ConfirmDestructive";
 export { Eyebrow } from "@/features/ui/Eyebrow";
 export { Figure } from "@/features/ui/Figure";
 export { EmptyState } from "@/features/ui/EmptyState";

@@ -16,6 +16,89 @@ export const SNAPSHOT_PATH = "snapshot.json";
 const LEDGER_PREFIX = "ledger_";
 const LEDGER_EXT = ".json";
 
+/**
+ * The generation marker (phase 5). Clearing or importing mints a fresh `resetId`
+ * here; a device that has synced before and now sees a different one knows the
+ * store was deliberately reset rather than merely empty. Without it an emptied
+ * Drive is indistinguishable from a fresh Google account, and a stale device
+ * would either diverge forever or push the cleared data straight back.
+ */
+export const ORIGIN_PATH = "origin.json";
+
+const BACKUP_PREFIX = "backup_";
+const ORPHAN_PREFIX = "orphan_";
+
+/** `:` is legal in Drive but hostile in a file name a person may download. */
+const stamp = (iso: string): string => iso.replace(/\.\d+Z$/, "Z").replace(/:/g, "-");
+const unstamp = (s: string): string => {
+  const [day, time] = s.split("T");
+  if (!time) return s;
+  return `${day}T${time.replace(/-/g, ":").replace(/Z$/, ".000Z")}`;
+};
+
+/**
+ * The whole pre-change world, retired just before a clear/import/restore
+ * overwrites it. Retired data is never deleted — the app simply stops reading it
+ * (§1.1: the inverse of an action must remain available), and these files are
+ * what the Settings backup list offers to roll back to.
+ */
+export function backupPath(at: string, kind: string): string {
+  return `${BACKUP_PREFIX}${stamp(at)}_${kind}${LEDGER_EXT}`;
+}
+
+/** A stale device's own journal, set aside when it adopts a reset it missed. */
+export function orphanPath(deviceId: string, at: string): string {
+  return `${ORPHAN_PREFIX}${deviceId}_${stamp(at)}${LEDGER_EXT}`;
+}
+
+export interface RetiredFile {
+  name: string;
+  origin: "backup" | "orphan";
+  /** Why the world was retired — only a backup knows. */
+  kind: string | null;
+  /** Which device set its data aside — only an orphan knows. */
+  deviceId: string | null;
+  at: string;
+}
+
+/**
+ * Recognise a retired file, or `null` for anything sync still reads. Deliberately
+ * strict: a live ledger, its dated archive, the snapshot and the origin marker
+ * must never be offered as a restore point.
+ */
+export function describeBackup(name: string): RetiredFile | null {
+  if (!name.endsWith(LEDGER_EXT)) return null;
+  const body = name.slice(0, -LEDGER_EXT.length);
+
+  if (body.startsWith(BACKUP_PREFIX)) {
+    const rest = body.slice(BACKUP_PREFIX.length);
+    const split = rest.lastIndexOf("_");
+    if (split <= 0) return null;
+    return {
+      name,
+      origin: "backup",
+      kind: rest.slice(split + 1),
+      deviceId: null,
+      at: unstamp(rest.slice(0, split)),
+    };
+  }
+
+  if (body.startsWith(ORPHAN_PREFIX)) {
+    const rest = body.slice(ORPHAN_PREFIX.length);
+    const split = rest.lastIndexOf("_");
+    if (split <= 0) return null;
+    return {
+      name,
+      origin: "orphan",
+      kind: null,
+      deviceId: rest.slice(0, split),
+      at: unstamp(rest.slice(split + 1)),
+    };
+  }
+
+  return null;
+}
+
 /** This device's live ledger. */
 export function ledgerPath(deviceId: string): string {
   return `${LEDGER_PREFIX}${deviceId}${LEDGER_EXT}`;
