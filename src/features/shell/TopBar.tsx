@@ -7,6 +7,7 @@ import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SyncIndicator } from "@/features/SyncIndicator";
+import { AuthButton } from "@/features/auth/AuthButton";
 import { ThemeToggle } from "@/features/shell/ThemeToggle";
 import { commandPaletteAtom } from "@/features/store";
 import { destinationFor } from "@/features/shell/nav";
@@ -53,6 +54,7 @@ export function TopBar({ maxWidth }: { maxWidth: string }) {
             <SearchIcon className="size-4" />
             <kbd className="text-muted-foreground/80 font-mono text-[0.6875rem]">⌘K</kbd>
           </Button>
+          <AuthButton signedOutOnly />
           <SyncIndicator />
           <ThemeToggle />
         </div>
