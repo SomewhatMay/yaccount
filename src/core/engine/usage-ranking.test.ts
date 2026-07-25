@@ -9,7 +9,11 @@ import {
   makeVoidRow,
   type Transaction,
 } from "@/core/model";
-import { rankCategoriesByUsage, rankContainersByUsage } from "./usage-ranking";
+import {
+  rankCategoriesByUsage,
+  rankContainersByUsage,
+  rankShortcutsByUsage,
+} from "./usage-ranking";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -159,6 +163,125 @@ describe("usage-ranked selectors", () => {
     ]);
   });
 
+  it("ranks shortcuts by matching active logged shape", () => {
+    const coffee = makeTemplate({
+      id: "coffee",
+      template_name: "Coffee",
+      amount: -500,
+      vendor_source: "Cafe",
+      container_id: "wallet",
+      category_id: "dining",
+      notes: "usual",
+    });
+    const savings = makeTemplate({
+      id: "savings",
+      template_name: "Savings",
+      amount: 10000,
+      vendor_source: "Sweep",
+      container_id: "wallet",
+      to_container_id: "bank",
+    });
+    const unused = makeTemplate({
+      id: "unused",
+      template_name: "Alpha",
+      amount: -100,
+      vendor_source: "Other",
+      container_id: "wallet",
+      category_id: "misc",
+    });
+    const rows = [
+      makeTransaction({
+        id: "coffee-1",
+        date: "2026-07-01",
+        amount: -500,
+        vendor_source: "Cafe",
+        category_id: "dining",
+        container_id: "wallet",
+        notes: "usual",
+        entered_at: "2026-07-01T00:00:00.000Z",
+      }),
+      makeTransaction({
+        id: "coffee-2",
+        date: "2026-07-02",
+        amount: -500,
+        vendor_source: "Cafe",
+        category_id: "dining",
+        container_id: "wallet",
+        notes: "usual",
+        entered_at: "2026-07-02T00:00:00.000Z",
+      }),
+      makeTransfer({
+        id: "savings-1",
+        date: "2026-07-03",
+        amount: 10000,
+        vendor_source: "Sweep",
+        container_id: "wallet",
+        to_container_id: "bank",
+        entered_at: "2026-07-03T00:00:00.000Z",
+      }),
+    ];
+
+    expect(
+      rankShortcutsByUsage([unused, savings, coffee], rows).map((t) => t.id),
+    ).toEqual(["coffee", "savings", "unused"]);
+  });
+
+  it("ignores pending, voided, and near-match rows for shortcut usage", () => {
+    const exact = makeTemplate({
+      id: "exact",
+      template_name: "Exact",
+      amount: -500,
+      vendor_source: "Cafe",
+      container_id: "wallet",
+      category_id: "dining",
+      notes: "usual",
+    });
+    const other = makeTemplate({
+      id: "other",
+      template_name: "Other",
+      amount: -700,
+      vendor_source: "Shop",
+      container_id: "wallet",
+      category_id: "misc",
+    });
+    const voided = makeTransaction({
+      id: "voided-shortcut",
+      date: "2026-07-01",
+      amount: -500,
+      vendor_source: "Cafe",
+      category_id: "dining",
+      container_id: "wallet",
+      notes: "usual",
+    });
+    const pending = {
+      ...voided,
+      id: "pending-shortcut",
+      inbox_status: "pending" as const,
+    };
+    const nearMatch = { ...voided, id: "near-match", notes: "changed" };
+    const otherUse = makeTransaction({
+      id: "other-use",
+      date: "2026-07-02",
+      amount: -700,
+      vendor_source: "Shop",
+      category_id: "misc",
+      container_id: "wallet",
+    });
+
+    expect(
+      rankShortcutsByUsage(
+        [exact, other],
+        [
+          voided,
+          makeVoidRow(voided, { id: "void-shortcut" }),
+          pending,
+          nearMatch,
+          otherUse,
+        ],
+      ).map((t) => t.id),
+    ).toEqual(["other", "exact"]);
+  });
+
   it("does not mutate candidates and returns deterministic output", () => {
     const candidates = [
       makeContainer({ id: "b", name: "Same" }),
@@ -183,6 +306,7 @@ describe("usage-ranked selectors", () => {
     ["../../features/inbox/InboxView.tsx", "rankCategoriesByUsage"],
     ["../../features/inbox/InboxView.tsx", "rankContainersByUsage"],
     ["../../features/goals/GoalSheet.tsx", "rankContainersByUsage"],
+    ["../../features/shell/QuickAddSheet.tsx", "rankShortcutsByUsage"],
   ])("routes selector options in %s through %s", (path, helper) => {
     expect(source(path)).toContain(helper);
   });
