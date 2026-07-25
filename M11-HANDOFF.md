@@ -5,7 +5,7 @@
 > 2026-07-23. Verification: 807 Vitest + 14 Playwright, typecheck, lint, static build and
 > touched-file Prettier.
 > **Post-M11:** Phase 4 FAB hold chooser merged via PR #13 (`7067f92`), user verified.
-> **Next:** Phase 5 data tools. M10 Capacitor remains not started.
+> **Next:** nothing queued — all five post-M11 phases are merged. M10 Capacitor remains not started.
 > **Last updated:** 2026-07-23, post-M11 Phase 4 complete.
 
 ---
@@ -939,12 +939,17 @@ and a concrete list of things for the user to test:
    10px movement cancellation, pointer cancellation, lost capture, Escape and arrow-key menu
    navigation are covered. FAB appearance and accessible name remain unchanged. User verified;
    817 Vitest + 25 Playwright passed (1 expected desktop touch skip).
-5. `post-m11-data-tools` — Settings export/import/clear-all for testing. Version and validate imports,
-   preserve journal/replay invariants, make failure atomic, and strongly confirm clear with Drive
-   resync consequences stated.
+5. `post-m11-data-tools` — **DONE**, PR #14 (`fc3a820`). Settings → Your data: export/import a
+   versioned op-set file, clear everything, and roll back to a retired state — across IndexedDB
+   **and** Google Drive. Imports are validated in full (envelope, op shape, replay, row schemas)
+   before any mutation. New Drive files `origin.json` (reset generation), `backup_*` and
+   `orphan_*`; clear/import/rollback retire the current world first, so nothing is ever deleted.
+   New `ConfirmDestructive` primitive (type the phrase to arm). User verified, including the
+   two-browser offline case; 879 Vitest + 33 Playwright passed (1 expected desktop touch skip).
 
-The detailed scope/exit table lives in `HANDOFF.md`. These phases do not reopen M10 Capacitor, Phase 8
-icon placement, the sync banner, or movable dashboard widgets.
+**All five post-M11 phases are complete.** The detailed scope/exit table lives in `HANDOFF.md`.
+These phases did not reopen M10 Capacitor, Phase 8 icon placement, the sync banner, or movable
+dashboard widgets — M10 and movable widgets remain unstarted.
 
 ---
 

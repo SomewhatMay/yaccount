@@ -1,19 +1,23 @@
 # yaccount — Handoff
 
-> ## ✅ **POST-M11 PHASE 4 MERGED — PHASE 5 NEXT**
-> FAB hold chooser merged via PR #13 (`7067f92`) on 2026-07-23. A quick press still opens Expense
-> exactly once; a 500ms hold opens the existing Expense/Income/Transfer quick-add paths. Pointer,
-> touch and keyboard cancellation prevent double activation. FAB appearance and accessible name are
-> unchanged. Verification: **817 Vitest + 25 Playwright passed (1 expected desktop touch skip)**,
-> typecheck, lint, static build and touched-file Prettier.
+> ## ✅ **POST-M11 PHASE 5 MERGED — ALL POST-M11 PHASES DONE**
+> Settings data tools merged via PR #14 (`fc3a820`) on 2026-07-25. Export/import a versioned
+> op-set file, clear everything, and roll back to a retired state — across **both** IndexedDB
+> and Google Drive. New Drive files `origin.json` (reset generation), `backup_*.json` and
+> `orphan_*.json`. Imports are fully validated before any mutation; clear/import/rollback retire
+> the whole current world before overwriting, so **nothing is ever deleted** — the app just stops
+> reading it. Verification: **879 Vitest + 33 Playwright passed (1 expected desktop touch skip)**,
+> typecheck, lint, static build and touched-file Prettier. User browser-verified, including the
+> two-browser offline case.
 >
-> M11 merged to `main` via PR #9 (`bf7d872`) on 2026-07-23. User passed all 14 desktop/mobile
-> Playwright cases. Verification: **807 Vitest + 14 Playwright**, typecheck, lint, static build and
-> touched-file Prettier. See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
+> Phase 4 (FAB hold chooser) merged via PR #13 (`7067f92`) on 2026-07-23. M11 merged via PR #9
+> (`bf7d872`). See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** post-M11 Phase 4 merged via PR #13 (`7067f92`), 2026-07-23.
-> **Next:** Phase 5, data tools. M10 Capacitor remains not started.
+> **Last updated:** post-M11 Phase 5 merged via PR #14 (`fc3a820`), 2026-07-25.
+> **Next:** nothing queued. **M10 (Capacitor) is the only milestone left** and remains not
+> started — do not begin it without the user's explicit go-ahead. Movable/visibility dashboard
+> widgets also remain unbuilt.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
 > **Prior:** **M8 (Authentication — Google OAuth, web flow) DONE — merged via PR #7** (`3e384a6`), browser-verified, 380 tests. Google Cloud setup DONE (consent screen in Testing + Web client ID `9849805335-…apps.googleusercontent.com` in `.env` as `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `drive.appdata` scope + `http://localhost:3000` JS origin). See "M8 decisions and delivered code".
 > **Prior:** **M7 DONE — merged via PR #6** (`2c97a1f`, 2026-07-22), browser-verified, 367 tests. **🎉 M7 was the LAST FEATURE MILESTONE — the product is feature-complete.** M8+ is platform work.
@@ -112,6 +116,71 @@ eec4db7 M8 auth: Google OAuth web flow (durable-grant AuthProvider seam)
 0e9416e Merge pull request #5 from SomewhatMay/m6-recurring   (M6)
 … (M5 PR #4, M4 PR #3, M3 PR #2, M0–M2 PR #1 below — see prior handoff history)
 ```
+
+### Post-M11 Phase 5 decisions and delivered code (merged via PR #14, `fc3a820`)
+
+- **Export format = a versioned OP SET, not a row dump** (`src/core/data/export.ts`):
+  `{format:"yaccount.export", version:1, exportedAt, appDbVersion, deviceId, opCount, ops}`.
+  State *is* `replay(listOps())`, so the journal is the only representation that restores
+  identical state while keeping the replay invariant — and it is the same primitive
+  `snapshot.json` already uses. **`deviceId` is provenance only and is NEVER imported** (two
+  devices sharing a ledger name breaks the §8.4 no-lost-write guarantee). Device-local
+  localStorage view prefs are deliberately excluded (`prefs.ts`: a sort order is not a fact
+  about your money) — restoring data does not restore reading habits.
+- **`validateExport` is the gate, and it is total.** Four stages, nothing written until all
+  pass: envelope → per-op shape (non-empty id, valid ISO `ts`, **known** type, object payload,
+  no duplicate ids) → **full replay into a throwaway `MemoryTx`** → every resulting row against
+  its zod table schema. Errors name the offending row. An invalid/unsupported file changes
+  nothing locally or on Drive.
+- **`OP_TYPES` + `OP_TYPES_ARE_EXHAUSTIVE`** (`oplog/types.ts`) — the `Op` union is erased at
+  compile time, so validating untrusted ops needs a runtime list. A type-level `Exclude` assert
+  fails the build if a new op type is added and not listed. **Verified it actually fires.**
+- **`origin.json` = the reset generation (the load-bearing new idea).** Drive gives no way to
+  distinguish "this account was deliberately emptied" from "fresh Google account, my local data
+  is the truth" — and the second is a legitimate flow. Clear/import/rollback mint a new
+  `resetId`; each device records the last-seen one in `app_meta["sync:origin"]`.
+  - Synced-before + **different** id → **adopt**: journal written to `orphan_<device>_<ts>.json`
+    first, local reset, then the normal pull refills from the new world. Offline edits are
+    **preserved, not replayed** (replaying would resurrect what was discarded) and surfaced as a
+    persistent Settings notice with Download/Roll back.
+  - **Never synced → merge as before**, so offline-first-then-connect does not regress.
+- **⚠️ The bug this phase almost shipped — do NOT regress it.** `readOrigin` first treated *any*
+  read failure as "no marker", and `reconcileGeneration` responded by **forgetting** the
+  recorded generation. Because `getAccessTokenSilent` returns the *cached* token with no network
+  call, sync keeps firing for ~1h after going offline — so every offline tick forgot, and every
+  reconnect re-adopted (toast + data set aside), forever. Fix, both halves required:
+  `readOrigin` returns **`present` | `absent` | `unknown`** (disambiguating a failed read via an
+  `exists` probe, keeping drivestore's error shape confined to `drive.ts`), and
+  **only a positive read is ever acted on** — `unknown` infers nothing, and a device **never
+  forgets a generation it holds**. Regression-tested in `sync/reset.test.ts` (`FakeDriveFS.offline`).
+- **Nothing is ever deleted.** Clear/import/rollback retire the entire current world to
+  `backup_<ts>_<kind>.json` before overwriting, and **abort if the store cannot be fully
+  enumerated** (a transient failure must never read as "empty store" and skip the backup — that
+  was the same bug class). The only deletions are live `ledger_*.json` whose ops were just
+  copied into that backup; dated collapse archives are never touched. Rollback retires the
+  current world first, so it too is reversible (§1.1).
+- **Ordering: Drive first, `origin.json` written LAST as the commit point**, then the local half
+  in ONE IndexedDB transaction (`Repo.resetTo`). Every failure point is non-lossy, so **retry is
+  the recovery** — no two-phase bookkeeping. A crash after the Drive commit but before the local
+  reset self-heals: that device adopts its own reset on the next tick.
+- **Repo additions:** `resetTo(ops, {meta})` (clears STATE_STORES + oplog + outbox, journals
+  `ops`, replays, **preserves `app_meta`/`deviceId`**, stamps meta in the same tx; aborts on a
+  bad op), `getMeta`/`setMeta`, and `seedGeneralOp`/`withGeneralWallet` so a cleared device
+  re-seeds the wallet deterministically and two cleared devices converge.
+- **UI = `Settings → Your data` only, no navigation change.** New `ConfirmDestructive`
+  (`src/features/ui/`): §12.4's "confirm-destructive = AlertDialog" still holds, but these acts
+  have no toast-sized undo, so the action stays **disabled until the user types a phrase**
+  (`erase`/`replace`/`roll back`). Drive consequences are stated in the copy *before* execution
+  and differ when not connected. Restore points list uses `CollapsibleSection`.
+- **a11y note learned here:** an `sr-only` file input is still a control in the accessibility
+  tree — screen-reader users met an unlabelled second "Choose File". Use `hidden`, and drive it
+  from a real labelled button. (Playwright's `setInputFiles` on the clipped input also silently
+  did nothing; the `filechooser` event is the reliable and more realistic path.)
+- **Honest caveats:** Drive files live in the hidden `appDataFolder`, so retired data is
+  recoverable *through the app*, not by browsing drive.google.com — the export file is the only
+  user-openable copy. And a *legitimate* adoption still resets local state before the pull
+  refills it, so a network drop in that window shows an empty app until the next tick (it
+  self-heals; reordering pull-before-adopt was judged not worth the added complexity).
 
 ### M9 decisions and delivered code (this session — merged to `main` via PR #8, `a7a4c65`)
 - **Browser-verified gotchas (hit during the real 2-profile verify — do NOT regress):**
@@ -353,13 +422,11 @@ stable-id registry. Preserve M11 icon placement and sync-banner behavior unless 
 | 2 ✅ | `post-m11-ledger-notes` | **DONE**, PR #11 (`ea6551f`). Optional notes create/edit/display for expense, income and transfer; blank → `null`; notes persist through full-row ops, IndexedDB, refresh, Drive serialization and shortcuts. Create/edit labels say Vendor for expense, Source for income, Label for transfer. Mobile toasts now enter below the top bar. | User verified; 810 Vitest + 18 Playwright passed. |
 | 3 ✅ | `post-m11-fab-money-mark` | **DONE**, PR #12 (`d8267ac`). Compact dollar-plus mark with plus at upper-right; FAB geometry, iris treatment, position, focus, accessible name and expense quick-tap behavior unchanged. | User verified; 810 Vitest + 20 Playwright passed. |
 | 4 ✅ | `post-m11-fab-hold-menu` | **DONE**, PR #13 (`7067f92`). Quick press opens Expense exactly once; 500ms hold opens an accessible Expense/Income/Transfer chooser reusing `quickAddAtom` + `QuickAddSheet`. 10px movement, pointer cancel, lost capture and Escape cancel without double activation; Enter/Space and arrow-key menu navigation work. FAB mark, geometry, iris, position, focus and name remain unchanged. | User verified; 817 Vitest + 25 Playwright passed (1 expected desktop touch skip). |
-| 5 | `post-m11-data-tools` | Settings tools to export, import and clear all local yaccount data for testing. Version/validate imports; preserve op-log/replay invariants; destructive clear requires explicit confirmation and explains Drive resync consequences. | Round-trip fixture restores identical state; invalid import changes nothing; clear cannot be accidental. |
+| 5 ✅ | `post-m11-data-tools` | **DONE**, PR #14 (`fc3a820`). Settings → Your data: export/import a versioned op-set file, clear everything, roll back to a retired state — across IndexedDB **and** Drive. New Drive files `origin.json`/`backup_*`/`orphan_*`; imports fully validated before any mutation; clear/import/rollback retire the current world first (nothing is deleted); `ConfirmDestructive` type-the-phrase gate. | User verified incl. two-browser offline; 879 Vitest + 33 Playwright passed (1 expected desktop touch skip). |
 
-Each phase branches from freshly pulled `main` after its predecessor and closure docs are merged.
-Re-read spec §12, invariants and current code; add focused Vitest/Playwright coverage; run the full
-validation suite. Before approval, leave the completed phase on its branch and stop for review. After
-approval, complete the PR/merge/main-pull/docs/prompt sequence above. M10 Capacitor and movable
-dashboard widgets remain separate.
+**All post-M11 phases are complete.** Each branched from freshly pulled `main` after its
+predecessor and closure docs were merged. M10 Capacitor and movable/visibility dashboard widgets
+remain separate and unstarted.
 
 ---
 
@@ -397,7 +464,14 @@ npm test && npm run typecheck && npm run lint && npm run build && npx prettier -
 - **UI = shadcn/ui first** (added M2). Reach for a shadcn component before hand-rolling; add via `npx shadcn@latest add <name>` (WSL: PATH export first). Radix base, `neutral` theme in `globals.css`, `cn` from `@/lib/utils`. **Icons = Lucide** (`lucide-react`). Toasts = `sonner` (`import { toast } from "sonner"`; `<Toaster/>` in layout). Theme = next-themes (`ThemeProvider`, light/dark). Memory: `shadcn-ui-policy`. Present shadcn components: button, input, label, select, card, table, badge, separator, alert-dialog, sonner, sheet, dropdown-menu, tooltip.
 - **Spec §12.4-a (added M3) covers editing patterns:** inline rename = ✓/✗ never blur-commit; loggable-repeatedly records get a **history list** with `⋯` Edit/Delete, never a write-only form; money direction = visible `SignToggle`; toggle menu entries = checkbox item with a **leading** indicator. shadcn `select`/`dropdown-menu` were edited in-repo (copy-in components) for width/padding/animation — selects are `position="popper"` so they animate.
 - **Design language = "The Standing Register", LOCKED — spec §12 is law.** Fonts Fraunces/Geist/Geist Mono; tinted paper/ink; rare iris; emerald inflow; sheets/register rows/`RowActions`; one category colour scheme plus optional icons. Read §12 before UI work.
-- **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
+- **`src/features/` = React/UI** (Jotai, components); **`src/core/` = pure TS** (model/oplog/repo/commands/engine/**data**). Keep the boundary — ESLint blocks `core` importing React/Next/Capacitor/drivestore.
+- **`.env` is gitignored and is NOT in a fresh clone.** Without `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `getAuthProvider()` throws and the whole app shell fails to render — so *every* Playwright test dies at the first `page.goto`. If e2e fails wholesale with "missing Web client ID", recreate `.env` with the public client ID recorded in the M8 note above.
+- **Next 16 refuses a second dev server for the same directory**, even on a different port — so a running `npm run dev` (port 3000) blocks Playwright's own server (3100) with "Another next dev server is already running". Stop it before `npx playwright test`.
+- **Drive layout is now five shapes** (§8.4 + phase 5): `snapshot.json`, `ledger_<id>.json`, `ledger_<id>_<YYYY-MM>.json` (archives), plus `origin.json` (reset generation) and the inert `backup_*`/`orphan_*` retired worlds. Only the first three are read by `runSync`; the retired ones are listed by Settings. **Never infer "absent" from a failed Drive read** — that exact conflation caused a re-adopt-every-reconnect bug (see the Phase 5 section).
+- **Prettier + `core.autocrlf=true`:** `npx prettier --check .` flags nearly every file with CRLF noise. Check only files you touched, and pass `--end-of-line auto` to neutralize the line-ending difference and see real drift.
 - **`HANDOFF.md` is TRACKED in git** (commit `88ebfa8` moved it into the repo so it travels across devices; the old "gitignored/local-only" note is stale). **Commit it at every milestone boundary** as a `docs:` commit on `main` (as was done for M7 → `c4c9992` and now M8) so a fresh clone / new agent sees the current state.
-- UI has 26 Playwright cases across desktop/mobile; the desktop-only touch case skips by design.
+- UI has 34 Playwright cases across desktop/mobile; the desktop-only touch case skips by design.
   `next build` remains only a prerender/static-export smoke check.
+- **Known, pre-existing:** `DiagnosticsPanel` logs a hydration mismatch on `/settings` (the
+  user-agent fact row differs between the prerender and the client). Harmless, noisy in the
+  Playwright web-server log, not yet fixed.

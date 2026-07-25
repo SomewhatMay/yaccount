@@ -72,12 +72,17 @@ yaccount/
 │  │  │  ├─ goals.ts         # contributed/progress/required_monthly §5.9
 │  │  │  ├─ recurring.ts     # due-date + generation §5.8
 │  │  │  └─ plan.ts          # monthly allocation plan §6.8
-│  │  └─ reporting/          # aggregations feeding charts §6
+│  │  ├─ reporting/          # aggregations feeding charts §6
+│  │  └─ data/               # export/import format + validation §8.7 (post-M11)
 │  ├─ auth/                  # AuthProvider abstraction §3.4 (added M8)
 │  │  ├─ AuthProvider.ts     # getAccessToken(): Promise<string>
 │  │  ├─ web.ts              # §3.3-B
 │  │  └─ native.ts           # §3.3-A
 │  ├─ sync/                  # drivestore checkpointer §8.4 (added M9)
+│  │  ├─ checkpointer.ts     # pure runSync over the DriveFS seam
+│  │  ├─ origin.ts           # reset generation §8.4 (post-M11)
+│  │  ├─ reset.ts            # clear/import/rollback + adoption §8.7 (post-M11)
+│  │  └─ drive.ts            # the ONLY drivestore import
 │  ├─ features/              # UI feature modules (React + Jotai atoms in store.ts)
 │  ├─ components/            # ui/ = shadcn/ui copy-in components (added M2); theme-provider.tsx
 │  └─ lib/                   # utils.ts (cn helper from shadcn)
@@ -489,6 +494,7 @@ Findings from an adversarial pass against `yaccount-tech-spec-v3.md` (source of 
 33. **The reducer cannot yet satisfy §8.6's "apply remote ops as a delta".** `replay` sorts by `compareOps`, but `Repo.dispatch` applies in arrival order and rows carry no version — so a late-arriving older `*.update`/`setting.set` would clobber a newer local edit (contra §8.5 LWW). M9 fix: buffer remote ops and apply under the total order (preferred — no model change), or add `updated_ts` per row and enforce LWW in the reducer. Local-only operation (M0–M8) is unaffected: the app always dispatches in ascending `ts`. Pinned by `repo.test.ts` "live state == replay(listOps())".
 34. **The snapshot natural-key upsert can destroy a report the deleting device never saw** (see spec §8.5 note). Decide at M9 between keeping the delete-by-key upsert and deriving the row id from `(container_id, date)` so a same-day collision becomes an ordinary LWW `put`.
 35. ✔ **`Repo.dispatch` had no rollback — FIXED at M3.** A throwing `applyOp` (e.g. an op type from a newer client) left the op in the journal because `oplog.put` had already committed, producing exactly the log/state desync the single transaction exists to prevent. Now wrapped in `try/catch` → `tx.abort()`. Regression-tested.
+36. ✔ **A failed Drive read must never read as "absent" — FOUND AND FIXED post-M11 (phase 5).** `readOrigin` treated any rejection as "no reset marker exists", and the reconciler answered that by *forgetting* the generation it had recorded. Because `getAccessTokenSilent` hands back a **cached** token with no network call, sync keeps running for ~1h after a device goes offline — so every offline tick forgot, and every reconnect compared the reappearing marker against the forgotten `null`, adopted, and set the device's data aside. Fix (both halves needed): `readOrigin` returns **`present` | `absent` | `unknown`**, disambiguating via an `exists` probe so drivestore's error shape stays in `drive.ts`; and **only a positive read is acted on** — `unknown` infers nothing, and a device never forgets a generation it holds. The same conflation in `runDriveReset`'s enumeration (a failed `list` reading as "empty store", which would have skipped the pre-overwrite backup) is fixed the same way: probe, then abort rather than guess. **General rule: in a store with no atomic primitives, silence is not an answer — never infer absence from a failure.**
 
 ### Spec-attribution / accuracy
 23. **Total order "timestamp + `id` tiebreak (§8.2)"** — §8.2 says "timestamped and UUID-keyed" but never defines a tiebreak/total order or LWW. This is *our* design; don't attribute it to §8.2.
