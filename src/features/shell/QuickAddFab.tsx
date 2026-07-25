@@ -178,7 +178,7 @@ export function QuickAddFab() {
         aria-haspopup="menu"
         aria-expanded={chooserOpen}
         aria-controls={chooserOpen ? "fab-create-chooser" : undefined}
-        className="bg-primary text-primary-foreground focus-visible:ring-ring/60 focus-visible:ring-offset-background fixed right-5 bottom-[calc(4.25rem_+_env(safe-area-inset-bottom))] z-40 inline-flex size-14 items-center justify-center rounded-full shadow-lg transition-transform duration-[var(--dur-1)] ease-[var(--ease-register)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95 lg:right-8 lg:bottom-8"
+        className="bg-primary text-primary-foreground focus-visible:ring-ring/60 focus-visible:ring-offset-background fixed right-5 bottom-[calc(4.25rem_+_0.5rem_+_env(safe-area-inset-bottom,0px))] z-40 inline-flex size-14 touch-none items-center justify-center rounded-full shadow-lg transition-transform duration-[var(--dur-1)] ease-[var(--ease-register)] select-none [-webkit-user-select:none] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95 lg:right-8 lg:bottom-8"
       >
         <span data-money-add-mark className="relative block size-7" aria-hidden="true">
           <DollarSignIcon
@@ -214,7 +214,7 @@ export function QuickAddFab() {
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) setChooserOpen(false);
           }}
-          className="bg-popover text-popover-foreground ring-foreground/10 fixed right-5 bottom-[calc(8.5rem_+_env(safe-area-inset-bottom))] z-50 w-48 rounded-xl p-1.5 shadow-lg ring-1 lg:right-8 lg:bottom-24"
+          className="bg-popover text-popover-foreground ring-foreground/10 fixed right-5 bottom-[calc(8.5rem_+_0.5rem_+_env(safe-area-inset-bottom,0px))] z-50 w-48 touch-manipulation rounded-xl p-1.5 shadow-lg ring-1 select-none [-webkit-user-select:none] lg:right-8 lg:bottom-24"
         >
           <p className="text-muted-foreground px-1.5 py-1 text-xs font-medium">
             Add an entry

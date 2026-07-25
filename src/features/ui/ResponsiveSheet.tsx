@@ -8,7 +8,21 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
+import {
+  bottomSheetMaxHeight,
+  revealFocusedControl,
+  subscribeVisualViewport,
+} from "@/features/ui/sheet-viewport";
+
+function visualViewportHeight(): number | null {
+  return typeof window === "undefined" ? null : (window.visualViewport?.height ?? null);
+}
+
+function subscribe(onChange: () => void): () => void {
+  return subscribeVisualViewport(window.visualViewport, onChange);
+}
 
 /**
  * Editing opens a Sheet, never a mode-swap (§12.4) — but which edge it comes
@@ -33,11 +47,38 @@ export function ResponsiveSheet({
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
+  const content = useRef<HTMLDivElement | null>(null);
+  const viewportHeight = useSyncExternalStore(
+    subscribe,
+    visualViewportHeight,
+    () => null,
+  );
+
+  useEffect(() => {
+    if (!open || sideways) return;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        if (content.current) {
+          revealFocusedControl(
+            content.current,
+            document.activeElement instanceof HTMLElement ? document.activeElement : null,
+          );
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, [open, sideways, viewportHeight]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        ref={content}
         side={sideways ? "right" : "bottom"}
+        style={sideways ? undefined : { maxHeight: bottomSheetMaxHeight(viewportHeight) }}
         className={cn(
           "gap-0 overflow-y-auto",
           // A bottom sheet stops short of the top edge so the screen behind it

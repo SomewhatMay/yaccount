@@ -384,7 +384,7 @@ test("keeps FAB geometry and shows a compact money-add mark", async ({
     testInfo.project.name === "mobile" ? 20 : 32,
   );
   expect(viewport.height - fabBox!.y - fabBox!.height).toBe(
-    testInfo.project.name === "mobile" ? 68 : 32,
+    testInfo.project.name === "mobile" ? 76 : 32,
   );
 
   await fab.focus();
