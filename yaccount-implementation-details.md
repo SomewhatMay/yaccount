@@ -339,6 +339,27 @@ Each milestone: **Goal · Scope · Deliverables · How to test · Exit criteria.
 
 ---
 
+### Post-M11 Phase 6 — GitHub Pages Delivery
+**Status:** DONE, merged via PR #15 (`95423c5`); deployed and browser-verified.
+
+**Delivered:**
+- `.github/workflows/pages.yml`: `main` push → `npm ci` → Vitest → typecheck → lint → static
+  export → Pages artifact/deploy. Missing `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` exits with an
+  annotation before install/build can produce a misleading green deployment.
+- `next.config.ts`: `YACCOUNT_GITHUB_PAGES=true` enables `/yaccount`
+  `basePath`/`assetPrefix`; `trailingSlash` emits route directory indexes. Local dev, Playwright
+  and future Capacitor builds remain rooted at `/`.
+- Public-history audit confirmed `.env` was never committed and found no leaked credentials.
+
+**Verification:** 879 Vitest; typecheck; lint; local + prefixed static builds; touched-file
+Prettier; 33 Playwright passed, 1 expected skip. Production workflow run `30146384768` green.
+Every live route, ledger query deep link and sampled asset returned 200. User verified Google
+sign-in and Drive sync over HTTPS.
+
+**Exit criteria:** Met. Live at `https://somewhatmay.github.io/yaccount/`.
+
+---
+
 ### Post-M11 Phase 1 — Mobile toast clearance
 **Status:** DONE, merged via PR #10 (`5519bf4`); Phase 2 superseded mobile placement.
 

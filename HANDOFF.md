@@ -1,23 +1,18 @@
 # yaccount — Handoff
 
-> ## ✅ **POST-M11 PHASE 5 MERGED — ALL POST-M11 PHASES DONE**
-> Settings data tools merged via PR #14 (`fc3a820`) on 2026-07-25. Export/import a versioned
-> op-set file, clear everything, and roll back to a retired state — across **both** IndexedDB
-> and Google Drive. New Drive files `origin.json` (reset generation), `backup_*.json` and
-> `orphan_*.json`. Imports are fully validated before any mutation; clear/import/rollback retire
-> the whole current world before overwriting, so **nothing is ever deleted** — the app just stops
-> reading it. Verification: **879 Vitest + 33 Playwright passed (1 expected desktop touch skip)**,
-> typecheck, lint, static build and touched-file Prettier. User browser-verified, including the
-> two-browser offline case.
+> ## ✅ **POST-M11 PHASE 6 MERGED — LIVE ON GITHUB PAGES**
+> GitHub Pages delivery merged via PR #15 (`95423c5`) on 2026-07-25. The public project page is
+> live at `https://somewhatmay.github.io/yaccount/`; every route and the ledger's query deep links
+> survive hard refresh. The `main` workflow gates deployment on Vitest, typecheck, lint and static
+> build, then uploads/deploys `out/`. User browser-verified Google sign-in and Drive sync over HTTPS.
 >
 > Phase 4 (FAB hold chooser) merged via PR #13 (`7067f92`) on 2026-07-23. M11 merged via PR #9
 > (`bf7d872`). See [`M11-HANDOFF.md`](M11-HANDOFF.md) for phase history.
 
 > Living handoff for the next agent picking up with fresh context. Update this at each milestone boundary.
-> **Last updated:** post-M11 Phase 5 merged via PR #14 (`fc3a820`), 2026-07-25.
-> **Next:** **Phase 6 — ship it on GitHub Pages** (branch `post-m11-github-pages`). The user has
-> chosen to make the repo **public** and serve a project page at
-> `https://somewhatmay.github.io/yaccount/`, so the build needs `basePath`. See the phase table.
+> **Last updated:** post-M11 Phase 6 merged via PR #15 (`95423c5`), deployed and browser-verified,
+> 2026-07-25.
+> **Next:** a user-reported bug-fix/update pass; exact scope pending. Start fresh from `main`.
 > **M10 (Capacitor) and movable/visibility dashboard widgets are explicitly deferred — the user
 > said skip both for now.** Do not start either without an explicit go-ahead.
 > **Prior:** M9 merged to `main` via PR #8 (`a7a4c65`), browser-verified. See "M9 decisions and delivered code".
@@ -183,6 +178,26 @@ eec4db7 M8 auth: Google OAuth web flow (durable-grant AuthProvider seam)
   user-openable copy. And a *legitimate* adoption still resets local state before the pull
   refills it, so a network drop in that window shows an empty app until the next tick (it
   self-heals; reordering pull-before-adopt was judged not worth the added complexity).
+
+### Post-M11 Phase 6 decisions and delivered code (merged via PR #15, `95423c5`)
+
+- **GitHub Pages project deployment:** `.github/workflows/pages.yml` runs on pushes to `main`,
+  gates the artifact on Vitest, typecheck, lint and `next build`, then deploys `out/`. Production
+  run `30146384768` passed both build and deploy jobs.
+- **Prefix is deployment-only:** `YACCOUNT_GITHUB_PAGES=true` enables
+  `basePath`/`assetPrefix: "/yaccount"`. Local dev, Playwright and the future Capacitor build stay
+  rooted at `/`; the tradeoff is that production parity requires an explicit prefixed build.
+- **`trailingSlash: true` is required for host-portable deep links:** static export emits
+  `ledger/index.html`, `settings/index.html`, etc. The deployed extensionless routes redirect to
+  their directory form and return 200; the ledger query URL also returns 200 and retains its query.
+- **OAuth fails closed:** Pages builds throw before compilation when
+  `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` is empty, and the workflow has an explicit annotated guard.
+  The public client ID is stored as a repository variable and is present in the live JS bundle.
+- **Public-history audit:** `.env` was never committed and no credential/private-key leak was
+  found. Matches were documentation and deliberate diagnostics redaction fixtures only.
+- **Verification:** 879 Vitest; typecheck; lint; local and prefixed static builds; touched-file
+  Prettier; 33 Playwright passed with 1 expected desktop-touch skip. Every deployed route, a ledger
+  query deep link and a deployed asset returned 200. User verified Google sign-in and Drive sync.
 
 ### M9 decisions and delivered code (this session — merged to `main` via PR #8, `a7a4c65`)
 - **Browser-verified gotchas (hit during the real 2-profile verify — do NOT regress):**
@@ -426,13 +441,13 @@ stable-id registry. Preserve M11 icon placement and sync-banner behavior unless 
 | 4 ✅ | `post-m11-fab-hold-menu` | **DONE**, PR #13 (`7067f92`). Quick press opens Expense exactly once; 500ms hold opens an accessible Expense/Income/Transfer chooser reusing `quickAddAtom` + `QuickAddSheet`. 10px movement, pointer cancel, lost capture and Escape cancel without double activation; Enter/Space and arrow-key menu navigation work. FAB mark, geometry, iris, position, focus and name remain unchanged. | User verified; 817 Vitest + 25 Playwright passed (1 expected desktop touch skip). |
 | 5 ✅ | `post-m11-data-tools` | **DONE**, PR #14 (`fc3a820`). Settings → Your data: export/import a versioned op-set file, clear everything, roll back to a retired state — across IndexedDB **and** Drive. New Drive files `origin.json`/`backup_*`/`orphan_*`; imports fully validated before any mutation; clear/import/rollback retire the current world first (nothing is deleted); `ConfirmDestructive` type-the-phrase gate. | User verified incl. two-browser offline; 879 Vitest + 33 Playwright passed (1 expected desktop touch skip). |
 
-| 6 | `post-m11-github-pages` | **NEXT.** Deploy the static export to GitHub Pages via Actions. Repo goes **public** (user's call, user does the flip); project page ⇒ `basePath: "/yaccount"`. Needs a build+deploy workflow, the `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` repo **variable**, and `https://somewhatmay.github.io` added to the Google OAuth Authorized JavaScript origins. | Site loads at the Pages URL; every route deep-links and survives refresh; Google sign-in + Drive sync work over HTTPS; local dev and Playwright still pass. |
+| 6 ✅ | `post-m11-github-pages` | **DONE**, PR #15 (`95423c5`). GitHub Actions gates and deploys the static project-page export; CI-only `/yaccount` prefix, directory-index routes, fail-closed OAuth variable. | Workflow run `30146384768` green; live routes/deep links/assets verified; user verified Google sign-in + Drive sync over HTTPS. |
 
-Phases 1–5 are complete. Each branched from freshly pulled `main` after its predecessor and
+Phases 1–6 are complete. Each branched from freshly pulled `main` after its predecessor and
 closure docs were merged. **M10 Capacitor and movable/visibility dashboard widgets are deferred
 by explicit user decision — do not start either without a go-ahead.**
 
-**Phase 6 pre-flight (the parts an agent cannot do):**
+**Phase 6 pre-flight (completed):**
 1. The user flips repo visibility to **public** (Pages needs it on the Free plan).
 2. The user adds `https://somewhatmay.github.io` as an **Authorized JavaScript origin** on the
    OAuth client in Google Cloud — sign-in fails with `origin_mismatch` until this is done.

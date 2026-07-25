@@ -57,6 +57,14 @@ Considered dropping Next.js for plain Vite + React (lower overhead, since a Capa
 
 **Why keep Next.js over Vite despite not using SSR/API routes today:** the author explicitly wants to preserve the *option* — acknowledged as a slim but non-zero possibility — of later migrating to a full backend-integrated architecture (SSR, API routes, server actions) without a framework rewrite. Static export today, full Next.js server features later if ever needed, is a strict superset path; Vite would not offer this without a separate migration.
 
+**Web delivery (post-M11, locked):** the browser build is deployed as the GitHub Pages project
+site `https://somewhatmay.github.io/yaccount/`. Pages builds opt into
+`basePath`/`assetPrefix: "/yaccount"` via `YACCOUNT_GITHUB_PAGES=true`; local development,
+Playwright and Capacitor remain rooted at `/`. `trailingSlash: true` emits a directory index for
+every static route so extensionless deep links and hard refreshes work on static hosting. Pushes to
+`main` deploy only after Vitest, typecheck, lint and the static build pass. A Pages build must fail
+before compilation if `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` is unset.
+
 ### 2.3 Cross-platform data-layer consequence
 
 Because the same static build runs in three environments, **all storage must be available in a plain browser context** — no native-only storage APIs. This confirms IndexedDB (§8) as correct for all three targets (available in desktop browsers, and inside Capacitor's WebView on both iOS and Android). Capacitor's native secure-storage plugin is used *only* for the native OAuth refresh token (§3), not for app data.
