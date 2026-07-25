@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import { ArrowRightIcon, XIcon } from "lucide-react";
 import { createTemplate, logTemplate, removeTemplate } from "@/core/commands";
+import { rankShortcutsByUsage } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
 import type { Container, Transaction } from "@/core/model";
 import { todayIso } from "@/features/clock";
@@ -85,6 +87,10 @@ function QuickAddForm({
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
+  const rankedTemplates = useMemo(
+    () => rankShortcutsByUsage(templates, transactions),
+    [templates, transactions],
+  );
 
   const f = useComposeFields({
     categories,
@@ -146,7 +152,7 @@ function QuickAddForm({
       }}
       className="space-y-5 px-5 pt-1 pb-7"
     >
-      {templates.length > 0 && (
+      {rankedTemplates.length > 0 && (
         <div className="space-y-2">
           <Eyebrow as="h3">Shortcuts</Eyebrow>
           {/* Stacked, not strung out: a name and its amount on two lines makes a
@@ -154,7 +160,7 @@ function QuickAddForm({
               pill per shortcut ran the strip off the side of the screen after
               three of them. */}
           <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
-            {templates.map((t) => (
+            {rankedTemplates.map((t) => (
               <div key={t.id} className="relative shrink-0">
                 <button
                   type="button"
