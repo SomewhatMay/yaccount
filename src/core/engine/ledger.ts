@@ -172,6 +172,11 @@ export function sortForRegister(txns: Transaction[]): Transaction[] {
   });
 }
 
+/** The latest live entries for compact dashboard/register previews. */
+export function recentRows(txns: Transaction[], limit = 3): Transaction[] {
+  return sortForRegister(activeRows(txns)).slice(0, Math.max(0, limit));
+}
+
 /** The orders the register offers (§12.4 M11 filter rail). */
 export const REGISTER_SORTS = ["newest", "oldest", "largest", "smallest"] as const;
 export type RegisterSort = (typeof REGISTER_SORTS)[number];

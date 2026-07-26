@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSetAtom } from "jotai";
+import { atom, useAtom, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import { LogInIcon, LogOutIcon, CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getAuthProvider } from "@/auth/web";
 import { syncAtom, syncStatusAtom } from "@/features/store";
+import { SYNC_ATTENTION_CLASS } from "@/features/SyncIndicator";
+
+const connectedAtom = atom<boolean | null>(null);
 
 /**
  * The sign-in control (§3.3-B, §12 "Quiet Register" — a calm header affordance,
@@ -23,11 +26,11 @@ import { syncAtom, syncStatusAtom } from "@/features/store";
  * stored); the token itself is renewed silently on demand during use. No data
  * syncs yet — Drive sync is M9. The auth provider is a module singleton.
  */
-export function AuthButton() {
+export function AuthButton({ signedOutOnly = false }: { signedOutOnly?: boolean }) {
   // `null` = not yet known (pre-restore). We render a neutral placeholder in
   // that state rather than defaulting to "Sign in", which would flash a wrong
   // signed-out control for a frame on every load before the grant is read.
-  const [connected, setConnected] = useState<boolean | null>(null);
+  const [connected, setConnected] = useAtom(connectedAtom);
   const [busy, setBusy] = useState(false);
   const sync = useSetAtom(syncAtom);
   const setSyncStatus = useSetAtom(syncStatusAtom);
@@ -78,7 +81,7 @@ export function AuthButton() {
   // Unknown state (pre-restore): a same-size, invisible placeholder so the
   // header doesn't shift and no misleading control flashes.
   if (connected === null) {
-    return <div className="h-8 w-[92px]" aria-hidden />;
+    return signedOutOnly ? null : <div className="h-8 w-[92px]" aria-hidden />;
   }
 
   if (!connected) {
@@ -86,7 +89,7 @@ export function AuthButton() {
       <Button
         variant="outline"
         size="sm"
-        className="rounded-full"
+        className={`${SYNC_ATTENTION_CLASS} rounded-full`}
         disabled={busy}
         onClick={signIn}
       >
@@ -95,6 +98,8 @@ export function AuthButton() {
       </Button>
     );
   }
+
+  if (signedOutOnly) return null;
 
   return (
     <DropdownMenu>

@@ -528,6 +528,52 @@ export function LargestList({
   );
 }
 
+/** Latest register activity, kept deliberately compact for the dashboard glance. */
+export function RecentEntriesList({
+  rows,
+  detailOf,
+  hrefFor,
+  colorOf = categoryDotColor,
+}: {
+  rows: Transaction[];
+  detailOf: (t: Transaction) => string;
+  hrefFor?: (t: Transaction) => string;
+  colorOf?: (categoryId: string) => string;
+}) {
+  if (rows.length === 0) return <EmptyNote>Nothing logged yet.</EmptyNote>;
+  return (
+    <ul className="divide-y">
+      {rows.map((t) => (
+        <li key={t.id}>
+          <LinkRow href={hrefFor?.(t)} className="flex items-center gap-3 py-2.5">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ background: colorOf(t.category_id ?? "") }}
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                {t.vendor_source}
+              </span>
+              <span className="text-muted-foreground block truncate text-xs">
+                {detailOf(t)} · {formatDay(t.date)}
+              </span>
+            </span>
+            <Money
+              cents={t.amount}
+              absolute={t.to_container_id !== null}
+              tone={
+                t.to_container_id !== null ? "quiet" : t.amount >= 0 ? "in" : "neutral"
+              }
+              className="shrink-0 text-sm"
+            />
+          </LinkRow>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export interface UpcomingRow {
   key: string;
   date: string;

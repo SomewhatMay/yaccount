@@ -236,10 +236,6 @@ export function LedgerView() {
     return (id: string | null) => (id ? (m.get(id) ?? "Unknown") : "");
   }, [containers]);
   const showContainer = containers.filter((c) => !c.is_archived).length > 1;
-  const uncounted = containers.filter(
-    (c) => !c.is_archived && !c.include_in_overall_balance,
-  ).length;
-
   // What else a row can be found by. The engine keeps no lookup tables, so the
   // view that has the names hands them over (§ filter.ts) — typing a category or
   // a wallet name into the search box finds the rows filed under it.
@@ -380,11 +376,6 @@ export function LedgerView() {
             {versusLastMonth === 0
               ? "level with last month"
               : `${versusLastMonth > 0 ? "up" : "down"} ${formatCents(Math.abs(versusLastMonth))} on last month`}
-          </Marginalia>
-        )}
-        {uncounted > 0 && (
-          <Marginalia className="mt-1">
-            {uncounted} container{uncounted === 1 ? "" : "s"} not counted
           </Marginalia>
         )}
       </Figure>
