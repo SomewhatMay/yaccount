@@ -56,12 +56,12 @@ import {
   defaultContainerIdAtom,
   dispatchAtom,
   flashRowAtom,
-  flashedRowAtom,
   goalsAtom,
   readyAtom,
   runRecurringGenerationAtom,
   transactionsAtom,
 } from "@/features/store";
+import { useFocusParam } from "@/features/useFocusParam";
 import { describeGoal } from "@/features/goals/describe";
 import { GoalSheet, type GoalFormInput } from "@/features/goals/GoalSheet";
 import { cn } from "@/lib/utils";
@@ -82,6 +82,7 @@ import {
   ListSkeleton,
   PageHeader,
   PageHeaderSkeleton,
+  useFlashRow,
 } from "@/features/ui";
 
 /** Device-local: how you like to READ your goals, not a fact about them. */
@@ -124,6 +125,13 @@ export function GoalsView() {
   const generate = useSetAtom(runRecurringGenerationAtom);
 
   const [sheet, setSheet] = useState<Goal | "new" | null>(null);
+
+  // A ⌘K result opens the goal it named — a goal sheet is a read, not a
+  // rename box, so landing in it is the answer rather than a hazard.
+  useFocusParam("/goals", (id) => {
+    const found = goals.find((g) => g.id === id);
+    if (found) setSheet(found);
+  });
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11).
   const [sort, setSort] = useLocalPref(SORT_KEY, "name", isGoalSort);
@@ -471,7 +479,7 @@ function GoalCard({
   onArchive?: () => void;
   onResume?: () => void;
 }) {
-  const flashed = useAtomValue(flashedRowAtom)?.id === goal.id;
+  const { ref, flashed } = useFlashRow(goal.id);
   const now = todayIso();
   const contributed = goalContributed(goal, txns);
   const basis = goalBasis(goal, txns);
@@ -486,6 +494,7 @@ function GoalCard({
 
   return (
     <div
+      ref={ref}
       className={cn(
         "rounded-2xl border p-5 transition-colors ease-[var(--ease-register)]",
         flashed

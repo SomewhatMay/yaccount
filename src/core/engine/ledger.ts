@@ -121,33 +121,6 @@ export function templateRows(txns: Transaction[]): Transaction[] {
 }
 
 /**
- * Free-text lookup over the register — what the ⌘K palette searches (M11).
- *
- * The matching itself is `matchesFilter`'s text half, so the palette narrows a
- * payee by exactly the rule the ledger's filter rail uses — a search that finds a
- * row the rail beside it hides would be two answers to one question.
- *
- * What is local to a palette: a blank query returns nothing (nothing typed is not
- * "everything" — the palette shows destinations instead), and `limit` caps what
- * there is room to show. Order is the caller's; pass rows already in register
- * order.
- */
-export function searchTransactions(
-  txns: Transaction[],
-  query: string,
-  opts: { limit?: number; label?: (t: Transaction) => string } = {},
-): Transaction[] {
-  if (query.trim() === "") return [];
-  const limit = opts.limit ?? 8;
-  const found: Transaction[] = [];
-  for (const t of txns) {
-    if (found.length >= limit) break;
-    if (matchesFilter(t, { text: query }, { label: opts.label })) found.push(t);
-  }
-  return found;
-}
-
-/**
  * Register order: newest first (§12.4 date-grouped rows).
  *
  * `date` alone can't do this. It is the calendar day the money moved — the user

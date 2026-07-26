@@ -16,11 +16,11 @@ import {
   defaultContainerIdAtom,
   dispatchAtom,
   flashRowAtom,
-  flashedRowAtom,
   readyAtom,
   snapshotsAtom,
   transactionsAtom,
 } from "@/features/store";
+import { useFocusParam } from "@/features/useFocusParam";
 import {
   archiveContainer,
   createContainer,
@@ -80,6 +80,7 @@ import {
   PageHeader,
   PageHeaderSkeleton,
   RowActions,
+  useFlashRow,
 } from "@/features/ui";
 
 /** Device-local: how you like to READ the list, not a fact about your money. */
@@ -124,6 +125,9 @@ export function ContainersView() {
   const flashRow = useSetAtom(flashRowAtom);
 
   const [creating, setCreating] = useState(false);
+
+  // A ⌘K result reveals the row; it does not open the rename field.
+  useFocusParam("/containers");
   const [logging, setLogging] = useState<Container | null>(null);
   const [archiving, setArchiving] = useState<Container | null>(null);
   const archivingBalance = archiving ? containerBalance(transactions, archiving.id) : 0;
@@ -417,7 +421,7 @@ function ContainerRow({
   onArchive: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const flashed = useAtomValue(flashedRowAtom)?.id === container.id;
+  const { ref, flashed } = useFlashRow(container.id);
   const flashRow = useSetAtom(flashRowAtom);
 
   async function rename(name: string) {
@@ -457,6 +461,7 @@ function ContainerRow({
 
   return (
     <div
+      ref={ref}
       className={cn(
         "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
         flashed

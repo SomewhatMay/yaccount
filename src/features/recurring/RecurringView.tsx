@@ -33,12 +33,12 @@ import {
   containersAtom,
   dispatchAtom,
   flashRowAtom,
-  flashedRowAtom,
   readyAtom,
   recurringRulesAtom,
   runRecurringGenerationAtom,
   transactionsAtom,
 } from "@/features/store";
+import { useFocusParam } from "@/features/useFocusParam";
 import { describeRule } from "@/features/recurring/describe";
 import { RecurringRuleSheet } from "@/features/recurring/RecurringRuleSheet";
 import {
@@ -66,6 +66,7 @@ import {
   PageHeader,
   PageHeaderSkeleton,
   RowActions,
+  useFlashRow,
 } from "@/features/ui";
 
 /** Device-local: how you like to READ your rules, not a fact about them. */
@@ -118,6 +119,12 @@ export function RecurringView() {
 
   // `null` = sheet closed; `"new"` = create; a rule = edit.
   const [sheet, setSheet] = useState<RecurringRule | "new" | null>(null);
+
+  // A ⌘K result opens the rule it named.
+  useFocusParam("/recurring", (id) => {
+    const found = rules.find((r) => r.id === id);
+    if (found) setSheet(found);
+  });
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11).
   const [sort, setSort] = useLocalPref(SORT_KEY, "next", isRuleSort);
@@ -396,7 +403,7 @@ function RuleRow({
   onEdit: () => void;
   onCancel: () => void;
 }) {
-  const flashed = useAtomValue(flashedRowAtom)?.id === rule.id;
+  const { ref, flashed } = useFlashRow(rule.id);
   const transfer = isTransferRule(rule);
   const income = !transfer && (rule.template_amount ?? 0) >= 0;
   const sub = transfer
@@ -405,6 +412,7 @@ function RuleRow({
 
   return (
     <div
+      ref={ref}
       className={cn(
         "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
         flashed

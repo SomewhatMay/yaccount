@@ -17,9 +17,9 @@ import {
   dispatchAtom,
   dispatchManyAtom,
   flashRowAtom,
-  flashedRowAtom,
   readyAtom,
 } from "@/features/store";
+import { useFocusParam } from "@/features/useFocusParam";
 import {
   createCategory,
   updateCategory,
@@ -61,6 +61,7 @@ import {
   PageHeader,
   PageHeaderSkeleton,
   RowActions,
+  useFlashRow,
 } from "@/features/ui";
 
 /** Device-local: how you like to READ the list, not a fact about your money. */
@@ -106,6 +107,9 @@ export function CategoriesView() {
   const [starting, setStarting] = useState(false);
   const [budgeting, setBudgeting] = useState<Category | null>(null);
   const [iconing, setIconing] = useState<Category | null>(null);
+
+  // A ⌘K result reveals the row; it does not open the rename field.
+  useFocusParam("/categories");
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11).
   const [sort, setSort] = useLocalPref(SORT_KEY, "name", isCategorySort);
@@ -437,7 +441,7 @@ function CategoryRow({
   onIcon: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const flashed = useAtomValue(flashedRowAtom)?.id === category.id;
+  const { ref, flashed } = useFlashRow(category.id);
   const flashRow = useSetAtom(flashRowAtom);
 
   async function save(name: string) {
@@ -465,6 +469,7 @@ function CategoryRow({
 
   return (
     <div
+      ref={ref}
       className={cn(
         "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
         flashed

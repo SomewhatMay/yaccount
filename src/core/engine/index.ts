@@ -9,3 +9,4 @@ export * from "./recurring";
 export * from "./goals";
 export * from "./plan";
 export * from "./usage-ranking";
+export * from "./search";
