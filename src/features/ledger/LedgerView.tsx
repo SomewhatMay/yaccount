@@ -67,6 +67,7 @@ import {
   Marginalia,
   Money,
   RowActions,
+  useFlashRow,
 } from "@/features/ui";
 import { FilterBar } from "@/features/FilterBar";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
@@ -609,17 +610,10 @@ function LedgerRow({
   onSaveShortcut: () => void;
 }) {
   const transfer = isTransfer(tx);
-  const row = useRef<HTMLDivElement>(null);
-  const bringIntoView = flashed?.scroll ?? false;
-
-  // Only a row found through the ⌘K palette scrolls: a row you just logged is
-  // already at the top of the register, and yanking the page to centre it would
-  // be motion in place of an answer. `scroll-behavior` is zeroed globally under
-  // `prefers-reduced-motion` (§12.5), so this obeys that with no special case.
-  useEffect(() => {
-    if (bringIntoView)
-      row.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [bringIntoView]);
+  // Only a row found through ⌘K or a `?focus=` link scrolls; a row you just
+  // logged is already at the top. The rule lives in `useFlashRow` now, shared
+  // with the four screens that grew the same landing.
+  const { ref: row } = useFlashRow(tx.id);
   // Money in is emerald; a transfer is your own money moving, so it stays quiet.
   const income = !transfer && tx.amount >= 0;
   const sub = [

@@ -12,7 +12,14 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 60 Vitest files, 945 tests passing. 33 Playwright cases pass with 1 expected desktop-touch skip.
+- 62 Vitest files, 999 tests passing. 41 Playwright cases pass with 1 expected desktop-touch skip.
+- **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
+  names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
+  screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
+  `$42.50`, `2026-07`, `is:`, `in:`, `cat:`; any token that is not exactly one of those stays a
+  word, so no query can fail. Results deep-link with `?focus=` (`src/features/focus-link.ts`,
+  `useFocusParam`); Goals and Recurring also open the row's sheet, Categories and Containers
+  deliberately do not.
 - `DB_VERSION = 3`. The Drive layout is `snapshot.json`, `ledger_<id>.json`,
   `ledger_<id>_<YYYY-MM>.json`, `origin.json`, and inert `backup_*` / `orphan_*` worlds.
 
@@ -39,10 +46,14 @@ npm run test:e2e
 
 Setup, Node version and the `.env` requirement are in [`README.md`](README.md).
 
-## Known issue
+## Known issues
 
 `DiagnosticsPanel` renders `navigator.userAgent` during render, so `/settings` logs a hydration
 mismatch. Harmless, noisy in the Playwright web-server log, not yet fixed.
+
+The four FAB hold-gesture Playwright cases are timing-sensitive and flake under six-worker CPU
+contention — a different two or three fail on each full-suite run, on unmodified `main` as well.
+They pass reliably at `--workers=2`. The gesture, not the app, is what is being measured.
 
 ## Hazards
 

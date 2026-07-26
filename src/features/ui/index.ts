@@ -26,3 +26,4 @@ export { Sparkline } from "@/features/ui/Sparkline";
 export { sparklinePath, type SparkGeometry } from "@/features/ui/geometry";
 export { contrastRatio, parseOklch, relativeLuminance } from "@/features/ui/contrast";
 export { useMediaQuery, SM_UP } from "@/features/ui/useMediaQuery";
+export { useFlashRow } from "@/features/ui/useFlashRow";

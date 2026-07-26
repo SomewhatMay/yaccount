@@ -183,6 +183,66 @@ test("views the monthly plan", async ({ page }) => {
   await expect(page.getByText("Unallocated", { exact: true })).toBeVisible();
 });
 
+async function openPalette(page: Page) {
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(page.getByPlaceholder(/Search everything/)).toBeVisible();
+}
+
+test("⌘K finds an entry by a word that is only in its notes", async ({ page }) => {
+  await createCategory(page, "E2E palette food");
+  await openReady(page, "/ledger", "Overall balance");
+
+  await openQuickAdd(page);
+  await page.getByLabel("Amount").fill("12.00");
+  await page.getByLabel("Vendor").fill("E2E palette payee");
+  await page.getByLabel("Notes").fill("aubergine for the weekend");
+  await choose(page, "Category", "E2E palette food");
+  await page.getByRole("button", { name: "Log expense" }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  // The word appears in no title anywhere — only in that one row's notes.
+  await page.getByPlaceholder(/Search everything/).fill("aubergine");
+  await page.getByRole("option", { name: /E2E palette payee/ }).first().click();
+
+  await expect(page).toHaveURL(/\/ledger/);
+  await expect(page.getByText("E2E palette payee", { exact: true })).toBeVisible();
+});
+
+test("⌘K narrows entries by an amount token", async ({ page }) => {
+  await createCategory(page, "E2E size food");
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E small buy", "3.00", "E2E size food");
+  await logExpense(page, "E2E large buy", "300.00", "E2E size food");
+
+  await openPalette(page);
+  await page.getByPlaceholder(/Search everything/).fill("E2E buy >100");
+  await expect(page.getByRole("option", { name: /E2E large buy/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /E2E small buy/ })).toBeHidden();
+});
+
+test("⌘K lands on a category, flagged on its own screen", async ({ page }) => {
+  await createCategory(page, "E2E findable category");
+  await openReady(page, "/", "How the money moved");
+
+  await openPalette(page);
+  await page.getByPlaceholder(/Search everything/).fill("E2E findable");
+  await page.getByRole("option", { name: /E2E findable category/ }).first().click();
+
+  await expect(page).toHaveURL(/\/categories/);
+  await expect(page.getByText("E2E findable category", { exact: true })).toBeVisible();
+  // The focus param is stripped once the row has been marked.
+  await expect(page).not.toHaveURL(/focus=/);
+});
+
+test("⌘K toggles closed on the same shortcut that opened it", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(page.getByPlaceholder(/Search everything/)).toBeHidden();
+});
+
 test("filters the ledger by visible text", async ({ page }) => {
   await createCategory(page, "E2E food");
   await openReady(page, "/ledger", "Overall balance");

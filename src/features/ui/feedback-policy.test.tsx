@@ -48,7 +48,10 @@ describe("deliberate feedback policy", () => {
   ])("highlights the affected row after routine mutations in %s", (path) => {
     const contents = source(path);
     expect(contents).toContain("flashRowAtom");
-    expect(contents).toContain("flashedRowAtom");
+    // The mark is read through `useFlashRow`, which owns the atom and adds the
+    // scroll a `?focus=` result needs; naming the atom directly is the older
+    // spelling of the same policy.
+    expect(contents).toMatch(/useFlashRow|flashedRowAtom/);
     expect(contents).toContain("bg-primary/15");
   });
 });
