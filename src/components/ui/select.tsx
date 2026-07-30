@@ -77,7 +77,9 @@ function SelectContent({
         align={align}
         {...props}
       >
-        <SelectScrollUpButton />
+        {/* Radix scroll buttons snap the touch-focused item back into view when
+            the first drag mounts one. The viewport already scrolls by touch,
+            wheel and keyboard without them. */}
         <SelectPrimitive.Viewport
           data-position={position}
           className={cn(
@@ -87,7 +89,6 @@ function SelectContent({
         >
           {children}
         </SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

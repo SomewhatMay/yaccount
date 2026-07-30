@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
 async function openReady(page: Page, path: string, marker: string | RegExp) {
@@ -9,6 +9,32 @@ async function openReady(page: Page, path: string, marker: string | RegExp) {
 async function choose(page: Page, label: string, option: string) {
   await page.getByRole("combobox", { name: label }).click();
   await page.getByRole("option", { name: option, exact: true }).click();
+}
+
+async function swipeUp(page: Page, target: Locator) {
+  const box = await target.boundingBox();
+  if (!box) throw new Error("Touch target is not visible.");
+
+  const session = await page.context().newCDPSession(page);
+  const x = box.x + box.width / 2;
+  let y = box.y + Math.min(box.height - 30, 400);
+
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x, y }],
+  });
+  for (let i = 0; i < 8; i++) {
+    y -= 25;
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x, y }],
+    });
+  }
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await session.detach();
 }
 
 async function createCategory(
@@ -64,6 +90,34 @@ test("logs an expense and shows it in the ledger", async ({ page }) => {
 
   await expect(page.getByText("E2E market", { exact: true })).toBeVisible();
   await expect(page.getByText("-$12.34", { exact: true }).last()).toBeVisible();
+});
+
+test("overflowing selects scroll by touch in sheets and pages", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Touch regression.");
+
+  for (let i = 1; i <= 18; i++) {
+    await createCategory(page, `E2E scroll category ${String(i).padStart(2, "0")}`);
+  }
+  const last = "E2E scroll category 18";
+
+  await openReady(page, "/ledger", "Overall balance");
+  await openQuickAdd(page);
+  await page.getByRole("combobox", { name: "Category" }).tap();
+  let viewport = page.locator("[data-radix-select-viewport]");
+  await swipeUp(page, viewport);
+  await expect.poll(() => viewport.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await page.getByRole("option", { name: last, exact: true }).tap();
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(last);
+
+  await openReady(page, "/", "How the money moved");
+  await page.getByText("Pick a category", { exact: true }).tap();
+  viewport = page.locator("[data-radix-select-viewport]");
+  await swipeUp(page, viewport);
+  await expect.poll(() => viewport.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await page.getByRole("option", { name: last, exact: true }).tap();
+  await expect(page.getByRole("combobox").filter({ hasText: last })).toBeVisible();
 });
 
 test("moves money between containers", async ({ page }) => {
