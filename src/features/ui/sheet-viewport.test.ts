@@ -1,49 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   bottomSheetViewportStyle,
-  retainVisualViewportSnapshot,
   subscribeVisualViewport,
 } from "@/features/ui/sheet-viewport";
 
 describe("iOS bottom-sheet viewport handling", () => {
-  it("anchors a bottom sheet above the keyboard with a visible top gap", () => {
+  it("anchors the sheet to the visual viewport without guessed chrome padding", () => {
     expect(
       bottomSheetViewportStyle({
         height: 500,
         offsetTop: 20,
-        pageTop: 120,
-        scrollY: 100,
+        layoutHeight: 800,
       }),
     ).toEqual({
-      bottom: "auto",
-      maxHeight: "536px",
-      paddingBottom: "96px",
-      scrollPaddingBottom: "96px",
-      top: "616px",
-      translate: "0 -100%",
+      bottom: "280px",
+      maxHeight: "440px",
     });
   });
 
-  it("uses page position when WebKit under-reports offsetTop", () => {
+  it("never positions below the layout viewport", () => {
     expect(
       bottomSheetViewportStyle({
         height: 500,
-        offsetTop: 0,
-        pageTop: 180,
-        scrollY: 100,
+        offsetTop: 320,
+        layoutHeight: 800,
       }),
-    ).toMatchObject({ top: "676px" });
+    ).toMatchObject({ bottom: "0px" });
   });
 
   it("uses CSS viewport fallback before visual viewport data is available", () => {
     expect(bottomSheetViewportStyle(null)).toBeUndefined();
-  });
-
-  it("retains the last viewport position through the close animation", () => {
-    const open = "500:20:120:100";
-
-    expect(retainVisualViewportSnapshot("", open, true)).toBe(open);
-    expect(retainVisualViewportSnapshot(open, "", false)).toBe(open);
   });
 
   it("subscribes to viewport resize and scroll, then removes both listeners", () => {

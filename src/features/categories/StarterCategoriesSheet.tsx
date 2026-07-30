@@ -105,7 +105,7 @@ function StarterForm({
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4">
+      <div className="px-4">
         {(["expense", "income"] as CategoryType[]).map((type) => (
           <fieldset key={type} className="mb-5">
             <legend className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">

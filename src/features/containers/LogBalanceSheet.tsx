@@ -181,7 +181,7 @@ function BalanceHistory({
         </div>
       </form>
 
-      <div className="mt-6 min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+      <div className="mt-6 px-4 pb-4">
         <Eyebrow as="h3" className="mb-2 px-1">
           History
         </Eyebrow>

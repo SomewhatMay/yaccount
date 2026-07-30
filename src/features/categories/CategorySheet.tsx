@@ -79,7 +79,6 @@ function CategoryForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Groceries"
-            autoFocus
             aria-invalid={error ? "true" : undefined}
             aria-describedby={error ? "c-name-error" : undefined}
           />

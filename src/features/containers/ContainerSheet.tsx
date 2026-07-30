@@ -92,7 +92,6 @@ function ContainerForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Vacation"
-            autoFocus
             aria-invalid={error ? "true" : undefined}
             aria-describedby={error ? "ct-name-error" : undefined}
           />

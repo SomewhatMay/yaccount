@@ -8,70 +8,78 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
-import { useCallback, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   bottomSheetViewportStyle,
-  retainVisualViewportSnapshot,
   subscribeVisualViewport,
+  type BottomSheetViewport,
 } from "@/features/ui/sheet-viewport";
 
-function visualViewportSnapshot(): string {
+function visualViewportSnapshot(): BottomSheetViewport | null {
   const viewport = window.visualViewport;
   return viewport
-    ? `${viewport.height}:${viewport.offsetTop}:${viewport.pageTop}:${window.scrollY}`
-    : "";
+    ? {
+        height: viewport.height,
+        offsetTop: viewport.offsetTop,
+        layoutHeight: window.innerHeight,
+      }
+    : null;
 }
 
-function bottomSheetViewport(snapshot: string) {
-  if (!snapshot) return null;
-  const [height, offsetTop, pageTop, scrollY] = snapshot.split(":").map(Number);
-  return { height, offsetTop, pageTop, scrollY };
+function sameViewport(
+  left: BottomSheetViewport | null,
+  right: BottomSheetViewport | null,
+) {
+  return (
+    left?.height === right?.height &&
+    left?.offsetTop === right?.offsetTop &&
+    left?.layoutHeight === right?.layoutHeight
+  );
 }
 
-function useVisualViewport(active: boolean): string {
-  const lastSnapshot = useRef("");
-  const subscribe = useCallback(
-    (onChange: () => void) => {
-      if (!active) return () => undefined;
-      const update = () => {
-        lastSnapshot.current = visualViewportSnapshot();
-        onChange();
-      };
-      update();
-      const unsubscribeViewport = subscribeVisualViewport(
-        window.visualViewport,
-        update,
-      );
-      window.addEventListener("resize", update);
-      window.addEventListener("scroll", update);
+function useVisualViewport(active: boolean): BottomSheetViewport | null {
+  const [viewport, setViewport] = useState<BottomSheetViewport | null>(null);
 
-      // WebKit may update visualViewport late or omit the expected event while
-      // animating the keyboard. Poll only while a mobile sheet is open.
-      let frame = requestAnimationFrame(function poll() {
-        update();
-        frame = requestAnimationFrame(poll);
-      });
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
 
-      return () => {
-        unsubscribeViewport();
-        window.removeEventListener("resize", update);
-        window.removeEventListener("scroll", update);
-        cancelAnimationFrame(frame);
+    let frame = 0;
+    let attempts = 0;
+
+    const settle = () => {
+      cancelAnimationFrame(frame);
+      attempts = 0;
+      const sample = () => {
+        const first = visualViewportSnapshot();
+        frame = requestAnimationFrame(() => {
+          const second = visualViewportSnapshot();
+          if (sameViewport(first, second) || attempts++ >= 6) {
+            setViewport(second);
+          } else {
+            sample();
+          }
+        });
       };
-    },
-    [active],
-  );
-  const getSnapshot = useCallback(
-    () =>
-      retainVisualViewportSnapshot(
-        lastSnapshot.current,
-        visualViewportSnapshot(),
-        active,
-      ),
-    [active],
-  );
-  return useSyncExternalStore(subscribe, getSnapshot, () => "");
+      sample();
+    };
+
+    settle();
+    const unsubscribeViewport = subscribeVisualViewport(window.visualViewport, settle);
+    window.addEventListener("resize", settle);
+    window.addEventListener("orientationchange", settle);
+
+    return () => {
+      unsubscribeViewport();
+      window.removeEventListener("resize", settle);
+      window.removeEventListener("orientationchange", settle);
+      cancelAnimationFrame(frame);
+    };
+  }, [active]);
+
+  return active ? viewport : null;
 }
 
 /**
@@ -98,15 +106,21 @@ export function ResponsiveSheet({
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
   const viewport = useVisualViewport(open && !sideways);
-  const bottomViewport = bottomSheetViewport(viewport);
+  const titleRef = useRef<HTMLHeadingElement>(null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : bottomSheetViewportStyle(bottomViewport)}
+        style={sideways ? undefined : bottomSheetViewportStyle(viewport)}
+        onOpenAutoFocus={(event) => {
+          if (!sideways) {
+            event.preventDefault();
+            titleRef.current?.focus({ preventScroll: true });
+          }
+        }}
         className={cn(
-          "max-w-full min-w-0 touch-pan-y gap-0 overflow-x-hidden overflow-y-auto overscroll-contain",
+          "max-w-full min-w-0 touch-pan-y gap-0 overflow-hidden",
           // A bottom sheet stops short of the top edge so the screen behind it
           // stays visible — you are editing a row, not leaving the ledger.
           "data-[side=bottom]:max-h-[88svh] data-[side=bottom]:rounded-t-2xl",
@@ -115,14 +129,21 @@ export function ResponsiveSheet({
         )}
       >
         <SheetHeader>
-          <SheetTitle className="font-display text-xl">{title}</SheetTitle>
+          <SheetTitle ref={titleRef} tabIndex={-1} className="font-display text-xl">
+            {title}
+          </SheetTitle>
           {description ? (
             <SheetDescription>{description}</SheetDescription>
           ) : (
             <SheetDescription className="sr-only">{title}</SheetDescription>
           )}
         </SheetHeader>
-        {children}
+        <div
+          data-slot="sheet-body"
+          className="min-h-0 flex-1 [scroll-padding-bottom:calc(1rem+env(safe-area-inset-bottom,0px))] overflow-x-hidden overflow-y-auto overscroll-contain"
+        >
+          {children}
+        </div>
       </SheetContent>
     </Sheet>
   );

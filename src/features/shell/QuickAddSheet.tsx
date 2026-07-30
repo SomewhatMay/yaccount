@@ -222,7 +222,6 @@ function QuickAddForm({
           onChange={(e) => f.onAmountChange(e.target.value)}
           placeholder="0.00"
           inputMode="decimal"
-          autoFocus
           aria-label="Amount"
           className="tnum h-14 w-40 border-0 bg-transparent p-0 font-mono text-4xl shadow-none focus-visible:ring-0 md:text-4xl"
         />

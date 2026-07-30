@@ -63,11 +63,10 @@ function IconPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search icons — rent, food, gym…"
           aria-label="Search icons"
-          autoFocus
         />
       </div>
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+      <div className="mt-3 px-4 pb-4">
         {/* The always-available way back to the plain dot. */}
         <button
           type="button"

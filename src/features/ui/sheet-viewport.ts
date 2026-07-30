@@ -6,43 +6,22 @@ export interface VisualViewportEvents {
 export interface BottomSheetViewport {
   height: number;
   offsetTop: number;
-  pageTop: number;
-  scrollY: number;
-}
-
-const IOS_CHROME_OVERLAP = 96;
-
-export function retainVisualViewportSnapshot(
-  previous: string,
-  current: string,
-  active: boolean,
-): string {
-  return active ? current || previous : previous;
-}
-
-function visualViewportTop(viewport: BottomSheetViewport): number {
-  return Math.max(0, viewport.offsetTop, viewport.pageTop - viewport.scrollY);
+  layoutHeight: number;
 }
 
 export function bottomSheetViewportStyle(viewport: BottomSheetViewport | null):
   | {
-      bottom: "auto";
+      bottom: string;
       maxHeight: string;
-      paddingBottom: string;
-      scrollPaddingBottom: string;
-      top: string;
-      translate: "0 -100%";
     }
   | undefined {
   if (!viewport) return undefined;
-  const bottomEdge = visualViewportTop(viewport) + viewport.height + IOS_CHROME_OVERLAP;
   return {
-    bottom: "auto",
-    maxHeight: `${viewport.height * 0.88 + IOS_CHROME_OVERLAP}px`,
-    paddingBottom: `${IOS_CHROME_OVERLAP}px`,
-    scrollPaddingBottom: `${IOS_CHROME_OVERLAP}px`,
-    top: `${bottomEdge}px`,
-    translate: "0 -100%",
+    bottom: `${Math.max(
+      0,
+      viewport.layoutHeight - viewport.offsetTop - viewport.height,
+    )}px`,
+    maxHeight: `${viewport.height * 0.88}px`,
   };
 }
 

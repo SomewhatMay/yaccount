@@ -37,6 +37,8 @@ describe("iPhone PWA interaction layout", () => {
     expect(sheet).toContain("touch-pan-y");
     expect(sheet).not.toContain("scrollIntoView");
     expect(sheet).not.toContain("bottomBleedStyle");
+    expect(sheet).not.toContain("function poll");
+    expect(sheet).not.toContain("IOS_CHROME_OVERLAP");
   });
 
   it("waits for the FAB click before mounting quick-add", () => {
