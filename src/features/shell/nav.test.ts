@@ -5,6 +5,7 @@ import {
   TAB_SLOTS,
   activeTab,
   destinationFor,
+  normalizePathname,
 } from "@/features/shell/nav";
 
 /**
@@ -38,7 +39,15 @@ describe("DESTINATIONS — every screen the app has", () => {
 
   it("resolves a pathname to its destination", () => {
     expect(destinationFor("/ledger")?.label).toBe("Ledger");
+    expect(destinationFor("/ledger/")?.label).toBe("Ledger");
     expect(destinationFor("/nope")).toBeUndefined();
+  });
+});
+
+describe("normalizePathname", () => {
+  it("removes trailing slashes without changing root", () => {
+    expect(normalizePathname("/")).toBe("/");
+    expect(normalizePathname("/ledger/")).toBe("/ledger");
   });
 });
 
@@ -83,6 +92,7 @@ describe("activeTab — which slot lights up", () => {
   it("marks a tab's own route", () => {
     expect(activeTab("/")).toBe("/");
     expect(activeTab("/ledger")).toBe("/ledger");
+    expect(activeTab("/ledger/")).toBe("/ledger");
     expect(activeTab("/inbox")).toBe("/inbox");
   });
 
@@ -90,6 +100,7 @@ describe("activeTab — which slot lights up", () => {
     // Routes stay stable at every breakpoint (locked), so /plan is a real screen
     // on a phone — the tab bar has to say how you got there.
     expect(activeTab("/plan")).toBe("more");
+    expect(activeTab("/plan/")).toBe("more");
     expect(activeTab("/goals")).toBe("more");
     expect(activeTab("/settings")).toBe("more");
   });

@@ -5,7 +5,11 @@ import { usePathname } from "next/navigation";
 import { useAtomValue } from "jotai";
 import { cn } from "@/lib/utils";
 import { pendingCountAtom } from "@/features/store";
-import { DESTINATIONS, destinationFor } from "@/features/shell/nav";
+import {
+  DESTINATIONS,
+  destinationFor,
+  normalizePathname,
+} from "@/features/shell/nav";
 import { AuthButton } from "@/features/auth/AuthButton";
 
 /** Settings sits apart from the ledger's screens — it is where you go when
@@ -17,11 +21,12 @@ const SETTINGS = destinationFor("/settings")!;
  * no reason to hide six of them behind a sheet, so the phone's More list simply
  * unfolds here.
  *
- * Same rule as the tab bar: the current screen is full-strength iris and nothing
- * else is (§12.2).
+ * The current screen uses a quiet iris plate as well as full-strength text, so
+ * selected state remains obvious at a glance.
  */
 export function SidebarRail() {
   const pathname = usePathname();
+  const activeHref = normalizePathname(pathname);
   const pending = useAtomValue(pendingCountAtom);
 
   return (
@@ -41,7 +46,7 @@ export function SidebarRail() {
               href={d.href}
               label={d.label}
               icon={d.icon}
-              current={pathname === d.href}
+              current={activeHref === d.href}
               badge={d.href === "/inbox" ? pending : 0}
             />
           ))}
@@ -54,7 +59,7 @@ export function SidebarRail() {
             href={SETTINGS.href}
             label={SETTINGS.label}
             icon={SETTINGS.icon}
-            current={pathname === SETTINGS.href}
+            current={activeHref === SETTINGS.href}
             badge={0}
           />
         </ul>
@@ -88,7 +93,7 @@ function RailLink({
           "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors duration-[var(--dur-1)]",
           "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
           current
-            ? "text-primary"
+            ? "bg-primary/10 text-primary"
             : "text-muted-foreground hover:text-foreground hover:bg-accent/60",
         )}
       >

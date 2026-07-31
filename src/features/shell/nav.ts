@@ -68,8 +68,14 @@ export const DESTINATIONS: Destination[] = [
   },
 ];
 
+/** Next's trailing-slash redirects must not affect selected navigation state. */
+export function normalizePathname(pathname: string): string {
+  return pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
+}
+
 export function destinationFor(pathname: string): Destination | undefined {
-  return DESTINATIONS.find((d) => d.href === pathname);
+  const normalized = normalizePathname(pathname);
+  return DESTINATIONS.find((d) => d.href === normalized);
 }
 
 /**
@@ -107,7 +113,8 @@ export const MORE_DESTINATIONS: Destination[] = DESTINATIONS.filter(
  * the bar claiming you are nowhere.
  */
 export function activeTab(pathname: string): string | null {
-  const tab = TAB_SLOTS.find((t) => t.href === pathname);
+  const normalized = normalizePathname(pathname);
+  const tab = TAB_SLOTS.find((t) => t.href === normalized);
   if (tab?.href) return tab.href;
-  return MORE_DESTINATIONS.some((d) => d.href === pathname) ? "more" : null;
+  return MORE_DESTINATIONS.some((d) => d.href === normalized) ? "more" : null;
 }

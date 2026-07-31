@@ -10,10 +10,8 @@ import { TAB_SLOTS, activeTab } from "@/features/shell/nav";
 /**
  * The thumb bar (< lg). Four slots, locked: Home · Ledger · Inbox · More.
  *
- * The active slot is drawn in **full-strength iris** and nothing else is —
- * §12.2 spends the one spark on the FAB, the active tab and the focus ring, so
- * there is no pill, no wash and no underline here. A tinted plate under the
- * current tab would be exactly the 4%-iris-everywhere habit M11 removed.
+ * The active slot uses full-strength iris plus a short top marker. The marker
+ * keeps the current location visible without relying on color alone.
  *
  * It sits above the home-indicator inset (`env(safe-area-inset-bottom)`), and
  * the page reserves matching space so the last row of a register is never stuck
@@ -57,9 +55,11 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
             </>
           );
           const className = cn(
-            "flex h-[var(--mobile-tab-bar-height)] w-full flex-col items-center justify-center gap-1.5 transition-colors duration-[var(--dur-1)]",
+            "relative flex h-[var(--mobile-tab-bar-height)] w-full flex-col items-center justify-center gap-1.5 transition-colors duration-[var(--dur-1)]",
             "focus-visible:ring-ring focus-visible:ring-inset focus-visible:ring-2 focus-visible:outline-none",
-            current ? "text-primary" : "text-muted-foreground",
+            current
+              ? "text-primary after:bg-primary after:absolute after:inset-x-1/3 after:top-0 after:h-0.5 after:rounded-full"
+              : "text-muted-foreground",
           );
 
           return (
@@ -77,6 +77,7 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
                   type="button"
                   onClick={onMore}
                   aria-label="More screens"
+                  aria-pressed={current}
                   className={className}
                 >
                   {inner}
