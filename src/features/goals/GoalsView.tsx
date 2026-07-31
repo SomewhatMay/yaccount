@@ -20,6 +20,7 @@ import {
   createRecurringRule,
   unarchiveGoal,
   uncancelGoal,
+  updateContainer,
   updateGoal,
 } from "@/core/commands";
 import { formatCents } from "@/core/money";
@@ -65,6 +66,7 @@ import {
 import { useFocusParam } from "@/features/useFocusParam";
 import { describeGoal } from "@/features/goals/describe";
 import { GoalSheet, type GoalFormInput } from "@/features/goals/GoalSheet";
+import { renamedGoalContainer } from "@/features/goals/rename-container";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -179,8 +181,10 @@ export function GoalsView() {
 
   async function handleSubmit(input: GoalFormInput, editing: Goal | null) {
     if (editing) {
-      // Edit the goal row (entity-LWW). Container + cycle basis are fixed; the
-      // factory re-validates the mode/kind cross-field rules.
+      const renamedContainer = renamedGoalContainer(editing, input.name, containers);
+
+      // Edit the goal and keep its container name in sync. The cycle basis stays
+      // fixed; the factory re-validates the mode/kind cross-field rules.
       const next = makeGoal({
         id: editing.id,
         container_id: editing.container_id,
@@ -196,6 +200,9 @@ export function GoalsView() {
         created_date: editing.created_date,
         completed_date: editing.completed_date,
       });
+      if (renamedContainer) {
+        await dispatch(updateContainer(renamedContainer));
+      }
       await dispatch(updateGoal(next));
       setSheet(null);
       flashRow({ id: next.id });
