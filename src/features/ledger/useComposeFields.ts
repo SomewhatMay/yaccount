@@ -6,6 +6,7 @@ import type { Category, Container, Transaction } from "@/core/model";
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
+  rankVendorSourcesByUsage,
 } from "@/core/engine/usage-ranking";
 import { dispatchAtom, flashRowAtom } from "@/features/store";
 import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
@@ -60,6 +61,10 @@ export function useComposeFields({
         transactions,
       ),
     [containers, transactions],
+  );
+  const vendorSources = useMemo(
+    () => rankVendorSourcesByUsage(transactions),
+    [transactions],
   );
 
   const [kind, setKindState] = useState<ComposeKind>(initialKind);
@@ -204,6 +209,7 @@ export function useComposeFields({
     },
     vendor,
     setVendor,
+    vendorSources,
     notes,
     setNotes,
     amountStr,

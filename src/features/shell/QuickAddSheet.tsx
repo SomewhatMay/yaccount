@@ -23,6 +23,7 @@ import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
 import { SignToggle } from "@/features/ledger/SignToggle";
+import { VendorSourceInput } from "@/features/ledger/VendorSourceInput";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
 import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
@@ -231,9 +232,10 @@ function QuickAddForm({
         <FieldLabel>
           {f.kind === "transfer" ? "Label" : f.kind === "income" ? "Source" : "Vendor"}
         </FieldLabel>
-        <Input
+        <VendorSourceInput
           value={f.vendor}
           onChange={(e) => f.setVendor(e.target.value)}
+          suggestions={f.kind === "transfer" ? [] : f.vendorSources}
           placeholder={
             f.kind === "transfer"
               ? "Optional"

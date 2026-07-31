@@ -7,6 +7,7 @@ import { isTransfer } from "@/core/engine/balances";
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
+  rankVendorSourcesByUsage,
 } from "@/core/engine/usage-ranking";
 import { formatCents, parseDollars } from "@/core/money";
 import {
@@ -22,6 +23,7 @@ import {
   type Sign,
 } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
+import { VendorSourceInput } from "@/features/ledger/VendorSourceInput";
 import { InlineError } from "@/features/ui/InlineError";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
@@ -192,6 +194,10 @@ function EditForm({
       ),
     [containers, transactions, tx.container_id],
   );
+  const vendorSources = useMemo(
+    () => rankVendorSourcesByUsage(transactions),
+    [transactions],
+  );
 
   const [date, setDate] = useState(tx.date);
   const [time, setTime] = useState(() => timeInputValue(tx.entered_at));
@@ -253,10 +259,11 @@ function EditForm({
           <Label htmlFor="edit-vendor">
             {cat?.type === "income" ? "Source" : "Vendor"}
           </Label>
-          <Input
+          <VendorSourceInput
             id="edit-vendor"
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
+            suggestions={vendorSources}
           />
         </div>
         <div className="grid gap-1.5">

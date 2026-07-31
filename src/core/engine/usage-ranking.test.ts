@@ -13,6 +13,7 @@ import {
   rankCategoriesByUsage,
   rankContainersByUsage,
   rankShortcutsByUsage,
+  rankVendorSourcesByUsage,
 } from "./usage-ranking";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -161,6 +162,41 @@ describe("usage-ranked selectors", () => {
       "destination",
       "unused",
     ]);
+  });
+
+  it("ranks normalized vendor/source names by frequency, then recency", () => {
+    const rows = [
+      entry("a1", "cat", "wallet", "2026-07-01T00:00:00.000Z"),
+      entry("a2", "cat", "wallet", "2026-07-02T00:00:00.000Z"),
+      entry("b1", "cat", "wallet", "2026-07-04T00:00:00.000Z"),
+      entry("c1", "cat", "wallet", "2026-07-03T00:00:00.000Z"),
+    ];
+    rows[0].vendor_source = " Cafe ";
+    rows[1].vendor_source = "cafe";
+    rows[2].vendor_source = "Employer";
+    rows[3].vendor_source = "Market";
+
+    expect(rankVendorSourcesByUsage(rows)).toEqual(["cafe", "Employer", "Market"]);
+  });
+
+  it("excludes transfers and inactive rows from vendor/source suggestions", () => {
+    const live = entry("live", "cat", "wallet", "2026-07-01T00:00:00.000Z");
+    live.vendor_source = "Live";
+    const pending = {
+      ...entry("pending-vendor", "cat", "wallet", "2026-07-03T00:00:00.000Z"),
+      vendor_source: "Pending",
+      inbox_status: "pending" as const,
+    };
+    const transfer = makeTransfer({
+      id: "move",
+      date: "2026-07-02",
+      amount: 100,
+      container_id: "source",
+      to_container_id: "destination",
+      vendor_source: "Source → Destination",
+    });
+
+    expect(rankVendorSourcesByUsage([pending, transfer, live])).toEqual(["Live"]);
   });
 
   it("ranks shortcuts by matching active logged shape", () => {

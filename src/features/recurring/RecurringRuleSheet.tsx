@@ -19,10 +19,12 @@ import {
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
+  rankVendorSourcesByUsage,
 } from "@/core/engine/usage-ranking";
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
+import { VendorSourceInput } from "@/features/ledger/VendorSourceInput";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { Button } from "@/components/ui/button";
@@ -123,6 +125,10 @@ function RuleForm({
         transactions,
       ),
     [containers, rule, transactions],
+  );
+  const vendorSources = useMemo(
+    () => rankVendorSourcesByUsage(transactions),
+    [transactions],
   );
 
   const editingTransfer = rule ? isTransferRule(rule) : false;
@@ -228,11 +234,12 @@ function RuleForm({
           <Label htmlFor="rr-vendor">
             {mode === "transfer" ? "Note" : "Payee / source"}
           </Label>
-          <Input
+          <VendorSourceInput
             id="rr-vendor"
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
             placeholder={mode === "transfer" ? "e.g. Move to savings" : "e.g. Netflix"}
+            suggestions={mode === "transfer" ? [] : vendorSources}
           />
         </div>
 

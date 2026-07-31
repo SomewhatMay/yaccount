@@ -60,6 +60,36 @@ export function rankContainersByUsage(
   return rank(candidates, usage, (container) => container.name);
 }
 
+/**
+ * Known payees/funding sources, most-used first. Case and surrounding whitespace
+ * do not split one name; the most recently used spelling wins.
+ */
+export function rankVendorSourcesByUsage(transactions: Transaction[]): string[] {
+  const usage = new Map<string, Usage & { value: string }>();
+  for (const row of activeRows(transactions)) {
+    if (row.to_container_id) continue;
+    const value = row.vendor_source.trim().normalize("NFC");
+    if (!value) continue;
+    const key = value.toLocaleLowerCase();
+    const recent = row.entered_at ?? `${row.date}T00:00:00.000Z`;
+    const current = usage.get(key);
+    usage.set(key, {
+      count: (current?.count ?? 0) + 1,
+      recent: current && current.recent > recent ? current.recent : recent,
+      value: !current || recent >= current.recent ? value : current.value,
+    });
+  }
+
+  return [...usage.values()]
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        b.recent.localeCompare(a.recent) ||
+        a.value.localeCompare(b.value),
+    )
+    .map(({ value }) => value);
+}
+
 function shortcutShape(row: Transaction, template: boolean): string {
   return JSON.stringify([
     template && row.to_container_id ? -Math.abs(row.amount) : row.amount,
