@@ -4,6 +4,7 @@ import {
   goalContributed,
   goalBasis,
   goalProgress,
+  goalRemainingProgress,
   requiredMonthly,
   requiresReplan,
   isAchieved,
@@ -67,6 +68,7 @@ describe("spend_down goal — progress is contributions, never balance (§5.9.3)
     expect(goalContributed(goal, txns)).toBe(20000); // the shirt never touched it
     expect(goalProgress(goal, txns)).toBe(1);
     expect(requiredMonthly(goal, txns, "2026-08-01")).toBe(0);
+    expect(goalRemainingProgress(goal, txns)).toBe(0.9);
   });
 
   it("half-saved then a spend: remaining = target − contributed (schedule untouched)", () => {
@@ -87,6 +89,10 @@ describe("spend_down goal — progress is contributions, never balance (§5.9.3)
       created_date: "2026-01-01",
     });
     expect(goalContributed(g, [contribute(2000, "2026-02-01", "c1")])).toBe(10000);
+  });
+
+  it("has no remaining fraction before funding", () => {
+    expect(goalRemainingProgress(goal, [])).toBeNull();
   });
 
   it("excludes pending transfers — approval is what moves money (§10 #3)", () => {
@@ -227,6 +233,7 @@ describe("reserve goal — progress is balance; a withdrawal re-opens the ask (�
     expect(goalProgress(goal, afterCrisis)).toBe(0.7);
     // the plan re-claims the shortfall over the months left (deadline basis=balance)
     expect(requiredMonthly(goal, afterCrisis, "2026-07-01")).toBe(Math.ceil(300000 / 7));
+    expect(goalRemainingProgress(goal, afterCrisis)).toBeNull();
   });
 
   it("reserve never latches to achieved (it oscillates, §5.9.6)", () => {

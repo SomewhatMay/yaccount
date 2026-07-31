@@ -35,6 +35,7 @@ import {
   goalBasis,
   goalContributed,
   goalProgress,
+  goalRemainingProgress,
   isAchieved,
   projectedCompletion,
   requiredMonthly,
@@ -485,12 +486,17 @@ function GoalCard({
   const basis = goalBasis(goal, txns);
   const balance = containerBalance(txns, goal.container_id);
   const progress = goalProgress(goal, txns);
+  const remainingProgress = goalRemainingProgress(goal, txns);
   const ask = requiredMonthly(goal, txns, now);
   const achieved = isAchieved(goal, txns);
   const replan = requiresReplan(goal, txns, now);
   const projected = projectedCompletion(goal, txns, now);
   const openEnded = goal.mode === "fixed" && goal.target_amount === null;
   const pct = progress === null ? null : Math.min(100, Math.round(progress * 100));
+  const remainingPct =
+    remainingProgress === null
+      ? null
+      : Math.min(100, Math.max(0, Math.round(remainingProgress * 100)));
 
   return (
     <div
@@ -557,8 +563,22 @@ function GoalCard({
         </div>
       )}
 
+      {remainingPct != null && (
+        <div className="mt-3 space-y-1.5">
+          <div className="text-muted-foreground flex items-baseline justify-between gap-3 text-xs">
+            <span>Remaining</span>
+            <span className="tnum font-mono">{formatCents(balance)}</span>
+          </div>
+          <Progress
+            value={remainingPct}
+            aria-label={`${goal.name ?? containerName} ${remainingPct}% remaining`}
+            className="[&>[data-slot=progress-indicator]]:bg-positive h-1.5"
+          />
+        </div>
+      )}
+
       <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        {goal.kind === "spend_down" && (
+        {goal.kind === "spend_down" && remainingProgress === null && (
           <span>
             <span className="tnum font-mono">{formatCents(balance)}</span> available
           </span>

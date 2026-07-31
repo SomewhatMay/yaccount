@@ -72,6 +72,17 @@ export function goalProgress(goal: Goal, txns: Transaction[]): number | null {
 }
 
 /**
+ * Portion of contributed money still available to spend. Only spend-down goals
+ * deplete; reserve goals already use their live balance as ordinary progress.
+ */
+export function goalRemainingProgress(goal: Goal, txns: Transaction[]): number | null {
+  if (goal.kind !== "spend_down") return null;
+  const contributed = goalContributed(goal, txns);
+  if (contributed <= 0) return null;
+  return containerBalance(txns, goal.container_id) / contributed;
+}
+
+/**
  * `required_monthly` (§5.9.4/.7) — the per-month ask the monthly plan (§6.8) sums:
  *   - `passive` → 0 (claims nothing).
  *   - `fixed`   → the committed M until the target is reached (0 once `basis ≥
