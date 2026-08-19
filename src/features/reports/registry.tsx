@@ -77,12 +77,9 @@ import {
 /**
  * ── The dashboard as a LIST, not a layout ───────────────────────────────────
  *
- * Every widget is one self-contained entry the dashboard maps over. That shape
- * is the point: a move-anything-around widget system is the next thing planned
- * for this screen, and with a registry that becomes a wrapper over this list
- * rather than a rewrite of a hand-laid JSX blob. The same stable `id` is already
- * doing three jobs — it keys the collapse preference, it anchors the per-widget
- * period override (§6.1), and it names the widget's error boundary.
+ * Every widget is one self-contained entry the dashboard maps over. The
+ * device-local layout wraps this registry without changing its stable ids. An id
+ * keys layout, collapse, per-widget period (§6.1), and the error boundary.
  *
  * A widget receives its window, never the global one: `range` is already resolved
  * to whatever this widget is showing. Each `render` returns a COMPONENT, so the
@@ -604,8 +601,7 @@ function Budgets({ range, categories, transactions, budgetTargets }: WidgetConte
 // ── The list itself ──────────────────────────────────────────────────────────
 
 /**
- * Fixed order for M11 (the user's call) — reordering is the widget system that
- * comes next, and this list is the thing it will reorder.
+ * Default order. A device-local preference may reorder or hide these stable ids.
  */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {

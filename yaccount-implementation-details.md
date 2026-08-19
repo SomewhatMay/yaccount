@@ -333,6 +333,6 @@ history.
 
 ## 12. Deferred
 
-See spec §8 for the full list. The two that most often need restating: **M10 Capacitor native
-packaging** and **movable/hideable dashboard widgets**, both deferred by explicit user decision.
-The widget registry's stable ids are the seam the second will wrap — keep them stable.
+See spec §8 for the full list. **M10 Capacitor native packaging** remains deferred by explicit
+user decision. Dashboard widget order and visibility are device-local preferences layered over
+the stable-id registry.

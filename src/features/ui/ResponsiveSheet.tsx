@@ -94,6 +94,7 @@ export function ResponsiveSheet({
   title,
   description,
   className,
+  bodyClassName,
   children,
 }: {
   open: boolean;
@@ -101,6 +102,7 @@ export function ResponsiveSheet({
   title: React.ReactNode;
   description?: React.ReactNode;
   className?: string;
+  bodyClassName?: string;
   children: React.ReactNode;
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
@@ -140,7 +142,10 @@ export function ResponsiveSheet({
         </SheetHeader>
         <div
           data-slot="sheet-body"
-          className="min-h-0 flex-1 [scroll-padding-bottom:calc(1rem+env(safe-area-inset-bottom,0px))] overflow-x-hidden overflow-y-auto overscroll-contain"
+          className={cn(
+            "min-h-0 flex-1 [scroll-padding-bottom:calc(1rem+env(safe-area-inset-bottom,0px))] overflow-x-hidden overflow-y-auto overscroll-contain",
+            bodyClassName,
+          )}
         >
           {children}
         </div>
