@@ -12,7 +12,14 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 62 Vitest files, 999 tests passing. 41 Playwright cases pass with 1 expected desktop-touch skip.
+- 64 Vitest files, 1,013 tests passing. Playwright currently has 42 passes, 3 expected
+  desktop-touch skips, and 3 pre-existing failures that also fail on `main` — unrelated to any
+  current work:
+  - `keeps FAB geometry` (mobile) expects a 76px bottom offset while the current CSS and
+    Chromium compute 64px.
+  - `FAB hold hints how to create the first shortcut` (desktop and mobile) is load-flaky: the
+    550ms keyboard hold does not open the chooser under a full parallel run, but the test passes
+    when run on its own.
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
   names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
   screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
@@ -22,17 +29,17 @@ repeat them — it says where things stand and what will bite you.
   deliberately do not.
 - `DB_VERSION = 3`. The Drive layout is `snapshot.json`, `ledger_<id>.json`,
   `ledger_<id>_<YYYY-MM>.json`, `origin.json`, and inert `backup_*` / `orphan_*` worlds.
+- Dashboard widgets can be reordered or hidden from a responsive Customize sheet. The versioned
+  layout preference is device-local; Overall balance is always visible and first.
 
 ## Next
 
 The product quality phases are complete. Choose the next scoped change explicitly, then start it
 on a fresh branch off freshly pulled `main`.
 
-**Deferred — do not start either without an explicit go-ahead:**
+**Deferred — do not start without an explicit go-ahead:**
 
 - **M10 Capacitor** native packaging.
-- **Movable / hideable dashboard widgets.** Wrap the existing stable-id widget registry when this
-  is eventually built; do not restructure it in the meantime.
 
 ## Verify
 

@@ -37,6 +37,30 @@ async function swipeUp(page: Page, target: Locator) {
   await session.detach();
 }
 
+async function dragUpByTouch(page: Page, target: Locator, distance: number) {
+  const box = await target.boundingBox();
+  if (!box) throw new Error("Drag handle is not visible.");
+
+  const session = await page.context().newCDPSession(page);
+  const x = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x, y: startY }],
+  });
+  for (let step = 1; step <= 6; step++) {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x, y: startY - (distance * step) / 6 }],
+    });
+  }
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await session.detach();
+}
+
 async function createCategory(
   page: Page,
   name: string,
@@ -80,7 +104,64 @@ async function logExpense(page: Page, payee: string, amount: string, category: s
 test.beforeEach(async ({ context }) => {
   // Every test gets a fresh context: no IndexedDB, localStorage, cookies, auth,
   // Drive profile, or ordering dependency can leak from another test.
-  await context.addInitScript(() => localStorage.clear());
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem("yaccount.e2e.storage-cleared")) return;
+    localStorage.clear();
+    sessionStorage.setItem("yaccount.e2e.storage-cleared", "true");
+  });
+});
+
+test("customizes dashboard widget order and visibility", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Customize dashboard" }).click();
+  await expect(page.getByRole("heading", { name: "Customize dashboard" })).toBeVisible();
+
+  const rows = page.locator("[data-widget-id]");
+  await expect(rows.first()).toHaveAttribute("data-widget-id", "balance");
+  await expect(
+    page.getByRole("checkbox", { name: "Show Overall balance" }),
+  ).toBeDisabled();
+
+  const recentHandle = page.getByRole("button", { name: "Move Recent entries" });
+  await recentHandle.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Space");
+  await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
+
+  await page.getByRole("checkbox", { name: "Show Budget pace" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("heading", { name: "Budget pace" })).toBeHidden();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Budget pace" })).toBeHidden();
+  await page.getByRole("button", { name: "Compare with another period" }).click();
+  await expect(page.getByRole("heading", { name: "Recent entries" })).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Budget pace" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Compare with another period" }).click();
+
+  await page.getByRole("button", { name: "Customize dashboard" }).click();
+  await expect(page.getByRole("heading", { name: "Customize dashboard" })).toBeVisible();
+  await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
+  await page.getByRole("button", { name: "Reset" }).click();
+  await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "pace");
+  await expect(page.getByRole("checkbox", { name: "Show Budget pace" })).toBeChecked();
+});
+
+test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Touch regression.");
+
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Customize dashboard" }).tap();
+  await dragUpByTouch(
+    page,
+    page.getByRole("button", { name: "Move Recent entries" }),
+    52,
+  );
+  await expect(page.locator("[data-widget-id]").nth(1)).toHaveAttribute(
+    "data-widget-id",
+    "recent",
+  );
 });
 
 test("logs an expense and shows it in the ledger", async ({ page }) => {
@@ -258,7 +339,10 @@ test("⌘K finds an entry by a word that is only in its notes", async ({ page })
   await openPalette(page);
   // The word appears in no title anywhere — only in that one row's notes.
   await page.getByPlaceholder(/Search everything/).fill("aubergine");
-  await page.getByRole("option", { name: /E2E palette payee/ }).first().click();
+  await page
+    .getByRole("option", { name: /E2E palette payee/ })
+    .first()
+    .click();
 
   await expect(page).toHaveURL(/\/ledger/);
   await expect(page.getByText("E2E palette payee", { exact: true })).toBeVisible();
@@ -282,7 +366,10 @@ test("⌘K lands on a category, flagged on its own screen", async ({ page }) => 
 
   await openPalette(page);
   await page.getByPlaceholder(/Search everything/).fill("E2E findable");
-  await page.getByRole("option", { name: /E2E findable category/ }).first().click();
+  await page
+    .getByRole("option", { name: /E2E findable category/ })
+    .first()
+    .click();
 
   await expect(page).toHaveURL(/\/categories/);
   await expect(page.getByText("E2E findable category", { exact: true })).toBeVisible();
@@ -502,9 +589,7 @@ test("places toasts below mobile top navigation and bottom-right on desktop", as
   page,
 }, testInfo) => {
   await createCategory(page, "E2E toast placement");
-  await page
-    .getByRole("button", { name: "Actions for E2E toast placement" })
-    .click();
+  await page.getByRole("button", { name: "Actions for E2E toast placement" }).click();
   await page.getByRole("menuitem", { name: "Archive" }).click();
 
   const toast = page.locator("[data-sonner-toast][data-mounted=true]").last();

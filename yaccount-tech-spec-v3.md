@@ -655,8 +655,6 @@ network endpoint, incompatible with a flat-file serverless store).
 ## 8. Out of scope / deferred
 
 - **M10 Capacitor native packaging** and the native OAuth flow (§3.2).
-- **Movable / hideable dashboard widgets.** The fixed ordered registry of stable widget ids is
-  the seam for this work; keep the ids stable.
 - **Native home-screen widgets** (WidgetKit and equivalent).
 - Receipts and attachments, bank-feed integration, transaction splitting / multi-category tagging.
 - Multi-currency. Multi-account / household support.
@@ -785,10 +783,11 @@ varies per screen is noise wearing a label's clothes.
   destination is marked by full-strength iris on icon and label, never a tinted plate. **Routes
   are stable at every breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add
   FAB is present at every width.
-- **Dashboard = an ordered widget registry** of stable ids. Secondary widgets fold; fold state and
-  any period override persist per id. Numbers identifying an honest ledger subset use real
-  `/ledger` deep links; summaries and ambiguous chart marks do not pretend to be links. **This
-  registry is the seam for later reordering/visibility work, not that work itself.**
+- **Dashboard = an ordered widget registry** of stable ids. The device-local layout preference
+  reorders and hides registry entries; Overall balance is always visible and first. Secondary
+  widgets fold; fold state and any period override persist per id. Numbers identifying an honest
+  ledger subset use real `/ledger` deep links; summaries and ambiguous chart marks do not pretend
+  to be links.
 - **Row actions hide until hover — but only where there is a hover.** A touch device has none, so
   the hiding is scoped to hover-capable pointers, and the whole control lives in one place
   (`RowActions`). Reading this rule literally once left phones with no row actions at all.
