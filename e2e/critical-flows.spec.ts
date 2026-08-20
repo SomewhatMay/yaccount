@@ -576,8 +576,12 @@ test("keeps FAB geometry and shows a compact money-add mark", async ({
   expect(viewport.width - fabBox!.x - fabBox!.width).toBe(
     testInfo.project.name === "mobile" ? 20 : 32,
   );
+  // Mobile: the FAB clears the tab bar by 0.5rem, so this tracks
+  // `--mobile-tab-bar-height` (3.5rem) + 8px. It was pinned to a hardcoded
+  // 4.25rem until 751b5a2 tied it to the variable; the constant here is the
+  // half of that change that was missed.
   expect(viewport.height - fabBox!.y - fabBox!.height).toBe(
-    testInfo.project.name === "mobile" ? 76 : 32,
+    testInfo.project.name === "mobile" ? 64 : 32,
   );
 
   await fab.focus();

@@ -12,14 +12,9 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 64 Vitest files, 1,013 tests passing. Playwright currently has 42 passes, 3 expected
-  desktop-touch skips, and 3 pre-existing failures that also fail on `main` — unrelated to any
-  current work:
-  - `keeps FAB geometry` (mobile) expects a 76px bottom offset while the current CSS and
-    Chromium compute 64px.
-  - `FAB hold hints how to create the first shortcut` (desktop and mobile) is load-flaky: the
-    550ms keyboard hold does not open the chooser under a full parallel run, but the test passes
-    when run on its own.
+- 64 Vitest files, 1,013 tests passing. Playwright is 45 passes and 3 expected desktop-touch
+  skips at `--workers=2`, with no failures. **Run e2e at `--workers=2`** — the default six
+  workers flake the FAB hold-gesture cases (see Known issues).
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
   names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
   screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
@@ -60,7 +55,9 @@ mismatch. Harmless, noisy in the Playwright web-server log, not yet fixed.
 
 The four FAB hold-gesture Playwright cases are timing-sensitive and flake under six-worker CPU
 contention — a different two or three fail on each full-suite run, on unmodified `main` as well.
-They pass reliably at `--workers=2`. The gesture, not the app, is what is being measured.
+They pass reliably at `--workers=2`. The gesture, not the app, is what is being measured. The
+cause is margin: `FAB_HOLD_MS` is 500 and the tests hold for 550, so a `setTimeout` delayed more
+than 50ms by CPU contention never fires before the release. Widening the test hold would fix it.
 
 ## Hazards
 
