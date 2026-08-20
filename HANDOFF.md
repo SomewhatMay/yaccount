@@ -13,8 +13,8 @@ repeat them — it says where things stand and what will bite you.
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
 - 64 Vitest files, 1,017 tests passing. Playwright is 47 passes and 3 expected desktop-touch
-  skips at `--workers=2`, with no failures. **Run e2e at `--workers=2`** — at the default six
-  workers the suite flakes broadly, not just on the FAB (see Known issues).
+  skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
+  issues).
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
   names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
   screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
@@ -50,29 +50,32 @@ Setup, Node version and the `.env` requirement are in [`README.md`](README.md).
 
 ## Known issues
 
-The Playwright suite flakes under load, and **the cause is not yet established.** A different
-one to four tests fail on each full-suite run at the default worker count. The failures are not
-confined to one area — `FAB hold hints`, `clear-all`, `exports every change`, `overflowing
-selects` and `ledger notes` have all failed at least once. They pass when run on their own.
+**Resolved.** The suite flaked because six browser workers plus the Next dev server oversubscribe
+a 12-thread box: the server gets starved and the timing-sensitive cases miss their windows.
+`playwright.config.ts` now pins `workers: 4`. Measured with a clean server between every run:
 
-Worker count *correlates*, but do not treat it as proven. Separate invocations:
+| Workers | Runs | Failing runs | Wall clock |
+| ------- | ---- | ------------ | ---------- |
+| 6 (default) | 4 | 2 | ~53s |
+| **4** | **8** | **0** | **~55s** |
+| 2 | 4 | 0 | ~85s |
 
-| Workers | Runs | Failures per run |
-| ------- | ---- | ---------------- |
-| 6 (default) | 4 | 1, 1, 2, 1 |
-| 4 | 3 | 0, 0, 1 |
-| 2 | 3 | 0, 0, 0 |
+Four costs nothing over six — the machine was already saturated — so just run `npm run test:e2e`.
 
-An interleaved A/B then contradicted that: one 6-worker run came back clean, and one 2-worker run
-failed 31 of 45. **That harness was at fault** — it looped runs back-to-back, so the next run
-started before the previous dev server released port 3100. Any future A/B must tear the server
-down and wait between runs, or the numbers are noise.
+**Do not loop e2e runs back-to-back.** Playwright tears its dev server down as the next run starts,
+`reuseExistingServer` attaches to the dying one, and ~33 of 47 tests fail at once. That mass
+failure is a measurement artifact, not a suite fault; it cost real time to chase twice. Wait for
+port 3100 to clear between runs.
 
-Practical advice until this is settled: run e2e at `--workers=2`. It has never failed that way in
-a clean invocation.
+**The static export fails two tests that pass against the dev server.** Serving `out/` after
+`npm run build` is faster (~40s) but `creates, edits, refreshes, and quietly hides ledger notes`
+and `⌘K lands on a category` fail on EVERY run — deterministic, not flaky. Nobody has looked into
+why, and `out/` is what actually deploys, so it may be a real production-only bug. Note also that
+React only reports hydration mismatches in dev, so the diagnostics hydration guard would go blind
+if the suite were ever pointed at the export.
 
-The FAB hold margin was a real but separate fragility: `FAB_HOLD_MS` is 500 and the app cancels
-the pending timer on release, so the old 550ms hold left 50ms of slack. It is now
+The FAB hold margin was a separate fragility: `FAB_HOLD_MS` is 500 and the app cancels the pending
+timer on release, so the old 550ms hold left 50ms of slack. It is now
 `FAB_HOLD_PAST_THRESHOLD_MS` (800) in the spec. That hardening did not cure the flake on its own.
 
 ## Hazards
