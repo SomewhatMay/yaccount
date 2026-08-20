@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
+  BROWSER_ONLY_FACTS,
   buildDiagnostics,
   createLogger,
   getLogLevel,
   logBuffer,
   setLogLevel,
+  withoutBrowserFacts,
 } from "./logger";
 
 beforeEach(() => {
@@ -98,6 +100,51 @@ describe("buildDiagnostics — what actually gets pasted into a bug report", () 
 
   it("still produces something useful when nothing has been logged", () => {
     expect(buildDiagnostics({ ok: 1 })).toMatch(/no log/i);
+  });
+});
+
+describe("withoutBrowserFacts — the first render has to match the prerendered HTML", () => {
+  // `/settings` is statically exported, so the HTML is built on a machine with
+  // no `navigator`. If the browser's FIRST render shows the real user agent and
+  // the HTML shows a dash, React reports a hydration mismatch. Blank these
+  // three until after the mount; everything else already agrees.
+  const facts = {
+    "user agent": "Mozilla/5.0 (X11; Linux x86_64)",
+    language: "en-CA",
+    "time zone": "America/Toronto",
+    "device id": "dev-1",
+    transactions: 42,
+  };
+
+  it("blanks exactly the facts the build machine cannot know", () => {
+    expect(withoutBrowserFacts(facts)).toEqual({
+      "user agent": null,
+      language: null,
+      "time zone": null,
+      "device id": "dev-1",
+      transactions: 42,
+    });
+  });
+
+  it("keeps every other fact, including the falsy ones", () => {
+    expect(withoutBrowserFacts({ transactions: 0, "device id": null })).toEqual({
+      transactions: 0,
+      "device id": null,
+    });
+  });
+
+  it("does not change the input", () => {
+    const input = { ...facts };
+    withoutBrowserFacts(input);
+    expect(input).toEqual(facts);
+  });
+
+  it("names the browser-only facts so the panel and the test cannot drift", () => {
+    expect([...BROWSER_ONLY_FACTS].sort()).toEqual([
+      "language",
+      "time zone",
+      "user agent",
+    ]);
   });
 });
 

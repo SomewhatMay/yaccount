@@ -12,14 +12,9 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 64 Vitest files, 1,013 tests passing. Playwright currently has 42 passes, 3 expected
-  desktop-touch skips, and 3 pre-existing failures that also fail on `main` — unrelated to any
-  current work:
-  - `keeps FAB geometry` (mobile) expects a 76px bottom offset while the current CSS and
-    Chromium compute 64px.
-  - `FAB hold hints how to create the first shortcut` (desktop and mobile) is load-flaky: the
-    550ms keyboard hold does not open the chooser under a full parallel run, but the test passes
-    when run on its own.
+- 64 Vitest files, 1,017 tests passing. Playwright is 47 passes and 3 expected desktop-touch
+  skips at `--workers=2`, with no failures. **Run e2e at `--workers=2`** — at the default six
+  workers the suite flakes broadly, not just on the FAB (see Known issues).
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
   names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
   screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
@@ -55,12 +50,30 @@ Setup, Node version and the `.env` requirement are in [`README.md`](README.md).
 
 ## Known issues
 
-`DiagnosticsPanel` renders `navigator.userAgent` during render, so `/settings` logs a hydration
-mismatch. Harmless, noisy in the Playwright web-server log, not yet fixed.
+The Playwright suite flakes under load, and **the cause is not yet established.** A different
+one to four tests fail on each full-suite run at the default worker count. The failures are not
+confined to one area — `FAB hold hints`, `clear-all`, `exports every change`, `overflowing
+selects` and `ledger notes` have all failed at least once. They pass when run on their own.
 
-The four FAB hold-gesture Playwright cases are timing-sensitive and flake under six-worker CPU
-contention — a different two or three fail on each full-suite run, on unmodified `main` as well.
-They pass reliably at `--workers=2`. The gesture, not the app, is what is being measured.
+Worker count *correlates*, but do not treat it as proven. Separate invocations:
+
+| Workers | Runs | Failures per run |
+| ------- | ---- | ---------------- |
+| 6 (default) | 4 | 1, 1, 2, 1 |
+| 4 | 3 | 0, 0, 1 |
+| 2 | 3 | 0, 0, 0 |
+
+An interleaved A/B then contradicted that: one 6-worker run came back clean, and one 2-worker run
+failed 31 of 45. **That harness was at fault** — it looped runs back-to-back, so the next run
+started before the previous dev server released port 3100. Any future A/B must tear the server
+down and wait between runs, or the numbers are noise.
+
+Practical advice until this is settled: run e2e at `--workers=2`. It has never failed that way in
+a clean invocation.
+
+The FAB hold margin was a real but separate fragility: `FAB_HOLD_MS` is 500 and the app cancels
+the pending timer on release, so the old 550ms hold left 50ms of slack. It is now
+`FAB_HOLD_PAST_THRESHOLD_MS` (800) in the spec. That hardening did not cure the flake on its own.
 
 ## Hazards
 

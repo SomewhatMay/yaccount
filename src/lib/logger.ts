@@ -125,6 +125,38 @@ export function getLogLevel(): LogLevel {
 export type { LogLevel, LogRecord };
 
 /**
+ * The facts that a statically-exported build CANNOT know, because it runs in
+ * Node on a build machine with no `navigator` and its own time zone.
+ *
+ * They are not slow or async — the browser has them on its very first render.
+ * The problem is that the prerendered HTML does not, so a first render that
+ * shows them disagrees with the markup React is hydrating and React reports a
+ * mismatch. Blank them for that one render, then let the real values in.
+ */
+export const BROWSER_ONLY_FACTS: ReadonlySet<string> = new Set([
+  "user agent",
+  "language",
+  "time zone",
+]);
+
+/**
+ * The same facts as the build machine would have rendered them. Only the keys
+ * in `BROWSER_ONLY_FACTS` are blanked, so a fact that is legitimately absent
+ * keeps whatever it already was and a genuine mismatch anywhere else still
+ * warns.
+ */
+export function withoutBrowserFacts(
+  facts: Record<string, string | number | null>,
+): Record<string, string | number | null> {
+  return Object.fromEntries(
+    Object.entries(facts).map(([key, value]) => [
+      key,
+      BROWSER_ONLY_FACTS.has(key) ? null : value,
+    ]),
+  );
+}
+
+/**
  * The whole diagnostic picture as one pasteable block: the facts about this
  * install, then the log tail. `facts` is passed in rather than read here — the
  * repo, auth and sync state live above this layer.
