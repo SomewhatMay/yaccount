@@ -1,6 +1,17 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
+/**
+ * How long a FAB press is held to get past the hold threshold.
+ *
+ * The app arms a `FAB_HOLD_MS` (500ms) timer on press and CANCELS it on
+ * release, so a hold that beats the timer by only a hair is a coin flip: under
+ * full-parallel CPU contention the timer fires late, the release cancels it,
+ * and the chooser never opens. The old 550 left 50ms — not enough. Keep a wide
+ * margin here rather than trimming the worker count.
+ */
+const FAB_HOLD_PAST_THRESHOLD_MS = 800;
+
 async function openReady(page: Page, path: string, marker: string | RegExp) {
   await page.goto(path);
   await expect(page.getByText(marker, { exact: true }).first()).toBeVisible();
@@ -401,7 +412,7 @@ test("FAB hold hints how to create the first shortcut", async ({ page }) => {
   const fab = page.getByRole("button", { name: "Log a transaction" });
   await fab.focus();
   await page.keyboard.down("Enter");
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.keyboard.up("Enter");
 
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
@@ -429,7 +440,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
 
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
   await page.mouse.up();
   await page.keyboard.press("Escape");
@@ -437,7 +448,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 11, y);
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.mouse.up();
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 
@@ -462,7 +473,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
     pointerType: "mouse",
     isPrimary: true,
   });
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.mouse.up();
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 });
@@ -473,7 +484,7 @@ test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
 
   await fab.focus();
   await page.keyboard.down("Enter");
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
   await page.keyboard.up("Enter");
   await page.keyboard.press("Escape");
@@ -487,7 +498,7 @@ test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 
   await page.keyboard.down(" ");
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.keyboard.up(" ");
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeFocused();
 });
@@ -517,7 +528,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     type: "touchStart",
     touchPoints: [point],
   });
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
   await session.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
@@ -534,7 +545,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     type: "touchCancel",
     touchPoints: [],
   });
-  await page.waitForTimeout(550);
+  await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
 });
 

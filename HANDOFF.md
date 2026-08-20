@@ -13,8 +13,8 @@ repeat them — it says where things stand and what will bite you.
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
 - 64 Vitest files, 1,013 tests passing. Playwright is 45 passes and 3 expected desktop-touch
-  skips at `--workers=2`, with no failures. **Run e2e at `--workers=2`** — the default six
-  workers flake the FAB hold-gesture cases (see Known issues).
+  skips at `--workers=2`, with no failures. **Run e2e at `--workers=2`** — at the default six
+  workers the suite flakes broadly, not just on the FAB (see Known issues).
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
   names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
   screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
@@ -53,11 +53,24 @@ Setup, Node version and the `.env` requirement are in [`README.md`](README.md).
 `DiagnosticsPanel` renders `navigator.userAgent` during render, so `/settings` logs a hydration
 mismatch. Harmless, noisy in the Playwright web-server log, not yet fixed.
 
-The four FAB hold-gesture Playwright cases are timing-sensitive and flake under six-worker CPU
-contention — a different two or three fail on each full-suite run, on unmodified `main` as well.
-They pass reliably at `--workers=2`. The gesture, not the app, is what is being measured. The
-cause is margin: `FAB_HOLD_MS` is 500 and the tests hold for 550, so a `setTimeout` delayed more
-than 50ms by CPU contention never fires before the release. Widening the test hold would fix it.
+The Playwright suite flakes under CPU contention, and **worker count is the only lever that
+actually fixes it** — measured on a 12-core WSL box, full suite, after the hold margin was already
+widened to 800ms:
+
+| Workers | Runs | Result |
+| ------- | ---- | ------ |
+| 6 (default) | 4 | failed every run (1, 1, 2, 1) |
+| 4 | 3 | failed 1 of 3 |
+| 2 | 3 | **green every run** — 45 passed, 3 skipped |
+
+So: **run e2e at `--workers=2`.** The failures move around and are not confined to the FAB —
+`clear-all`, `overflowing selects` and assorted `toContainText` checks all fail under load. The
+machine, not the app, is what is being measured.
+
+The FAB hold margin was a real but separate fragility: `FAB_HOLD_MS` is 500 and the app cancels
+the pending timer on release, so the old 550ms hold left 50ms of slack. It is now
+`FAB_HOLD_PAST_THRESHOLD_MS` (800) in the spec. That hardening did **not** cure the flake on its
+own — it was measured before and after, and 6 workers still failed every run.
 
 ## Hazards
 
