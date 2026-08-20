@@ -649,9 +649,13 @@ test("renders diagnostics without a hydration mismatch", async ({ page }) => {
 
   await openReady(page, "/settings", "Under the hood");
 
-  // The values still arrive — blanking them is for one render, not for good.
-  const userAgent = page.locator("dt", { hasText: /^user agent$/ }).locator("+ dd");
-  await expect(userAgent).toContainText(/Mozilla/);
+  // Every blanked fact still arrives — the blanking lasts one render, not for
+  // good, and `Copy diagnostics` reads the same unblanked `facts()`.
+  const value = (name: string) =>
+    page.locator("dt", { hasText: new RegExp(`^${name}$`) }).locator("+ dd");
+  await expect(value("user agent")).toContainText(/Mozilla/);
+  await expect(value("language")).not.toHaveText("—");
+  await expect(value("time zone")).toContainText("/");
   expect(complaints).toEqual([]);
 });
 
