@@ -50,24 +50,30 @@ Setup, Node version and the `.env` requirement are in [`README.md`](README.md).
 
 ## Known issues
 
-The Playwright suite flakes under CPU contention, and **worker count is the only lever that
-actually fixes it** — measured on a 12-core WSL box, full suite, after the hold margin was already
-widened to 800ms:
+The Playwright suite flakes under load, and **the cause is not yet established.** A different
+one to four tests fail on each full-suite run at the default worker count. The failures are not
+confined to one area — `FAB hold hints`, `clear-all`, `exports every change`, `overflowing
+selects` and `ledger notes` have all failed at least once. They pass when run on their own.
 
-| Workers | Runs | Result |
-| ------- | ---- | ------ |
-| 6 (default) | 4 | failed every run (1, 1, 2, 1) |
-| 4 | 3 | failed 1 of 3 |
-| 2 | 3 | **green every run** — 45 passed, 3 skipped |
+Worker count *correlates*, but do not treat it as proven. Separate invocations:
 
-So: **run e2e at `--workers=2`.** The failures move around and are not confined to the FAB —
-`clear-all`, `overflowing selects` and assorted `toContainText` checks all fail under load. The
-machine, not the app, is what is being measured.
+| Workers | Runs | Failures per run |
+| ------- | ---- | ---------------- |
+| 6 (default) | 4 | 1, 1, 2, 1 |
+| 4 | 3 | 0, 0, 1 |
+| 2 | 3 | 0, 0, 0 |
+
+An interleaved A/B then contradicted that: one 6-worker run came back clean, and one 2-worker run
+failed 31 of 45. **That harness was at fault** — it looped runs back-to-back, so the next run
+started before the previous dev server released port 3100. Any future A/B must tear the server
+down and wait between runs, or the numbers are noise.
+
+Practical advice until this is settled: run e2e at `--workers=2`. It has never failed that way in
+a clean invocation.
 
 The FAB hold margin was a real but separate fragility: `FAB_HOLD_MS` is 500 and the app cancels
 the pending timer on release, so the old 550ms hold left 50ms of slack. It is now
-`FAB_HOLD_PAST_THRESHOLD_MS` (800) in the spec. That hardening did **not** cure the flake on its
-own — it was measured before and after, and 6 workers still failed every run.
+`FAB_HOLD_PAST_THRESHOLD_MS` (800) in the spec. That hardening did not cure the flake on its own.
 
 ## Hazards
 
