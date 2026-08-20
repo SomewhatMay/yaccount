@@ -12,7 +12,7 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 64 Vitest files, 1,013 tests passing. Playwright is 45 passes and 3 expected desktop-touch
+- 64 Vitest files, 1,017 tests passing. Playwright is 47 passes and 3 expected desktop-touch
   skips at `--workers=2`, with no failures. **Run e2e at `--workers=2`** — at the default six
   workers the suite flakes broadly, not just on the FAB (see Known issues).
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
@@ -49,9 +49,6 @@ npm run test:e2e
 Setup, Node version and the `.env` requirement are in [`README.md`](README.md).
 
 ## Known issues
-
-`DiagnosticsPanel` renders `navigator.userAgent` during render, so `/settings` logs a hydration
-mismatch. Harmless, noisy in the Playwright web-server log, not yet fixed.
 
 The Playwright suite flakes under CPU contention, and **worker count is the only lever that
 actually fixes it** — measured on a 12-core WSL box, full suite, after the hold margin was already

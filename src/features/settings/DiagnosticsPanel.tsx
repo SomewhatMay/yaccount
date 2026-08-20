@@ -20,6 +20,7 @@ import {
   setLogLevel,
   SSR_LOG_LEVEL,
   subscribeLogLevel,
+  withoutBrowserFacts,
   type LogLevel,
   type LogRecord,
 } from "@/lib/logger";
@@ -54,6 +55,9 @@ const LEVEL_TONE: Record<LogLevel, string> = {
  * install. This is that picture: the facts (versions, device, counts, last sync
  * failure) plus the tail of the log, redacted, behind one Copy button.
  */
+/** Hydration is a one-way trip, so this store never has to announce a change. */
+const subscribeNothing = () => () => {};
+
 export function DiagnosticsPanel() {
   const transactions = useAtomValue(transactionsAtom);
   const syncStatus = useAtomValue(syncStatusAtom);
@@ -67,6 +71,16 @@ export function DiagnosticsPanel() {
   // loglevel owns the level and persists it; read it as the external store it is,
   // so the pre-hydration render uses the documented default instead of guessing.
   const level = useSyncExternalStore(subscribeLogLevel, getLogLevel, () => SSR_LOG_LEVEL);
+  // `navigator` and the time zone exist on the first client render but NOT in
+  // the prerendered HTML, so rendering them straight away disagrees with the
+  // markup React is hydrating. Read "has this hydrated yet" as the external
+  // fact it is — the same shape as `level` above, and unlike a setState in an
+  // effect it neither cascades renders nor trips `react-hooks/set-state-in-effect`.
+  const mounted = useSyncExternalStore(
+    subscribeNothing,
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -151,17 +165,19 @@ export function DiagnosticsPanel() {
       </div>
 
       <dl className="bg-card grid gap-x-6 gap-y-2 rounded-2xl border p-5 text-sm sm:grid-cols-2">
-        {Object.entries(facts()).map(([k, v]) => (
-          // `min-w-0` at THIS level too: a grid item defaults to `min-width:auto`,
-          // so a nowrap-truncated value (the user-agent string) would set the
-          // track to its full width and scroll the whole page sideways.
-          <div key={k} className="flex min-w-0 items-baseline justify-between gap-3">
-            <dt className="text-muted-foreground shrink-0">{k}</dt>
-            <dd className="tnum min-w-0 truncate text-right font-mono text-xs">
-              {v === null || v === "" ? "—" : String(v)}
-            </dd>
-          </div>
-        ))}
+        {Object.entries(mounted ? facts() : withoutBrowserFacts(facts())).map(
+          ([k, v]) => (
+            // `min-w-0` at THIS level too: a grid item defaults to `min-width:auto`,
+            // so a nowrap-truncated value (the user-agent string) would set the
+            // track to its full width and scroll the whole page sideways.
+            <div key={k} className="flex min-w-0 items-baseline justify-between gap-3">
+              <dt className="text-muted-foreground shrink-0">{k}</dt>
+              <dd className="tnum min-w-0 truncate text-right font-mono text-xs">
+                {v === null || v === "" ? "—" : String(v)}
+              </dd>
+            </div>
+          ),
+        )}
       </dl>
 
       <div className="bg-card overflow-hidden rounded-2xl border">

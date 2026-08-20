@@ -629,6 +629,32 @@ test("places toasts below mobile top navigation and bottom-right on desktop", as
   expect(toastBox!.y + toastBox!.height).toBeGreaterThan(page.viewportSize()!.height / 2);
 });
 
+test("renders diagnostics without a hydration mismatch", async ({ page }) => {
+  // `/settings` is prerendered on a build machine with no `navigator`, so the
+  // user agent, language and time zone are blank in the HTML. Rendering the
+  // real values on the FIRST client render would disagree with that markup;
+  // React would log a mismatch and replace the DOM it just hydrated.
+  // React raises the mismatch as an uncaught error, NOT a console message, so
+  // listening on `console` alone silently passes even when the bug is present.
+  const complaints: string[] = [];
+  const noteIfHydration = (text: string) => {
+    if (/hydrat|server rendered text didn't match/i.test(text)) complaints.push(text);
+  };
+  page.on("pageerror", (error) => noteIfHydration(String(error)));
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      noteIfHydration(message.text());
+    }
+  });
+
+  await openReady(page, "/settings", "Under the hood");
+
+  // The values still arrive — blanking them is for one render, not for good.
+  const userAgent = page.locator("dt", { hasText: /^user agent$/ }).locator("+ dd");
+  await expect(userAgent).toContainText(/Mozilla/);
+  expect(complaints).toEqual([]);
+});
+
 test("exports every change as a versioned file", async ({ page }) => {
   await createCategory(page, "E2E export me");
   await openReady(page, "/ledger", "Overall balance");
