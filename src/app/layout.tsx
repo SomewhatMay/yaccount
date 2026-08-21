@@ -202,11 +202,17 @@ const sheetTraceScript = String.raw`
       button.textContent = "Arm sheet trace";
       button.style.cssText =
         "position:fixed;top:4px;left:4px;z-index:2147483647;padding:6px 10px;border:1px solid #777;border-radius:999px;background:#fff;color:#111;font:12px system-ui";
-      button.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        if (active) showResults(button);
-        else arm(button);
-      });
+      window.addEventListener(
+        "pointerdown",
+        (event) => {
+          if (event.target !== button) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (active) showResults(button);
+          else arm(button);
+        },
+        { capture: true },
+      );
       document.body.append(button);
     }
 
