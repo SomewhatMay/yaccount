@@ -9,6 +9,13 @@ export interface BottomSheetViewport {
   layoutHeight: number;
 }
 
+const KEYBOARD_THRESHOLD = 60;
+
+export function keyboardInset(base: number, height: number): number {
+  const delta = Math.round(base - height);
+  return delta > KEYBOARD_THRESHOLD ? delta : 0;
+}
+
 export function bottomSheetViewportStyle(viewport: BottomSheetViewport | null):
   | {
       bottom: string;

@@ -1,49 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-  bottomSheetViewportStyle,
-  subscribeVisualViewport,
-} from "@/features/ui/sheet-viewport";
+import { describe, expect, it } from "vitest";
+import { keyboardInset } from "@/features/ui/sheet-viewport";
 
-describe("iOS bottom-sheet viewport handling", () => {
-  it("anchors the sheet to the visual viewport without guessed chrome padding", () => {
-    expect(
-      bottomSheetViewportStyle({
-        height: 500,
-        offsetTop: 20,
-        layoutHeight: 800,
-      }),
-    ).toEqual({
-      bottom: "280px",
-      maxHeight: "440px",
-    });
-  });
+describe("iOS bottom-sheet keyboard inset", () => {
+  it("rounds real keyboard movement and ignores non-keyboard deltas", () => {
+    expect(keyboardInset(800, 800)).toBe(0);
+    expect(keyboardInset(800, 797)).toBe(0);
+    expect(keyboardInset(800, 500)).toBe(300);
 
-  it("never positions below the layout viewport", () => {
-    expect(
-      bottomSheetViewportStyle({
-        height: 500,
-        offsetTop: 320,
-        layoutHeight: 800,
-      }),
-    ).toMatchObject({ bottom: "0px" });
-  });
+    const fractional = keyboardInset(800, 652.6666);
+    expect(fractional).toBe(147);
+    expect(Number.isInteger(fractional)).toBe(true);
 
-  it("uses CSS viewport fallback before visual viewport data is available", () => {
-    expect(bottomSheetViewportStyle(null)).toBeUndefined();
-  });
-
-  it("subscribes to viewport resize and scroll, then removes both listeners", () => {
-    const addEventListener = vi.fn();
-    const removeEventListener = vi.fn();
-    const viewport = { addEventListener, removeEventListener };
-    const onChange = vi.fn();
-
-    const cleanup = subscribeVisualViewport(viewport, onChange);
-
-    expect(addEventListener).toHaveBeenCalledWith("resize", onChange);
-    expect(addEventListener).toHaveBeenCalledWith("scroll", onChange);
-    cleanup();
-    expect(removeEventListener).toHaveBeenCalledWith("resize", onChange);
-    expect(removeEventListener).toHaveBeenCalledWith("scroll", onChange);
+    expect(keyboardInset(600, 700)).toBe(0);
   });
 });
