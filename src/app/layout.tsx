@@ -36,6 +36,7 @@ const sheetTraceScript = String.raw`
     const session = Math.random().toString(36).slice(2);
     const viewportEvents = [];
     const styleWrites = [];
+    let styleCommitCount = 0;
     let active = false;
     let startedAt = null;
     let observer = null;
@@ -118,13 +119,16 @@ const sheetTraceScript = String.raw`
       document.getElementById("sheet-trace-results")?.remove();
       viewportEvents.length = 0;
       styleWrites.length = 0;
+      styleCommitCount = 0;
       startedAt = performance.now();
       recordViewport("trace-start");
 
       observer = new MutationObserver((mutations) => {
+        const commit = ++styleCommitCount;
         for (const mutation of mutations) {
           const entry = {
             ...sample("style-write"),
+            commit,
             oldStyle: mutation.oldValue,
             style: target?.getAttribute("style") ?? null,
           };
@@ -153,7 +157,7 @@ const sheetTraceScript = String.raw`
     function traceResult() {
       return JSON.stringify(
         {
-          benchmark: "yaccount-stage-3-baseline",
+          benchmark: "yaccount-stage-3-after",
           session,
           elapsedAtReport:
             startedAt === null ? null : rounded(performance.now() - startedAt),
@@ -161,6 +165,7 @@ const sheetTraceScript = String.raw`
           viewportResizeCount: viewportEvents.filter(
             (entry) => entry.event === "visual-resize",
           ).length,
+          styleCommitCount,
           styleWriteCount: styleWrites.length,
           viewportEvents,
           styleWrites,
