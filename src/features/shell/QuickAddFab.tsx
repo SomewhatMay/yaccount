@@ -2,12 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import {
-  ArrowRightLeftIcon,
-  BookmarkIcon,
-  DollarSignIcon,
-  PlusIcon,
-} from "lucide-react";
+import { ArrowRightLeftIcon, BookmarkIcon, DollarSignIcon, PlusIcon } from "lucide-react";
 import { logTemplate } from "@/core/commands";
 import { rankShortcutsByUsage } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
@@ -173,7 +168,7 @@ export function QuickAddFab() {
           if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0))
             return;
           event.preventDefault();
-          event.currentTarget.focus();
+          if (event.pointerType === "mouse") event.currentTarget.focus();
           pendingPointerQuickAdd.current = false;
           suppressClick.current = false;
           pointerId.current = event.pointerId;
@@ -269,8 +264,7 @@ export function QuickAddFab() {
             <div className="px-2.5 pt-1 pb-2">
               <p className="text-sm font-medium">No shortcuts yet</p>
               <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Open an entry&apos;s actions in the ledger, then choose Save as
-                shortcut.
+                Open an entry&apos;s actions in the ledger, then choose Save as shortcut.
               </p>
             </div>
           ) : (
