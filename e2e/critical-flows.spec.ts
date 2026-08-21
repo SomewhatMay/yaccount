@@ -184,6 +184,35 @@ test("logs an expense and shows it in the ledger", async ({ page }) => {
   await expect(page.getByText("-$12.34", { exact: true }).last()).toBeVisible();
 });
 
+test("scrolls from a row menu trigger and opens it on tap", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Touch regression.");
+
+  await createCategory(page, "E2E row menu category");
+  await openReady(page, "/ledger", "Overall balance");
+  for (let i = 1; i <= 12; i++) {
+    await logExpense(page, `E2E row menu ${i}`, "1.00", "E2E row menu category");
+  }
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight),
+  ).toBeGreaterThan(await page.evaluate(() => window.innerHeight));
+
+  const trigger = page.getByRole("button", { name: "Actions for E2E row menu 12" });
+  const initialScrollY = await page.evaluate(() => window.scrollY);
+  await dragUpByTouch(page, trigger, 200);
+
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(initialScrollY);
+  await expect(page.getByRole("menu")).toBeHidden();
+
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.tap();
+  await expect(page.getByRole("menu")).toBeVisible();
+});
+
 test("overflowing selects scroll by touch in sheets and pages", async ({
   page,
 }, testInfo) => {
