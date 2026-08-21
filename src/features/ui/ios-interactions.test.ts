@@ -45,6 +45,13 @@ describe("iPhone PWA interaction layout", () => {
     expect(read("../../components/ui/sheet.tsx")).not.toContain("transition ");
   });
 
+  it("does not animate after Safari reports its final keyboard resize", () => {
+    const sheet = read("../../components/ui/sheet.tsx");
+
+    expect(sheet).not.toContain("transition-[translate]");
+    expect(sheet).toContain("transition-none");
+  });
+
   it("waits for the FAB click before mounting quick-add", () => {
     const fab = read("../shell/QuickAddFab.tsx");
 

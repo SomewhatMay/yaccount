@@ -37,3 +37,13 @@ export function sheetKeyboardStyle(
     "--kb": `${inset}px`,
   };
 }
+
+export function sheetViewportStyle(
+  inset: number,
+  lift: number,
+): ReturnType<typeof sheetKeyboardStyle> & { "--sheet-occlusion": string } {
+  return {
+    ...sheetKeyboardStyle(inset, lift),
+    "--sheet-occlusion": `${lift}px`,
+  };
+}

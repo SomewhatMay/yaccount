@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import {
   keyboardGeometry,
   nextBaseline,
-  sheetKeyboardStyle,
+  sheetViewportStyle,
   viewportTop,
 } from "@/features/ui/sheet-viewport";
 
@@ -89,7 +89,7 @@ export function ResponsiveSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : sheetKeyboardStyle(inset, lift)}
+        style={sideways ? undefined : sheetViewportStyle(inset, lift)}
         onOpenAutoFocus={(event) => {
           if (!sideways) {
             event.preventDefault();
@@ -97,10 +97,10 @@ export function ResponsiveSheet({
           }
         }}
         className={cn(
-          "max-w-full min-w-0 touch-pan-y gap-0 overflow-hidden",
+          "after:bg-popover max-w-full min-w-0 touch-pan-y gap-0 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-[var(--sheet-occlusion,0px)] after:content-['']",
           // A bottom sheet stops short of the top edge so the screen behind it
           // stays visible — you are editing a row, not leaving the ledger.
-          "data-[side=bottom]:max-h-[calc(88svh_-_var(--kb,0px))] data-[side=bottom]:rounded-t-2xl",
+          "data-[side=bottom]:max-h-[min(88svh,calc(100svh_-_var(--kb,0px)))] data-[side=bottom]:rounded-t-2xl",
           "sm:max-w-md",
           className,
         )}

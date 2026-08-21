@@ -212,6 +212,28 @@ test("commits once for a keyboard resize burst and ignores viewport scroll", asy
       translate: node.style.translate,
     })),
   ).toEqual({ inset: "264px", translate: "0px -67px" });
+  const layout = await sheet.evaluate((node) => {
+    const viewportProbe = document.createElement("div");
+    viewportProbe.style.cssText =
+      "position:fixed;height:100svh;visibility:hidden;pointer-events:none";
+    document.body.append(viewportProbe);
+    const smallViewportHeight = Number.parseFloat(getComputedStyle(viewportProbe).height);
+    viewportProbe.remove();
+
+    const style = getComputedStyle(node);
+    return {
+      expectedMaxHeight: smallViewportHeight - 264,
+      extensionHeight: getComputedStyle(node, "::after").height,
+      maxHeight: Number.parseFloat(style.maxHeight),
+      overflow: style.overflow,
+    };
+  });
+  expect(layout.maxHeight, JSON.stringify(layout)).toBeCloseTo(
+    layout.expectedMaxHeight,
+    1,
+  );
+  expect(layout.extensionHeight).toBe("67px");
+  expect(layout.overflow).toBe("visible");
 
   await page.evaluate(() => {
     const viewport = window.visualViewport as VisualViewport & {

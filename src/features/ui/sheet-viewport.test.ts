@@ -4,6 +4,7 @@ import {
   keyboardInset,
   nextBaseline,
   sheetKeyboardStyle,
+  sheetViewportStyle,
 } from "@/features/ui/sheet-viewport";
 
 describe("iOS bottom-sheet keyboard inset", () => {
@@ -53,5 +54,13 @@ describe("iOS bottom-sheet keyboard inset", () => {
     expect(style).toEqual({ translate: "0 -264px", "--kb": "264px" });
     expect(style).not.toHaveProperty("transform");
     expect(style).not.toHaveProperty("bottom");
+  });
+
+  it("extends the sheet surface through the recorded Safari obstruction", () => {
+    expect(sheetViewportStyle(264, 67)).toEqual({
+      translate: "0 -67px",
+      "--kb": "264px",
+      "--sheet-occlusion": "67px",
+    });
   });
 });
