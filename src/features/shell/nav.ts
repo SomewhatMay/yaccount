@@ -118,3 +118,14 @@ export function activeTab(pathname: string): string | null {
   if (tab?.href) return tab.href;
   return MORE_DESTINATIONS.some((d) => d.href === normalized) ? "more" : null;
 }
+
+export function tabSlotState({
+  current,
+  pending,
+}: {
+  current: boolean;
+  pending: boolean;
+}): "active" | "pending" | "idle" {
+  if (current) return "active";
+  return pending ? "pending" : "idle";
+}

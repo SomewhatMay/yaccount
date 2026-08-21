@@ -1,11 +1,46 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useAtomValue } from "jotai";
+import { useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { pendingCountAtom } from "@/features/store";
-import { TAB_SLOTS, activeTab } from "@/features/shell/nav";
+import { TAB_SLOTS, activeTab, tabSlotState } from "@/features/shell/nav";
+
+const TAB_TOUCH_MOVE_PX = 10;
+
+type TabTouchPress = {
+  href: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
+};
+
+function TabLinkContent({
+  current,
+  children,
+}: {
+  current: boolean;
+  children: ReactNode;
+}) {
+  const { pending } = useLinkStatus();
+  const state = tabSlotState({ current, pending });
+
+  return (
+    <>
+      {children}
+      {state === "pending" && (
+        <span
+          data-tab-pending
+          aria-hidden
+          className="bg-primary/60 absolute inset-x-1/3 top-0 h-0.5 animate-pulse rounded-full"
+        />
+      )}
+    </>
+  );
+}
 
 /**
  * The thumb bar (< lg). Four slots, locked: Home · Ledger · Inbox · More.
@@ -20,6 +55,7 @@ import { TAB_SLOTS, activeTab } from "@/features/shell/nav";
 export function BottomTabBar({ onMore }: { onMore: () => void }) {
   const pathname = usePathname();
   const pending = useAtomValue(pendingCountAtom);
+  const touchPress = useRef<TabTouchPress | null>(null);
   const active = activeTab(pathname);
 
   return (
@@ -69,8 +105,51 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
                   href={slot.href}
                   aria-current={current ? "page" : undefined}
                   className={className}
+                  onPointerDown={(event) => {
+                    if (event.pointerType !== "touch" || !event.isPrimary) return;
+                    event.preventDefault();
+                    touchPress.current = {
+                      href: slot.href!,
+                      pointerId: event.pointerId,
+                      startX: event.clientX,
+                      startY: event.clientY,
+                      moved: false,
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    const press = touchPress.current;
+                    if (!press || press.pointerId !== event.pointerId) return;
+                    if (
+                      Math.hypot(
+                        event.clientX - press.startX,
+                        event.clientY - press.startY,
+                      ) > TAB_TOUCH_MOVE_PX
+                    ) {
+                      press.moved = true;
+                    }
+                  }}
+                  onPointerUp={(event) => {
+                    const press = touchPress.current;
+                    touchPress.current = null;
+                    if (
+                      !press ||
+                      press.pointerId !== event.pointerId ||
+                      press.href !== slot.href ||
+                      press.moved
+                    )
+                      return;
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }}
+                  onPointerCancel={() => {
+                    touchPress.current = null;
+                  }}
+                  onLostPointerCapture={() => {
+                    touchPress.current = null;
+                  }}
                 >
-                  {inner}
+                  <TabLinkContent current={current}>{inner}</TabLinkContent>
                 </Link>
               ) : (
                 <button
