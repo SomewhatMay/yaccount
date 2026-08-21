@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -46,5 +46,27 @@ describe("iPhone PWA interaction layout", () => {
 
     expect(fab).toContain("pendingPointerQuickAdd");
     expect(fab).toContain("if (pendingPointerQuickAdd.current)");
+  });
+
+  it("routes every dropdown trigger through RowActions", () => {
+    const featureRoot = new URL("../", import.meta.url);
+    const directTriggerImports = readdirSync(featureRoot, {
+      recursive: true,
+      encoding: "utf8",
+    })
+      .filter(
+        (path) =>
+          /\.tsx?$/.test(path) &&
+          path !== "ui/RowActions.tsx" &&
+          !path.endsWith(".test.ts"),
+      )
+      .filter((path) =>
+        /import\s*\{[^}]*\bDropdownMenuTrigger\b[^}]*\}\s*from\s*["']@\/components\/ui\/dropdown-menu["']/s.test(
+          readFileSync(new URL(path, featureRoot), "utf8"),
+        ),
+      )
+      .sort();
+
+    expect(directTriggerImports).toEqual([]);
   });
 });

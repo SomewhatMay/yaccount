@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { recordSnapshot, removeSnapshot, updateSnapshot } from "@/core/commands";
 import { formatCents, parseDollars } from "@/core/money";
 import type { Container, ContainerSnapshot } from "@/core/model";
@@ -18,16 +18,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SheetFooter } from "@/components/ui/sheet";
-import { ResponsiveSheet } from "@/features/ui";
+import { ResponsiveSheet, RowActions } from "@/features/ui";
 import { InlineError } from "@/features/ui/InlineError";
 import { todayIso } from "@/features/clock";
 import { Eyebrow } from "@/features/ui";
@@ -204,31 +199,16 @@ function BalanceHistory({
                 <span className="tnum font-mono text-sm">
                   {formatCents(s.reported_balance)}
                 </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground size-8 rounded-lg opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-                      aria-label={`Actions for the ${s.date} report`}
-                    >
-                      <MoreHorizontalIcon className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => startEdit(s)}>
-                      <PencilIcon className="size-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => setRemoving(s)}
-                    >
-                      <Trash2Icon className="size-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <RowActions label={`Actions for the ${s.date} report`}>
+                  <DropdownMenuItem onClick={() => startEdit(s)}>
+                    <PencilIcon className="size-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onClick={() => setRemoving(s)}>
+                    <Trash2Icon className="size-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </RowActions>
               </div>
             ))
           )}

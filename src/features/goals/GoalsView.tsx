@@ -5,7 +5,6 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import {
   ArchiveIcon,
-  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -71,12 +70,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
@@ -85,6 +79,7 @@ import {
   ListSkeleton,
   PageHeader,
   PageHeaderSkeleton,
+  RowActions,
   useFlashRow,
 } from "@/features/ui";
 
@@ -627,41 +622,29 @@ function GoalMenu({
   onResume?: () => void;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground size-8 shrink-0 rounded-lg"
-          aria-label={`Actions for ${name}`}
-        >
-          <MoreHorizontalIcon className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit}>
-          <PencilIcon className="size-4" />
-          Edit
+    <RowActions label={`Actions for ${name}`} className="opacity-100">
+      <DropdownMenuItem onClick={onEdit}>
+        <PencilIcon className="size-4" />
+        Edit
+      </DropdownMenuItem>
+      {onResume && (
+        <DropdownMenuItem onClick={onResume}>
+          <RotateCcwIcon className="size-4" />
+          Resume
         </DropdownMenuItem>
-        {onResume && (
-          <DropdownMenuItem onClick={onResume}>
-            <RotateCcwIcon className="size-4" />
-            Resume
-          </DropdownMenuItem>
-        )}
-        {onArchive && (
-          <DropdownMenuItem onClick={onArchive}>
-            <ArchiveIcon className="size-4" />
-            Archive
-          </DropdownMenuItem>
-        )}
-        {onCancel && (
-          <DropdownMenuItem variant="destructive" onClick={onCancel}>
-            <XIcon className="size-4" />
-            Cancel goal
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      )}
+      {onArchive && (
+        <DropdownMenuItem onClick={onArchive}>
+          <ArchiveIcon className="size-4" />
+          Archive
+        </DropdownMenuItem>
+      )}
+      {onCancel && (
+        <DropdownMenuItem variant="destructive" onClick={onCancel}>
+          <XIcon className="size-4" />
+          Cancel goal
+        </DropdownMenuItem>
+      )}
+    </RowActions>
   );
 }

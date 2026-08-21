@@ -3,17 +3,13 @@
 import { useEffect, useState } from "react";
 import { atom, useAtom, useSetAtom } from "jotai";
 import { toast } from "sonner";
-import { LogInIcon, LogOutIcon, CheckIcon } from "lucide-react";
+import { LogInIcon, LogOutIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { getAuthProvider } from "@/auth/web";
 import { syncAtom, syncStatusAtom } from "@/features/store";
 import { SYNC_ATTENTION_CLASS } from "@/features/SyncIndicator";
+import { RowActions } from "@/features/ui";
 
 const connectedAtom = atom<boolean | null>(null);
 
@@ -102,19 +98,11 @@ export function AuthButton({ signedOutOnly = false }: { signedOutOnly?: boolean 
   if (signedOutOnly) return null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-positive rounded-full">
-          <CheckIcon className="size-4" />
-          Google
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={signOut}>
-          <LogOutIcon className="size-4" />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <RowActions label="Google account actions" className="text-positive opacity-100">
+      <DropdownMenuItem onClick={signOut}>
+        <LogOutIcon className="size-4" />
+        Sign out
+      </DropdownMenuItem>
+    </RowActions>
   );
 }

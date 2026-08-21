@@ -1,8 +1,10 @@
 "use client";
 
 import { MoreHorizontalIcon } from "lucide-react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { endTap, moveTap, startTap, type TapState } from "@/features/ui/tap-open";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,15 +35,31 @@ export function RowActions({
   children: React.ReactNode;
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const tap = useRef<TapState | null>(null);
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           aria-label={label}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            tap.current = startTap(event.clientX, event.clientY);
+            event.currentTarget?.focus();
+          }}
+          onPointerMove={(event) => {
+            if (tap.current)
+              tap.current = moveTap(tap.current, event.clientX, event.clientY);
+          }}
+          onPointerUp={() => {
+            if (tap.current && endTap(tap.current) === "open") setOpen(true);
+            tap.current = null;
+          }}
           className={cn(
-            "text-muted-foreground size-8 shrink-0 rounded-lg opacity-0 transition-opacity",
+            "text-muted-foreground size-8 shrink-0 touch-pan-y rounded-lg opacity-0 transition-opacity",
             "group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100",
             className,
           )}
