@@ -90,7 +90,7 @@ export function DashboardWidget({ def, base }: { def: WidgetDef; base: WidgetCon
     <Collapsible
       open={open}
       onOpenChange={(next) => setOpenPref(next ? "open" : "closed")}
-      className="bg-card group rounded-2xl border p-5"
+      className="bg-card group rounded-2xl border p-5 [contain-intrinsic-size:auto_4rem] [content-visibility:auto]"
     >
       <div className="flex items-center gap-2">
         <CollapsibleTrigger className="group/w flex min-w-0 flex-1 items-center gap-2 text-left">

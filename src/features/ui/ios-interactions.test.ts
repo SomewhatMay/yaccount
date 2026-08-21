@@ -52,6 +52,13 @@ describe("iPhone PWA interaction layout", () => {
     expect(read("../shell/BottomTabBar.tsx")).toContain("useLinkStatus");
   });
 
+  it("skips layout work for off-screen dashboard widgets", () => {
+    const widget = read("../reports/WidgetShell.tsx");
+
+    expect(widget).toContain("content-visibility");
+    expect(widget).toContain("contain-intrinsic-size");
+  });
+
   it("routes every dropdown trigger through RowActions", () => {
     const featureRoot = new URL("../", import.meta.url);
     const directTriggerImports = readdirSync(featureRoot, {
