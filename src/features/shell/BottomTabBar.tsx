@@ -3,10 +3,20 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useAtomValue } from "jotai";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { pendingCountAtom } from "@/features/store";
 import { TAB_SLOTS, activeTab, tabSlotState } from "@/features/shell/nav";
+
+const TAB_TOUCH_MOVE_PX = 10;
+
+type TabTouchPress = {
+  href: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
+};
 
 function TabLinkContent({
   current,
@@ -45,6 +55,7 @@ function TabLinkContent({
 export function BottomTabBar({ onMore }: { onMore: () => void }) {
   const pathname = usePathname();
   const pending = useAtomValue(pendingCountAtom);
+  const touchPress = useRef<TabTouchPress | null>(null);
   const active = activeTab(pathname);
 
   return (
@@ -94,6 +105,49 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
                   href={slot.href}
                   aria-current={current ? "page" : undefined}
                   className={className}
+                  onPointerDown={(event) => {
+                    if (event.pointerType !== "touch" || !event.isPrimary) return;
+                    event.preventDefault();
+                    touchPress.current = {
+                      href: slot.href!,
+                      pointerId: event.pointerId,
+                      startX: event.clientX,
+                      startY: event.clientY,
+                      moved: false,
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    const press = touchPress.current;
+                    if (!press || press.pointerId !== event.pointerId) return;
+                    if (
+                      Math.hypot(
+                        event.clientX - press.startX,
+                        event.clientY - press.startY,
+                      ) > TAB_TOUCH_MOVE_PX
+                    ) {
+                      press.moved = true;
+                    }
+                  }}
+                  onPointerUp={(event) => {
+                    const press = touchPress.current;
+                    touchPress.current = null;
+                    if (
+                      !press ||
+                      press.pointerId !== event.pointerId ||
+                      press.href !== slot.href ||
+                      press.moved
+                    )
+                      return;
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }}
+                  onPointerCancel={() => {
+                    touchPress.current = null;
+                  }}
+                  onLostPointerCapture={() => {
+                    touchPress.current = null;
+                  }}
                 >
                   <TabLinkContent current={current}>{inner}</TabLinkContent>
                 </Link>
