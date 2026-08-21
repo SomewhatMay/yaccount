@@ -13,4 +13,14 @@ describe("iOS bottom-sheet keyboard inset", () => {
 
     expect(keyboardInset(600, 700)).toBe(0);
   });
+
+  it("turns the recorded iPhone samples into one keyboard transition", () => {
+    const outputs = [616, 352].map((height) => keyboardInset(616, height));
+    const transitions = outputs
+      .slice(1)
+      .filter((value, index) => value !== outputs[index]);
+
+    expect(new Set(outputs).size).toBe(2);
+    expect(transitions).toHaveLength(1);
+  });
 });
