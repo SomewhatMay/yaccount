@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keyboardInset } from "@/features/ui/sheet-viewport";
+import { keyboardInset, nextBaseline } from "@/features/ui/sheet-viewport";
 
 describe("iOS bottom-sheet keyboard inset", () => {
   it("rounds real keyboard movement and ignores non-keyboard deltas", () => {
@@ -22,5 +22,16 @@ describe("iOS bottom-sheet keyboard inset", () => {
 
     expect(new Set(outputs).size).toBe(2);
     expect(transitions).toHaveLength(1);
+  });
+
+  it("recovers a baseline captured while the keyboard was already open", () => {
+    const shrunken = nextBaseline(0, 352);
+    expect(shrunken).toBe(352);
+    expect(keyboardInset(shrunken, 352)).toBe(0);
+
+    const recovered = nextBaseline(shrunken, 616);
+    expect(recovered).toBe(616);
+    expect(keyboardInset(recovered, 616)).toBe(0);
+    expect(nextBaseline(recovered, 352)).toBe(616);
   });
 });

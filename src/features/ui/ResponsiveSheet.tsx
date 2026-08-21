@@ -12,74 +12,50 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   bottomSheetViewportStyle,
-  subscribeVisualViewport,
+  nextBaseline,
   type BottomSheetViewport,
 } from "@/features/ui/sheet-viewport";
 
-function visualViewportSnapshot(): BottomSheetViewport | null {
-  const viewport = window.visualViewport;
-  return viewport
-    ? {
-        height: viewport.height,
-        offsetTop: viewport.offsetTop,
-        layoutHeight: window.innerHeight,
-      }
-    : null;
-}
-
-function sameViewport(
-  left: BottomSheetViewport | null,
-  right: BottomSheetViewport | null,
-) {
-  return (
-    left?.height === right?.height &&
-    left?.offsetTop === right?.offsetTop &&
-    left?.layoutHeight === right?.layoutHeight
-  );
-}
-
 function useVisualViewport(active: boolean): BottomSheetViewport | null {
-  const [viewport, setViewport] = useState<BottomSheetViewport | null>(null);
+  const [state, setState] = useState<{
+    active: boolean;
+    viewport: BottomSheetViewport | null;
+  }>({ active, viewport: null });
+  const baseline = useRef(0);
+
+  if (state.active !== active) {
+    setState({ active, viewport: null });
+  }
 
   useEffect(() => {
     if (!active) {
+      baseline.current = 0;
       return;
     }
 
-    let frame = 0;
-    let attempts = 0;
+    const visual = window.visualViewport;
+    if (!visual) return;
 
-    const settle = () => {
-      cancelAnimationFrame(frame);
-      attempts = 0;
-      const sample = () => {
-        const first = visualViewportSnapshot();
-        frame = requestAnimationFrame(() => {
-          const second = visualViewportSnapshot();
-          if (sameViewport(first, second) || attempts++ >= 6) {
-            setViewport(second);
-          } else {
-            sample();
-          }
-        });
-      };
-      sample();
+    baseline.current = visual.height;
+    const update = () => {
+      baseline.current = nextBaseline(baseline.current, visual.height);
+      setState({
+        active: true,
+        viewport: {
+          height: visual.height,
+          layoutHeight: baseline.current,
+        },
+      });
     };
 
-    settle();
-    const unsubscribeViewport = subscribeVisualViewport(window.visualViewport, settle);
-    window.addEventListener("resize", settle);
-    window.addEventListener("orientationchange", settle);
+    visual.addEventListener("resize", update);
 
     return () => {
-      unsubscribeViewport();
-      window.removeEventListener("resize", settle);
-      window.removeEventListener("orientationchange", settle);
-      cancelAnimationFrame(frame);
+      visual.removeEventListener("resize", update);
     };
   }, [active]);
 
-  return active ? viewport : null;
+  return active && state.active ? state.viewport : null;
 }
 
 /**
