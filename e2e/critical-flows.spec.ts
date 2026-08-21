@@ -122,6 +122,14 @@ test.beforeEach(async ({ context }) => {
   });
 });
 
+test("opens Ledger on the first immediate tab tap", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Touch regression.");
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Ledger" }).tap();
+  await expect(page).toHaveURL(/\/ledger\/?$/);
+});
+
 test("customizes dashboard widget order and visibility", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Customize dashboard" }).click();
