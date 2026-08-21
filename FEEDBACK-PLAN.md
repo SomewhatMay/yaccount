@@ -766,7 +766,7 @@ Update this table in a commit on the next stage's branch, once the previous stag
 ## 4 · Unresolved
 
 Answer these before starting the stage that depends on them. Record the answer in that stage's PR
-body. Ask **one question at a time**, never batched.
+body. Ask all questions that block the stage together.
 
 | Q | Question | Blocks |
 |---|---|---|
