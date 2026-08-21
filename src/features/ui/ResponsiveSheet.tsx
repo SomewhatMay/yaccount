@@ -11,20 +11,20 @@ import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  bottomSheetViewportStyle,
+  keyboardInset,
   nextBaseline,
-  type BottomSheetViewport,
+  sheetKeyboardStyle,
 } from "@/features/ui/sheet-viewport";
 
-function useVisualViewport(active: boolean): BottomSheetViewport | null {
+function useKeyboardInset(active: boolean): number {
   const [state, setState] = useState<{
     active: boolean;
-    viewport: BottomSheetViewport | null;
-  }>({ active, viewport: null });
+    inset: number;
+  }>({ active, inset: 0 });
   const baseline = useRef(0);
 
   if (state.active !== active) {
-    setState({ active, viewport: null });
+    setState({ active, inset: 0 });
   }
 
   useEffect(() => {
@@ -41,10 +41,7 @@ function useVisualViewport(active: boolean): BottomSheetViewport | null {
       baseline.current = nextBaseline(baseline.current, visual.height);
       setState({
         active: true,
-        viewport: {
-          height: visual.height,
-          layoutHeight: baseline.current,
-        },
+        inset: keyboardInset(baseline.current, visual.height),
       });
     };
 
@@ -55,7 +52,7 @@ function useVisualViewport(active: boolean): BottomSheetViewport | null {
     };
   }, [active]);
 
-  return active && state.active ? state.viewport : null;
+  return active && state.active ? state.inset : 0;
 }
 
 /**
@@ -83,14 +80,14 @@ export function ResponsiveSheet({
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
-  const viewport = useVisualViewport(open && !sideways);
+  const inset = useKeyboardInset(open && !sideways);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : bottomSheetViewportStyle(viewport)}
+        style={sideways ? undefined : sheetKeyboardStyle(inset)}
         onOpenAutoFocus={(event) => {
           if (!sideways) {
             event.preventDefault();
@@ -101,7 +98,7 @@ export function ResponsiveSheet({
           "max-w-full min-w-0 touch-pan-y gap-0 overflow-hidden",
           // A bottom sheet stops short of the top edge so the screen behind it
           // stays visible — you are editing a row, not leaving the ledger.
-          "data-[side=bottom]:max-h-[88svh] data-[side=bottom]:rounded-t-2xl",
+          "data-[side=bottom]:max-h-[calc(88svh_-_var(--kb,0px))] data-[side=bottom]:rounded-t-2xl",
           "sm:max-w-md",
           className,
         )}

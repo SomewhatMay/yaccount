@@ -1,8 +1,3 @@
-export interface BottomSheetViewport {
-  height: number;
-  layoutHeight: number;
-}
-
 const KEYBOARD_THRESHOLD = 60;
 
 export function keyboardInset(base: number, height: number): number {
@@ -14,15 +9,12 @@ export function nextBaseline(prev: number, height: number): number {
   return Math.max(prev, height);
 }
 
-export function bottomSheetViewportStyle(viewport: BottomSheetViewport | null):
-  | {
-      bottom: string;
-      maxHeight: string;
-    }
-  | undefined {
-  if (!viewport) return undefined;
+export function sheetKeyboardStyle(inset: number): {
+  translate: string;
+  "--kb": string;
+} {
   return {
-    bottom: `${keyboardInset(viewport.layoutHeight, viewport.height)}px`,
-    maxHeight: `${viewport.height * 0.88}px`,
+    translate: `0 -${inset}px`,
+    "--kb": `${inset}px`,
   };
 }

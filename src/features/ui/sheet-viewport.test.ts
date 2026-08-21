@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { keyboardInset, nextBaseline } from "@/features/ui/sheet-viewport";
+import {
+  keyboardInset,
+  nextBaseline,
+  sheetKeyboardStyle,
+} from "@/features/ui/sheet-viewport";
 
 describe("iOS bottom-sheet keyboard inset", () => {
   it("rounds real keyboard movement and ignores non-keyboard deltas", () => {
@@ -33,5 +37,13 @@ describe("iOS bottom-sheet keyboard inset", () => {
     expect(recovered).toBe(616);
     expect(keyboardInset(recovered, 616)).toBe(0);
     expect(nextBaseline(recovered, 352)).toBe(616);
+  });
+
+  it("moves the sheet with a separate translate property", () => {
+    const style = sheetKeyboardStyle(264);
+
+    expect(style).toEqual({ translate: "0 -264px", "--kb": "264px" });
+    expect(style).not.toHaveProperty("transform");
+    expect(style).not.toHaveProperty("bottom");
   });
 });
