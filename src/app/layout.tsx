@@ -35,6 +35,10 @@ const longTaskObserverScript = String.raw`
   (() => {
     const session = Math.random().toString(36).slice(2);
     const records = [];
+    let ledgerPointerDown = null;
+    let ledgerClick = null;
+    let ledgerVisible = null;
+    let routeWatchStarted = false;
     const supportedEntryTypes =
       typeof PerformanceObserver === "undefined"
         ? []
@@ -48,21 +52,136 @@ const longTaskObserverScript = String.raw`
 
     record("observer-start", {
       session,
-      timeOrigin: performance.timeOrigin,
       startedAt: performance.now(),
-      path: location.pathname,
       supportedEntryTypes,
     });
+
+    function rounded(value) {
+      return value === null ? null : Number(value.toFixed(1));
+    }
+
+    function eventOccurredAt(event) {
+      const stamp = Number(event.timeStamp);
+      if (!Number.isFinite(stamp)) return null;
+      return stamp > performance.now() + 60_000 ? stamp - performance.timeOrigin : stamp;
+    }
+
+    function isLedgerPath(pathname) {
+      return pathname.replace(/\/+$/, "").endsWith("/ledger");
+    }
+
+    function isLedgerTabEvent(event) {
+      if (!(event.target instanceof Element)) return false;
+      const link = event.target.closest('nav[aria-label="Primary"] a');
+      if (!link) return false;
+      return isLedgerPath(
+        new URL(link.getAttribute("href") ?? "", location.href).pathname,
+      );
+    }
+
+    function watchLedgerRoute() {
+      if (routeWatchStarted) return;
+      routeWatchStarted = true;
+      const deadline = performance.now() + 10_000;
+
+      function check() {
+        if (isLedgerPath(location.pathname)) {
+          requestAnimationFrame(() => {
+            ledgerVisible = performance.now();
+            record("ledger-visible", { at: rounded(ledgerVisible) });
+          });
+          return;
+        }
+        if (performance.now() < deadline) {
+          requestAnimationFrame(check);
+        } else {
+          record("ledger-timeout", { at: rounded(performance.now()) });
+        }
+      }
+
+      requestAnimationFrame(check);
+    }
+
+    addEventListener(
+      "pointerdown",
+      (event) => {
+        if (ledgerPointerDown !== null || !isLedgerTabEvent(event)) return;
+        const receivedAt = performance.now();
+        const occurredAt = eventOccurredAt(event);
+        ledgerPointerDown = { occurredAt, receivedAt };
+        record("ledger-pointerdown", {
+          occurredAt: rounded(occurredAt),
+          receivedAt: rounded(receivedAt),
+          inputDelay:
+            occurredAt === null ? null : rounded(Math.max(0, receivedAt - occurredAt)),
+          pointerType: event.pointerType,
+        });
+        watchLedgerRoute();
+      },
+      { capture: true, passive: true },
+    );
+
+    addEventListener(
+      "click",
+      (event) => {
+        if (ledgerClick !== null || !isLedgerTabEvent(event)) return;
+        ledgerClick = performance.now();
+        record("ledger-click", { receivedAt: rounded(ledgerClick) });
+      },
+      { capture: true, passive: true },
+    );
+
+    function safeSummary() {
+      const longTasks = records.filter((entry) => entry.event === "longtask");
+      const durations = longTasks.map((entry) => entry.duration);
+      const total = durations.reduce((sum, duration) => sum + duration, 0);
+      const firstEventAt = ledgerPointerDown?.occurredAt ?? null;
+      const receivedAt = ledgerPointerDown?.receivedAt ?? null;
+      const status = ledgerVisible !== null ? "navigated" : "not observed";
+
+      return JSON.stringify(
+        {
+          benchmark: "yaccount-stage-2-baseline",
+          session,
+          elapsedAtReport: rounded(performance.now()),
+          longTaskSupported: supportedEntryTypes.includes("longtask"),
+          longTaskCount: longTasks.length,
+          longTaskTotal: rounded(total),
+          longTaskMaximum: durations.length ? rounded(Math.max(...durations)) : 0,
+          longTasks: longTasks.map(({ startTime, duration, endTime }) => ({
+            startTime,
+            duration,
+            endTime,
+          })),
+          firstTap: {
+            pointerDownObserved: ledgerPointerDown !== null,
+            clickObserved: ledgerClick !== null,
+            inputDelay:
+              firstEventAt === null || receivedAt === null
+                ? null
+                : rounded(Math.max(0, receivedAt - firstEventAt)),
+            tapToLedger:
+              firstEventAt === null || ledgerVisible === null
+                ? null
+                : rounded(Math.max(0, ledgerVisible - firstEventAt)),
+            status,
+          },
+        },
+        null,
+        2,
+      );
+    }
 
     function mountResultsPanel() {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = "Perf logs";
+      button.textContent = "Safe benchmark";
       button.style.cssText =
         "position:fixed;top:4px;right:4px;z-index:2147483647;padding:6px 10px;border:1px solid #777;border-radius:999px;background:#fff;color:#111;font:12px system-ui";
 
       button.addEventListener("click", () => {
         document.getElementById("tap-perf-results")?.remove();
+        const result = safeSummary();
 
         const panel = document.createElement("div");
         panel.id = "tap-perf-results";
@@ -71,18 +190,26 @@ const longTaskObserverScript = String.raw`
 
         const textarea = document.createElement("textarea");
         textarea.readOnly = true;
-        textarea.value = JSON.stringify(records, null, 2);
+        textarea.value = result;
         textarea.style.cssText =
           "min-height:0;flex:1;width:100%;padding:8px;font:11px ui-monospace,monospace";
 
         const actions = document.createElement("div");
         actions.style.cssText = "display:flex;gap:8px";
 
-        const select = document.createElement("button");
-        select.type = "button";
-        select.textContent = "Select all";
-        select.style.cssText = "padding:8px 12px;border:1px solid #777;border-radius:8px";
-        select.addEventListener("click", () => textarea.select());
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.textContent = "Copy safe result";
+        copy.style.cssText = "padding:8px 12px;border:1px solid #777;border-radius:8px";
+        copy.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(result);
+            copy.textContent = "Copied";
+          } catch {
+            textarea.select();
+            copy.textContent = "Selected — tap Copy";
+          }
+        });
 
         const close = document.createElement("button");
         close.type = "button";
@@ -90,7 +217,7 @@ const longTaskObserverScript = String.raw`
         close.style.cssText = "padding:8px 12px;border:1px solid #777;border-radius:8px";
         close.addEventListener("click", () => panel.remove());
 
-        actions.append(select, close);
+        actions.append(copy, close);
         panel.append(textarea, actions);
         document.body.append(panel);
       });
@@ -115,7 +242,6 @@ const longTaskObserverScript = String.raw`
 
         record("longtask", {
           session,
-          path: location.pathname,
           name: entry.name,
           startTime: Number(entry.startTime.toFixed(1)),
           duration: Number(entry.duration.toFixed(1)),
