@@ -41,6 +41,10 @@ describe("iPhone PWA interaction layout", () => {
     expect(sheet).not.toContain("IOS_CHROME_OVERLAP");
   });
 
+  it("scopes the sheet transition to keyboard movement", () => {
+    expect(read("../../components/ui/sheet.tsx")).not.toContain("transition ");
+  });
+
   it("waits for the FAB click before mounting quick-add", () => {
     const fab = read("../shell/QuickAddFab.tsx");
 
