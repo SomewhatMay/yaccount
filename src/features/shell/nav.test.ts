@@ -6,6 +6,7 @@ import {
   activeTab,
   destinationFor,
   normalizePathname,
+  tabSlotState,
 } from "@/features/shell/nav";
 
 /**
@@ -107,5 +108,14 @@ describe("activeTab — which slot lights up", () => {
 
   it("marks nothing for a route the shell does not know", () => {
     expect(activeTab("/whatever")).toBeNull();
+  });
+});
+
+describe("tabSlotState", () => {
+  it("gives current state priority over pending state", () => {
+    expect(tabSlotState({ current: false, pending: false })).toBe("idle");
+    expect(tabSlotState({ current: false, pending: true })).toBe("pending");
+    expect(tabSlotState({ current: true, pending: false })).toBe("active");
+    expect(tabSlotState({ current: true, pending: true })).toBe("active");
   });
 });

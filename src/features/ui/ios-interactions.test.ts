@@ -48,6 +48,10 @@ describe("iPhone PWA interaction layout", () => {
     expect(fab).toContain("if (pendingPointerQuickAdd.current)");
   });
 
+  it("shows pending feedback for tab navigation", () => {
+    expect(read("../shell/BottomTabBar.tsx")).toContain("useLinkStatus");
+  });
+
   it("routes every dropdown trigger through RowActions", () => {
     const featureRoot = new URL("../", import.meta.url);
     const directTriggerImports = readdirSync(featureRoot, {

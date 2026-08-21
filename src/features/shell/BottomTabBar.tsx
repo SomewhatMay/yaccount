@@ -1,11 +1,36 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useAtomValue } from "jotai";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { pendingCountAtom } from "@/features/store";
-import { TAB_SLOTS, activeTab } from "@/features/shell/nav";
+import { TAB_SLOTS, activeTab, tabSlotState } from "@/features/shell/nav";
+
+function TabLinkContent({
+  current,
+  children,
+}: {
+  current: boolean;
+  children: ReactNode;
+}) {
+  const { pending } = useLinkStatus();
+  const state = tabSlotState({ current, pending });
+
+  return (
+    <>
+      {children}
+      {state === "pending" && (
+        <span
+          data-tab-pending
+          aria-hidden
+          className="bg-primary/60 absolute inset-x-1/3 top-0 h-0.5 animate-pulse rounded-full"
+        />
+      )}
+    </>
+  );
+}
 
 /**
  * The thumb bar (< lg). Four slots, locked: Home · Ledger · Inbox · More.
@@ -70,7 +95,7 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
                   aria-current={current ? "page" : undefined}
                   className={className}
                 >
-                  {inner}
+                  <TabLinkContent current={current}>{inner}</TabLinkContent>
                 </Link>
               ) : (
                 <button
