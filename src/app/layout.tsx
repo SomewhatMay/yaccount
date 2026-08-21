@@ -40,6 +40,8 @@ const sheetTraceScript = String.raw`
     let startedAt = null;
     let observer = null;
     let target = null;
+    let resultTimer = null;
+    let statusNode = null;
 
     function rounded(value) {
       return Number(value.toFixed(2));
@@ -68,6 +70,9 @@ const sheetTraceScript = String.raw`
       window.visualViewport?.removeEventListener("resize", onViewportResize);
       window.visualViewport?.removeEventListener("scroll", onViewportScroll);
       window.removeEventListener("resize", onWindowResize);
+      window.removeEventListener("focusin", onFieldFocus, true);
+      if (resultTimer !== null) clearTimeout(resultTimer);
+      resultTimer = null;
       active = false;
     }
 
@@ -81,6 +86,21 @@ const sheetTraceScript = String.raw`
 
     function onWindowResize() {
       recordViewport("window-resize");
+    }
+
+    function onFieldFocus(event) {
+      if (
+        !active ||
+        !target?.contains(event.target) ||
+        !(event.target instanceof Element) ||
+        !event.target.matches("input, textarea, select")
+      )
+        return;
+      if (statusNode) statusNode.textContent = "Recording sheet trace";
+      if (resultTimer !== null) clearTimeout(resultTimer);
+      resultTimer = setTimeout(() => {
+        if (statusNode) showResults(statusNode);
+      }, 2000);
     }
 
     function arm(button) {
@@ -125,8 +145,9 @@ const sheetTraceScript = String.raw`
         passive: true,
       });
       window.addEventListener("resize", onWindowResize, { passive: true });
+      window.addEventListener("focusin", onFieldFocus, true);
       active = true;
-      button.textContent = "Show sheet trace";
+      button.textContent = "Sheet trace ready";
     }
 
     function traceResult() {
@@ -193,27 +214,26 @@ const sheetTraceScript = String.raw`
       actions.append(copy, close);
       panel.append(textarea, actions);
       document.body.append(panel);
-      button.textContent = "Arm sheet trace";
+      button.textContent = "Sheet trace complete";
     }
 
     function mountTraceButton() {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Arm sheet trace";
+      const button = document.createElement("div");
+      button.textContent = "Open a bottom sheet";
       button.style.cssText =
         "position:fixed;top:4px;left:4px;z-index:2147483647;padding:6px 10px;border:1px solid #777;border-radius:999px;background:#fff;color:#111;font:12px system-ui";
-      window.addEventListener(
-        "pointerdown",
-        (event) => {
-          if (event.target !== button) return;
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          if (active) showResults(button);
-          else arm(button);
-        },
-        { capture: true },
-      );
+      statusNode = button;
       document.body.append(button);
+
+      const sheetPoll = setInterval(() => {
+        const sheet = document.querySelector(
+          '[data-slot="sheet-content"][data-side="bottom"]',
+        );
+        if (!sheet) return;
+        clearInterval(sheetPoll);
+        button.textContent = "Preparing sheet trace";
+        setTimeout(() => arm(button), 600);
+      }, 100);
     }
 
     if (document.readyState === "loading") {
