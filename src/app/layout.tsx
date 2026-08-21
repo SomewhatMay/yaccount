@@ -31,6 +31,193 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const sheetTraceScript = String.raw`
+  (() => {
+    const session = Math.random().toString(36).slice(2);
+    const viewportEvents = [];
+    const styleWrites = [];
+    let active = false;
+    let startedAt = null;
+    let observer = null;
+    let target = null;
+
+    function rounded(value) {
+      return Number(value.toFixed(2));
+    }
+
+    function sample(event) {
+      const visual = window.visualViewport;
+      return {
+        event,
+        elapsed: startedAt === null ? 0 : rounded(performance.now() - startedAt),
+        height: visual ? rounded(visual.height) : null,
+        offsetTop: visual ? rounded(visual.offsetTop) : null,
+        innerHeight: window.innerHeight,
+      };
+    }
+
+    function recordViewport(event) {
+      const entry = sample(event);
+      viewportEvents.push(entry);
+      console.info("[sheet-trace] viewport", JSON.stringify(entry));
+    }
+
+    function stopTrace() {
+      observer?.disconnect();
+      observer = null;
+      window.visualViewport?.removeEventListener("resize", onViewportResize);
+      window.visualViewport?.removeEventListener("scroll", onViewportScroll);
+      window.removeEventListener("resize", onWindowResize);
+      active = false;
+    }
+
+    function onViewportResize() {
+      recordViewport("visual-resize");
+    }
+
+    function onViewportScroll() {
+      recordViewport("visual-scroll");
+    }
+
+    function onWindowResize() {
+      recordViewport("window-resize");
+    }
+
+    function arm(button) {
+      target = document.querySelector(
+        '[data-slot="sheet-content"][data-side="bottom"]',
+      );
+      if (!target) {
+        button.textContent = "Open a bottom sheet first";
+        setTimeout(() => {
+          button.textContent = "Arm sheet trace";
+        }, 1600);
+        return;
+      }
+
+      document.getElementById("sheet-trace-results")?.remove();
+      viewportEvents.length = 0;
+      styleWrites.length = 0;
+      startedAt = performance.now();
+      recordViewport("trace-start");
+
+      observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          const entry = {
+            ...sample("style-write"),
+            oldStyle: mutation.oldValue,
+            style: target?.getAttribute("style") ?? null,
+          };
+          styleWrites.push(entry);
+          console.info("[sheet-trace] style", JSON.stringify(entry));
+        }
+      });
+      observer.observe(target, {
+        attributes: true,
+        attributeFilter: ["style"],
+        attributeOldValue: true,
+      });
+
+      window.visualViewport?.addEventListener("resize", onViewportResize, {
+        passive: true,
+      });
+      window.visualViewport?.addEventListener("scroll", onViewportScroll, {
+        passive: true,
+      });
+      window.addEventListener("resize", onWindowResize, { passive: true });
+      active = true;
+      button.textContent = "Show sheet trace";
+    }
+
+    function traceResult() {
+      return JSON.stringify(
+        {
+          benchmark: "yaccount-stage-3-baseline",
+          session,
+          elapsedAtReport:
+            startedAt === null ? null : rounded(performance.now() - startedAt),
+          visualViewportSupported: Boolean(window.visualViewport),
+          viewportResizeCount: viewportEvents.filter(
+            (entry) => entry.event === "visual-resize",
+          ).length,
+          styleWriteCount: styleWrites.length,
+          viewportEvents,
+          styleWrites,
+        },
+        null,
+        2,
+      );
+    }
+
+    function showResults(button) {
+      stopTrace();
+      const result = traceResult();
+      document.getElementById("sheet-trace-results")?.remove();
+
+      const panel = document.createElement("div");
+      panel.id = "sheet-trace-results";
+      panel.style.cssText =
+        "position:fixed;inset:12px;z-index:2147483647;display:flex;flex-direction:column;gap:8px;padding:12px;background:#fff;color:#111;border:1px solid #777;border-radius:12px";
+
+      const textarea = document.createElement("textarea");
+      textarea.readOnly = true;
+      textarea.value = result;
+      textarea.style.cssText =
+        "min-height:0;flex:1;width:100%;padding:8px;font:11px ui-monospace,monospace";
+
+      const actions = document.createElement("div");
+      actions.style.cssText = "display:flex;gap:8px";
+
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = "Copy safe result";
+      copy.style.cssText =
+        "padding:8px 12px;border:1px solid #777;border-radius:8px";
+      copy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(result);
+          copy.textContent = "Copied";
+        } catch {
+          textarea.select();
+          copy.textContent = "Selected — tap Copy";
+        }
+      });
+
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = "Close";
+      close.style.cssText =
+        "padding:8px 12px;border:1px solid #777;border-radius:8px";
+      close.addEventListener("click", () => panel.remove());
+
+      actions.append(copy, close);
+      panel.append(textarea, actions);
+      document.body.append(panel);
+      button.textContent = "Arm sheet trace";
+    }
+
+    function mountTraceButton() {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Arm sheet trace";
+      button.style.cssText =
+        "position:fixed;top:4px;left:4px;z-index:2147483647;padding:6px 10px;border:1px solid #777;border-radius:999px;background:#fff;color:#111;font:12px system-ui";
+      button.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        if (active) showResults(button);
+        else arm(button);
+      });
+      document.body.append(button);
+    }
+
+    if (document.readyState === "loading") {
+      addEventListener("DOMContentLoaded", mountTraceButton, { once: true });
+    } else {
+      mountTraceButton();
+    }
+  })();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -40,6 +227,9 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn(geist.variable, geistMono.variable, fraunces.variable)}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: sheetTraceScript }} />
+      </head>
       <body className="bg-background min-h-screen font-sans antialiased">
         <ThemeProvider
           attribute="class"
