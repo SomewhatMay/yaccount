@@ -156,7 +156,7 @@ test("commits once for a keyboard resize burst and ignores viewport scroll", asy
     const viewport = window.visualViewport as VisualViewport & {
       height: number;
     };
-    viewport.height = window.innerHeight;
+    viewport.height = 616;
   });
   await openQuickAdd(page);
   const sheet = page.locator('[data-slot="sheet-content"][data-side="bottom"]');
@@ -184,9 +184,9 @@ test("commits once for a keyboard resize burst and ignores viewport scroll", asy
       offsetTop: number;
     };
     const samples = [
-      { height: window.innerHeight, offsetTop: 0 },
-      { height: window.innerHeight - 24, offsetTop: 0 },
-      { height: window.innerHeight - 44, offsetTop: 0 },
+      { height: 616, offsetTop: 0 },
+      { height: 592, offsetTop: 0 },
+      { height: 572, offsetTop: 0 },
       { height: 352, offsetTop: 196.66 },
     ];
 
@@ -206,6 +206,12 @@ test("commits once for a keyboard resize burst and ignores viewport scroll", asy
     commitsAfterResize,
     `style snapshots: ${snapshotsAfterResize}`,
   ).toBeLessThanOrEqual(1);
+  expect(
+    await sheet.evaluate((node) => ({
+      inset: node.style.getPropertyValue("--kb"),
+      translate: node.style.translate,
+    })),
+  ).toEqual({ inset: "264px", translate: "0px -67px" });
 
   await page.evaluate(() => {
     const viewport = window.visualViewport as VisualViewport & {

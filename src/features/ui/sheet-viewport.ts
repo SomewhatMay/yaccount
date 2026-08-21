@@ -5,16 +5,35 @@ export function keyboardInset(base: number, height: number): number {
   return delta > KEYBOARD_THRESHOLD ? delta : 0;
 }
 
+export function keyboardGeometry(
+  base: number,
+  height: number,
+  viewportTop: number,
+): { inset: number; lift: number } {
+  const inset = keyboardInset(base, height);
+  return {
+    inset,
+    lift: Math.max(0, Math.round(inset - viewportTop)),
+  };
+}
+
+export function viewportTop(viewport: VisualViewport): number {
+  return viewport.offsetTop;
+}
+
 export function nextBaseline(prev: number, height: number): number {
   return Math.max(prev, height);
 }
 
-export function sheetKeyboardStyle(inset: number): {
+export function sheetKeyboardStyle(
+  inset: number,
+  lift = inset,
+): {
   translate: string;
   "--kb": string;
 } {
   return {
-    translate: `0 -${inset}px`,
+    translate: `0 -${lift}px`,
     "--kb": `${inset}px`,
   };
 }

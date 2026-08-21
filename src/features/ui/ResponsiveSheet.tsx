@@ -11,20 +11,22 @@ import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  keyboardInset,
+  keyboardGeometry,
   nextBaseline,
   sheetKeyboardStyle,
+  viewportTop,
 } from "@/features/ui/sheet-viewport";
 
-function useKeyboardInset(active: boolean): number {
+function useKeyboardInset(active: boolean): { inset: number; lift: number } {
   const [state, setState] = useState<{
     active: boolean;
     inset: number;
-  }>({ active, inset: 0 });
+    lift: number;
+  }>({ active, inset: 0, lift: 0 });
   const baseline = useRef(0);
 
   if (state.active !== active) {
-    setState({ active, inset: 0 });
+    setState({ active, inset: 0, lift: 0 });
   }
 
   useEffect(() => {
@@ -41,7 +43,7 @@ function useKeyboardInset(active: boolean): number {
       baseline.current = nextBaseline(baseline.current, visual.height);
       setState({
         active: true,
-        inset: keyboardInset(baseline.current, visual.height),
+        ...keyboardGeometry(baseline.current, visual.height, viewportTop(visual)),
       });
     };
 
@@ -52,7 +54,7 @@ function useKeyboardInset(active: boolean): number {
     };
   }, [active]);
 
-  return active && state.active ? state.inset : 0;
+  return active && state.active ? state : { inset: 0, lift: 0 };
 }
 
 /**
@@ -80,14 +82,14 @@ export function ResponsiveSheet({
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
-  const inset = useKeyboardInset(open && !sideways);
+  const { inset, lift } = useKeyboardInset(open && !sideways);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : sheetKeyboardStyle(inset)}
+        style={sideways ? undefined : sheetKeyboardStyle(inset, lift)}
         onOpenAutoFocus={(event) => {
           if (!sideways) {
             event.preventDefault();

@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  keyboardGeometry,
   keyboardInset,
   nextBaseline,
   sheetKeyboardStyle,
 } from "@/features/ui/sheet-viewport";
 
 describe("iOS bottom-sheet keyboard inset", () => {
+  it("separates keyboard height from the recorded Safari viewport pan", () => {
+    expect(keyboardGeometry(616, 352, 196.66)).toEqual({
+      inset: 264,
+      lift: 67,
+    });
+  });
+
   it("rounds real keyboard movement and ignores non-keyboard deltas", () => {
     expect(keyboardInset(800, 800)).toBe(0);
     expect(keyboardInset(800, 797)).toBe(0);
