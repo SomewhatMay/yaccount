@@ -59,6 +59,7 @@ import {
   flashRowAtom,
   goalsAtom,
   readyAtom,
+  runGoalMaintenanceAtom,
   runRecurringGenerationAtom,
   transactionsAtom,
 } from "@/features/store";
@@ -66,6 +67,7 @@ import { useFocusParam } from "@/features/useFocusParam";
 import { describeGoal } from "@/features/goals/describe";
 import { GoalSheet, type GoalFormInput } from "@/features/goals/GoalSheet";
 import { renamedGoalContainer } from "@/features/goals/rename-container";
+import { reopenedGoal } from "@/features/goals/reopen";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,6 +123,7 @@ export function GoalsView() {
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const generate = useSetAtom(runRecurringGenerationAtom);
+  const maintainGoals = useSetAtom(runGoalMaintenanceAtom);
 
   const [sheet, setSheet] = useState<Goal | "new" | null>(null);
 
@@ -180,25 +183,29 @@ export function GoalsView() {
 
       // Edit the goal and keep its container name in sync. The cycle basis stays
       // fixed; the factory re-validates the mode/kind cross-field rules.
-      const next = makeGoal({
-        id: editing.id,
-        container_id: editing.container_id,
-        kind: input.kind,
-        mode: input.mode,
-        name: input.name,
-        target_amount: input.target_amount,
-        deadline: input.deadline,
-        planned_monthly: input.planned_monthly,
-        opening_contributed: editing.opening_contributed,
-        status: editing.status,
-        is_archived: editing.is_archived,
-        created_date: editing.created_date,
-        completed_date: editing.completed_date,
-      });
+      const next = reopenedGoal(
+        makeGoal({
+          id: editing.id,
+          container_id: editing.container_id,
+          kind: input.kind,
+          mode: input.mode,
+          name: input.name,
+          target_amount: input.target_amount,
+          deadline: input.deadline,
+          planned_monthly: input.planned_monthly,
+          opening_contributed: editing.opening_contributed,
+          status: editing.status,
+          is_archived: editing.is_archived,
+          created_date: editing.created_date,
+          completed_date: editing.completed_date,
+        }),
+        txns,
+      );
       if (renamedContainer) {
         await dispatch(updateContainer(renamedContainer));
       }
       await dispatch(updateGoal(next));
+      await maintainGoals();
       setSheet(null);
       flashRow({ id: next.id });
       return;
