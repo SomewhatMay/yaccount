@@ -1,6 +1,6 @@
 import type { Container, ContainerSnapshot, Transaction } from "../model";
 import { isLiveLedgerRow, isTransfer, netContributions } from "./balances";
-import { inRange, type DateRange } from "./period";
+import { inRange, monthKeysInRange, type DateRange } from "./period";
 
 /**
  * Container Flows + investment/asset reporting (§5.4, §5.6). Deferred here from
@@ -16,6 +16,16 @@ export interface ContainerFlow {
   inflow: number; // cents moved in
   outflow: number; // cents moved out (positive magnitude)
   net: number; // inflow − outflow
+}
+
+export interface InvestmentReport {
+  containerId: string;
+  name: string;
+  currentValue: number | null;
+  netContributions: number;
+  gainLoss: number | null;
+  firstSnapshotMonth: string | null;
+  series: { month: string; value: number; contributed: number }[];
 }
 
 /**
@@ -125,4 +135,69 @@ export function reconstructedBalance(
   }
   // base is after the target — subtract the gap's transfers to walk back.
   return base.reported_balance - transferDelta(txns, containerId, targetDate, base.date);
+}
+
+/** One investment card, valued consistently inside its reporting window. */
+export function investmentReport(
+  container: Container,
+  snapshots: ContainerSnapshot[],
+  txns: Transaction[],
+  range: DateRange,
+): InvestmentReport {
+  const ownSnapshots = snapshots.filter((s) => s.container_id === container.id);
+  const snapshot = latestSnapshot(
+    ownSnapshots.filter((s) => inRange(s.date, range)),
+    container.id,
+  );
+  const contributions = snapshot
+    ? netContributions(
+        txns.filter((t) => t.date <= snapshot.date),
+        container.id,
+      )
+    : 0;
+  const keys = monthKeysInRange(
+    range,
+    ownSnapshots
+      .map((s) => s.date)
+      .concat(
+        txns
+          .filter(
+            (t) =>
+              isLiveLedgerRow(t) &&
+              isTransfer(t) &&
+              (t.container_id === container.id || t.to_container_id === container.id),
+          )
+          .map((t) => t.date),
+      ),
+  );
+  const series =
+    ownSnapshots.length > 0
+      ? keys.flatMap((month) => {
+          const [year, number] = month.split("-").map(Number);
+          const day = new Date(year, number, 0).getDate();
+          const monthEnd = `${month}-${String(day).padStart(2, "0")}`;
+          const targetDate =
+            range.end !== null && monthEnd > range.end ? range.end : monthEnd;
+          const value = reconstructedBalance(container.id, snapshots, txns, targetDate);
+          const contributed = netContributions(
+            txns.filter((t) => t.date <= targetDate),
+            container.id,
+          );
+          return value === null ? [] : [{ month, value, contributed }];
+        })
+      : [];
+  const firstSnapshot = ownSnapshots.reduce<ContainerSnapshot | null>(
+    (first, candidate) => (!first || candidate.date < first.date ? candidate : first),
+    null,
+  );
+
+  return {
+    containerId: container.id,
+    name: container.name,
+    currentValue: snapshot?.reported_balance ?? null,
+    netContributions: contributions,
+    gainLoss: snapshot ? snapshot.reported_balance - contributions : null,
+    firstSnapshotMonth: firstSnapshot?.date.slice(0, 7) ?? null,
+    series,
+  };
 }

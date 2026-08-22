@@ -25,6 +25,7 @@ import type {
   CategorySlice,
   ContainerFlow,
   MonthlyTotal,
+  InvestmentReport,
 } from "@/core/engine";
 import { cn } from "@/lib/utils";
 import {
@@ -550,19 +551,18 @@ export function BudgetComparisonTable({
 }
 
 // ── Investment gain/loss card + reconstructed-balance sparkline (§5.6) ────────
-export interface InvestmentReport {
-  containerId: string;
-  name: string;
-  currentValue: number | null;
-  netContributions: number;
-  gainLoss: number | null;
-  series: { month: string; value: number }[];
-}
-
 export function InvestmentCard({ report }: { report: InvestmentReport }) {
   const { currentValue, netContributions, gainLoss, series } = report;
   const withYear = spansYears(series.map((m) => m.month));
-  const data = series.map((m) => ({ ...m, label: monthLabel(m.month, withYear) }));
+  const data = series.map((m) => {
+    const reconstructed =
+      report.firstSnapshotMonth !== null && m.month < report.firstSnapshotMonth;
+    return {
+      ...m,
+      label: `${monthLabel(m.month, withYear)}${reconstructed ? "*" : ""}`,
+    };
+  });
+  const hasReconstructed = data.some((m) => m.label.endsWith("*"));
   const gainColor =
     gainLoss === null ? "" : gainLoss >= 0 ? "text-positive" : "text-destructive";
 
@@ -593,20 +593,41 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
           </span>
         )}
       </div>
-      {data.length > 1 && (
-        <ResponsiveContainer width="100%" height={72} className="mt-3">
-          <LineChart data={data} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
+      {data.length > 0 && (
+        <ResponsiveContainer width="100%" height={200} className="mt-3">
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} stroke={CHART.grid} />
+            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
+            <YAxis
+              tick={axisTick}
+              tickFormatter={formatAxisCents}
+              tickLine={false}
+              axisLine={false}
+              width={56}
+            />
             <Tooltip content={<MoneyTooltip />} />
+            <Legend />
+            <Line
+              dataKey="contributed"
+              name="Contributed"
+              type="monotone"
+              stroke={CHART.expense}
+              strokeWidth={1.75}
+              dot={data.length === 1}
+            />
             <Line
               dataKey="value"
               name="Value"
               type="monotone"
               stroke={CHART.savings}
               strokeWidth={1.75}
-              dot={false}
+              dot={data.length === 1}
             />
           </LineChart>
         </ResponsiveContainer>
+      )}
+      {hasReconstructed && (
+        <p className="text-muted-foreground mt-1 text-[11px]">* reconstructed value</p>
       )}
     </div>
   );
