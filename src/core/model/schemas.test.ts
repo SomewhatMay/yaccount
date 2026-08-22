@@ -33,6 +33,19 @@ describe("primitives", () => {
 });
 
 describe("CategorySchema (§5.1)", () => {
+  it("defaults old category records to included in stats", () => {
+    const category = CategorySchema.parse({
+      id: "old",
+      name: "Old export",
+      type: "expense",
+      is_archived: false,
+      color: null,
+      icon: null,
+    });
+
+    expect(category.excluded_from_stats).toBe(false);
+  });
+
   it("accepts a valid expense category", () => {
     const c = CategorySchema.parse({
       id: "c1",

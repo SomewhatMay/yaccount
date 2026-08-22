@@ -10,6 +10,7 @@ export const CategorySchema = z.object({
   name: zName,
   type: CategoryTypeSchema,
   is_archived: z.boolean(), // soft-delete only (§5.5) — never hard-deleted
+  excluded_from_stats: z.boolean().default(false),
   // The category's colour: null = the deterministic hue derived from the id at
   // render (M5, §10.1); a stored value is honoured if present. Not user-set in
   // the UI — the adjustable identity is `icon` (M11).
