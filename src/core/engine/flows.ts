@@ -155,7 +155,19 @@ export function investmentReport(
     : 0;
   const keys = monthKeysInRange(
     range,
-    txns.map((t) => t.date),
+    snapshots
+      .filter((s) => s.container_id === container.id)
+      .map((s) => s.date)
+      .concat(
+        txns
+          .filter(
+            (t) =>
+              isLiveLedgerRow(t) &&
+              isTransfer(t) &&
+              (t.container_id === container.id || t.to_container_id === container.id),
+          )
+          .map((t) => t.date),
+      ),
   );
   const series = snapshot
     ? keys.flatMap((month) => {

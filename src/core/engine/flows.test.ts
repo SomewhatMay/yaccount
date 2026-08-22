@@ -141,6 +141,25 @@ describe("investmentReport — one reporting window (§5.6)", () => {
     expect(report.gainLoss).toBe(20000);
     expect(report.gainLoss).toBe(report.currentValue! - report.netContributions);
   });
+
+  it("builds its series from snapshots when there are no transfers", () => {
+    const snaps = [
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-05-31",
+        reported_balance: 110000,
+      }),
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-06-30",
+        reported_balance: 120000,
+      }),
+    ];
+
+    const report = investmentReport(savings, snaps, [], range);
+
+    expect(report.series.map((point) => point.month)).toEqual(["2026-05", "2026-06"]);
+  });
 });
 
 describe("reconstructedBalance — nearest snapshot ± transfers in the gap (§5.6 / §10 #4)", () => {
