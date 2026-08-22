@@ -70,6 +70,7 @@ export function ResponsiveSheet({
   description,
   className,
   bodyClassName,
+  scrollHeader = false,
   children,
 }: {
   open: boolean;
@@ -78,12 +79,25 @@ export function ResponsiveSheet({
   description?: React.ReactNode;
   className?: string;
   bodyClassName?: string;
+  scrollHeader?: boolean;
   children: React.ReactNode;
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
   const { inset, lift } = useKeyboardInset(open && !sideways);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const header = (
+    <SheetHeader>
+      <SheetTitle ref={titleRef} tabIndex={-1} className="font-display text-xl">
+        {title}
+      </SheetTitle>
+      {description ? (
+        <SheetDescription>{description}</SheetDescription>
+      ) : (
+        <SheetDescription className="sr-only">{title}</SheetDescription>
+      )}
+    </SheetHeader>
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -105,23 +119,16 @@ export function ResponsiveSheet({
           className,
         )}
       >
-        <SheetHeader>
-          <SheetTitle ref={titleRef} tabIndex={-1} className="font-display text-xl">
-            {title}
-          </SheetTitle>
-          {description ? (
-            <SheetDescription>{description}</SheetDescription>
-          ) : (
-            <SheetDescription className="sr-only">{title}</SheetDescription>
-          )}
-        </SheetHeader>
+        {!scrollHeader && header}
         <div
           data-slot="sheet-body"
           className={cn(
             "min-h-0 flex-1 [scroll-padding-bottom:calc(1rem+env(safe-area-inset-bottom,0px))] overflow-x-hidden overflow-y-auto overscroll-contain",
+            scrollHeader && "space-y-4",
             bodyClassName,
           )}
         >
+          {scrollHeader && header}
           {children}
         </div>
       </SheetContent>

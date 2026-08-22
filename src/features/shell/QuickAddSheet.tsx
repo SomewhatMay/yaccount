@@ -66,6 +66,7 @@ export function QuickAddSheet() {
       onOpenChange={(next) => !next && setOpenKind(null)}
       title="Add an entry"
       description="Log an expense, income, or a move between containers."
+      scrollHeader
     >
       {openKind !== null && (
         <QuickAddForm initialKind={openKind} onDone={() => setOpenKind(null)} />

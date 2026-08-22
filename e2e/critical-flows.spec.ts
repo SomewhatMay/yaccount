@@ -250,6 +250,20 @@ test("commits once for a keyboard resize burst and ignores viewport scroll", asy
   );
 });
 
+test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile sheet regression.");
+
+  await openReady(page, "/", "How the money moved");
+  await openQuickAdd(page);
+
+  const body = page.locator('[data-slot="sheet-body"]');
+  await expect(body.getByRole("heading", { name: "Add an entry" })).toBeVisible();
+  await expect(
+    body.getByText("Log an expense, income, or a move between containers."),
+  ).toBeVisible();
+  await expect(body.getByLabel("Amount")).toBeVisible();
+});
+
 test("customizes dashboard widget order and visibility", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Customize dashboard" }).click();
