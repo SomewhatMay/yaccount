@@ -755,7 +755,7 @@ Update this table in a commit on the next stage's branch, once the previous stag
 | Stage | Branch | PR | Status |
 |---|---|---|---|
 | 1 | `fix/row-menu-scroll` | #28 | merged |
-| 2 | `fix/touch-responsiveness` | — | not started |
+| 2 | `fix/touch-responsiveness` | #29 | merged |
 | 3 | `fix/sheet-keyboard` | — | not started |
 | 4 | `fix/goal-reopen-on-edit` | — | not started |
 | 5 | `fix/investment-report-window` | — | not started |

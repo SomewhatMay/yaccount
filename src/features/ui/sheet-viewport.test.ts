@@ -1,49 +1,66 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  bottomSheetViewportStyle,
-  subscribeVisualViewport,
+  keyboardGeometry,
+  keyboardInset,
+  nextBaseline,
+  sheetKeyboardStyle,
+  sheetViewportStyle,
 } from "@/features/ui/sheet-viewport";
 
-describe("iOS bottom-sheet viewport handling", () => {
-  it("anchors the sheet to the visual viewport without guessed chrome padding", () => {
-    expect(
-      bottomSheetViewportStyle({
-        height: 500,
-        offsetTop: 20,
-        layoutHeight: 800,
-      }),
-    ).toEqual({
-      bottom: "280px",
-      maxHeight: "440px",
+describe("iOS bottom-sheet keyboard inset", () => {
+  it("separates keyboard height from the recorded Safari viewport pan", () => {
+    expect(keyboardGeometry(616, 352, 196.66)).toEqual({
+      inset: 264,
+      lift: 67,
     });
   });
 
-  it("never positions below the layout viewport", () => {
-    expect(
-      bottomSheetViewportStyle({
-        height: 500,
-        offsetTop: 320,
-        layoutHeight: 800,
-      }),
-    ).toMatchObject({ bottom: "0px" });
+  it("rounds real keyboard movement and ignores non-keyboard deltas", () => {
+    expect(keyboardInset(800, 800)).toBe(0);
+    expect(keyboardInset(800, 797)).toBe(0);
+    expect(keyboardInset(800, 500)).toBe(300);
+
+    const fractional = keyboardInset(800, 652.6666);
+    expect(fractional).toBe(147);
+    expect(Number.isInteger(fractional)).toBe(true);
+
+    expect(keyboardInset(600, 700)).toBe(0);
   });
 
-  it("uses CSS viewport fallback before visual viewport data is available", () => {
-    expect(bottomSheetViewportStyle(null)).toBeUndefined();
+  it("turns the recorded iPhone samples into one keyboard transition", () => {
+    const outputs = [616, 352].map((height) => keyboardInset(616, height));
+    const transitions = outputs
+      .slice(1)
+      .filter((value, index) => value !== outputs[index]);
+
+    expect(new Set(outputs).size).toBe(2);
+    expect(transitions).toHaveLength(1);
   });
 
-  it("subscribes to viewport resize and scroll, then removes both listeners", () => {
-    const addEventListener = vi.fn();
-    const removeEventListener = vi.fn();
-    const viewport = { addEventListener, removeEventListener };
-    const onChange = vi.fn();
+  it("recovers a baseline captured while the keyboard was already open", () => {
+    const shrunken = nextBaseline(0, 352);
+    expect(shrunken).toBe(352);
+    expect(keyboardInset(shrunken, 352)).toBe(0);
 
-    const cleanup = subscribeVisualViewport(viewport, onChange);
+    const recovered = nextBaseline(shrunken, 616);
+    expect(recovered).toBe(616);
+    expect(keyboardInset(recovered, 616)).toBe(0);
+    expect(nextBaseline(recovered, 352)).toBe(616);
+  });
 
-    expect(addEventListener).toHaveBeenCalledWith("resize", onChange);
-    expect(addEventListener).toHaveBeenCalledWith("scroll", onChange);
-    cleanup();
-    expect(removeEventListener).toHaveBeenCalledWith("resize", onChange);
-    expect(removeEventListener).toHaveBeenCalledWith("scroll", onChange);
+  it("moves the sheet with a separate translate property", () => {
+    const style = sheetKeyboardStyle(264);
+
+    expect(style).toEqual({ translate: "0 -264px", "--kb": "264px" });
+    expect(style).not.toHaveProperty("transform");
+    expect(style).not.toHaveProperty("bottom");
+  });
+
+  it("extends the sheet surface through the recorded Safari obstruction", () => {
+    expect(sheetViewportStyle(264, 67)).toEqual({
+      translate: "0 -67px",
+      "--kb": "264px",
+      "--sheet-occlusion": "67px",
+    });
   });
 });

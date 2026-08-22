@@ -130,6 +130,140 @@ test("opens Ledger on the first immediate tab tap", async ({ page }, testInfo) =
   await expect(page).toHaveURL(/\/ledger\/?$/);
 });
 
+test("commits once for a keyboard resize burst and ignores viewport scroll", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile viewport regression.");
+
+  await context.addInitScript(() => {
+    const fake = Object.assign(new EventTarget(), {
+      height: window.innerHeight,
+      offsetTop: 0,
+      width: window.innerWidth,
+      pageLeft: 0,
+      pageTop: 0,
+      scale: 1,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: fake,
+    });
+  });
+
+  await openReady(page, "/", "How the money moved");
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as VisualViewport & {
+      height: number;
+    };
+    viewport.height = 616;
+  });
+  await openQuickAdd(page);
+  const sheet = page.locator('[data-slot="sheet-content"][data-side="bottom"]');
+  await expect(sheet).toBeVisible();
+  await page.waitForTimeout(100);
+
+  await sheet.evaluate((node) => {
+    node.setAttribute("data-test-style-commits", "0");
+    node.setAttribute("data-test-style-snapshots", "[]");
+    const observer = new MutationObserver(() => {
+      const count = Number(node.getAttribute("data-test-style-commits") ?? "0");
+      node.setAttribute("data-test-style-commits", String(count + 1));
+      const snapshots = JSON.parse(
+        node.getAttribute("data-test-style-snapshots") ?? "[]",
+      ) as string[];
+      snapshots.push(node.getAttribute("style") ?? "");
+      node.setAttribute("data-test-style-snapshots", JSON.stringify(snapshots));
+    });
+    observer.observe(node, { attributes: true, attributeFilter: ["style"] });
+  });
+
+  await page.evaluate(async () => {
+    const viewport = window.visualViewport as VisualViewport & {
+      height: number;
+      offsetTop: number;
+    };
+    const samples = [
+      { height: 616, offsetTop: 0 },
+      { height: 592, offsetTop: 0 },
+      { height: 572, offsetTop: 0 },
+      { height: 352, offsetTop: 196.66 },
+    ];
+
+    for (const sample of samples) {
+      viewport.height = sample.height;
+      viewport.offsetTop = sample.offsetTop;
+      viewport.dispatchEvent(new Event("resize"));
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+  });
+  await page.waitForTimeout(100);
+
+  const commitsAfterResize = Number(await sheet.getAttribute("data-test-style-commits"));
+  const snapshotsAfterResize =
+    (await sheet.getAttribute("data-test-style-snapshots")) ?? "[]";
+  expect(
+    commitsAfterResize,
+    `style snapshots: ${snapshotsAfterResize}`,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    await sheet.evaluate((node) => ({
+      inset: node.style.getPropertyValue("--kb"),
+      translate: node.style.translate,
+    })),
+  ).toEqual({ inset: "264px", translate: "0px -67px" });
+  const layout = await sheet.evaluate((node) => {
+    const viewportProbe = document.createElement("div");
+    viewportProbe.style.cssText =
+      "position:fixed;height:100svh;visibility:hidden;pointer-events:none";
+    document.body.append(viewportProbe);
+    const smallViewportHeight = Number.parseFloat(getComputedStyle(viewportProbe).height);
+    viewportProbe.remove();
+
+    const style = getComputedStyle(node);
+    return {
+      expectedMaxHeight: smallViewportHeight - 264,
+      extensionHeight: getComputedStyle(node, "::after").height,
+      maxHeight: Number.parseFloat(style.maxHeight),
+      overflow: style.overflow,
+    };
+  });
+  expect(layout.maxHeight, JSON.stringify(layout)).toBeCloseTo(
+    layout.expectedMaxHeight,
+    1,
+  );
+  expect(layout.extensionHeight).toBe("67px");
+  expect(layout.overflow).toBe("visible");
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as VisualViewport & {
+      offsetTop: number;
+    };
+    viewport.offsetTop = 220;
+    viewport.dispatchEvent(new Event("scroll"));
+  });
+  await page.waitForTimeout(100);
+
+  await expect(sheet).toHaveAttribute(
+    "data-test-style-commits",
+    String(commitsAfterResize),
+  );
+});
+
+test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile sheet regression.");
+
+  await openReady(page, "/", "How the money moved");
+  await openQuickAdd(page);
+
+  const body = page.locator('[data-slot="sheet-body"]');
+  await expect(body.getByRole("heading", { name: "Add an entry" })).toBeVisible();
+  await expect(
+    body.getByText("Log an expense, income, or a move between containers."),
+  ).toBeVisible();
+  await expect(body.getByLabel("Amount")).toBeVisible();
+});
+
 test("customizes dashboard widget order and visibility", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Customize dashboard" }).click();

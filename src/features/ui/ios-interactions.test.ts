@@ -35,10 +35,21 @@ describe("iPhone PWA interaction layout", () => {
     expect(sheet).toContain("overflow-x-hidden");
     expect(sheet).toContain("overflow-y-auto");
     expect(sheet).toContain("touch-pan-y");
-    expect(sheet).not.toContain("scrollIntoView");
-    expect(sheet).not.toContain("bottomBleedStyle");
-    expect(sheet).not.toContain("function poll");
-    expect(sheet).not.toContain("IOS_CHROME_OVERLAP");
+    expect(sheet).not.toContain("offsetTop");
+    expect(sheet).not.toContain("innerHeight");
+    expect(sheet).not.toContain("requestAnimationFrame");
+    expect(sheet).not.toContain('"scroll"');
+  });
+
+  it("scopes the sheet transition to keyboard movement", () => {
+    expect(read("../../components/ui/sheet.tsx")).not.toContain("transition ");
+  });
+
+  it("does not animate after Safari reports its final keyboard resize", () => {
+    const sheet = read("../../components/ui/sheet.tsx");
+
+    expect(sheet).not.toContain("transition-[translate]");
+    expect(sheet).toContain("transition-none");
   });
 
   it("waits for the FAB click before mounting quick-add", () => {

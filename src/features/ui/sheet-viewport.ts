@@ -1,39 +1,49 @@
-export interface VisualViewportEvents {
-  addEventListener(type: "resize" | "scroll", listener: () => void): void;
-  removeEventListener(type: "resize" | "scroll", listener: () => void): void;
+const KEYBOARD_THRESHOLD = 60;
+
+export function keyboardInset(base: number, height: number): number {
+  const delta = Math.round(base - height);
+  return delta > KEYBOARD_THRESHOLD ? delta : 0;
 }
 
-export interface BottomSheetViewport {
-  height: number;
-  offsetTop: number;
-  layoutHeight: number;
-}
-
-export function bottomSheetViewportStyle(viewport: BottomSheetViewport | null):
-  | {
-      bottom: string;
-      maxHeight: string;
-    }
-  | undefined {
-  if (!viewport) return undefined;
+export function keyboardGeometry(
+  base: number,
+  height: number,
+  viewportTop: number,
+): { inset: number; lift: number } {
+  const inset = keyboardInset(base, height);
   return {
-    bottom: `${Math.max(
-      0,
-      viewport.layoutHeight - viewport.offsetTop - viewport.height,
-    )}px`,
-    maxHeight: `${viewport.height * 0.88}px`,
+    inset,
+    lift: Math.max(0, Math.round(inset - viewportTop)),
   };
 }
 
-export function subscribeVisualViewport(
-  viewport: VisualViewportEvents | null,
-  onChange: () => void,
-): () => void {
-  if (!viewport) return () => undefined;
-  viewport.addEventListener("resize", onChange);
-  viewport.addEventListener("scroll", onChange);
-  return () => {
-    viewport.removeEventListener("resize", onChange);
-    viewport.removeEventListener("scroll", onChange);
+export function viewportTop(viewport: VisualViewport): number {
+  return viewport.offsetTop;
+}
+
+export function nextBaseline(prev: number, height: number): number {
+  return Math.max(prev, height);
+}
+
+export function sheetKeyboardStyle(
+  inset: number,
+  lift = inset,
+): {
+  translate: string;
+  "--kb": string;
+} {
+  return {
+    translate: `0 -${lift}px`,
+    "--kb": `${inset}px`,
+  };
+}
+
+export function sheetViewportStyle(
+  inset: number,
+  lift: number,
+): ReturnType<typeof sheetKeyboardStyle> & { "--sheet-occlusion": string } {
+  return {
+    ...sheetKeyboardStyle(inset, lift),
+    "--sheet-occlusion": `${lift}px`,
   };
 }

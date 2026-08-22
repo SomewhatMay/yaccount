@@ -11,75 +11,50 @@ import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  bottomSheetViewportStyle,
-  subscribeVisualViewport,
-  type BottomSheetViewport,
+  keyboardGeometry,
+  nextBaseline,
+  sheetViewportStyle,
+  viewportTop,
 } from "@/features/ui/sheet-viewport";
 
-function visualViewportSnapshot(): BottomSheetViewport | null {
-  const viewport = window.visualViewport;
-  return viewport
-    ? {
-        height: viewport.height,
-        offsetTop: viewport.offsetTop,
-        layoutHeight: window.innerHeight,
-      }
-    : null;
-}
+function useKeyboardInset(active: boolean): { inset: number; lift: number } {
+  const [state, setState] = useState<{
+    active: boolean;
+    inset: number;
+    lift: number;
+  }>({ active, inset: 0, lift: 0 });
+  const baseline = useRef(0);
 
-function sameViewport(
-  left: BottomSheetViewport | null,
-  right: BottomSheetViewport | null,
-) {
-  return (
-    left?.height === right?.height &&
-    left?.offsetTop === right?.offsetTop &&
-    left?.layoutHeight === right?.layoutHeight
-  );
-}
-
-function useVisualViewport(active: boolean): BottomSheetViewport | null {
-  const [viewport, setViewport] = useState<BottomSheetViewport | null>(null);
+  if (state.active !== active) {
+    setState({ active, inset: 0, lift: 0 });
+  }
 
   useEffect(() => {
     if (!active) {
+      baseline.current = 0;
       return;
     }
 
-    let frame = 0;
-    let attempts = 0;
+    const visual = window.visualViewport;
+    if (!visual) return;
 
-    const settle = () => {
-      cancelAnimationFrame(frame);
-      attempts = 0;
-      const sample = () => {
-        const first = visualViewportSnapshot();
-        frame = requestAnimationFrame(() => {
-          const second = visualViewportSnapshot();
-          if (sameViewport(first, second) || attempts++ >= 6) {
-            setViewport(second);
-          } else {
-            sample();
-          }
-        });
-      };
-      sample();
+    baseline.current = visual.height;
+    const update = () => {
+      baseline.current = nextBaseline(baseline.current, visual.height);
+      setState({
+        active: true,
+        ...keyboardGeometry(baseline.current, visual.height, viewportTop(visual)),
+      });
     };
 
-    settle();
-    const unsubscribeViewport = subscribeVisualViewport(window.visualViewport, settle);
-    window.addEventListener("resize", settle);
-    window.addEventListener("orientationchange", settle);
+    visual.addEventListener("resize", update);
 
     return () => {
-      unsubscribeViewport();
-      window.removeEventListener("resize", settle);
-      window.removeEventListener("orientationchange", settle);
-      cancelAnimationFrame(frame);
+      visual.removeEventListener("resize", update);
     };
   }, [active]);
 
-  return active ? viewport : null;
+  return active && state.active ? state : { inset: 0, lift: 0 };
 }
 
 /**
@@ -95,6 +70,7 @@ export function ResponsiveSheet({
   description,
   className,
   bodyClassName,
+  scrollHeader = false,
   children,
 }: {
   open: boolean;
@@ -103,18 +79,31 @@ export function ResponsiveSheet({
   description?: React.ReactNode;
   className?: string;
   bodyClassName?: string;
+  scrollHeader?: boolean;
   children: React.ReactNode;
 }) {
   // Prerender assumes the wider layout; the client corrects it on hydration.
   const sideways = useMediaQuery(SM_UP, true);
-  const viewport = useVisualViewport(open && !sideways);
+  const { inset, lift } = useKeyboardInset(open && !sideways);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const header = (
+    <SheetHeader>
+      <SheetTitle ref={titleRef} tabIndex={-1} className="font-display text-xl">
+        {title}
+      </SheetTitle>
+      {description ? (
+        <SheetDescription>{description}</SheetDescription>
+      ) : (
+        <SheetDescription className="sr-only">{title}</SheetDescription>
+      )}
+    </SheetHeader>
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={sideways ? "right" : "bottom"}
-        style={sideways ? undefined : bottomSheetViewportStyle(viewport)}
+        style={sideways ? undefined : sheetViewportStyle(inset, lift)}
         onOpenAutoFocus={(event) => {
           if (!sideways) {
             event.preventDefault();
@@ -122,31 +111,24 @@ export function ResponsiveSheet({
           }
         }}
         className={cn(
-          "max-w-full min-w-0 touch-pan-y gap-0 overflow-hidden",
+          "after:bg-popover max-w-full min-w-0 touch-pan-y gap-0 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-[var(--sheet-occlusion,0px)] after:content-['']",
           // A bottom sheet stops short of the top edge so the screen behind it
           // stays visible — you are editing a row, not leaving the ledger.
-          "data-[side=bottom]:max-h-[88svh] data-[side=bottom]:rounded-t-2xl",
+          "data-[side=bottom]:max-h-[min(88svh,calc(100svh_-_var(--kb,0px)))] data-[side=bottom]:rounded-t-2xl",
           "sm:max-w-md",
           className,
         )}
       >
-        <SheetHeader>
-          <SheetTitle ref={titleRef} tabIndex={-1} className="font-display text-xl">
-            {title}
-          </SheetTitle>
-          {description ? (
-            <SheetDescription>{description}</SheetDescription>
-          ) : (
-            <SheetDescription className="sr-only">{title}</SheetDescription>
-          )}
-        </SheetHeader>
+        {!scrollHeader && header}
         <div
           data-slot="sheet-body"
           className={cn(
             "min-h-0 flex-1 [scroll-padding-bottom:calc(1rem+env(safe-area-inset-bottom,0px))] overflow-x-hidden overflow-y-auto overscroll-contain",
+            scrollHeader && "space-y-4",
             bodyClassName,
           )}
         >
+          {scrollHeader && header}
           {children}
         </div>
       </SheetContent>
