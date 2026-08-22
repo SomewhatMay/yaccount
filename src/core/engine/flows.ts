@@ -170,26 +170,22 @@ export function investmentReport(
           .map((t) => t.date),
       ),
   );
-  const series = ownSnapshots.length > 0
-    ? keys.flatMap((month) => {
-        const [year, number] = month.split("-").map(Number);
-        const day = new Date(year, number, 0).getDate();
-        const monthEnd = `${month}-${String(day).padStart(2, "0")}`;
-        const targetDate =
-          range.end !== null && monthEnd > range.end ? range.end : monthEnd;
-        const value = reconstructedBalance(
-          container.id,
-          snapshots,
-          txns,
-          targetDate,
-        );
-        const contributed = netContributions(
-          txns.filter((t) => t.date <= targetDate),
-          container.id,
-        );
-        return value === null ? [] : [{ month, value, contributed }];
-      })
-    : [];
+  const series =
+    ownSnapshots.length > 0
+      ? keys.flatMap((month) => {
+          const [year, number] = month.split("-").map(Number);
+          const day = new Date(year, number, 0).getDate();
+          const monthEnd = `${month}-${String(day).padStart(2, "0")}`;
+          const targetDate =
+            range.end !== null && monthEnd > range.end ? range.end : monthEnd;
+          const value = reconstructedBalance(container.id, snapshots, txns, targetDate);
+          const contributed = netContributions(
+            txns.filter((t) => t.date <= targetDate),
+            container.id,
+          );
+          return value === null ? [] : [{ month, value, contributed }];
+        })
+      : [];
   const firstSnapshot = ownSnapshots.reduce<ContainerSnapshot | null>(
     (first, candidate) => (!first || candidate.date < first.date ? candidate : first),
     null,

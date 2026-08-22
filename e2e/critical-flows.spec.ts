@@ -405,9 +405,7 @@ test("scopes investment contributions to the reporting period", async ({ page })
   await page.getByRole("radio", { name: "Investment", exact: true }).click();
   await page.getByRole("button", { name: "Create container" }).click();
 
-  await page
-    .getByRole("button", { name: "Actions for E2E investment period" })
-    .click();
+  await page.getByRole("button", { name: "Actions for E2E investment period" }).click();
   await page.getByRole("menuitem", { name: "Reported balances" }).click();
   await page.getByLabel("As of").fill("2026-01-31");
   await page.getByLabel("Reported value").fill("10.00");
