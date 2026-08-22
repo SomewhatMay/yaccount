@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeCategory } from "../model/category";
 import { makeBudgetTarget } from "../model/budgetTarget";
 import { makeTransaction, makeVoidRow, makeTransfer } from "../model/transaction";
-import type { Transaction } from "../model";
+import type { Category, Transaction } from "../model";
 import {
   categoryBreakdown,
   categoryBreakdownMonthlyAverage,
@@ -15,6 +15,7 @@ import {
   periodSummary,
   sankeyFlows,
   savingsRateSeries,
+  statsTransactions,
   topPayees,
   waterfallData,
   budgetComparison,
@@ -94,6 +95,62 @@ const txns: Transaction[] = [
 
 const range = resolvePeriod({ kind: "preset", preset: "last-3-months" }, "2026-07-21");
 // → 2026-04-21 … 2026-07-21 ; month keys Apr, May, Jun, Jul (4)
+
+describe("statsTransactions — category statistical exclusion", () => {
+  it("drops excluded category rows and preserves every other row shape", () => {
+    const hidden = {
+      ...makeCategory({ id: "hidden", name: "Hidden", type: "expense" }),
+      excluded_from_stats: true,
+    };
+    const oldRecord = {
+      id: "old",
+      name: "Old record",
+      type: "expense",
+      is_archived: false,
+      color: null,
+      icon: null,
+    } as Category;
+    const included = makeCategory({ id: "included", name: "Included", type: "expense" });
+    const hiddenRow = makeTransaction({
+      id: "hidden-row",
+      date: "2026-07-01",
+      amount: -1000,
+      vendor_source: "Hidden expense",
+      category_id: hidden.id,
+    });
+    const includedRow = makeTransaction({
+      id: "included-row",
+      date: "2026-07-01",
+      amount: -2000,
+      vendor_source: "Included expense",
+      category_id: included.id,
+    });
+    const oldRow = makeTransaction({
+      id: "old-row",
+      date: "2026-07-01",
+      amount: -3000,
+      vendor_source: "Old expense",
+      category_id: oldRecord.id,
+    });
+    const transfer = makeTransfer({
+      id: "transfer",
+      date: "2026-07-01",
+      amount: 4000,
+      container_id: "general",
+      to_container_id: "savings",
+      fromName: "General",
+      toName: "Savings",
+    });
+    const uncategorized = { ...includedRow, id: "uncategorized", category_id: null };
+
+    expect(
+      statsTransactions(
+        [hiddenRow, includedRow, oldRow, transfer, uncategorized],
+        [hidden, included, oldRecord],
+      ).map((row) => row.id),
+    ).toEqual(["included-row", "old-row", "transfer", "uncategorized"]);
+  });
+});
 
 describe("categoryBreakdown — signed-sum, zero-filtered, transfer-free (§6.4)", () => {
   it("nets the void pair and the refund; excludes the transfer and empty categories", () => {

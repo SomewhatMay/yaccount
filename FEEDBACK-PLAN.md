@@ -758,7 +758,7 @@ Update this table in a commit on the next stage's branch, once the previous stag
 | 2 | `fix/touch-responsiveness` | #29 | merged |
 | 3 | `fix/sheet-keyboard` | #30 | merged |
 | 4 | `fix/goal-reopen-on-edit` | #31 | merged |
-| 5 | `fix/investment-report-window` | — | not started |
+| 5 | `fix/investment-report-window` | #32 | merged |
 | 6 | `feat/hide-categories-from-stats` | — | not started |
 
 ---

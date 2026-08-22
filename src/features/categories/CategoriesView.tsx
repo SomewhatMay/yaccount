@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  EyeIcon,
+  EyeOffIcon,
   PencilIcon,
   PlusIcon,
   ShapesIcon,
@@ -467,6 +469,11 @@ function CategoryRow({
     });
   }
 
+  async function setExcludedFromStats(excluded: boolean) {
+    await onChange(updateCategory({ ...category, excluded_from_stats: excluded }));
+    flashRow({ id: category.id });
+  }
+
   return (
     <div
       ref={ref}
@@ -493,6 +500,12 @@ function CategoryRow({
         ) : (
           <span className="truncate text-sm font-medium">{category.name}</span>
         )}
+        {category.excluded_from_stats && (
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
+            <EyeOffIcon className="size-3" aria-hidden />
+            Hidden from stats
+          </div>
+        )}
         {budget !== null ? (
           <div className="text-muted-foreground truncate text-xs">
             {formatCents(budget)}/mo budget
@@ -515,6 +528,16 @@ function CategoryRow({
         <DropdownMenuItem onClick={onBudget}>
           <TargetIcon className="size-4" />
           Budget
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setExcludedFromStats(!category.excluded_from_stats)}
+        >
+          {category.excluded_from_stats ? (
+            <EyeIcon className="size-4" />
+          ) : (
+            <EyeOffIcon className="size-4" />
+          )}
+          {category.excluded_from_stats ? "Show in stats" : "Hide from stats"}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={archive}>
           <ArchiveIcon className="size-4" />

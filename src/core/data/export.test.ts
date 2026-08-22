@@ -109,6 +109,18 @@ describe("export envelope (versioned, §8.2 op set)", () => {
     expect(result.ops).toEqual(goodOps);
   });
 
+  it("accepts an export from before categories could be excluded from stats", async () => {
+    const oldExport = tweak((file) => {
+      const category = (file.ops as { payload: { row: Record<string, unknown> } }[])[1]
+        .payload.row;
+      delete category.excluded_from_stats;
+    });
+
+    const result = await validateExport(oldExport);
+
+    expect(result.ok).toBe(true);
+  });
+
   it("round-trips to identical materialized state (the exit criterion)", async () => {
     const result = await validateExport(goodFile());
     expect(result.ok).toBe(true);

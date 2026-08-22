@@ -26,6 +26,22 @@ export interface MonthlyTotal {
   savings: number; // income − expense (may be negative)
 }
 
+/** Dashboard rows after synced category statistical exclusions. */
+export function statsTransactions(
+  txns: Transaction[],
+  categories: Category[],
+): Transaction[] {
+  const excluded = new Set(
+    categories
+      .filter((category) => category.excluded_from_stats === true)
+      .map((c) => c.id),
+  );
+  return txns.filter(
+    (transaction) =>
+      transaction.category_id === null || !excluded.has(transaction.category_id),
+  );
+}
+
 /** Category rows in the window, by type, that are real ledger entries. */
 function categorized(
   txns: Transaction[],
