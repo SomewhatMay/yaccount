@@ -462,9 +462,67 @@ test("creates a savings goal", async ({ page }) => {
   await page.getByLabel("Goal name").fill("E2E rainy day");
   await page.getByRole("combobox").click();
   await page.getByRole("option", { name: "Passive (no plan)" }).click();
+  await page.getByLabel("Target (optional)").fill("100.00");
   await page.getByRole("button", { name: "Create goal" }).click();
 
   await expect(page.getByRole("heading", { name: "E2E rainy day" })).toBeVisible();
+
+  await openReady(page, "/ledger", "Overall balance");
+  await openQuickAdd(page);
+  await page.getByRole("radio", { name: "Transfer" }).click();
+  await page.getByLabel("Amount").fill("100.00");
+  await page.getByLabel("Transfer label").fill("Fund E2E rainy day");
+  await choose(page, "From container", "General");
+  await choose(page, "To container", "E2E rainy day");
+  await page.getByRole("button", { name: "Move money" }).click();
+
+  await openReady(page, "/goals", "Savings goals");
+  const closed = page.getByRole("heading", { name: "Achieved & closed" }).locator("..");
+  await expect(closed.getByRole("heading", { name: "E2E rainy day" })).toBeVisible();
+
+  await page.evaluate(() => {
+    const calls: string[] = [];
+    Object.defineProperty(window, "__stage4ScrollCalls", {
+      configurable: true,
+      value: calls,
+      writable: true,
+    });
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (options) {
+      (
+        window as unknown as {
+          __stage4ScrollCalls: string[];
+        }
+      ).__stage4ScrollCalls.push(this.textContent ?? "");
+      original.call(this, options);
+    };
+  });
+
+  await closed.getByRole("button", { name: "Actions for E2E rainy day" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByLabel("Target (optional)").fill("200.00");
+  await page.evaluate(() => {
+    (
+      window as unknown as {
+        __stage4ScrollCalls: string[];
+      }
+    ).__stage4ScrollCalls = [];
+  });
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(page.getByRole("heading", { name: "Achieved & closed" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "E2E rainy day" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (
+          window as unknown as {
+            __stage4ScrollCalls: string[];
+          }
+        ).__stage4ScrollCalls.some((text) => text.includes("E2E rainy day")),
+      ),
+    )
+    .toBe(true);
 });
 
 test("approves a generated Inbox occurrence", async ({ page }) => {

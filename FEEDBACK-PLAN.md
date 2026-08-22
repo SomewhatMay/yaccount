@@ -756,7 +756,7 @@ Update this table in a commit on the next stage's branch, once the previous stag
 |---|---|---|---|
 | 1 | `fix/row-menu-scroll` | #28 | merged |
 | 2 | `fix/touch-responsiveness` | #29 | merged |
-| 3 | `fix/sheet-keyboard` | — | not started |
+| 3 | `fix/sheet-keyboard` | #30 | merged |
 | 4 | `fix/goal-reopen-on-edit` | — | not started |
 | 5 | `fix/investment-report-window` | — | not started |
 | 6 | `feat/hide-categories-from-stats` | — | not started |
@@ -775,5 +775,5 @@ body. Ask all questions that block the stage together.
 | 3 | **Hide-from-stats scope: dashboard only, or Plan and Budget pace too?** Plan and budgets read categories separately. Cheap to include, but "hidden" then means something stronger. | Stage 6 |
 | 4 | **Excluded categories: synced field, or device-local pref?** Plan assumes a synced `Category` field. Device-local would keep it a view preference like widget layout. | Stage 6 |
 | 5 | **Investments: rescope headline numbers to the period, or keep them all-time and label them?** Plan assumes rescope. All-time-but-labelled is legitimate. | Stage 5 |
-| 6 | **Reopening a goal: resume its cancelled recurring rule?** Completion cancels it. Silent non-resume means the goal reopens with no funding. | Stage 4 |
+| 6 | **Reopening a goal: resume its cancelled recurring rule?** No. Keep it cancelled; the user must resume it explicitly. | Stage 4 |
 | 7 | **Move the `⋯` off the right edge as well?** Separate design change. Recommend trying the gesture fix alone first. | after Stage 1 |
