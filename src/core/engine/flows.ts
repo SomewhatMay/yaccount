@@ -1,6 +1,6 @@
 import type { Container, ContainerSnapshot, Transaction } from "../model";
 import { isLiveLedgerRow, isTransfer, netContributions } from "./balances";
-import { inRange, type DateRange } from "./period";
+import { inRange, monthKeysInRange, type DateRange } from "./period";
 
 /**
  * Container Flows + investment/asset reporting (§5.4, §5.6). Deferred here from
@@ -16,6 +16,15 @@ export interface ContainerFlow {
   inflow: number; // cents moved in
   outflow: number; // cents moved out (positive magnitude)
   net: number; // inflow − outflow
+}
+
+export interface InvestmentReport {
+  containerId: string;
+  name: string;
+  currentValue: number | null;
+  netContributions: number;
+  gainLoss: number | null;
+  series: { month: string; value: number }[];
 }
 
 /**
@@ -125,4 +134,49 @@ export function reconstructedBalance(
   }
   // base is after the target — subtract the gap's transfers to walk back.
   return base.reported_balance - transferDelta(txns, containerId, targetDate, base.date);
+}
+
+/** One investment card, valued consistently inside its reporting window. */
+export function investmentReport(
+  container: Container,
+  snapshots: ContainerSnapshot[],
+  txns: Transaction[],
+  range: DateRange,
+): InvestmentReport {
+  const snapshot = latestSnapshot(
+    snapshots.filter((s) => inRange(s.date, range)),
+    container.id,
+  );
+  const contributions = snapshot
+    ? netContributions(
+        txns.filter((t) => t.date <= snapshot.date),
+        container.id,
+      )
+    : 0;
+  const keys = monthKeysInRange(
+    range,
+    txns.map((t) => t.date),
+  );
+  const series = snapshot
+    ? keys.flatMap((month) => {
+        const [year, number] = month.split("-").map(Number);
+        const day = new Date(year, number, 0).getDate();
+        const value = reconstructedBalance(
+          container.id,
+          snapshots,
+          txns,
+          `${month}-${String(day).padStart(2, "0")}`,
+        );
+        return value === null ? [] : [{ month, value }];
+      })
+    : [];
+
+  return {
+    containerId: container.id,
+    name: container.name,
+    currentValue: snapshot?.reported_balance ?? null,
+    netContributions: contributions,
+    gainLoss: snapshot ? snapshot.reported_balance - contributions : null,
+    series,
+  };
 }

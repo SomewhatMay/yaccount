@@ -24,6 +24,7 @@ import type {
   BudgetComparisonRow,
   CategorySlice,
   ContainerFlow,
+  InvestmentReport,
   MonthlyTotal,
 } from "@/core/engine";
 import { cn } from "@/lib/utils";
@@ -550,15 +551,6 @@ export function BudgetComparisonTable({
 }
 
 // ── Investment gain/loss card + reconstructed-balance sparkline (§5.6) ────────
-export interface InvestmentReport {
-  containerId: string;
-  name: string;
-  currentValue: number | null;
-  netContributions: number;
-  gainLoss: number | null;
-  series: { month: string; value: number }[];
-}
-
 export function InvestmentCard({ report }: { report: InvestmentReport }) {
   const { currentValue, netContributions, gainLoss, series } = report;
   const withYear = spansYears(series.map((m) => m.month));

@@ -14,16 +14,14 @@ import {
   dailySpend,
   goalBasis,
   goalProgress,
+  investmentReport,
   largestTransactions,
-  monthKeysInRange,
   monthlyTotals,
-  netContributions,
   overallBalance,
   overallBalanceSeries,
   overallBalanceAsOf,
   periodSummary,
   precedingRange,
-  reconstructedBalance,
   requiredMonthly,
   recentRows,
   sankeyFlows,
@@ -31,10 +29,10 @@ import {
   topPayees,
   totalExpenseBudgetOnDate,
   trailingDays,
-  unrealizedGainLoss,
   upcomingOccurrences,
   waterfallData,
   type DateRange,
+  type InvestmentReport,
 } from "@/core/engine";
 import type {
   BudgetTarget,
@@ -71,7 +69,6 @@ import {
   InvestmentCard,
   MonthlyBarsChart,
   WaterfallChart,
-  type InvestmentReport,
 } from "./widgets";
 
 /**
@@ -125,13 +122,6 @@ export function rangeText(r: DateRange): string {
   if (r.start === null && r.end === null) return "All time";
   const f = (iso: string) => rangeFmt.format(new Date(`${iso}T00:00:00`));
   return `${r.start ? f(r.start) : "…"} – ${r.end ? f(r.end) : "…"}`;
-}
-
-/** Last calendar day of a "YYYY-MM" key, as an ISO date. */
-function monthEnd(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  const day = new Date(y, m, 0).getDate(); // month m (1-based), day 0 → last of m
-  return `${key}-${String(day).padStart(2, "0")}`;
 }
 
 // ── Hero: what the period kept ───────────────────────────────────────────────
@@ -546,33 +536,13 @@ function Flows({ range, containers, transactions }: WidgetContext) {
 }
 
 function Investments({ range, containers, transactions, snapshots }: WidgetContext) {
-  const reports = useMemo<InvestmentReport[]>(() => {
-    const keys = monthKeysInRange(
-      range,
-      transactions.map((t) => t.date),
-    );
-    return containers
-      .filter((c) => c.is_investment && !c.is_archived)
-      .map((c) => {
-        const nc = netContributions(transactions, c.id);
-        const gl = unrealizedGainLoss(c.id, snapshots, transactions);
-        return {
-          containerId: c.id,
-          name: c.name,
-          currentValue: gl === null ? null : gl + nc,
-          netContributions: nc,
-          gainLoss: gl,
-          series:
-            gl === null
-              ? []
-              : keys.map((k) => ({
-                  month: k,
-                  value:
-                    reconstructedBalance(c.id, snapshots, transactions, monthEnd(k)) ?? 0,
-                })),
-        };
-      });
-  }, [containers, snapshots, transactions, range]);
+  const reports = useMemo<InvestmentReport[]>(
+    () =>
+      containers
+        .filter((c) => c.is_investment && !c.is_archived)
+        .map((c) => investmentReport(c, snapshots, transactions, range)),
+    [containers, snapshots, transactions, range],
+  );
 
   if (reports.length === 0)
     return <EmptyNote>No containers are tracked as investments.</EmptyNote>;

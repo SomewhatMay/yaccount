@@ -3,7 +3,12 @@ import { makeContainer, makeGeneralContainer } from "../model/container";
 import { makeContainerSnapshot } from "../model/containerSnapshot";
 import { makeTransaction, makeTransfer } from "../model/transaction";
 import type { Transaction } from "../model";
-import { containerFlows, unrealizedGainLoss, reconstructedBalance } from "./flows";
+import {
+  containerFlows,
+  investmentReport,
+  unrealizedGainLoss,
+  reconstructedBalance,
+} from "./flows";
 import { resolvePeriod } from "./period";
 
 const general = makeGeneralContainer();
@@ -107,6 +112,34 @@ describe("unrealizedGainLoss — Current Value − Net Contributions (§5.6)", (
 
   it("is null when the container has never been snapshotted", () => {
     expect(unrealizedGainLoss("savings", [], txns)).toBeNull();
+  });
+});
+
+describe("investmentReport — one reporting window (§5.6)", () => {
+  it("values every headline at the latest snapshot in a past range", () => {
+    const snaps = [
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-06-30",
+        reported_balance: 170000,
+      }),
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-07-20",
+        reported_balance: 145000,
+      }),
+    ];
+    const june = resolvePeriod(
+      { kind: "custom", start: "2026-06-01", end: "2026-06-30" },
+      "2026-07-21",
+    );
+
+    const report = investmentReport(savings, snaps, txns, june);
+
+    expect(report.currentValue).toBe(170000);
+    expect(report.netContributions).toBe(150000);
+    expect(report.gainLoss).toBe(20000);
+    expect(report.gainLoss).toBe(report.currentValue! - report.netContributions);
   });
 });
 
