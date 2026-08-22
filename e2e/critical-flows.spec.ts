@@ -398,6 +398,57 @@ test("moves money between containers", async ({ page }) => {
   await expect(page.getByText("$25.00", { exact: true })).toBeVisible();
 });
 
+test("scopes investment contributions to the reporting period", async ({ page }) => {
+  await openReady(page, "/containers", "Where your money lives");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Name").fill("E2E investment period");
+  await page.getByRole("radio", { name: "Investment", exact: true }).click();
+  await page.getByRole("button", { name: "Create container" }).click();
+
+  await page
+    .getByRole("button", { name: "Actions for E2E investment period" })
+    .click();
+  await page.getByRole("menuitem", { name: "Reported balances" }).click();
+  await page.getByLabel("As of").fill("2026-01-31");
+  await page.getByLabel("Reported value").fill("10.00");
+  await page.getByRole("button", { name: "Save report" }).click();
+  await expect(page.getByText("2026-01-31", { exact: true })).toBeVisible();
+  await page.getByLabel("As of").fill("2026-02-28");
+  await page.getByLabel("Reported value").fill("110.00");
+  await page.getByRole("button", { name: "Save report" }).click();
+  await expect(page.getByText("2026-02-28", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openReady(page, "/ledger", "Overall balance");
+  await openQuickAdd(page);
+  await page.getByRole("radio", { name: "Transfer" }).click();
+  await page.getByLabel("Amount").fill("100.00");
+  await page.getByLabel("Transfer label").fill("E2E investment contribution");
+  await choose(page, "From container", "General");
+  await choose(page, "To container", "E2E investment period");
+  await page.getByLabel("Date and time").fill("2026-02-15T12:00");
+  await page.getByRole("button", { name: "Move money" }).click();
+  await expect(
+    page.getByText("E2E investment contribution", { exact: true }),
+  ).toBeVisible();
+
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: /Reporting period:/ }).click();
+  await page.getByRole("button", { name: "All time", exact: true }).click();
+  const card = page
+    .getByText("E2E investment period", { exact: true })
+    .locator("..")
+    .locator("..");
+  const contributed = card.locator("span").filter({ hasText: /^contributed/ });
+  await expect(contributed).toContainText("$100.00");
+
+  await page.getByRole("button", { name: /Reporting period:/ }).click();
+  await page.getByRole("button", { name: "Last 3 months", exact: true }).focus();
+  await page.keyboard.press("Enter");
+
+  await expect(contributed).toContainText("$0.00");
+});
+
 test("creates, edits, refreshes, and quietly hides ledger notes", async ({ page }) => {
   await createCategory(page, "E2E notes expense");
   await createCategory(page, "E2E notes income", "Income");
