@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  EyeIcon,
   EyeOffIcon,
   PencilIcon,
   PlusIcon,
@@ -52,10 +53,7 @@ import { FilterBar } from "@/features/FilterBar";
 import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenuCheckboxItem,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
@@ -531,13 +529,16 @@ function CategoryRow({
           <TargetIcon className="size-4" />
           Budget
         </DropdownMenuItem>
-        <DropdownMenuCheckboxItem
-          checked={category.excluded_from_stats}
-          onCheckedChange={setExcludedFromStats}
+        <DropdownMenuItem
+          onClick={() => setExcludedFromStats(!category.excluded_from_stats)}
         >
-          <EyeOffIcon className="size-4" />
-          Hide from stats
-        </DropdownMenuCheckboxItem>
+          {category.excluded_from_stats ? (
+            <EyeIcon className="size-4" />
+          ) : (
+            <EyeOffIcon className="size-4" />
+          )}
+          {category.excluded_from_stats ? "Show in stats" : "Hide from stats"}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={archive}>
           <ArchiveIcon className="size-4" />
           Archive

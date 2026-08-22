@@ -1,6 +1,11 @@
 import { expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { makeCategory } from "@/core/model";
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { CategoriesView } from "./CategoriesView";
 
 const fixture = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
@@ -67,10 +72,26 @@ function textOf(node: ReactNode): string {
   return textOf(node.props.children);
 }
 
-it("shows the stats toggle and a marker on an excluded category row", () => {
+function findElement(
+  node: ReactNode,
+  predicate: (element: ReactElement<{ children?: ReactNode }>) => boolean,
+): ReactElement<{ children?: ReactNode }> | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findElement(child, predicate);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return null;
+  if (predicate(node)) return node;
+  return findElement(node.props.children, predicate);
+}
+
+function renderCategoryRow(excludedFromStats: boolean) {
   const category = {
     ...makeCategory({ id: "hidden", name: "Hidden category", type: "expense" }),
-    excluded_from_stats: true,
+    excluded_from_stats: excludedFromStats,
   };
   fixture.values.set("ready", true);
   fixture.values.set("categories", [category]);
@@ -85,7 +106,34 @@ it("shows the stats toggle and a marker on an excluded category row", () => {
   const row = (rowElement.type as (props: Record<string, unknown>) => ReactNode)(
     rowElement.props,
   );
+  return row;
+}
 
-  expect(textOf(row)).toContain("Hide from stats");
-  expect(textOf(row)).toContain("Hidden from stats");
+it("switches one stats action between visible and hidden icons", () => {
+  const includedRow = renderCategoryRow(false);
+  const hideAction = findElement(
+    includedRow,
+    (element) =>
+      element.type === DropdownMenuItem && textOf(element).trim() === "Hide from stats",
+  );
+  expect(hideAction).not.toBeNull();
+  expect(
+    findElement(hideAction, (element) => element.type === EyeOffIcon),
+  ).not.toBeNull();
+  expect(
+    findElement(includedRow, (element) => element.type === DropdownMenuCheckboxItem),
+  ).toBeNull();
+
+  const excludedRow = renderCategoryRow(true);
+  const showAction = findElement(
+    excludedRow,
+    (element) =>
+      element.type === DropdownMenuItem && textOf(element).trim() === "Show in stats",
+  );
+  expect(showAction).not.toBeNull();
+  expect(findElement(showAction, (element) => element.type === EyeIcon)).not.toBeNull();
+  expect(textOf(excludedRow)).toContain("Hidden from stats");
+  expect(
+    findElement(excludedRow, (element) => element.type === DropdownMenuCheckboxItem),
+  ).toBeNull();
 });

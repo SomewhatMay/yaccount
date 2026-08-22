@@ -336,9 +336,13 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await expect(out.getByText("$12.34", { exact: true })).toBeVisible();
 
   await openReady(page, "/categories", "What your money does");
-  await page.getByRole("button", { name: "Actions for E2E hidden stats" }).click();
-  await page.getByRole("menuitemcheckbox", { name: "Hide from stats" }).click();
+  const actions = page.getByRole("button", { name: "Actions for E2E hidden stats" });
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Hide from stats" }).click();
   await expect(page.getByText("Hidden from stats", { exact: true })).toBeVisible();
+  await actions.click();
+  await expect(page.getByRole("menuitem", { name: "Show in stats" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await openReady(page, "/", "How the money moved");
   await expect(out.getByText("$0.00", { exact: true })).toBeVisible();
