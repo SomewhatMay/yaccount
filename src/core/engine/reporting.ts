@@ -32,7 +32,9 @@ export function statsTransactions(
   categories: Category[],
 ): Transaction[] {
   const excluded = new Set(
-    categories.filter((category) => category.excluded_from_stats === true).map((c) => c.id),
+    categories
+      .filter((category) => category.excluded_from_stats === true)
+      .map((c) => c.id),
   );
   return txns.filter(
     (transaction) =>

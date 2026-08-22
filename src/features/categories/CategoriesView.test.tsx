@@ -78,9 +78,9 @@ it("shows the stats toggle and a marker on an excluded category row", () => {
 
   const view = CategoriesView();
   const sectionElement = findComponent(view, "CategorySection")!;
-  const section = (
-    sectionElement.type as (props: Record<string, unknown>) => ReactNode
-  )(sectionElement.props);
+  const section = (sectionElement.type as (props: Record<string, unknown>) => ReactNode)(
+    sectionElement.props,
+  );
   const rowElement = findComponent(section, "CategoryRow")!;
   const row = (rowElement.type as (props: Record<string, unknown>) => ReactNode)(
     rowElement.props,
