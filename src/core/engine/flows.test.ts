@@ -160,6 +160,32 @@ describe("investmentReport — one reporting window (§5.6)", () => {
 
     expect(report.series.map((point) => point.month)).toEqual(["2026-05", "2026-06"]);
   });
+
+  it("separates value from contributed basis when a deposit causes the increase", () => {
+    const snaps = [
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-05-31",
+        reported_balance: 100000,
+      }),
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-06-30",
+        reported_balance: 150000,
+      }),
+    ];
+    const throughJune = resolvePeriod(
+      { kind: "custom", start: "2026-05-01", end: "2026-06-30" },
+      "2026-07-21",
+    );
+
+    const report = investmentReport(savings, snaps, txns.slice(0, 2), throughJune);
+
+    expect(report.series).toEqual([
+      { month: "2026-05", value: 100000, contributed: 100000 },
+      { month: "2026-06", value: 150000, contributed: 150000 },
+    ]);
+  });
 });
 
 describe("reconstructedBalance — nearest snapshot ± transfers in the gap (§5.6 / §10 #4)", () => {
