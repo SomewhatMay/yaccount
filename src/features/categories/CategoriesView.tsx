@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  EyeOffIcon,
   PencilIcon,
   PlusIcon,
   ShapesIcon,
@@ -51,7 +52,10 @@ import { FilterBar } from "@/features/FilterBar";
 import { RenameField } from "@/features/RenameField";
 import { nameTaken } from "@/features/unique-name";
 import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
 import {
   CollapsibleSection,
@@ -467,6 +471,11 @@ function CategoryRow({
     });
   }
 
+  async function setExcludedFromStats(excluded: boolean) {
+    await onChange(updateCategory({ ...category, excluded_from_stats: excluded }));
+    flashRow({ id: category.id });
+  }
+
   return (
     <div
       ref={ref}
@@ -493,6 +502,12 @@ function CategoryRow({
         ) : (
           <span className="truncate text-sm font-medium">{category.name}</span>
         )}
+        {category.excluded_from_stats && (
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
+            <EyeOffIcon className="size-3" aria-hidden />
+            Hidden from stats
+          </div>
+        )}
         {budget !== null ? (
           <div className="text-muted-foreground truncate text-xs">
             {formatCents(budget)}/mo budget
@@ -516,6 +531,13 @@ function CategoryRow({
           <TargetIcon className="size-4" />
           Budget
         </DropdownMenuItem>
+        <DropdownMenuCheckboxItem
+          checked={category.excluded_from_stats}
+          onCheckedChange={setExcludedFromStats}
+        >
+          <EyeOffIcon className="size-4" />
+          Hide from stats
+        </DropdownMenuCheckboxItem>
         <DropdownMenuItem onClick={archive}>
           <ArchiveIcon className="size-4" />
           Archive
