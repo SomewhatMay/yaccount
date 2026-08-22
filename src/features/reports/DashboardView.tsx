@@ -14,7 +14,12 @@ import {
   snapshotsAtom,
   transactionsAtom,
 } from "@/features/store";
-import { resolvePeriod, type DateRange, type ReportingPeriod } from "@/core/engine";
+import {
+  resolvePeriod,
+  statsTransactions,
+  type DateRange,
+  type ReportingPeriod,
+} from "@/core/engine";
 import { todayIso } from "@/features/clock";
 import { FigureSkeleton, ListSkeleton, PageHeader } from "@/features/ui";
 import { PeriodPicker } from "./PeriodPicker";
@@ -71,7 +76,7 @@ export function DashboardView() {
       today,
       categories,
       containers,
-      transactions,
+      transactions: statsTransactions(transactions, categories),
       budgetTargets,
       snapshots,
       recurringRules,
