@@ -326,6 +326,24 @@ test("logs an expense and shows it in the ledger", async ({ page }) => {
   await expect(page.getByText("-$12.34", { exact: true }).last()).toBeVisible();
 });
 
+test("hides a category expense from dashboard statistics", async ({ page }) => {
+  await createCategory(page, "E2E hidden stats");
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E hidden expense", "12.34", "E2E hidden stats");
+
+  await openReady(page, "/", "How the money moved");
+  const out = page.getByText("Out", { exact: true }).locator("..");
+  await expect(out.getByText("$12.34", { exact: true })).toBeVisible();
+
+  await openReady(page, "/categories", "What your money does");
+  await page.getByRole("button", { name: "Actions for E2E hidden stats" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Hide from stats" }).click();
+  await expect(page.getByText("Hidden from stats", { exact: true })).toBeVisible();
+
+  await openReady(page, "/", "How the money moved");
+  await expect(out.getByText("$0.00", { exact: true })).toBeVisible();
+});
+
 test("scrolls from a row menu trigger and opens it on tap", async ({
   page,
 }, testInfo) => {
