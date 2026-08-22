@@ -207,7 +207,7 @@ export function GoalsView() {
       await dispatch(updateGoal(next));
       await maintainGoals();
       setSheet(null);
-      flashRow({ id: next.id });
+      flashRow({ id: next.id, scroll: true });
       return;
     }
 

@@ -9,4 +9,8 @@ describe("goal edit maintenance", () => {
       /await dispatch\(updateGoal\(next\)\);\s+await maintainGoals\(\);/,
     );
   });
+
+  it("scrolls the moved goal into view", () => {
+    expect(source).toContain("flashRow({ id: next.id, scroll: true })");
+  });
 });
