@@ -100,6 +100,31 @@ export interface WidgetContext {
   goals: Goal[];
 }
 
+export type WidgetAvailability =
+  | { status: "ready" }
+  | {
+      status: "needs-setup" | "insufficient-data" | "empty";
+      title: string;
+      description: string;
+      action: { label: string; href: string };
+    };
+
+export interface WidgetMathLine {
+  kind: "actual" | "scheduled" | "inferred" | "context";
+  label: string;
+  amount?: number;
+  value?: string;
+  note?: string;
+}
+
+export interface WidgetMathDisclosure {
+  range: string;
+  freshness: string;
+  lines: WidgetMathLine[];
+  exclusions: string[];
+  rule: string;
+}
+
 export interface WidgetDef {
   /** Stable forever: it is a stored preference key, not a label. */
   id: string;
@@ -113,6 +138,9 @@ export interface WidgetDef {
    *  period override would be a menu that lies about what it does. */
   fixedWindow?: boolean;
   render: (ctx: WidgetContext) => React.ReactNode;
+  renderCompact?: (ctx: WidgetContext) => React.ReactNode;
+  availability?: (ctx: WidgetContext) => WidgetAvailability;
+  math?: (ctx: WidgetContext) => WidgetMathDisclosure;
 }
 
 const monthLabelFmt = new Intl.DateTimeFormat("en-US", { month: "long" });
@@ -450,8 +478,24 @@ function Largest({ range, categories, reportTransactions }: WidgetContext) {
   );
 }
 
-function Recent({ categories, containers, ledgerTransactions }: WidgetContext) {
-  const rows = useMemo(() => recentRows(ledgerTransactions), [ledgerTransactions]);
+function Recent(context: WidgetContext) {
+  return <RecentReport {...context} limit={8} />;
+}
+
+function RecentCompact(context: WidgetContext) {
+  return <RecentReport {...context} limit={3} />;
+}
+
+function RecentReport({
+  categories,
+  containers,
+  ledgerTransactions,
+  limit,
+}: WidgetContext & { limit?: number }) {
+  const rows = useMemo(
+    () => recentRows(ledgerTransactions, limit),
+    [ledgerTransactions, limit],
+  );
   const detailOf = useMemo(() => {
     const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
     const containerNames = new Map(containers.map((c) => [c.id, c.name]));
@@ -634,6 +678,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     defaultVisible: true,
     fixedWindow: true,
     render: (ctx) => <Recent {...ctx} />,
+    renderCompact: (ctx) => <RecentCompact {...ctx} />,
   },
   {
     id: "saved",

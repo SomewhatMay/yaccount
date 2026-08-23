@@ -18,6 +18,7 @@ import {
   reorderDashboards,
   resolveDashboardState,
   setWidgetVisible,
+  setWidgetSize,
   tombstoneDashboard,
   type DashboardDefinition,
   type DashboardLayout,
@@ -157,6 +158,7 @@ describe("dashboard layout v2", () => {
     const legacy = encodeLegacyLayout({
       order: ["balance", "recent", "pace", "later"],
       hidden: ["pace", "later"],
+      sizes: {},
     });
     const settings = [setting(SETTING.dashboardLayout, legacy)];
 
@@ -239,6 +241,12 @@ describe("dashboard layout editing", () => {
     expect(defaultDashboardLayout(widgets)).toEqual({
       order: ["balance", "pace", "recent", "later"],
       hidden: ["later"],
+      sizes: {
+        balance: "expanded",
+        pace: "expanded",
+        recent: "expanded",
+        later: "expanded",
+      },
     });
   });
 
@@ -252,6 +260,8 @@ describe("dashboard layout editing", () => {
     expect(setWidgetVisible(initial, "pace", false).hidden).toEqual(["pace", "later"]);
     expect(setWidgetVisible(initial, "later", true).hidden).toEqual([]);
     expect(setWidgetVisible(initial, "balance", false)).toBe(initial);
+    expect(setWidgetSize(initial, "pace", "compact").sizes.pace).toBe("compact");
+    expect(setWidgetSize(initial, "balance", "compact")).toBe(initial);
   });
 });
 
@@ -328,8 +338,9 @@ describe("dashboard set lifecycle", () => {
       { ...source.instances[1], instanceId: ids[2] },
     ]);
     expect(layoutFromDashboard(duplicate, widgets)).toEqual({
-      order: ["balance", "pace"],
-      hidden: ["pace"],
+      order: [ids[0], ids[1]],
+      hidden: [ids[1]],
+      sizes: { [ids[0]]: "expanded", [ids[1]]: "compact" },
     });
   });
 

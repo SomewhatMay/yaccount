@@ -4,7 +4,11 @@ import { makeCategory, makeGeneralContainer, makeTransaction } from "@/core/mode
 import { DashboardView } from "./DashboardView";
 import type { WidgetContext, WidgetDef } from "./registry";
 
-const fixture = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
+const fixture = vi.hoisted(() => ({
+  values: new Map<string, unknown>(),
+  periodKeys: [] as string[],
+  compareKeys: [] as string[],
+}));
 const dashboardSets = vi.hoisted(() => ({
   dashboards: [
     {
@@ -13,7 +17,20 @@ const dashboardSets = vi.hoisted(() => ({
       name: "Overview",
       rank: 0,
       isDeleted: false,
-      instances: [],
+      instances: [
+        {
+          instanceId: "balance-instance",
+          widgetType: "balance",
+          size: "expanded" as const,
+          hidden: false,
+        },
+        {
+          instanceId: "saved-instance",
+          widgetType: "saved",
+          size: "compact" as const,
+          hidden: false,
+        },
+      ],
     },
   ],
   activeDashboard: {
@@ -22,10 +39,27 @@ const dashboardSets = vi.hoisted(() => ({
     name: "Overview",
     rank: 0,
     isDeleted: false,
-    instances: [],
+    instances: [
+      {
+        instanceId: "balance-instance",
+        widgetType: "balance",
+        size: "expanded" as const,
+        hidden: false,
+      },
+      {
+        instanceId: "saved-instance",
+        widgetType: "saved",
+        size: "compact" as const,
+        hidden: false,
+      },
+    ],
   },
   defaultDashboardId: "overview",
-  layout: { order: ["balance", "saved"], hidden: [] },
+  layout: {
+    order: ["balance-instance", "saved-instance"],
+    hidden: [],
+    sizes: { "balance-instance": "expanded", "saved-instance": "compact" },
+  },
   setActiveDashboard: vi.fn(),
   saveLayout: vi.fn(),
   createDashboard: vi.fn(),
@@ -61,8 +95,14 @@ vi.mock("@/features/store", () => ({
 }));
 
 vi.mock("./period-pref", () => ({
-  usePeriodPref: () => [{ kind: "preset", preset: "all" }, vi.fn()],
-  useComparePref: () => [null, vi.fn()],
+  usePeriodPref: (key: string) => {
+    fixture.periodKeys.push(key);
+    return [{ kind: "preset", preset: "all" }, vi.fn()];
+  },
+  useComparePref: (key: string) => {
+    fixture.compareKeys.push(key);
+    return [null, vi.fn()];
+  },
 }));
 
 vi.mock("./use-dashboard-layout", () => ({
@@ -85,6 +125,22 @@ function findComponent(
     return node as ReactElement<Record<string, unknown>>;
   }
   return findComponent(node.props.children, name);
+}
+
+function findComponents(
+  node: ReactNode,
+  name: string,
+): ReactElement<Record<string, unknown>>[] {
+  if (Array.isArray(node)) {
+    return node.flatMap((child) => findComponents(child, name));
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return [];
+  return [
+    ...(typeof node.type === "function" && node.type.name === name
+      ? [node as ReactElement<Record<string, unknown>>]
+      : []),
+    ...findComponents(node.props.children, name),
+  ];
 }
 
 function callComponent<P>(element: ReactElement<P>) {
@@ -122,13 +178,20 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.values.set("snapshots", []);
   fixture.values.set("recurringRules", []);
   fixture.values.set("goals", []);
+  fixture.periodKeys = [];
+  fixture.compareKeys = [];
 
   const dashboard = DashboardView();
+  expect(fixture.periodKeys).toEqual(["yaccount.dashboard.period.overview"]);
+  expect(fixture.compareKeys).toEqual(["yaccount.dashboard.compare.overview"]);
   const setBar = findComponent(dashboard, "DashboardSetBar")!;
   expect(setBar.props.activeId).toBe("overview");
   const columnElement = findComponent(dashboard, "WidgetColumn")!;
   const column = callComponent(columnElement);
-  const [balanceWidget, savedWidget] = column.props.children as ReactElement<{
+  const [balanceWidget, savedWidget] = findComponents(
+    column,
+    "DashboardWidget",
+  ) as ReactElement<{
     def: WidgetDef;
     base: WidgetContext;
   }>[];

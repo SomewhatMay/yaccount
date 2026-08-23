@@ -24,18 +24,23 @@ import { todayIso } from "@/features/clock";
 import { FigureSkeleton, ListSkeleton, PageHeader } from "@/features/ui";
 import { PeriodPicker } from "./PeriodPicker";
 import { useComparePref, usePeriodPref } from "./period-pref";
-import { DASHBOARD_WIDGETS, type WidgetContext, type WidgetDef } from "./registry";
+import { DASHBOARD_WIDGETS, rangeText, type WidgetContext } from "./registry";
 import { DashboardEditor } from "./DashboardEditor";
 import { DashboardSetBar } from "./DashboardSets";
 import { DashboardWidget } from "./WidgetShell";
 import { WidgetGallerySheet } from "./WidgetGallerySheet";
-import { setWidgetVisible, type DashboardLayout } from "./dashboard-layout";
+import {
+  dashboardWidgetEntries,
+  setWidgetVisible,
+  type DashboardLayout,
+  type DashboardWidgetEntry,
+} from "./dashboard-layout";
 import { useDashboardSets } from "./use-dashboard-layout";
 
 /** The window the dashboard opens on when nothing has been chosen yet. */
 const DEFAULT_PERIOD: ReportingPeriod = { kind: "preset", preset: "last-3-months" };
-const PERIOD_KEY = "yaccount.dashboard.period";
-const COMPARE_KEY = "yaccount.dashboard.compare";
+const PERIOD_KEY_PREFIX = "yaccount.dashboard.period";
+const COMPARE_KEY_PREFIX = "yaccount.dashboard.compare";
 
 /**
  * The dashboard (§6). It owns browser-local reporting windows, the synced layout,
@@ -54,26 +59,41 @@ export function DashboardView() {
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
 
-  // Reporting windows are browser-local display preferences.
-  const [period, setPeriod] = usePeriodPref(PERIOD_KEY, DEFAULT_PERIOD);
-  const [comparePeriod, setComparePeriod] = useComparePref(COMPARE_KEY);
   const dashboardSets = useDashboardSets();
+  const activeDashboardId = dashboardSets.activeDashboard.id;
+  // Reporting windows are browser-local and independent for every dashboard.
+  const [period, setPeriod] = usePeriodPref(
+    `${PERIOD_KEY_PREFIX}.${activeDashboardId}`,
+    DEFAULT_PERIOD,
+  );
+  const [comparePeriod, setComparePeriod] = useComparePref(
+    `${COMPARE_KEY_PREFIX}.${activeDashboardId}`,
+  );
   const { layout, saveLayout } = dashboardSets;
   const activeLayout = draftLayout ?? layout;
-  const visibleWidgets = useMemo(() => {
-    const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
-    return activeLayout.order.flatMap((id) => {
-      const widget = byId.get(id);
-      return widget && !activeLayout.hidden.includes(id) ? [widget] : [];
-    });
-  }, [activeLayout]);
-  const hiddenWidgets = useMemo(() => {
-    const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
-    return activeLayout.order.flatMap((id) => {
-      const widget = byId.get(id);
-      return widget && activeLayout.hidden.includes(id) ? [widget] : [];
-    });
-  }, [activeLayout]);
+  const widgetEntries = useMemo(
+    () =>
+      dashboardWidgetEntries(
+        dashboardSets.activeDashboard,
+        activeLayout,
+        DASHBOARD_WIDGETS,
+      ),
+    [activeLayout, dashboardSets.activeDashboard],
+  );
+  const visibleWidgets = useMemo(
+    () =>
+      widgetEntries.filter(
+        ({ instance }) => !activeLayout.hidden.includes(instance.instanceId),
+      ),
+    [activeLayout.hidden, widgetEntries],
+  );
+  const hiddenWidgets = useMemo(
+    () =>
+      widgetEntries.filter(({ instance }) =>
+        activeLayout.hidden.includes(instance.instanceId),
+      ),
+    [activeLayout.hidden, widgetEntries],
+  );
 
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
@@ -108,7 +128,11 @@ export function DashboardView() {
   );
 
   function beginEditing() {
-    setDraftLayout({ order: [...layout.order], hidden: [...layout.hidden] });
+    setDraftLayout({
+      order: [...layout.order],
+      hidden: [...layout.hidden],
+      sizes: { ...layout.sizes },
+    });
   }
 
   function cancelEditing() {
@@ -206,15 +230,18 @@ export function DashboardView() {
         <DashboardEditor
           base={{ ...data, range: primaryRange }}
           widgets={visibleWidgets}
+          allWidgets={widgetEntries}
           layout={draftLayout}
           onLayoutChange={setDraftLayout}
           onAddWidgets={() => setGalleryOpen(true)}
         />
       ) : compareRange ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
-          <WidgetColumn range={compareRange} data={data} widgets={visibleWidgets} />
-        </div>
+        <ComparisonWidgets
+          primaryRange={primaryRange}
+          compareRange={compareRange}
+          data={data}
+          widgets={visibleWidgets}
+        />
       ) : (
         <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
       )}
@@ -222,9 +249,17 @@ export function DashboardView() {
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
         widgets={hiddenWidgets}
-        onAdd={(id) => {
+        onAdd={(instanceId) => {
           setDraftLayout((current) =>
-            current ? setWidgetVisible(current, id, true) : current,
+            current
+              ? setWidgetVisible(
+                  current,
+                  instanceId,
+                  true,
+                  widgetEntries.find(({ instance }) => instance.widgetType === "balance")
+                    ?.instance.instanceId,
+                )
+              : current,
           );
         }}
       />
@@ -243,14 +278,107 @@ function WidgetColumn({
 }: {
   range: DateRange;
   data: Omit<WidgetContext, "range">;
-  widgets: readonly WidgetDef[];
+  widgets: readonly DashboardWidgetEntry[];
 }) {
   const base: WidgetContext = { ...data, range };
   return (
-    <div className="space-y-6">
-      {widgets.map((w) => (
-        <DashboardWidget key={w.id} def={w} base={base} />
+    <div className="grid gap-6 md:grid-cols-2">
+      {widgets.map(({ instance, def }) => (
+        <div
+          key={instance.instanceId}
+          className={instance.size === "expanded" ? "md:col-span-2" : undefined}
+        >
+          <DashboardWidget
+            instanceId={instance.instanceId}
+            size={instance.size}
+            def={def}
+            base={base}
+          />
+        </div>
       ))}
     </div>
+  );
+}
+
+function ComparisonWidgets({
+  primaryRange,
+  compareRange,
+  data,
+  widgets,
+}: {
+  primaryRange: DateRange;
+  compareRange: DateRange;
+  data: Omit<WidgetContext, "range">;
+  widgets: readonly DashboardWidgetEntry[];
+}) {
+  return (
+    <div className="space-y-6">
+      {widgets.map(({ instance, def }) => {
+        const primary: WidgetContext = { ...data, range: primaryRange };
+        if (def.fixedWindow) {
+          return (
+            <div
+              key={instance.instanceId}
+              className={
+                instance.size === "compact" ? "md:w-[calc(50%-0.75rem)]" : undefined
+              }
+            >
+              <DashboardWidget
+                instanceId={instance.instanceId}
+                size={instance.size}
+                def={def}
+                base={primary}
+                comparisonUnsupported
+              />
+            </div>
+          );
+        }
+        return (
+          <div key={instance.instanceId} className="grid gap-6 lg:grid-cols-2">
+            <ComparisonCell
+              side="primary"
+              label={rangeText(primaryRange)}
+              instance={instance}
+              def={def}
+              base={primary}
+            />
+            <ComparisonCell
+              side="compare"
+              label={rangeText(compareRange)}
+              instance={instance}
+              def={def}
+              base={{ ...data, range: compareRange }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ComparisonCell({
+  side,
+  label,
+  instance,
+  def,
+  base,
+}: {
+  side: "primary" | "compare";
+  label: string;
+  instance: DashboardWidgetEntry["instance"];
+  def: DashboardWidgetEntry["def"];
+  base: WidgetContext;
+}) {
+  return (
+    <section className="space-y-2" aria-label={`${def.title}, ${label}`}>
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <DashboardWidget
+        instanceId={instance.instanceId}
+        surfaceId={`${instance.instanceId}-${side}`}
+        size={instance.size}
+        def={def}
+        base={base}
+      />
+    </section>
   );
 }

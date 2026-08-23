@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import {
   PERIOD_PRESETS,
@@ -11,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/features/ErrorBoundary";
 import { useLocalPref } from "@/features/prefs";
 import { Marginalia, RowActions } from "@/features/ui";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -24,7 +27,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { decodePeriod, encodePeriod } from "./period-pref";
 import { PRESET_LABEL, periodLabel } from "./PeriodPicker";
-import { rangeText, type WidgetContext, type WidgetDef } from "./registry";
+import {
+  rangeText,
+  type WidgetAvailability,
+  type WidgetContext,
+  type WidgetDef,
+} from "./registry";
+import { ShowMathSheet } from "./ShowMathSheet";
 
 /**
  * One widget on the dashboard: its panel, its fold, its window, and the blast
@@ -59,17 +68,26 @@ function windowKey(id: string): string {
 }
 
 export function DashboardWidget({
+  instanceId,
+  size,
   def,
   base,
   editing = false,
+  comparisonUnsupported = false,
+  surfaceId = instanceId,
 }: {
+  instanceId: string;
+  size: "compact" | "expanded";
   def: WidgetDef;
   base: WidgetContext;
   editing?: boolean;
+  comparisonUnsupported?: boolean;
+  surfaceId?: string;
 }) {
-  const [openPref, setOpenPref] = useLocalPref(openKey(def.id), "open", isOpenState);
+  const [mathOpen, setMathOpen] = useState(false);
+  const [openPref, setOpenPref] = useLocalPref(openKey(instanceId), "open", isOpenState);
   const [windowPref, setWindowPref] = useLocalPref(
-    windowKey(def.id),
+    windowKey(instanceId),
     FOLLOW,
     isWindowPref,
   );
@@ -81,23 +99,61 @@ export function DashboardWidget({
   const range: DateRange = override ? resolvePeriod(override, base.today) : base.range;
   const ctx: WidgetContext = override ? { ...base, range } : base;
 
-  const body = (
-    <ErrorBoundary label={def.title} resetKeys={[range.start, range.end]}>
-      {def.render(ctx)}
-    </ErrorBoundary>
+  const availability = def.availability?.(ctx) ?? { status: "ready" as const };
+  const render = size === "compact" && def.renderCompact ? def.renderCompact : def.render;
+  const body =
+    availability.status === "ready" ? (
+      <ErrorBoundary label={def.title} resetKeys={[range.start, range.end]}>
+        {render(ctx)}
+      </ErrorBoundary>
+    ) : (
+      renderAvailabilityState(availability)
+    );
+  const math = availability.status === "ready" ? def.math?.(ctx) : null;
+  const content = (
+    <>
+      {body}
+      {comparisonUnsupported && (
+        <Marginalia className="mt-3 text-xs">
+          <span>Period comparison isn&apos;t supported for this current view.</span>
+        </Marginalia>
+      )}
+      {math && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setMathOpen(true)}
+          >
+            Show the math
+          </Button>
+        </div>
+      )}
+      {math && (
+        <ShowMathSheet
+          open={mathOpen}
+          onOpenChange={setMathOpen}
+          title={def.title}
+          idPrefix={surfaceId}
+          disclosure={math}
+        />
+      )}
+    </>
   );
 
   // Edit mode keeps the report visible while its ordinary controls stand down.
   // The editor supplies one shared card frame and movement controls around it.
-  if (editing) return <div className="p-5">{body}</div>;
+  if (editing) return <div className="p-5">{content}</div>;
 
   // The hero and the KPI strip are the screen's opening statement, not panels:
   // no chrome, nothing to fold, and no window of their own to choose.
-  if (def.bare) return body;
+  if (def.bare) return <div data-widget-size={size}>{content}</div>;
 
   const open = openPref === "open";
   return (
     <Collapsible
+      data-widget-size={size}
       open={open}
       onOpenChange={(next) => setOpenPref(next ? "open" : "closed")}
       className="bg-card group rounded-2xl border p-5 [contain-intrinsic-size:auto_4rem] [content-visibility:auto]"
@@ -125,8 +181,34 @@ export function DashboardWidget({
         </Marginalia>
       )}
 
-      <CollapsibleContent className="pt-4">{body}</CollapsibleContent>
+      <CollapsibleContent className={cn("pt-4", size === "compact" && "pt-3")}>
+        {content}
+      </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function renderAvailabilityState(
+  availability: Exclude<WidgetAvailability, { status: "ready" }>,
+) {
+  const label = {
+    "needs-setup": "Needs setup",
+    "insufficient-data": "More history needed",
+    empty: "No data yet",
+  }[availability.status];
+  return (
+    <div role="status" className="border-rule rounded-xl border border-dashed p-4">
+      <p className="text-brand text-xs font-semibold tracking-[0.12em] uppercase">
+        {label}
+      </p>
+      <h4 className="mt-1 font-medium">{availability.title}</h4>
+      <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+        {availability.description}
+      </p>
+      <Button asChild variant="outline" size="sm" className="mt-3">
+        <Link href={availability.action.href}>{availability.action.label}</Link>
+      </Button>
+    </div>
   );
 }
 

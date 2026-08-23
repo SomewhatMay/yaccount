@@ -1,0 +1,129 @@
+import { expect, it, vi } from "vitest";
+import { isValidElement, type ReactNode } from "react";
+import type { WidgetContext, WidgetDef } from "./registry";
+import { ShowMathSheet } from "./ShowMathSheet";
+import { DashboardWidget } from "./WidgetShell";
+
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useState: <T,>(initialValue: T) => [initialValue, vi.fn()],
+  };
+});
+
+vi.mock("@/features/prefs", () => ({
+  useLocalPref: (key: string) =>
+    key.includes(".open.") ? ["open", vi.fn()] : ["global", vi.fn()],
+}));
+
+const base = {
+  range: { start: "2026-08-01", end: "2026-08-31" },
+  today: "2026-08-23",
+  categories: [],
+  containers: [],
+  ledgerTransactions: [],
+  reportTransactions: [],
+  budgetTargets: [],
+  snapshots: [],
+  recurringRules: [],
+  goals: [],
+} satisfies WidgetContext;
+
+function textOf(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join(" ");
+  if (!isValidElement<{ children?: ReactNode }>(node)) return "";
+  return textOf(node.props.children);
+}
+
+function render(def: WidgetDef, size: "compact" | "expanded" = "expanded") {
+  return DashboardWidget({
+    instanceId: "test-instance",
+    size,
+    def,
+    base,
+  });
+}
+
+it("uses dedicated compact content instead of clipping expanded content", () => {
+  const def = {
+    id: "test",
+    title: "Test forecast",
+    description: "Test",
+    defaultVisible: true,
+    render: () => <div>Expanded ledger</div>,
+    renderCompact: () => <div>Compact total $42</div>,
+  } as WidgetDef;
+
+  expect(textOf(render(def, "compact"))).toContain("Compact total $42");
+  expect(textOf(render(def, "compact"))).not.toContain("Expanded ledger");
+});
+
+it("keeps an ineligible configured widget with a directed setup action", () => {
+  const def = {
+    id: "test",
+    title: "Test forecast",
+    description: "Test",
+    defaultVisible: true,
+    render: () => <div>Fabricated certainty</div>,
+    availability: () => ({
+      status: "needs-setup",
+      title: "Add a recurring rule",
+      description: "A dated rule unlocks this forecast.",
+      action: { label: "Set up recurring", href: "/recurring" },
+    }),
+  } as WidgetDef;
+
+  const text = textOf(render(def));
+  expect(text).toContain("Add a recurring rule");
+  expect(text).toContain("Set up recurring");
+  expect(text).not.toContain("Fabricated certainty");
+});
+
+it("offers the reusable math surface when a widget discloses its inputs", () => {
+  const def = {
+    id: "test",
+    title: "Test forecast",
+    description: "Test",
+    defaultVisible: true,
+    render: () => <div>$42</div>,
+    math: () => ({
+      range: "Aug 23 – Sep 21, 2026",
+      freshness: "Ledger current through Aug 23",
+      lines: [{ kind: "scheduled", label: "Known bills", amount: -5800 }],
+      exclusions: ["Investment containers"],
+      rule: "Approved rows are actual; active rules are scheduled.",
+    }),
+  } as WidgetDef;
+
+  expect(textOf(render(def))).toContain("Show the math");
+});
+
+it("separates math inputs and always discloses freshness, exclusions, and rule", () => {
+  const sheet = ShowMathSheet({
+    open: true,
+    onOpenChange: vi.fn(),
+    title: "Test forecast",
+    idPrefix: "test-instance",
+    disclosure: {
+      range: "Aug 23 – Sep 21, 2026",
+      freshness: "Ledger current through Aug 23",
+      lines: [
+        { kind: "actual", label: "Opening cash", amount: 42000 },
+        { kind: "scheduled", label: "Known bills", amount: -5800 },
+        { kind: "inferred", label: "Flexible spending", amount: -2100 },
+      ],
+      exclusions: ["Investment containers"],
+      rule: "Approved rows are actual; active rules are scheduled.",
+    },
+  });
+  const text = textOf(sheet.props.children);
+
+  expect(text).toContain("Actual");
+  expect(text).toContain("Scheduled");
+  expect(text).toContain("Inferred");
+  expect(text).toContain("Ledger current through Aug 23");
+  expect(text).toContain("Investment containers");
+  expect(text).toContain("Approved rows are actual");
+});

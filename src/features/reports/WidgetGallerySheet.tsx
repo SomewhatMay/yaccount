@@ -3,7 +3,7 @@
 import { PlusIcon } from "lucide-react";
 import { ResponsiveSheet } from "@/features/ui";
 import { cn } from "@/lib/utils";
-import type { WidgetDef } from "./registry";
+import type { DashboardWidgetEntry } from "./dashboard-layout";
 
 export function WidgetGallerySheet({
   open,
@@ -13,8 +13,8 @@ export function WidgetGallerySheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  widgets: readonly WidgetDef[];
-  onAdd: (id: string) => void;
+  widgets: readonly DashboardWidgetEntry[];
+  onAdd: (instanceId: string) => void;
 }) {
   return (
     <ResponsiveSheet
@@ -29,19 +29,19 @@ export function WidgetGallerySheet({
             Every widget is already on your dashboard.
           </p>
         ) : (
-          widgets.map((widget) => (
+          widgets.map(({ instance, def }) => (
             <button
-              key={widget.id}
+              key={instance.instanceId}
               type="button"
-              aria-label={`Add ${widget.title}`}
-              onClick={() => onAdd(widget.id)}
+              aria-label={`Add ${def.title}`}
+              onClick={() => onAdd(instance.instanceId)}
               className="bg-card hover:bg-muted/45 focus-visible:ring-ring/50 flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors focus-visible:ring-3 focus-visible:outline-none"
             >
-              <WidgetMiniature id={widget.id} />
+              <WidgetMiniature id={def.id} />
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">{widget.title}</span>
+                <span className="block text-sm font-medium">{def.title}</span>
                 <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
-                  {widget.description}
+                  {def.description}
                 </span>
               </span>
               <span className="bg-primary text-primary-foreground grid size-7 shrink-0 place-items-center rounded-full">
