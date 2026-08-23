@@ -41,6 +41,8 @@ const base = {
     ledgerTransactions: [],
     reportTransactions: [],
     recurringRules: [],
+    snapshots: [],
+    goals: [],
   }),
 } satisfies WidgetContext;
 

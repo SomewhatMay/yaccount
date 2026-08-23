@@ -18,6 +18,7 @@ describe("the dashboard widget registry", () => {
     // live. Add freely; rename nothing.
     expect(DASHBOARD_WIDGETS.map((w) => w.id)).toEqual([
       "balance",
+      "money-map",
       "pace",
       "recent",
       "saved",
@@ -58,8 +59,12 @@ describe("the dashboard widget registry", () => {
     }
   });
 
-  it("ships every widget visible — M11 folds them, it does not hide them", () => {
-    expect(DASHBOARD_WIDGETS.every((w) => w.defaultVisible)).toBe(true);
+  it("keeps optional analysis off the initial dashboard", () => {
+    expect(
+      DASHBOARD_WIDGETS.filter((widget) => !widget.defaultVisible).map(
+        (widget) => widget.id,
+      ),
+    ).toEqual(["money-map"]);
   });
 
   it("only exempts a widget from the period control when its window is its meaning", () => {
@@ -67,6 +72,7 @@ describe("the dashboard widget registry", () => {
     // own windows. A period menu on any of them would be a control that lies.
     expect(DASHBOARD_WIDGETS.filter((w) => w.fixedWindow).map((w) => w.id)).toEqual([
       "balance",
+      "money-map",
       "pace",
       "recent",
       "upcoming",
@@ -80,10 +86,10 @@ describe("the dashboard widget registry", () => {
   });
 
   it("puts budget pace directly below overall balance", () => {
-    expect(DASHBOARD_WIDGETS.slice(0, 3).map((w) => w.id)).toEqual([
-      "balance",
-      "pace",
-      "recent",
-    ]);
+    expect(
+      DASHBOARD_WIDGETS.filter((widget) => widget.defaultVisible)
+        .slice(0, 3)
+        .map((widget) => widget.id),
+    ).toEqual(["balance", "pace", "recent"]);
   });
 });

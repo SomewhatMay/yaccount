@@ -1,11 +1,19 @@
 import {
   monthlyTotals,
+  moneyMap as deriveMoneyMap,
   overallBalance,
   periodSummary,
   upcomingOccurrences,
   type DateRange,
 } from "@/core/engine";
-import type { Category, Container, RecurringRule, Transaction } from "@/core/model";
+import type {
+  Category,
+  Container,
+  ContainerSnapshot,
+  Goal,
+  RecurringRule,
+  Transaction,
+} from "@/core/model";
 
 export interface DashboardAggregateInputs {
   categories: Category[];
@@ -13,6 +21,8 @@ export interface DashboardAggregateInputs {
   ledgerTransactions: Transaction[];
   reportTransactions: Transaction[];
   recurringRules: RecurringRule[];
+  snapshots: ContainerSnapshot[];
+  goals: Goal[];
 }
 
 export interface DashboardAggregateCalculators {
@@ -20,6 +30,7 @@ export interface DashboardAggregateCalculators {
   periodSummary: typeof periodSummary;
   overallBalance: typeof overallBalance;
   upcomingOccurrences: typeof upcomingOccurrences;
+  moneyMap: typeof deriveMoneyMap;
 }
 
 export interface DashboardAggregates {
@@ -27,6 +38,7 @@ export interface DashboardAggregates {
   period: (range: DateRange) => ReturnType<typeof periodSummary>;
   balance: () => number;
   occurrences: (from: string, to: string) => ReturnType<typeof upcomingOccurrences>;
+  moneyMap: () => ReturnType<typeof deriveMoneyMap>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -34,6 +46,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   periodSummary,
   overallBalance,
   upcomingOccurrences,
+  moneyMap: deriveMoneyMap,
 };
 
 function rangeKey(range: DateRange): string {
@@ -53,6 +66,7 @@ export function createDashboardAggregates(
   const occurrenceCache = new Map<string, ReturnType<typeof upcomingOccurrences>>();
   let hasBalance = false;
   let balance = 0;
+  let cachedMoneyMap: ReturnType<typeof deriveMoneyMap> | null = null;
 
   return {
     monthly(range) {
@@ -95,6 +109,17 @@ export function createDashboardAggregates(
       });
       occurrenceCache.set(key, result);
       return result;
+    },
+    moneyMap() {
+      if (!cachedMoneyMap) {
+        cachedMoneyMap = calculate.moneyMap(
+          inputs.containers,
+          inputs.snapshots,
+          inputs.ledgerTransactions,
+          inputs.goals,
+        );
+      }
+      return cachedMoneyMap;
     },
   };
 }

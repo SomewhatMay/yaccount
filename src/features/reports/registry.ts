@@ -140,6 +140,15 @@ const loadRecentCompact: WidgetModuleLoader = () =>
     default: module.LEGACY_COMPACT_RENDERERS.recent,
   }));
 
+const loadMoneyMap: WidgetModuleLoader = () =>
+  import("./widget-modules/MoneyMapWidget").then((module) => ({
+    default: module.MoneyMapExpanded,
+  }));
+const loadMoneyMapCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/MoneyMapWidget").then((module) => ({
+    default: module.MoneyMapCompact,
+  }));
+
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
 }
@@ -162,6 +171,35 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     bare: true,
     fixedWindow: true,
     ...legacy("balance"),
+  },
+  {
+    id: "money-map",
+    title: "Money map",
+    description: "Where tracked value sits and which job each container has.",
+    defaultVisible: false,
+    fixedWindow: true,
+    gallery: gallery(
+      "analysis",
+      ["container", "account", "investment", "goal", "net worth", "value"],
+      ({ containers }) => {
+        const count = containers.filter((container) => !container.is_archived).length;
+        return count > 1
+          ? `${count} tracked locations; reconcile where value sits`
+          : null;
+      },
+    ),
+    availability: ({ containers }) =>
+      containers.some((container) => !container.is_archived)
+        ? { status: "ready" }
+        : {
+            status: "needs-setup",
+            title: "Add a container",
+            description: "A tracked location unlocks this map.",
+            action: { label: "Set up containers", href: "/containers" },
+          },
+    load: loadMoneyMap,
+    component: lazy(loadMoneyMap),
+    ...compact(loadMoneyMapCompact),
   },
   {
     id: "pace",

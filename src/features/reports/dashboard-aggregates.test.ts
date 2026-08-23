@@ -11,6 +11,8 @@ const inputs: DashboardAggregateInputs = {
   ledgerTransactions: [],
   reportTransactions: [],
   recurringRules: [],
+  snapshots: [],
+  goals: [],
 };
 
 function calculators(): DashboardAggregateCalculators {
@@ -24,6 +26,11 @@ function calculators(): DashboardAggregateCalculators {
     })),
     overallBalance: vi.fn(() => 0),
     upcomingOccurrences: vi.fn(() => []),
+    moneyMap: vi.fn(() => ({
+      knownTrackedValue: 0,
+      unvaluedCount: 0,
+      branches: [],
+    })),
   };
 }
 
@@ -38,11 +45,13 @@ it("shares exact dashboard aggregates within one data revision", () => {
     aggregates.occurrences("2026-08-01", "2026-08-31"),
   );
   expect(aggregates.balance()).toBe(aggregates.balance());
+  expect(aggregates.moneyMap()).toBe(aggregates.moneyMap());
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
   expect(calculate.upcomingOccurrences).toHaveBeenCalledOnce();
   expect(calculate.overallBalance).toHaveBeenCalledOnce();
+  expect(calculate.moneyMap).toHaveBeenCalledOnce();
 });
 
 it("does not share cached money across data revisions or ranges", () => {

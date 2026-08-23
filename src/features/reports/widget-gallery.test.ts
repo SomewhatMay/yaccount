@@ -21,6 +21,8 @@ const context = {
     ledgerTransactions: [],
     reportTransactions: [],
     recurringRules: [],
+    snapshots: [],
+    goals: [],
   }),
 } satisfies WidgetContext;
 

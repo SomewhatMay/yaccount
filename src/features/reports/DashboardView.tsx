@@ -115,6 +115,8 @@ export function DashboardView() {
         ledgerTransactions: transactions,
         reportTransactions,
         recurringRules,
+        snapshots,
+        goals,
       }),
     };
   }, [
