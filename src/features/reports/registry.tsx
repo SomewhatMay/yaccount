@@ -90,7 +90,10 @@ export interface WidgetContext {
   today: string;
   categories: Category[];
   containers: Container[];
-  transactions: Transaction[];
+  /** Complete ledger for balance, location, transfer, and goal semantics. */
+  ledgerTransactions: Transaction[];
+  /** Category statistical exclusions applied for reporting semantics. */
+  reportTransactions: Transaction[];
   budgetTargets: BudgetTarget[];
   snapshots: ContainerSnapshot[];
   recurringRules: RecurringRule[];
@@ -130,43 +133,46 @@ export function rangeText(r: DateRange): string {
 
 const BALANCE_CURVE_DAYS = 90;
 
-function BalanceFigure({ today, containers, transactions }: WidgetContext) {
+function BalanceFigure({ today, containers, ledgerTransactions }: WidgetContext) {
   const balance = useMemo(
-    () => overallBalance(transactions, containers),
-    [transactions, containers],
+    () => overallBalance(ledgerTransactions, containers),
+    [ledgerTransactions, containers],
   );
   const curve = useMemo(
     () =>
       overallBalanceSeries(
-        transactions,
+        ledgerTransactions,
         containers,
         trailingDays(today, BALANCE_CURVE_DAYS),
       ),
-    [transactions, containers, today],
+    [ledgerTransactions, containers, today],
   );
   return (
     <Figure
       label="Overall balance"
       cents={balance}
-      series={recentRows(transactions, 1).length > 0 ? curve : undefined}
+      series={recentRows(ledgerTransactions, 1).length > 0 ? curve : undefined}
     />
   );
 }
 
-function SavedFigure({ range, categories, transactions }: WidgetContext) {
+function SavedFigure({ range, categories, reportTransactions }: WidgetContext) {
   const monthly = useMemo(
-    () => monthlyTotals(transactions, categories, range),
-    [transactions, categories, range],
+    () => monthlyTotals(reportTransactions, categories, range),
+    [reportTransactions, categories, range],
   );
   const summary = useMemo(
-    () => periodSummary(transactions, categories, range),
-    [transactions, categories, range],
+    () => periodSummary(reportTransactions, categories, range),
+    [reportTransactions, categories, range],
   );
   const delta = useMemo(() => {
     const before = precedingRange(range);
     if (!before) return null;
-    return comparePeriodSummary(summary, periodSummary(transactions, categories, before));
-  }, [summary, transactions, categories, range]);
+    return comparePeriodSummary(
+      summary,
+      periodSummary(reportTransactions, categories, before),
+    );
+  }, [summary, reportTransactions, categories, range]);
 
   const curve = useMemo(() => {
     const values = monthly.map((m) => m.savings);
@@ -208,20 +214,29 @@ function SavedFigure({ range, categories, transactions }: WidgetContext) {
 
 // ── The KPI strip ────────────────────────────────────────────────────────────
 
-function Kpis({ range, today, categories, containers, transactions }: WidgetContext) {
+function Kpis({
+  range,
+  today,
+  categories,
+  containers,
+  ledgerTransactions,
+  reportTransactions,
+}: WidgetContext) {
   const { kpis, note } = useMemo(() => {
     const before = precedingRange(range);
-    const current = periodSummary(transactions, categories, range);
-    const previous = before ? periodSummary(transactions, categories, before) : null;
+    const current = periodSummary(reportTransactions, categories, range);
+    const previous = before
+      ? periodSummary(reportTransactions, categories, before)
+      : null;
     const delta = previous ? comparePeriodSummary(current, previous) : null;
 
     const asOf = range.end ?? today;
-    const balance = overallBalanceAsOf(transactions, containers, asOf);
+    const balance = overallBalanceAsOf(ledgerTransactions, containers, asOf);
     const balanceBefore = before
-      ? overallBalanceAsOf(transactions, containers, before.end!)
+      ? overallBalanceAsOf(ledgerTransactions, containers, before.end!)
       : null;
 
-    const rates = savingsRateSeries(monthlyTotals(transactions, categories, range))
+    const rates = savingsRateSeries(monthlyTotals(reportTransactions, categories, range))
       .map((r) => r.rate)
       .filter((r): r is number => r !== null);
 
@@ -268,18 +283,18 @@ function Kpis({ range, today, categories, containers, transactions }: WidgetCont
         ? `Compared with ${rangeText(before).toLowerCase()}, the window of the same length before this one.`
         : undefined,
     };
-  }, [range, today, categories, containers, transactions]);
+  }, [range, today, categories, containers, ledgerTransactions, reportTransactions]);
 
   return <KpiStrip kpis={kpis} note={note} />;
 }
 
 // ── Budget pace ──────────────────────────────────────────────────────────────
 
-function Pace({ today, categories, transactions, budgetTargets }: WidgetContext) {
+function Pace({ today, categories, reportTransactions, budgetTargets }: WidgetContext) {
   const yearMonth = today.slice(0, 7);
   const pace = useMemo(
-    () => budgetPace(transactions, categories, budgetTargets, yearMonth, today),
-    [transactions, categories, budgetTargets, yearMonth, today],
+    () => budgetPace(reportTransactions, categories, budgetTargets, yearMonth, today),
+    [reportTransactions, categories, budgetTargets, yearMonth, today],
   );
   const month = monthLabelFmt.format(new Date(`${yearMonth}-01T00:00:00`));
   return <BudgetPaceMeter pace={pace} monthLabel={month} />;
@@ -287,10 +302,10 @@ function Pace({ today, categories, transactions, budgetTargets }: WidgetContext)
 
 // ── Money flow ───────────────────────────────────────────────────────────────
 
-function Flow({ range, categories, transactions }: WidgetContext) {
+function Flow({ range, categories, reportTransactions }: WidgetContext) {
   const flows = useMemo(
-    () => sankeyFlows(transactions, categories, range),
-    [transactions, categories, range],
+    () => sankeyFlows(reportTransactions, categories, range),
+    [reportTransactions, categories, range],
   );
   return (
     <MoneyFlowChart flows={flows} colorOf={(id) => categoryColorFor(id, categories)} />
@@ -303,16 +318,16 @@ function Flow({ range, categories, transactions }: WidgetContext) {
  *  panel rather than a page. */
 const CALENDAR_DAYS = 56;
 
-function Calendar({ range, today, categories, transactions }: WidgetContext) {
+function Calendar({ range, today, categories, reportTransactions }: WidgetContext) {
   const { days, spend } = useMemo(() => {
     const end = range.end ?? today;
     const axis = trailingDays(end, CALENDAR_DAYS);
     const window = { start: axis[0] ?? end, end };
     return {
       days: axis,
-      spend: spendByDay(dailySpend(transactions, categories, window)),
+      spend: spendByDay(dailySpend(reportTransactions, categories, window)),
     };
-  }, [range, today, categories, transactions]);
+  }, [range, today, categories, reportTransactions]);
   // No marginalia here on purpose: the grid's own footer already names the months
   // it covers, and §12.3 caps a screen at two asides before they read as labels.
   // This screen spends both on the hero and on budget pace.
@@ -327,25 +342,27 @@ function Calendar({ range, today, categories, transactions }: WidgetContext) {
 
 // ── Where it went ────────────────────────────────────────────────────────────
 
-function Breakdown({ range, categories, transactions }: WidgetContext) {
+function Breakdown({ range, categories, reportTransactions }: WidgetContext) {
   const [mode, setMode] = useState<"total" | "avg">("total");
 
   const slices = useMemo(
     () => ({
       expense:
         mode === "avg"
-          ? categoryBreakdownMonthlyAverage(transactions, categories, range, {
+          ? categoryBreakdownMonthlyAverage(reportTransactions, categories, range, {
               type: "expense",
             })
-          : categoryBreakdown(transactions, categories, range, { type: "expense" }),
+          : categoryBreakdown(reportTransactions, categories, range, {
+              type: "expense",
+            }),
       income:
         mode === "avg"
-          ? categoryBreakdownMonthlyAverage(transactions, categories, range, {
+          ? categoryBreakdownMonthlyAverage(reportTransactions, categories, range, {
               type: "income",
             })
-          : categoryBreakdown(transactions, categories, range, { type: "income" }),
+          : categoryBreakdown(reportTransactions, categories, range, { type: "income" }),
     }),
-    [transactions, categories, range, mode],
+    [reportTransactions, categories, range, mode],
   );
 
   // The sparkline always shows the real month-by-month shape, whichever way the
@@ -353,12 +370,14 @@ function Breakdown({ range, categories, transactions }: WidgetContext) {
   const trends = useMemo(() => {
     const map = new Map<string, number[]>();
     for (const type of ["expense", "income"] as const) {
-      for (const t of categoryTrendSeries(transactions, categories, range, { type })) {
+      for (const t of categoryTrendSeries(reportTransactions, categories, range, {
+        type,
+      })) {
         map.set(t.categoryId, t.series);
       }
     }
     return map;
-  }, [transactions, categories, range]);
+  }, [reportTransactions, categories, range]);
 
   return (
     <div className="space-y-6">
@@ -402,20 +421,20 @@ function Breakdown({ range, categories, transactions }: WidgetContext) {
 
 // ── The lists ────────────────────────────────────────────────────────────────
 
-function Payees({ range, categories, transactions }: WidgetContext) {
+function Payees({ range, categories, reportTransactions }: WidgetContext) {
   const payees = useMemo(
-    () => topPayees(transactions, categories, range, 6),
-    [transactions, categories, range],
+    () => topPayees(reportTransactions, categories, range, 6),
+    [reportTransactions, categories, range],
   );
   return (
     <PayeeList payees={payees} hrefFor={(payee) => ledgerHref({ text: payee, range })} />
   );
 }
 
-function Largest({ range, categories, transactions }: WidgetContext) {
+function Largest({ range, categories, reportTransactions }: WidgetContext) {
   const rows = useMemo(
-    () => largestTransactions(transactions, range, 6),
-    [transactions, range],
+    () => largestTransactions(reportTransactions, range, 6),
+    [reportTransactions, range],
   );
   const nameOf = useMemo(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
@@ -431,8 +450,8 @@ function Largest({ range, categories, transactions }: WidgetContext) {
   );
 }
 
-function Recent({ categories, containers, transactions }: WidgetContext) {
-  const rows = useMemo(() => recentRows(transactions), [transactions]);
+function Recent({ categories, containers, ledgerTransactions }: WidgetContext) {
+  const rows = useMemo(() => recentRows(ledgerTransactions), [ledgerTransactions]);
   const detailOf = useMemo(() => {
     const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
     const containerNames = new Map(containers.map((c) => [c.id, c.name]));
@@ -472,7 +491,7 @@ function Upcoming({ today, recurringRules }: WidgetContext) {
   return <UpcomingList rows={rows} />;
 }
 
-function Goals({ today, transactions, goals }: WidgetContext) {
+function Goals({ today, ledgerTransactions, goals }: WidgetContext) {
   const rows = useMemo(
     () =>
       goals
@@ -480,44 +499,51 @@ function Goals({ today, transactions, goals }: WidgetContext) {
         .map((g) => ({
           id: g.id,
           name: g.name ?? "Goal",
-          basis: goalBasis(g, transactions),
+          basis: goalBasis(g, ledgerTransactions),
           target: g.target_amount,
-          progress: goalProgress(g, transactions),
-          monthly: requiredMonthly(g, transactions, today),
+          progress: goalProgress(g, ledgerTransactions),
+          monthly: requiredMonthly(g, ledgerTransactions, today),
         }))
         .sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1)),
-    [goals, transactions, today],
+    [goals, ledgerTransactions, today],
   );
   return <GoalsRail goals={rows} />;
 }
 
 // ── The M5 charts, unchanged in substance ────────────────────────────────────
 
-function Monthly({ range, categories, transactions, budgetTargets }: WidgetContext) {
+function Monthly({
+  range,
+  categories,
+  reportTransactions,
+  budgetTargets,
+}: WidgetContext) {
   const monthly = useMemo(() => {
-    const base = monthlyTotals(transactions, categories, range);
+    const base = monthlyTotals(reportTransactions, categories, range);
     return base.map((m) => ({
       ...m,
       budget: totalExpenseBudgetOnDate(budgetTargets, categories, `${m.month}-01`),
     }));
-  }, [transactions, categories, budgetTargets, range]);
+  }, [reportTransactions, categories, budgetTargets, range]);
   return <MonthlyBarsChart monthly={monthly} />;
 }
 
-function Waterfall({ range, categories, transactions }: WidgetContext) {
+function Waterfall({ range, categories, reportTransactions }: WidgetContext) {
   const w = useMemo(
-    () => waterfallData(monthlyTotals(transactions, categories, range)),
-    [transactions, categories, range],
+    () => waterfallData(monthlyTotals(reportTransactions, categories, range)),
+    [reportTransactions, categories, range],
   );
   return <WaterfallChart income={w.income} expenses={w.expenses} savings={w.savings} />;
 }
 
-function Trend({ range, categories, transactions, budgetTargets }: WidgetContext) {
+function Trend({ range, categories, reportTransactions, budgetTargets }: WidgetContext) {
   const [selected, setSelected] = useState<string | null>(null);
   const series = useMemo(
     () =>
-      selected ? categoryMonthlySpend(transactions, selected, range, budgetTargets) : [],
-    [transactions, selected, range, budgetTargets],
+      selected
+        ? categoryMonthlySpend(reportTransactions, selected, range, budgetTargets)
+        : [],
+    [reportTransactions, selected, range, budgetTargets],
   );
   return (
     <CategoryDrilldown
@@ -529,21 +555,26 @@ function Trend({ range, categories, transactions, budgetTargets }: WidgetContext
   );
 }
 
-function Flows({ range, containers, transactions }: WidgetContext) {
+function Flows({ range, containers, ledgerTransactions }: WidgetContext) {
   const flows = useMemo(
-    () => containerFlows(transactions, containers, range),
-    [transactions, containers, range],
+    () => containerFlows(ledgerTransactions, containers, range),
+    [ledgerTransactions, containers, range],
   );
   return <ContainerFlowsTable flows={flows} />;
 }
 
-function Investments({ range, containers, transactions, snapshots }: WidgetContext) {
+function Investments({
+  range,
+  containers,
+  ledgerTransactions,
+  snapshots,
+}: WidgetContext) {
   const reports = useMemo<InvestmentReport[]>(
     () =>
       containers
         .filter((c) => c.is_investment && !c.is_archived)
-        .map((c) => investmentReport(c, snapshots, transactions, range)),
-    [containers, snapshots, transactions, range],
+        .map((c) => investmentReport(c, snapshots, ledgerTransactions, range)),
+    [containers, snapshots, ledgerTransactions, range],
   );
 
   if (reports.length === 0)
@@ -557,10 +588,15 @@ function Investments({ range, containers, transactions, snapshots }: WidgetConte
   );
 }
 
-function Budgets({ range, categories, transactions, budgetTargets }: WidgetContext) {
+function Budgets({
+  range,
+  categories,
+  reportTransactions,
+  budgetTargets,
+}: WidgetContext) {
   const rows = useMemo(
-    () => budgetComparison(transactions, categories, range, budgetTargets),
-    [transactions, categories, range, budgetTargets],
+    () => budgetComparison(reportTransactions, categories, range, budgetTargets),
+    [reportTransactions, categories, range, budgetTargets],
   );
   return (
     <BudgetComparisonTable

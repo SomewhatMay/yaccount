@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { makeCategory, makeTransaction } from "@/core/model";
+import { makeCategory, makeGeneralContainer, makeTransaction } from "@/core/model";
 import { DashboardView } from "./DashboardView";
 
 const fixture = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
@@ -34,10 +34,13 @@ vi.mock("./period-pref", () => ({
 }));
 
 vi.mock("./use-dashboard-layout", () => ({
-  useDashboardLayout: () => [{ order: ["saved"], hidden: [], version: 1 }, vi.fn()],
+  useDashboardLayout: () => [
+    { order: ["balance", "saved"], hidden: [], version: 1 },
+    vi.fn(),
+  ],
 }));
 
-it("passes stats-filtered transactions to every dashboard widget", () => {
+it("keeps hidden-from-stats rows in balance while excluding them from reports", () => {
   const included = makeCategory({ id: "included", name: "Included", type: "expense" });
   const excluded = {
     ...makeCategory({ id: "excluded", name: "Excluded", type: "expense" }),
@@ -45,7 +48,7 @@ it("passes stats-filtered transactions to every dashboard widget", () => {
   };
   fixture.values.set("ready", true);
   fixture.values.set("categories", [included, excluded]);
-  fixture.values.set("containers", []);
+  fixture.values.set("containers", [makeGeneralContainer()]);
   fixture.values.set("transactions", [
     makeTransaction({
       id: "included-row",
@@ -70,9 +73,12 @@ it("passes stats-filtered transactions to every dashboard widget", () => {
   const dashboard = DashboardView();
   const columnElement = dashboard.props.children[1];
   const column = columnElement.type(columnElement.props);
-  const widget = column.props.children[0];
+  const [balanceWidget, savedWidget] = column.props.children;
+  const balanceElement = balanceWidget.props.def.render(balanceWidget.props.base);
+  const savedElement = savedWidget.props.def.render(savedWidget.props.base);
+  const balanceFigure = balanceElement.type(balanceElement.props);
+  const savedFigure = savedElement.type(savedElement.props);
 
-  expect(widget.props.base.transactions.map((row: { id: string }) => row.id)).toEqual([
-    "included-row",
-  ]);
+  expect(balanceFigure.props.cents).toBe(-3000);
+  expect(savedFigure.props.cents).toBe(-1000);
 });

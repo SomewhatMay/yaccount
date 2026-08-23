@@ -412,7 +412,9 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await logExpense(page, "E2E hidden expense", "12.34", "E2E hidden stats");
 
   await openReady(page, "/", "How the money moved");
+  const balance = page.getByText("Overall balance", { exact: true }).locator("..");
   const out = page.getByText("Out", { exact: true }).locator("..");
+  await expect(balance.getByText("-$12.34", { exact: true })).toBeVisible();
   await expect(out.getByText("$12.34", { exact: true })).toBeVisible();
 
   await openReady(page, "/categories", "What your money does");
@@ -425,6 +427,7 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await page.keyboard.press("Escape");
 
   await openReady(page, "/", "How the money moved");
+  await expect(balance.getByText("-$12.34", { exact: true })).toBeVisible();
   await expect(out.getByText("$0.00", { exact: true })).toBeVisible();
 });
 
