@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useEffect, useState, type LazyExoticComponent } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import {
   PERIOD_PRESETS,
@@ -32,6 +32,7 @@ import {
   type WidgetAvailability,
   type WidgetContext,
   type WidgetDef,
+  type WidgetRenderer,
 } from "./registry";
 import { ShowMathSheet } from "./ShowMathSheet";
 
@@ -39,9 +40,9 @@ import { ShowMathSheet } from "./ShowMathSheet";
  * One widget on the dashboard: its panel, its fold, its window, and the blast
  * radius when it breaks.
  *
- * Everything here is keyed on the widget's stable `id`, which is why the registry
- * insists on one. Fold state and per-widget periods are browser-local. The named
- * `ErrorBoundary` limits a rendering failure to its widget.
+ * Browser-local fold and period preferences use the stable instance ID, so two
+ * configured instances never overwrite each other. The named `ErrorBoundary`
+ * limits a rendering failure to its widget.
  */
 
 const OPEN_STATES = ["open", "closed"] as const;
@@ -98,18 +99,35 @@ export function DashboardWidget({
     def.fixedWindow || windowPref === FOLLOW ? null : decodePeriod(windowPref);
   const range: DateRange = override ? resolvePeriod(override, base.today) : base.range;
   const ctx: WidgetContext = override ? { ...base, range } : base;
+  const open = openPref === "open";
+  const active = editing || Boolean(def.bare) || open;
 
-  const availability = def.availability?.(ctx) ?? { status: "ready" as const };
+  const availability = active
+    ? (def.availability?.(ctx) ?? { status: "ready" as const })
+    : { status: "ready" as const };
   const render = size === "compact" && def.renderCompact ? def.renderCompact : def.render;
-  const body =
-    availability.status === "ready" ? (
-      <ErrorBoundary label={def.title} resetKeys={[range.start, range.end]}>
-        {render(ctx)}
-      </ErrorBoundary>
-    ) : (
-      renderAvailabilityState(availability)
-    );
-  const math = availability.status === "ready" ? def.math?.(ctx) : null;
+  const component =
+    size === "compact" && def.compactComponent ? def.compactComponent : def.component;
+  const body = !active ? null : availability.status === "ready" ? (
+    <ErrorBoundary label={def.title} resetKeys={[range.start, range.end]}>
+      {render ? (
+        render(ctx)
+      ) : component ? (
+        <DeferredWidgetContent
+          title={def.title}
+          Renderer={component}
+          context={ctx}
+          immediate={editing || Boolean(def.bare) || size === "compact"}
+        />
+      ) : (
+        <p role="alert">{def.title} has no renderer.</p>
+      )}
+    </ErrorBoundary>
+  ) : (
+    renderAvailabilityState(availability)
+  );
+  const hasMath = active && availability.status === "ready" && Boolean(def.math);
+  const math = hasMath && mathOpen ? def.math?.(ctx) : null;
   const content = (
     <>
       {body}
@@ -118,7 +136,7 @@ export function DashboardWidget({
           <span>Period comparison isn&apos;t supported for this current view.</span>
         </Marginalia>
       )}
-      {math && (
+      {hasMath && (
         <div className="mt-3 flex justify-end">
           <Button
             type="button"
@@ -150,7 +168,6 @@ export function DashboardWidget({
   // no chrome, nothing to fold, and no window of their own to choose.
   if (def.bare) return <div data-widget-size={size}>{content}</div>;
 
-  const open = openPref === "open";
   return (
     <Collapsible
       data-widget-size={size}
@@ -185,6 +202,61 @@ export function DashboardWidget({
         {content}
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function DeferredWidgetContent({
+  title,
+  Renderer,
+  context,
+  immediate,
+}: {
+  title: string;
+  Renderer: LazyExoticComponent<WidgetRenderer>;
+  context: WidgetContext;
+  immediate: boolean;
+}) {
+  const browserWithoutObserver =
+    typeof window !== "undefined" && !("IntersectionObserver" in window);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [nearViewport, setNearViewport] = useState(immediate || browserWithoutObserver);
+
+  useEffect(() => {
+    if (immediate || nearViewport || !node || !("IntersectionObserver" in window)) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [immediate, nearViewport, node]);
+
+  if (!nearViewport) {
+    return (
+      <div ref={setNode} className="min-h-20 min-w-0" aria-busy="true">
+        <span className="sr-only">Loading {title}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={setNode} className="min-w-0">
+      <Suspense
+        fallback={
+          <div className="min-h-20" aria-busy="true">
+            <span className="sr-only">Loading {title}</span>
+          </div>
+        }
+      >
+        <Renderer {...context} />
+      </Suspense>
+    </div>
   );
 }
 

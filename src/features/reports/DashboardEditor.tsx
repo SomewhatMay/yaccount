@@ -295,7 +295,10 @@ function MoveMenu({
           )
         }
       >
-        <DropdownMenuRadioItem value="compact" disabled={!def.renderCompact}>
+        <DropdownMenuRadioItem
+          value="compact"
+          disabled={!def.renderCompact && !def.compactComponent}
+        >
           Compact
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="expanded">Expanded</DropdownMenuRadioItem>

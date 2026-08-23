@@ -1,8 +1,11 @@
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { isValidElement, type ReactNode } from "react";
 import type { WidgetContext, WidgetDef } from "./registry";
 import { ShowMathSheet } from "./ShowMathSheet";
 import { DashboardWidget } from "./WidgetShell";
+import { createDashboardAggregates } from "./dashboard-aggregates";
+
+const fixture = vi.hoisted(() => ({ open: "open" }));
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
@@ -14,8 +17,12 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("@/features/prefs", () => ({
   useLocalPref: (key: string) =>
-    key.includes(".open.") ? ["open", vi.fn()] : ["global", vi.fn()],
+    key.includes(".open.") ? [fixture.open, vi.fn()] : ["global", vi.fn()],
 }));
+
+afterEach(() => {
+  fixture.open = "open";
+});
 
 const base = {
   range: { start: "2026-08-01", end: "2026-08-31" },
@@ -28,6 +35,13 @@ const base = {
   snapshots: [],
   recurringRules: [],
   goals: [],
+  aggregates: createDashboardAggregates({
+    categories: [],
+    containers: [],
+    ledgerTransactions: [],
+    reportTransactions: [],
+    recurringRules: [],
+  }),
 } satisfies WidgetContext;
 
 function textOf(node: ReactNode): string {
@@ -126,4 +140,29 @@ it("separates math inputs and always discloses freshness, exclusions, and rule",
   expect(text).toContain("Ledger current through Aug 23");
   expect(text).toContain("Investment containers");
   expect(text).toContain("Approved rows are actual");
+});
+
+it("does no renderer or math work while a widget is folded", () => {
+  fixture.open = "closed";
+  const renderBody = vi.fn(() => <div>Heavy detail</div>);
+  const deriveMath = vi.fn(() => ({
+    range: "Aug 2026",
+    freshness: "Current",
+    lines: [],
+    exclusions: [],
+    rule: "Test rule",
+  }));
+  const def = {
+    id: "test",
+    title: "Test forecast",
+    description: "Test",
+    defaultVisible: true,
+    render: renderBody,
+    math: deriveMath,
+  } as WidgetDef;
+
+  render(def);
+
+  expect(renderBody).not.toHaveBeenCalled();
+  expect(deriveMath).not.toHaveBeenCalled();
 });

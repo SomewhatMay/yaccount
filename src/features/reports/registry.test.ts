@@ -38,11 +38,12 @@ describe("the dashboard widget registry", () => {
     ]);
   });
 
-  it("gives every widget something to render and a name to render it under", () => {
+  it("keeps render modules behind lightweight loader descriptors", () => {
     for (const w of DASHBOARD_WIDGETS) {
       expect(w.title.trim(), `${w.id} needs a title`).not.toBe("");
       expect(w.description.trim(), `${w.id} needs a description`).not.toBe("");
-      expect(typeof w.render, `${w.id} needs a render`).toBe("function");
+      expect(typeof w.load, `${w.id} needs a loader`).toBe("function");
+      expect(w.render, `${w.id} eagerly embeds a renderer`).toBeUndefined();
     }
   });
 

@@ -149,7 +149,7 @@ function callComponent<P>(element: ReactElement<P>) {
   );
 }
 
-it("keeps hidden-from-stats rows in balance while excluding them from reports", () => {
+it("keeps hidden-from-stats rows in balance while excluding them from reports", async () => {
   const included = makeCategory({ id: "included", name: "Included", type: "expense" });
   const excluded = {
     ...makeCategory({ id: "excluded", name: "Excluded", type: "expense" }),
@@ -195,14 +195,16 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
     def: WidgetDef;
     base: WidgetContext;
   }>[];
-  const balanceElement = balanceWidget.props.def.render(
-    balanceWidget.props.base,
-  ) as ReactElement;
-  const savedElement = savedWidget.props.def.render(
-    savedWidget.props.base,
-  ) as ReactElement;
-  const balanceFigure = callComponent(balanceElement);
-  const savedFigure = callComponent(savedElement);
+  expect(balanceWidget.props.base.aggregates).toBeDefined();
+  expect(balanceWidget.props.base.aggregates).toBe(savedWidget.props.base.aggregates);
+  const BalanceRenderer = (await balanceWidget.props.def.load!()).default as (
+    context: WidgetContext,
+  ) => ReactElement<Record<string, unknown>>;
+  const SavedRenderer = (await savedWidget.props.def.load!()).default as (
+    context: WidgetContext,
+  ) => ReactElement<Record<string, unknown>>;
+  const balanceFigure = BalanceRenderer(balanceWidget.props.base);
+  const savedFigure = SavedRenderer(savedWidget.props.base);
 
   expect(balanceFigure.props.cents).toBe(-3000);
   expect(savedFigure.props.cents).toBe(-1000);

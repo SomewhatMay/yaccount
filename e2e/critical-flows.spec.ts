@@ -391,6 +391,21 @@ test("persists a useful compact widget mode", async ({ page }) => {
   await expect(recentCard).toHaveAttribute("data-widget-size", "compact");
 });
 
+test("keeps lazy dashboard detail within the mobile viewport", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile overflow regression.");
+
+  await openReady(page, "/", "How the money moved");
+  await expect(page.getByText(/no allowances set for/)).toBeVisible();
+  const widths = await page.evaluate(() => ({
+    content: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+
+  expect(widths.content).toBe(widths.viewport);
+});
+
 test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Touch regression.");
 

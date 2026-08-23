@@ -36,6 +36,7 @@ import {
   type DashboardWidgetEntry,
 } from "./dashboard-layout";
 import { useDashboardSets } from "./use-dashboard-layout";
+import { createDashboardAggregates } from "./dashboard-aggregates";
 
 /** The window the dashboard opens on when nothing has been chosen yet. */
 const DEFAULT_PERIOD: ReportingPeriod = { kind: "preset", preset: "last-3-months" };
@@ -103,29 +104,36 @@ export function DashboardView() {
     [comparePeriod, today],
   );
 
-  const data = useMemo(
-    () => ({
+  const data = useMemo(() => {
+    const reportTransactions = statsTransactions(transactions, categories);
+    return {
       today,
       categories,
       containers,
       ledgerTransactions: transactions,
-      reportTransactions: statsTransactions(transactions, categories),
+      reportTransactions,
       budgetTargets,
       snapshots,
       recurringRules,
       goals,
-    }),
-    [
-      today,
-      categories,
-      containers,
-      transactions,
-      budgetTargets,
-      snapshots,
-      recurringRules,
-      goals,
-    ],
-  );
+      aggregates: createDashboardAggregates({
+        categories,
+        containers,
+        ledgerTransactions: transactions,
+        reportTransactions,
+        recurringRules,
+      }),
+    };
+  }, [
+    today,
+    categories,
+    containers,
+    transactions,
+    budgetTargets,
+    snapshots,
+    recurringRules,
+    goals,
+  ]);
 
   function beginEditing() {
     setDraftLayout({
@@ -286,7 +294,7 @@ function WidgetColumn({
       {widgets.map(({ instance, def }) => (
         <div
           key={instance.instanceId}
-          className={instance.size === "expanded" ? "md:col-span-2" : undefined}
+          className={instance.size === "expanded" ? "min-w-0 md:col-span-2" : "min-w-0"}
         >
           <DashboardWidget
             instanceId={instance.instanceId}

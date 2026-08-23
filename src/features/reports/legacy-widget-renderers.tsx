@@ -16,11 +16,8 @@ import {
   goalProgress,
   investmentReport,
   largestTransactions,
-  monthlyTotals,
-  overallBalance,
   overallBalanceSeries,
   overallBalanceAsOf,
-  periodSummary,
   precedingRange,
   requiredMonthly,
   recentRows,
@@ -29,20 +26,10 @@ import {
   topPayees,
   totalExpenseBudgetOnDate,
   trailingDays,
-  upcomingOccurrences,
   waterfallData,
-  type DateRange,
   type InvestmentReport,
 } from "@/core/engine";
-import type {
-  BudgetTarget,
-  Category,
-  Container,
-  ContainerSnapshot,
-  Goal,
-  RecurringRule,
-  Transaction,
-} from "@/core/model";
+import type { Transaction } from "@/core/model";
 import { categoryColorFor } from "@/features/category-color";
 import { ledgerHref } from "@/features/ledger/deep-link";
 import { Figure, Marginalia, Money } from "@/features/ui";
@@ -70,6 +57,7 @@ import {
   MonthlyBarsChart,
   WaterfallChart,
 } from "./widgets";
+import { rangeText, type WidgetContext } from "./registry";
 
 /**
  * ── The dashboard as a LIST, not a layout ───────────────────────────────────
@@ -84,88 +72,19 @@ import {
  * belong to the dashboard and break the moment the list is reordered.
  */
 
-export interface WidgetContext {
-  /** The window this widget is showing — the dashboard's, or its own override. */
-  range: DateRange;
-  today: string;
-  categories: Category[];
-  containers: Container[];
-  /** Complete ledger for balance, location, transfer, and goal semantics. */
-  ledgerTransactions: Transaction[];
-  /** Category statistical exclusions applied for reporting semantics. */
-  reportTransactions: Transaction[];
-  budgetTargets: BudgetTarget[];
-  snapshots: ContainerSnapshot[];
-  recurringRules: RecurringRule[];
-  goals: Goal[];
-}
-
-export type WidgetAvailability =
-  | { status: "ready" }
-  | {
-      status: "needs-setup" | "insufficient-data" | "empty";
-      title: string;
-      description: string;
-      action: { label: string; href: string };
-    };
-
-export interface WidgetMathLine {
-  kind: "actual" | "scheduled" | "inferred" | "context";
-  label: string;
-  amount?: number;
-  value?: string;
-  note?: string;
-}
-
-export interface WidgetMathDisclosure {
-  range: string;
-  freshness: string;
-  lines: WidgetMathLine[];
-  exclusions: string[];
-  rule: string;
-}
-
-export interface WidgetDef {
-  /** Stable forever: it is a stored preference key, not a label. */
-  id: string;
-  title: string;
-  /** Plain-language recognition copy for the Add widgets gallery. */
-  description: string;
-  defaultVisible: boolean;
-  /** No panel, no collapse — the screen's own opening figure. */
-  bare?: boolean;
-  /** Its window is fixed by what it MEANS (this month; the next 30 days), so a
-   *  period override would be a menu that lies about what it does. */
-  fixedWindow?: boolean;
-  render: (ctx: WidgetContext) => React.ReactNode;
-  renderCompact?: (ctx: WidgetContext) => React.ReactNode;
-  availability?: (ctx: WidgetContext) => WidgetAvailability;
-  math?: (ctx: WidgetContext) => WidgetMathDisclosure;
-}
-
 const monthLabelFmt = new Intl.DateTimeFormat("en-US", { month: "long" });
-const rangeFmt = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
-/** A window in words, for the widget that has to say which one it is showing. */
-export function rangeText(r: DateRange): string {
-  if (r.start === null && r.end === null) return "All time";
-  const f = (iso: string) => rangeFmt.format(new Date(`${iso}T00:00:00`));
-  return `${r.start ? f(r.start) : "…"} – ${r.end ? f(r.end) : "…"}`;
-}
 
 // ── Hero: what the period kept ───────────────────────────────────────────────
 
 const BALANCE_CURVE_DAYS = 90;
 
-function BalanceFigure({ today, containers, ledgerTransactions }: WidgetContext) {
-  const balance = useMemo(
-    () => overallBalance(ledgerTransactions, containers),
-    [ledgerTransactions, containers],
-  );
+function BalanceFigure({
+  today,
+  containers,
+  ledgerTransactions,
+  aggregates,
+}: WidgetContext) {
+  const balance = aggregates.balance();
   const curve = useMemo(
     () =>
       overallBalanceSeries(
@@ -184,23 +103,19 @@ function BalanceFigure({ today, containers, ledgerTransactions }: WidgetContext)
   );
 }
 
-function SavedFigure({ range, categories, reportTransactions }: WidgetContext) {
-  const monthly = useMemo(
-    () => monthlyTotals(reportTransactions, categories, range),
-    [reportTransactions, categories, range],
-  );
-  const summary = useMemo(
-    () => periodSummary(reportTransactions, categories, range),
-    [reportTransactions, categories, range],
-  );
+function SavedFigure({
+  range,
+  categories,
+  reportTransactions,
+  aggregates,
+}: WidgetContext) {
+  const monthly = aggregates.monthly(range);
+  const summary = aggregates.period(range);
   const delta = useMemo(() => {
     const before = precedingRange(range);
     if (!before) return null;
-    return comparePeriodSummary(
-      summary,
-      periodSummary(reportTransactions, categories, before),
-    );
-  }, [summary, reportTransactions, categories, range]);
+    return comparePeriodSummary(summary, aggregates.period(before));
+  }, [summary, aggregates, range]);
 
   const curve = useMemo(() => {
     const values = monthly.map((m) => m.savings);
@@ -245,17 +160,14 @@ function SavedFigure({ range, categories, reportTransactions }: WidgetContext) {
 function Kpis({
   range,
   today,
-  categories,
   containers,
   ledgerTransactions,
-  reportTransactions,
+  aggregates,
 }: WidgetContext) {
   const { kpis, note } = useMemo(() => {
     const before = precedingRange(range);
-    const current = periodSummary(reportTransactions, categories, range);
-    const previous = before
-      ? periodSummary(reportTransactions, categories, before)
-      : null;
+    const current = aggregates.period(range);
+    const previous = before ? aggregates.period(before) : null;
     const delta = previous ? comparePeriodSummary(current, previous) : null;
 
     const asOf = range.end ?? today;
@@ -264,7 +176,7 @@ function Kpis({
       ? overallBalanceAsOf(ledgerTransactions, containers, before.end!)
       : null;
 
-    const rates = savingsRateSeries(monthlyTotals(reportTransactions, categories, range))
+    const rates = savingsRateSeries(aggregates.monthly(range))
       .map((r) => r.rate)
       .filter((r): r is number => r !== null);
 
@@ -311,7 +223,7 @@ function Kpis({
         ? `Compared with ${rangeText(before).toLowerCase()}, the window of the same length before this one.`
         : undefined,
     };
-  }, [range, today, categories, containers, ledgerTransactions, reportTransactions]);
+  }, [range, today, containers, ledgerTransactions, aggregates]);
 
   return <KpiStrip kpis={kpis} note={note} />;
 }
@@ -517,7 +429,7 @@ function RecentReport({
 /** How far ahead "coming up" looks. A month is what a commitment list is for. */
 const UPCOMING_DAYS = 30;
 
-function Upcoming({ today, recurringRules }: WidgetContext) {
+function Upcoming({ today, aggregates }: WidgetContext) {
   const rows = useMemo(() => {
     // Calendar arithmetic, like every other date in this app — a month ahead is
     // not `today + 30 × 86400000` on the two days a year the clocks move.
@@ -525,13 +437,16 @@ function Upcoming({ today, recurringRules }: WidgetContext) {
       addDays(new Date(`${today}T00:00:00`), UPCOMING_DAYS),
       "yyyy-MM-dd",
     );
-    return upcomingOccurrences(recurringRules, today, until, { limit: 8 }).map((o) => ({
-      key: `${o.rule.id}:${o.date}`,
-      date: o.date,
-      name: o.rule.template_vendor_source,
-      amount: o.amount,
-    }));
-  }, [today, recurringRules]);
+    return aggregates
+      .occurrences(today, until)
+      .slice(0, 8)
+      .map((o) => ({
+        key: `${o.rule.id}:${o.date}`,
+        date: o.date,
+        name: o.rule.template_vendor_source,
+        amount: o.amount,
+      }));
+  }, [today, aggregates]);
   return <UpcomingList rows={rows} />;
 }
 
@@ -556,27 +471,19 @@ function Goals({ today, ledgerTransactions, goals }: WidgetContext) {
 
 // ── The M5 charts, unchanged in substance ────────────────────────────────────
 
-function Monthly({
-  range,
-  categories,
-  reportTransactions,
-  budgetTargets,
-}: WidgetContext) {
+function Monthly({ range, categories, budgetTargets, aggregates }: WidgetContext) {
   const monthly = useMemo(() => {
-    const base = monthlyTotals(reportTransactions, categories, range);
+    const base = aggregates.monthly(range);
     return base.map((m) => ({
       ...m,
       budget: totalExpenseBudgetOnDate(budgetTargets, categories, `${m.month}-01`),
     }));
-  }, [reportTransactions, categories, budgetTargets, range]);
+  }, [aggregates, categories, budgetTargets, range]);
   return <MonthlyBarsChart monthly={monthly} />;
 }
 
-function Waterfall({ range, categories, reportTransactions }: WidgetContext) {
-  const w = useMemo(
-    () => waterfallData(monthlyTotals(reportTransactions, categories, range)),
-    [reportTransactions, categories, range],
-  );
+function Waterfall({ range, aggregates }: WidgetContext) {
+  const w = useMemo(() => waterfallData(aggregates.monthly(range)), [aggregates, range]);
   return <WaterfallChart income={w.income} expenses={w.expenses} savings={w.savings} />;
 }
 
@@ -650,146 +557,26 @@ function Budgets({
   );
 }
 
-// ── The list itself ──────────────────────────────────────────────────────────
+/** Render implementations stay behind dynamic imports in the metadata registry. */
+export const LEGACY_WIDGET_RENDERERS = {
+  balance: BalanceFigure,
+  pace: Pace,
+  recent: Recent,
+  saved: SavedFigure,
+  kpis: Kpis,
+  flow: Flow,
+  calendar: Calendar,
+  breakdown: Breakdown,
+  payees: Payees,
+  upcoming: Upcoming,
+  largest: Largest,
+  goals: Goals,
+  monthly: Monthly,
+  waterfall: Waterfall,
+  trend: Trend,
+  flows: Flows,
+  investments: Investments,
+  budgets: Budgets,
+};
 
-/** Default order. The synced layout may reorder or hide these stable ids. */
-export const DASHBOARD_WIDGETS: WidgetDef[] = [
-  {
-    id: "balance",
-    title: "Overall balance",
-    description: "Current total across every counted container.",
-    defaultVisible: true,
-    bare: true,
-    fixedWindow: true,
-    render: (ctx) => <BalanceFigure {...ctx} />,
-  },
-  {
-    id: "pace",
-    title: "Budget pace",
-    description: "Spending against allowances as this month unfolds.",
-    defaultVisible: true,
-    fixedWindow: true,
-    render: (ctx) => <Pace {...ctx} />,
-  },
-  {
-    id: "recent",
-    title: "Recent entries",
-    description: "The latest approved entries across the ledger.",
-    defaultVisible: true,
-    fixedWindow: true,
-    render: (ctx) => <Recent {...ctx} />,
-    renderCompact: (ctx) => <RecentCompact {...ctx} />,
-  },
-  {
-    id: "saved",
-    title: "Saved this period",
-    description: "Income left after expenses in the selected period.",
-    defaultVisible: true,
-    render: (ctx) => <SavedFigure {...ctx} />,
-  },
-  {
-    id: "kpis",
-    title: "Headline figures",
-    description: "Income, spending, savings rate, and ending balance at a glance.",
-    defaultVisible: true,
-    bare: true,
-    render: (ctx) => <Kpis {...ctx} />,
-  },
-  {
-    id: "flow",
-    title: "Money flow",
-    description: "How income moved through categories and into savings.",
-    defaultVisible: true,
-    render: (ctx) => <Flow {...ctx} />,
-  },
-  {
-    id: "calendar",
-    title: "Spending calendar",
-    description: "Daily spending rhythm across the latest eight weeks.",
-    defaultVisible: true,
-    render: (ctx) => <Calendar {...ctx} />,
-  },
-  {
-    id: "breakdown",
-    title: "Where it went",
-    description: "Income and expenses by category, with recent trends.",
-    defaultVisible: true,
-    render: (ctx) => <Breakdown {...ctx} />,
-  },
-  {
-    id: "payees",
-    title: "Top payees",
-    description: "The largest destinations for spending in the selected period.",
-    defaultVisible: true,
-    render: (ctx) => <Payees {...ctx} />,
-  },
-  {
-    id: "upcoming",
-    title: "Coming up",
-    description: "Recurring income and bills due in the next 30 days.",
-    defaultVisible: true,
-    fixedWindow: true,
-    render: (ctx) => <Upcoming {...ctx} />,
-  },
-  {
-    id: "largest",
-    title: "Largest entries",
-    description: "The highest-value entries in the selected period.",
-    defaultVisible: true,
-    render: (ctx) => <Largest {...ctx} />,
-  },
-  {
-    id: "goals",
-    title: "Goals",
-    description: "Progress and monthly asks for active goals.",
-    defaultVisible: true,
-    render: (ctx) => <Goals {...ctx} />,
-  },
-  {
-    id: "monthly",
-    title: "Month by month",
-    description: "Income, expenses, savings, and budget over time.",
-    defaultVisible: true,
-    render: (ctx) => <Monthly {...ctx} />,
-  },
-  {
-    id: "waterfall",
-    title: "Income → expenses → savings",
-    description: "How the period's income became spending and savings.",
-    defaultVisible: true,
-    render: (ctx) => <Waterfall {...ctx} />,
-  },
-  {
-    id: "trend",
-    title: "Category over time",
-    description: "One category's monthly spending against its budget.",
-    defaultVisible: true,
-    render: (ctx) => <Trend {...ctx} />,
-  },
-  {
-    id: "flows",
-    title: "Container flows",
-    description: "Money transferred into and out of each container.",
-    defaultVisible: true,
-    render: (ctx) => <Flows {...ctx} />,
-  },
-  {
-    id: "investments",
-    title: "Investments",
-    description: "Value, contributions, and gain or loss for each investment.",
-    defaultVisible: true,
-    render: (ctx) => <Investments {...ctx} />,
-  },
-  {
-    id: "budgets",
-    title: "Budget comparison",
-    description: "Average spending against allowances by category.",
-    defaultVisible: true,
-    render: (ctx) => <Budgets {...ctx} />,
-  },
-];
-
-/** The month a pace widget is about, for its title. */
-export function paceTitle(today: string): string {
-  return `Budget pace — ${monthLabelFmt.format(new Date(`${today.slice(0, 7)}-01T00:00:00`))}`;
-}
+export const LEGACY_COMPACT_RENDERERS = { recent: RecentCompact };
