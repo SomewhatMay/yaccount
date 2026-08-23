@@ -37,6 +37,7 @@ on a fresh branch off freshly pulled `main`.
 
 **Deferred — do not start without an explicit go-ahead:**
 
+- **[Future-dated transaction handling #35](https://github.com/SomewhatMay/yaccount/issues/35)** — revisit the interim dashboard rule after dashboard widgets.
 - **M10 Capacitor** native packaging.
 
 ## Verify
