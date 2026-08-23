@@ -31,10 +31,8 @@ import { rangeText, type WidgetContext, type WidgetDef } from "./registry";
  * radius when it breaks.
  *
  * Everything here is keyed on the widget's stable `id`, which is why the registry
- * insists on one. The fold and the per-widget period override are stored per id
- * (`prefs.ts`, device-local — how you like to read a report is not a fact about
- * your money), and the `ErrorBoundary` is named after the widget so a chart that
- * trips over an unexpected shape costs you that chart and not the screen.
+ * insists on one. Fold state and per-widget periods are browser-local. The named
+ * `ErrorBoundary` limits a rendering failure to its widget.
  */
 
 const OPEN_STATES = ["open", "closed"] as const;
@@ -60,7 +58,15 @@ function windowKey(id: string): string {
   return `yaccount.dashboard.window.${id}`;
 }
 
-export function DashboardWidget({ def, base }: { def: WidgetDef; base: WidgetContext }) {
+export function DashboardWidget({
+  def,
+  base,
+  editing = false,
+}: {
+  def: WidgetDef;
+  base: WidgetContext;
+  editing?: boolean;
+}) {
   const [openPref, setOpenPref] = useLocalPref(openKey(def.id), "open", isOpenState);
   const [windowPref, setWindowPref] = useLocalPref(
     windowKey(def.id),
@@ -80,6 +86,10 @@ export function DashboardWidget({ def, base }: { def: WidgetDef; base: WidgetCon
       {def.render(ctx)}
     </ErrorBoundary>
   );
+
+  // Edit mode keeps the report visible while its ordinary controls stand down.
+  // The editor supplies one shared card frame and movement controls around it.
+  if (editing) return <div className="p-5">{body}</div>;
 
   // The hero and the KPI strip are the screen's opening statement, not panels:
   // no chrome, nothing to fold, and no window of their own to choose.

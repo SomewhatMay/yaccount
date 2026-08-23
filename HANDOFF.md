@@ -12,7 +12,7 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 64 Vitest files, 1,017 tests passing. Playwright is 47 passes and 3 expected desktop-touch
+- 73 Vitest files, 1,052 tests passing. Playwright is 57 passes and 7 expected desktop-touch
   skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
   issues).
 - **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
@@ -24,8 +24,9 @@ repeat them — it says where things stand and what will bite you.
   deliberately do not.
 - `DB_VERSION = 3`. The Drive layout is `snapshot.json`, `ledger_<id>.json`,
   `ledger_<id>_<YYYY-MM>.json`, `origin.json`, and inert `backup_*` / `orphan_*` worlds.
-- Dashboard widgets can be reordered or hidden from a responsive Customize sheet. The versioned
-  layout preference is device-local; Overall balance is always visible and first.
+- Dashboard widgets edit in place. Cards drag to reorder, hidden widgets return through the
+  descriptive gallery, and the versioned layout setting syncs. Overall balance stays visible and
+  first. Reporting periods and fold state remain browser-local.
 
 ## Next
 

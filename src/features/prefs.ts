@@ -3,12 +3,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 /**
- * Device-local view preferences — how you like to look at your ledger, as
- * opposed to what is in it.
- *
- * These deliberately do NOT go through the op log. A sort order is not a fact
- * about your money; syncing it would mean a phone deciding how a laptop reads
- * (§8.4 ledgers carry the ledger, nothing else). localStorage, per device.
+ * Browser-local display preferences, including filters, folds, and reporting
+ * windows. Account-wide preferences use synced settings instead.
  *
  * Storage is a convenience, never a dependency: private browsing, a blocked
  * storage setting or a server prerender all leave it unreadable, and every one of

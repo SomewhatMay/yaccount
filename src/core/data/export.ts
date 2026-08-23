@@ -30,10 +30,9 @@ import { SettingSchema } from "../model/setting";
  * sharing a ledger name would break the §8.4 "no two devices write the same
  * file" guarantee, which is the whole basis of the no-lost-write design.
  *
- * Device-local view preferences (sort order, dashboard layout, folded widgets) are deliberately
- * NOT here. `prefs.ts` states the rule — a sort order is not a fact about your
- * money — and syncing one device's reading habits into another is exactly what
- * that decision rejects.
+ * Browser-local display preferences (sort order, reporting windows, folded
+ * widgets) are not here. Synced settings, including dashboard layout, travel in
+ * the op journal and are exported with it.
  */
 export const EXPORT_FORMAT = "yaccount.export";
 export const EXPORT_VERSION = 1;

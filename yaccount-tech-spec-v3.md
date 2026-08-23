@@ -469,8 +469,8 @@ appDbVersion, deviceId, opCount, ops}`. Since state *is* the replay of the journ
 the only representation that restores identical state while preserving the replay invariant — and
 it is the same primitive the snapshot uses, so export, import, merge and collapse all speak one
 language. `deviceId` is provenance only and is **never imported**: two devices sharing a ledger
-name would break the no-lost-write guarantee. Device-local view preferences are deliberately not
-exported — a sort order is not a fact about the user's money.
+name would break the no-lost-write guarantee. Browser-local display preferences are not exported.
+Synced settings, including dashboard layout, are part of the journal and portable format.
 
 **An import is validated in full before anything is mutated, anywhere.** Envelope → every op's
 shape (id, ISO `ts`, a *known* op type, object payload, no duplicate ids) → a complete replay into
@@ -783,9 +783,10 @@ varies per screen is noise wearing a label's clothes.
   destination is marked by full-strength iris on icon and label, never a tinted plate. **Routes
   are stable at every breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add
   FAB is present at every width.
-- **Dashboard = an ordered widget registry** of stable ids. The device-local layout preference
-  reorders and hides registry entries; Overall balance is always visible and first. Secondary
-  widgets fold; fold state and any period override persist per id. Numbers identifying an honest
+- **Dashboard = an ordered widget registry** of stable ids. The synced layout setting reorders and
+  hides registry entries; Overall balance is always visible and first. Cards edit directly in
+  place, with hidden reports available through a descriptive gallery. Secondary widgets fold;
+  fold state and any period override persist in the browser per id. Numbers identifying an honest
   ledger subset use real `/ledger` deep links; summaries and ambiguous chart marks do not pretend
   to be links.
 - **Row actions hide until hover — but only where there is a hover.** A touch device has none, so

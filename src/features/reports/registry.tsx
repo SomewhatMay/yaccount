@@ -74,9 +74,9 @@ import {
 /**
  * ── The dashboard as a LIST, not a layout ───────────────────────────────────
  *
- * Every widget is one self-contained entry the dashboard maps over. The
- * device-local layout wraps this registry without changing its stable ids. An id
- * keys layout, collapse, per-widget period (§6.1), and the error boundary.
+ * Every widget is one self-contained entry the dashboard maps over. The synced
+ * layout references stable ids; each id also keys collapse, per-widget period
+ * (§6.1), and the error boundary.
  *
  * A widget receives its window, never the global one: `range` is already resolved
  * to whatever this widget is showing. Each `render` returns a COMPONENT, so the
@@ -101,6 +101,8 @@ export interface WidgetDef {
   /** Stable forever: it is a stored preference key, not a label. */
   id: string;
   title: string;
+  /** Plain-language recognition copy for the Add widgets gallery. */
+  description: string;
   defaultVisible: boolean;
   /** No panel, no collapse — the screen's own opening figure. */
   bare?: boolean;
@@ -570,13 +572,12 @@ function Budgets({ range, categories, transactions, budgetTargets }: WidgetConte
 
 // ── The list itself ──────────────────────────────────────────────────────────
 
-/**
- * Default order. A device-local preference may reorder or hide these stable ids.
- */
+/** Default order. The synced layout may reorder or hide these stable ids. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
     id: "balance",
     title: "Overall balance",
+    description: "Current total across every counted container.",
     defaultVisible: true,
     bare: true,
     fixedWindow: true,
@@ -585,6 +586,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
     id: "pace",
     title: "Budget pace",
+    description: "Spending against allowances as this month unfolds.",
     defaultVisible: true,
     fixedWindow: true,
     render: (ctx) => <Pace {...ctx} />,
@@ -592,6 +594,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
     id: "recent",
     title: "Recent entries",
+    description: "The latest approved entries across the ledger.",
     defaultVisible: true,
     fixedWindow: true,
     render: (ctx) => <Recent {...ctx} />,
@@ -599,12 +602,14 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
     id: "saved",
     title: "Saved this period",
+    description: "Income left after expenses in the selected period.",
     defaultVisible: true,
     render: (ctx) => <SavedFigure {...ctx} />,
   },
   {
     id: "kpis",
     title: "Headline figures",
+    description: "Income, spending, savings rate, and ending balance at a glance.",
     defaultVisible: true,
     bare: true,
     render: (ctx) => <Kpis {...ctx} />,
@@ -612,30 +617,35 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
     id: "flow",
     title: "Money flow",
+    description: "How income moved through categories and into savings.",
     defaultVisible: true,
     render: (ctx) => <Flow {...ctx} />,
   },
   {
     id: "calendar",
     title: "Spending calendar",
+    description: "Daily spending rhythm across the latest eight weeks.",
     defaultVisible: true,
     render: (ctx) => <Calendar {...ctx} />,
   },
   {
     id: "breakdown",
     title: "Where it went",
+    description: "Income and expenses by category, with recent trends.",
     defaultVisible: true,
     render: (ctx) => <Breakdown {...ctx} />,
   },
   {
     id: "payees",
     title: "Top payees",
+    description: "The largest destinations for spending in the selected period.",
     defaultVisible: true,
     render: (ctx) => <Payees {...ctx} />,
   },
   {
     id: "upcoming",
     title: "Coming up",
+    description: "Recurring income and bills due in the next 30 days.",
     defaultVisible: true,
     fixedWindow: true,
     render: (ctx) => <Upcoming {...ctx} />,
@@ -643,48 +653,56 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
     id: "largest",
     title: "Largest entries",
+    description: "The highest-value entries in the selected period.",
     defaultVisible: true,
     render: (ctx) => <Largest {...ctx} />,
   },
   {
     id: "goals",
     title: "Goals",
+    description: "Progress and monthly asks for active goals.",
     defaultVisible: true,
     render: (ctx) => <Goals {...ctx} />,
   },
   {
     id: "monthly",
     title: "Month by month",
+    description: "Income, expenses, savings, and budget over time.",
     defaultVisible: true,
     render: (ctx) => <Monthly {...ctx} />,
   },
   {
     id: "waterfall",
     title: "Income → expenses → savings",
+    description: "How the period's income became spending and savings.",
     defaultVisible: true,
     render: (ctx) => <Waterfall {...ctx} />,
   },
   {
     id: "trend",
     title: "Category over time",
+    description: "One category's monthly spending against its budget.",
     defaultVisible: true,
     render: (ctx) => <Trend {...ctx} />,
   },
   {
     id: "flows",
     title: "Container flows",
+    description: "Money transferred into and out of each container.",
     defaultVisible: true,
     render: (ctx) => <Flows {...ctx} />,
   },
   {
     id: "investments",
     title: "Investments",
+    description: "Value, contributions, and gain or loss for each investment.",
     defaultVisible: true,
     render: (ctx) => <Investments {...ctx} />,
   },
   {
     id: "budgets",
     title: "Budget comparison",
+    description: "Average spending against allowances by category.",
     defaultVisible: true,
     render: (ctx) => <Budgets {...ctx} />,
   },

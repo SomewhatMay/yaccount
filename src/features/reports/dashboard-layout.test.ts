@@ -12,6 +12,7 @@ function defs(...ids: string[]): WidgetDef[] {
   return ids.map((id) => ({
     id,
     title: id,
+    description: id,
     defaultVisible: id !== "later",
     render: () => null,
   }));

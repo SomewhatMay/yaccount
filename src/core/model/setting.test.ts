@@ -8,6 +8,10 @@ describe("settings (M3 — synced preferences)", () => {
     expect(SETTING.defaultContainerId).toBe("default_container_id");
   });
 
+  it("pins the dashboard layout key", () => {
+    expect(SETTING.dashboardLayout).toBe("dashboard_layout");
+  });
+
   it("builds a key/value row", () => {
     expect(makeSetting(SETTING.defaultContainerId, "general")).toEqual({
       key: "default_container_id",

@@ -264,25 +264,35 @@ test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo)
   await expect(body.getByLabel("Amount")).toBeVisible();
 });
 
-test("customizes dashboard widget order and visibility", async ({ page }) => {
+test("edits dashboard cards in place and commits on Done", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Customize dashboard" }).click();
-  await expect(page.getByRole("heading", { name: "Customize dashboard" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Arrange your dashboard" }),
+  ).toBeVisible();
 
   const rows = page.locator("[data-widget-id]");
   await expect(rows.first()).toHaveAttribute("data-widget-id", "balance");
-  await expect(
-    page.getByRole("checkbox", { name: "Show Overall balance" }),
-  ).toBeDisabled();
+  await expect(page.getByText("Pinned", { exact: true })).toBeVisible();
 
-  const recentHandle = page.getByRole("button", { name: "Move Recent entries" });
-  await recentHandle.focus();
-  await page.keyboard.press("Space");
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Space");
+  await page
+    .getByRole("button", { name: "Move Recent entries without dragging" })
+    .click();
+  await page.getByRole("menuitem", { name: "Before Budget pace" }).click();
   await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
 
-  await page.getByRole("checkbox", { name: "Show Budget pace" }).click();
+  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await expect(page.locator('[data-widget-id="pace"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("heading", { name: "How the money moved" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Budget pace" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page
+    .getByRole("button", { name: "Move Recent entries without dragging" })
+    .click();
+  await page.getByRole("menuitem", { name: "Before Budget pace" }).click();
+  await page.getByRole("button", { name: "Hide Budget pace" }).click();
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByRole("heading", { name: "Budget pace" })).toBeHidden();
 
@@ -293,23 +303,45 @@ test("customizes dashboard widget order and visibility", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Budget pace" })).toHaveCount(0);
   await page.getByRole("button", { name: "Compare with another period" }).click();
 
-  await page.getByRole("button", { name: "Customize dashboard" }).click();
-  await expect(page.getByRole("heading", { name: "Customize dashboard" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
   await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
   await page.getByRole("button", { name: "Reset" }).click();
-  await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "pace");
-  await expect(page.getByRole("checkbox", { name: "Show Budget pace" })).toBeChecked();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.locator("h3").first()).toHaveText("Budget pace");
+});
+
+test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+
+  await expect(page.getByRole("heading", { name: "Add widgets" })).toBeVisible();
+  await expect(
+    page.getByText("Spending against allowances as this month unfolds."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add Budget pace" }).click();
+  await page.keyboard.press("Escape");
+
+  await expect(page.locator('[data-widget-id="pace"]')).toBeVisible();
 });
 
 test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Touch regression.");
 
   await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Customize dashboard" }).tap();
+  await page.getByRole("button", { name: "Edit dashboard" }).tap();
+  const recentHandle = page.getByRole("button", {
+    name: "Move Recent entries",
+    exact: true,
+  });
+  const recentBox = await recentHandle.boundingBox();
+  const paceBox = await page.locator('[data-widget-id="pace"]').boundingBox();
+  if (!recentBox || !paceBox) throw new Error("Dashboard cards are not visible.");
   await dragUpByTouch(
     page,
-    page.getByRole("button", { name: "Move Recent entries" }),
-    52,
+    recentHandle,
+    recentBox.y + recentBox.height / 2 - (paceBox.y + paceBox.height / 2),
   );
   await expect(page.locator("[data-widget-id]").nth(1)).toHaveAttribute(
     "data-widget-id",

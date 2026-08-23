@@ -17,6 +17,8 @@ export type Setting = z.infer<typeof SettingSchema>;
 export const SETTING = {
   /** Default Spending Container (§5.2) — what the compose bar picks by default. */
   defaultContainerId: "default_container_id",
+  /** Dashboard widget order and visibility. */
+  dashboardLayout: "dashboard_layout",
 } as const;
 
 export type SettingKey = (typeof SETTING)[keyof typeof SETTING];

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
-import { SlidersHorizontalIcon } from "lucide-react";
+import { LayoutDashboardIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   budgetTargetsAtom,
@@ -25,8 +25,10 @@ import { FigureSkeleton, ListSkeleton, PageHeader } from "@/features/ui";
 import { PeriodPicker } from "./PeriodPicker";
 import { useComparePref, usePeriodPref } from "./period-pref";
 import { DASHBOARD_WIDGETS, type WidgetContext, type WidgetDef } from "./registry";
+import { DashboardEditor } from "./DashboardEditor";
 import { DashboardWidget } from "./WidgetShell";
-import { WidgetLayoutSheet } from "./WidgetLayoutSheet";
+import { WidgetGallerySheet } from "./WidgetGallerySheet";
+import { setWidgetVisible, type DashboardLayout } from "./dashboard-layout";
 import { useDashboardLayout } from "./use-dashboard-layout";
 
 /** The window the dashboard opens on when nothing has been chosen yet. */
@@ -35,11 +37,13 @@ const PERIOD_KEY = "yaccount.dashboard.period";
 const COMPARE_KEY = "yaccount.dashboard.compare";
 
 /**
- * The dashboard (§6). It owns the reporting windows, the data every widget
- * reads, and the device-local view of the stable widget registry.
+ * The dashboard (§6). It owns browser-local reporting windows, the synced layout,
+ * and the data every widget reads.
  */
 export function DashboardView() {
-  const [customizing, setCustomizing] = useState(false);
+  const [draftLayout, setDraftLayout] = useState<DashboardLayout | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [savingLayout, setSavingLayout] = useState(false);
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
@@ -49,19 +53,25 @@ export function DashboardView() {
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
 
-  // The period survives a refresh now: it is a view preference, stored per device
-  // like every other one. Choosing "Year to date", reloading and quietly being
-  // shown three months was a small lie the screen told on every visit.
+  // Reporting windows are browser-local display preferences.
   const [period, setPeriod] = usePeriodPref(PERIOD_KEY, DEFAULT_PERIOD);
   const [comparePeriod, setComparePeriod] = useComparePref(COMPARE_KEY);
-  const [layout, setLayout] = useDashboardLayout();
+  const [layout, saveLayout] = useDashboardLayout();
+  const activeLayout = draftLayout ?? layout;
   const visibleWidgets = useMemo(() => {
     const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
-    return layout.order.flatMap((id) => {
+    return activeLayout.order.flatMap((id) => {
       const widget = byId.get(id);
-      return widget && !layout.hidden.includes(id) ? [widget] : [];
+      return widget && !activeLayout.hidden.includes(id) ? [widget] : [];
     });
-  }, [layout]);
+  }, [activeLayout]);
+  const hiddenWidgets = useMemo(() => {
+    const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
+    return activeLayout.order.flatMap((id) => {
+      const widget = byId.get(id);
+      return widget && activeLayout.hidden.includes(id) ? [widget] : [];
+    });
+  }, [activeLayout]);
 
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
@@ -94,32 +104,77 @@ export function DashboardView() {
     ],
   );
 
+  function beginEditing() {
+    setDraftLayout({ order: [...layout.order], hidden: [...layout.hidden] });
+  }
+
+  function cancelEditing() {
+    setGalleryOpen(false);
+    setDraftLayout(null);
+  }
+
+  async function finishEditing() {
+    if (!draftLayout) return;
+    setSavingLayout(true);
+    try {
+      await saveLayout(draftLayout);
+      setGalleryOpen(false);
+      setDraftLayout(null);
+    } catch {
+      // `dispatchAtom` reports the write failure; keep the draft available to retry.
+    } finally {
+      setSavingLayout(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Dashboard"
-        title="How the money moved"
+        title={draftLayout ? "Arrange your dashboard" : "How the money moved"}
         action={
           ready ? (
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-              <PeriodPicker
-                period={period}
-                onPeriodChange={setPeriod}
-                comparePeriod={comparePeriod}
-                onCompareChange={setComparePeriod}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 shrink-0 rounded-full px-2"
-                aria-label="Customize dashboard"
-                onClick={() => setCustomizing(true)}
-              >
-                <SlidersHorizontalIcon className="size-4" aria-hidden />
-                <span className="sr-only sm:not-sr-only">Customize</span>
-              </Button>
-            </div>
+            draftLayout ? (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={savingLayout}
+                  onClick={cancelEditing}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={savingLayout}
+                  onClick={() => void finishEditing()}
+                >
+                  {savingLayout ? "Saving…" : "Done"}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                <PeriodPicker
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  comparePeriod={comparePeriod}
+                  onCompareChange={setComparePeriod}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0 rounded-full px-2"
+                  aria-label="Edit dashboard"
+                  onClick={beginEditing}
+                >
+                  <LayoutDashboardIcon className="size-4" aria-hidden />
+                  <span className="sr-only sm:not-sr-only">Edit</span>
+                </Button>
+              </div>
+            )
           ) : undefined
         }
       />
@@ -129,6 +184,14 @@ export function DashboardView() {
           <FigureSkeleton />
           <ListSkeleton rows={4} />
         </>
+      ) : draftLayout ? (
+        <DashboardEditor
+          base={{ ...data, range: primaryRange }}
+          widgets={visibleWidgets}
+          layout={draftLayout}
+          onLayoutChange={setDraftLayout}
+          onAddWidgets={() => setGalleryOpen(true)}
+        />
       ) : compareRange ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
@@ -137,19 +200,22 @@ export function DashboardView() {
       ) : (
         <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
       )}
-      <WidgetLayoutSheet
-        open={customizing}
-        onOpenChange={setCustomizing}
-        widgets={DASHBOARD_WIDGETS}
-        layout={layout}
-        onLayoutChange={setLayout}
+      <WidgetGallerySheet
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        widgets={hiddenWidgets}
+        onAdd={(id) => {
+          setDraftLayout((current) =>
+            current ? setWidgetVisible(current, id, true) : current,
+          );
+        }}
       />
     </div>
   );
 }
 
 /**
- * Every visible widget, in the device's order, for one window. Compare (§6.2)
+ * Every visible widget, in synced order, for one window. Compare (§6.2)
  * reads the same resolved list twice.
  */
 function WidgetColumn({
