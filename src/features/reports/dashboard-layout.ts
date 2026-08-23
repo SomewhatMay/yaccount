@@ -112,8 +112,45 @@ export function defaultDashboardDefinition(
     name: "Overview",
     rank: 0,
     isDeleted: false,
-    instances: widgets.map(defaultInstance),
+    instances: widgets
+      .filter((widget) => !widget.gallery?.repeatable)
+      .map(defaultInstance),
   };
+}
+
+export function addDashboardWidgetInstance(
+  dashboard: DashboardDefinition,
+  widgetType: string,
+  configuration: {
+    size?: DashboardWidgetInstance["size"];
+    subject?: DashboardWidgetInstance["subject"];
+    settings?: DashboardWidgetInstance["settings"];
+  },
+  makeId: () => string,
+): DashboardDefinition {
+  const used = new Set(dashboard.instances.map((instance) => instance.instanceId));
+  let instanceId = "";
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = makeId().trim();
+    if (candidate && !used.has(candidate)) {
+      instanceId = candidate;
+      break;
+    }
+  }
+  if (!instanceId) throw new Error("could not create a unique widget instance id");
+
+  const instance = DashboardWidgetInstanceSchema.parse({
+    instanceId,
+    widgetType,
+    size: configuration.size ?? "expanded",
+    hidden: false,
+    ...(configuration.subject ? { subject: configuration.subject } : {}),
+    ...(configuration.settings ? { settings: configuration.settings } : {}),
+  });
+  return DashboardDefinitionSchema.parse({
+    ...dashboard,
+    instances: [...dashboard.instances, instance],
+  });
 }
 
 export function createDashboardDefinition({

@@ -36,6 +36,7 @@ export interface DashboardSetsController {
   defaultDashboardId: string;
   layout: DashboardLayout;
   setActiveDashboard: (id: string) => void;
+  saveDashboard: (dashboard: DashboardDefinition) => Promise<void>;
   saveLayout: (layout: DashboardLayout) => Promise<void>;
   createDashboard: (name: string, starter: DashboardStarter) => Promise<void>;
   renameDashboard: (id: string, name: string) => Promise<void>;
@@ -99,15 +100,23 @@ export function useDashboardSets(): DashboardSetsController {
     [setLocalActiveId, state.dashboards],
   );
 
-  const saveLayout = useCallback(
-    (next: DashboardLayout) => {
-      const updated = applyDashboardLayout(activeDashboard, next, DASHBOARD_WIDGETS);
+  const saveDashboard = useCallback(
+    (next: DashboardDefinition) => {
+      if (next.id !== activeDashboard.id) {
+        throw new Error("cannot replace a different dashboard");
+      }
       return dispatchMany([
-        dashboardOp(updated),
+        dashboardOp(next),
         ...(!hasDefaultSetting ? [defaultOp()] : []),
       ]);
     },
     [activeDashboard, dashboardOp, defaultOp, dispatchMany, hasDefaultSetting],
+  );
+
+  const saveLayout = useCallback(
+    (next: DashboardLayout) =>
+      saveDashboard(applyDashboardLayout(activeDashboard, next, DASHBOARD_WIDGETS)),
+    [activeDashboard, saveDashboard],
   );
 
   const createDashboard = useCallback(
@@ -242,6 +251,7 @@ export function useDashboardSets(): DashboardSetsController {
     defaultDashboardId: state.defaultDashboardId,
     layout,
     setActiveDashboard,
+    saveDashboard,
     saveLayout,
     createDashboard,
     renameDashboard,

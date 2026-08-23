@@ -4,6 +4,7 @@ import { DASHBOARD_WIDGETS } from "./registry";
 import {
   DASHBOARD_DEFAULT_KEY,
   OVERVIEW_DASHBOARD_ID,
+  addDashboardWidgetInstance,
   applyDashboardLayout,
   dashboardItemKey,
   decodeDashboardDefinition,
@@ -183,6 +184,24 @@ describe("useDashboardSets", () => {
         (instance) => instance.instanceId === unknown.instanceId,
       ),
     ).toEqual(unknown);
+  });
+
+  it("saves configured instance drafts only when the editor commits", async () => {
+    const overview = storedDashboard(fallback);
+    fixture.settings = settingsFor(overview);
+    const sets = useDashboardSets();
+    const configured = addDashboardWidgetInstance(
+      overview,
+      "watch-container",
+      { subject: { type: "container", id: "general" } },
+      () => "watch-1",
+    );
+
+    await sets.saveDashboard(configured);
+
+    expect(decodeDashboardDefinition(dispatchedOps()[0].payload.row.value)).toEqual(
+      configured,
+    );
   });
 
   it("creates a starter while materializing the fallback Overview", async () => {

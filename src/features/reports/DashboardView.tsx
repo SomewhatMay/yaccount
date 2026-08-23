@@ -20,6 +20,7 @@ import {
   type DateRange,
   type ReportingPeriod,
 } from "@/core/engine";
+import { newId } from "@/core/model";
 import { todayIso } from "@/features/clock";
 import { FigureSkeleton, ListSkeleton, PageHeader } from "@/features/ui";
 import { PeriodPicker } from "./PeriodPicker";
@@ -30,9 +31,12 @@ import { DashboardSetBar } from "./DashboardSets";
 import { DashboardWidget } from "./WidgetShell";
 import { WidgetGallerySheet } from "./WidgetGallerySheet";
 import {
+  addDashboardWidgetInstance,
+  applyDashboardLayout,
   dashboardWidgetEntries,
+  layoutFromDashboard,
   setWidgetVisible,
-  type DashboardLayout,
+  type DashboardDefinition,
   type DashboardWidgetEntry,
 } from "./dashboard-layout";
 import { useDashboardSets } from "./use-dashboard-layout";
@@ -48,7 +52,7 @@ const COMPARE_KEY_PREFIX = "yaccount.dashboard.compare";
  * and the data every widget reads.
  */
 export function DashboardView() {
-  const [draftLayout, setDraftLayout] = useState<DashboardLayout | null>(null);
+  const [draftDashboard, setDraftDashboard] = useState<DashboardDefinition | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
   const ready = useAtomValue(readyAtom);
@@ -70,16 +74,13 @@ export function DashboardView() {
   const [comparePeriod, setComparePeriod] = useComparePref(
     `${COMPARE_KEY_PREFIX}.${activeDashboardId}`,
   );
-  const { layout, saveLayout } = dashboardSets;
-  const activeLayout = draftLayout ?? layout;
+  const activeDashboard = draftDashboard ?? dashboardSets.activeDashboard;
+  const activeLayout = draftDashboard
+    ? layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS)
+    : dashboardSets.layout;
   const widgetEntries = useMemo(
-    () =>
-      dashboardWidgetEntries(
-        dashboardSets.activeDashboard,
-        activeLayout,
-        DASHBOARD_WIDGETS,
-      ),
-    [activeLayout, dashboardSets.activeDashboard],
+    () => dashboardWidgetEntries(activeDashboard, activeLayout, DASHBOARD_WIDGETS),
+    [activeDashboard, activeLayout],
   );
   const visibleWidgets = useMemo(
     () =>
@@ -88,14 +89,6 @@ export function DashboardView() {
       ),
     [activeLayout.hidden, widgetEntries],
   );
-  const hiddenWidgets = useMemo(
-    () =>
-      widgetEntries.filter(({ instance }) =>
-        activeLayout.hidden.includes(instance.instanceId),
-      ),
-    [activeLayout.hidden, widgetEntries],
-  );
-
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
   const primaryRange = useMemo(() => resolvePeriod(period, today), [period, today]);
@@ -136,25 +129,28 @@ export function DashboardView() {
   ]);
 
   function beginEditing() {
-    setDraftLayout({
-      order: [...layout.order],
-      hidden: [...layout.hidden],
-      sizes: { ...layout.sizes },
+    setDraftDashboard({
+      ...dashboardSets.activeDashboard,
+      instances: dashboardSets.activeDashboard.instances.map((instance) => ({
+        ...instance,
+        ...(instance.subject ? { subject: { ...instance.subject } } : {}),
+        ...(instance.settings ? { settings: { ...instance.settings } } : {}),
+      })),
     });
   }
 
   function cancelEditing() {
     setGalleryOpen(false);
-    setDraftLayout(null);
+    setDraftDashboard(null);
   }
 
   async function finishEditing() {
-    if (!draftLayout) return;
+    if (!draftDashboard) return;
     setSavingLayout(true);
     try {
-      await saveLayout(draftLayout);
+      await dashboardSets.saveDashboard(draftDashboard);
       setGalleryOpen(false);
-      setDraftLayout(null);
+      setDraftDashboard(null);
     } catch {
       // `dispatchAtom` reports the write failure; keep the draft available to retry.
     } finally {
@@ -166,10 +162,10 @@ export function DashboardView() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Dashboard"
-        title={draftLayout ? "Arrange your dashboard" : "How the money moved"}
+        title={draftDashboard ? "Arrange your dashboard" : "How the money moved"}
         action={
           ready ? (
-            draftLayout ? (
+            draftDashboard ? (
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -214,7 +210,7 @@ export function DashboardView() {
         }
       />
 
-      {ready && !draftLayout && (
+      {ready && !draftDashboard && (
         <DashboardSetBar
           dashboards={dashboardSets.dashboards}
           activeId={dashboardSets.activeDashboard.id}
@@ -234,13 +230,17 @@ export function DashboardView() {
           <FigureSkeleton />
           <ListSkeleton rows={4} />
         </>
-      ) : draftLayout ? (
+      ) : draftDashboard ? (
         <DashboardEditor
           base={{ ...data, range: primaryRange }}
           widgets={visibleWidgets}
           allWidgets={widgetEntries}
-          layout={draftLayout}
-          onLayoutChange={setDraftLayout}
+          layout={activeLayout}
+          onLayoutChange={(next) =>
+            setDraftDashboard((current) =>
+              current ? applyDashboardLayout(current, next, DASHBOARD_WIDGETS) : current,
+            )
+          }
           onAddWidgets={() => setGalleryOpen(true)}
         />
       ) : compareRange ? (
@@ -256,17 +256,31 @@ export function DashboardView() {
       <WidgetGallerySheet
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
-        widgets={hiddenWidgets}
-        onAdd={(instanceId) => {
-          setDraftLayout((current) =>
+        definitions={DASHBOARD_WIDGETS}
+        entries={widgetEntries}
+        hiddenInstanceIds={activeLayout.hidden}
+        context={{ ...data, range: primaryRange }}
+        onRestore={(instanceId) => {
+          setDraftDashboard((current) => {
+            if (!current) return current;
+            const layout = layoutFromDashboard(current, DASHBOARD_WIDGETS);
+            return applyDashboardLayout(
+              current,
+              setWidgetVisible(
+                layout,
+                instanceId,
+                true,
+                widgetEntries.find(({ instance }) => instance.widgetType === "balance")
+                  ?.instance.instanceId,
+              ),
+              DASHBOARD_WIDGETS,
+            );
+          });
+        }}
+        onCreate={(widgetType, configuration) => {
+          setDraftDashboard((current) =>
             current
-              ? setWidgetVisible(
-                  current,
-                  instanceId,
-                  true,
-                  widgetEntries.find(({ instance }) => instance.widgetType === "balance")
-                    ?.instance.instanceId,
-                )
+              ? addDashboardWidgetInstance(current, widgetType, configuration, newId)
               : current,
           );
         }}

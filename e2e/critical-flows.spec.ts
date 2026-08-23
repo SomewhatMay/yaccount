@@ -375,6 +375,19 @@ test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
   await expect(page.locator('[data-widget-id="pace"]')).toBeVisible();
 });
 
+test("searches the grouped widget gallery by recognition language", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await page.getByRole("button", { name: "Hide Recent entries" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+
+  await expect(page.getByRole("heading", { name: "Planning" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search widgets" }).fill("allowance");
+  await expect(page.getByRole("button", { name: "Add Budget pace" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add Recent entries" })).toHaveCount(0);
+});
+
 test("persists a useful compact widget mode", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Edit dashboard" }).click();

@@ -57,6 +57,15 @@ export interface WidgetMathDisclosure {
 
 export type WidgetRenderer = ComponentType<WidgetContext>;
 export type WidgetModuleLoader = () => Promise<{ default: WidgetRenderer }>;
+export type WidgetGalleryGroup = "planning" | "forecasts" | "watch" | "analysis";
+
+export interface WidgetGalleryMetadata {
+  group: WidgetGalleryGroup;
+  terms: string[];
+  repeatable?: boolean;
+  subject?: "container" | "category";
+  suggest?: (ctx: WidgetContext) => string | null;
+}
 
 export interface WidgetDef {
   id: string;
@@ -65,6 +74,7 @@ export interface WidgetDef {
   defaultVisible: boolean;
   bare?: boolean;
   fixedWindow?: boolean;
+  gallery?: WidgetGalleryMetadata;
   /** Production descriptors use loaders; render functions remain a small test seam. */
   load?: WidgetModuleLoader;
   loadCompact?: WidgetModuleLoader;
@@ -134,6 +144,14 @@ function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
 }
 
+function gallery(
+  group: WidgetGalleryGroup,
+  terms: string[],
+  suggest?: WidgetGalleryMetadata["suggest"],
+): WidgetGalleryMetadata {
+  return { group, terms, ...(suggest ? { suggest } : {}) };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -151,6 +169,12 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     description: "Spending against allowances as this month unfolds.",
     defaultVisible: true,
     fixedWindow: true,
+    gallery: gallery(
+      "planning",
+      ["budget", "allowance", "overspending"],
+      ({ budgetTargets }) =>
+        budgetTargets.length > 0 ? "Active allowances need a pace check" : null,
+    ),
     ...legacy("pace"),
   },
   {
@@ -159,6 +183,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     description: "The latest approved entries across the ledger.",
     defaultVisible: true,
     fixedWindow: true,
+    gallery: gallery("analysis", ["transaction", "entry", "activity", "ledger"]),
     ...legacy("recent"),
     ...compact(loadRecentCompact),
   },
@@ -167,6 +192,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Saved this period",
     description: "Income left after expenses in the selected period.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["income", "expense", "savings", "kept"]),
     ...legacy("saved"),
   },
   {
@@ -175,6 +201,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     description: "Income, spending, savings rate, and ending balance at a glance.",
     defaultVisible: true,
     bare: true,
+    gallery: gallery("analysis", ["summary", "income", "spending", "balance"]),
     ...legacy("kpis"),
   },
   {
@@ -182,6 +209,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Money flow",
     description: "How income moved through categories and into savings.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["income", "expense", "savings", "sankey"]),
     ...legacy("flow"),
   },
   {
@@ -189,6 +217,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Spending calendar",
     description: "Daily spending rhythm across the latest eight weeks.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["daily", "spending", "heatmap", "calendar"]),
     ...legacy("calendar"),
   },
   {
@@ -196,6 +225,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Where it went",
     description: "Income and expenses by category, with recent trends.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["category", "breakdown", "doughnut"]),
     ...legacy("breakdown"),
   },
   {
@@ -203,6 +233,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Top payees",
     description: "The largest destinations for spending in the selected period.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["merchant", "vendor", "payee", "spending"]),
     ...legacy("payees"),
   },
   {
@@ -211,6 +242,14 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     description: "Recurring income and bills due in the next 30 days.",
     defaultVisible: true,
     fixedWindow: true,
+    gallery: gallery(
+      "planning",
+      ["bill", "subscription", "recurring", "paycheck", "scheduled"],
+      ({ recurringRules }) =>
+        recurringRules.some((rule) => rule.status !== "cancelled")
+          ? "Scheduled money is ready to review"
+          : null,
+    ),
     ...legacy("upcoming"),
   },
   {
@@ -218,6 +257,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Largest entries",
     description: "The highest-value entries in the selected period.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["transaction", "purchase", "largest"]),
     ...legacy("largest"),
   },
   {
@@ -225,6 +265,18 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Goals",
     description: "Progress and monthly asks for active goals.",
     defaultVisible: true,
+    gallery: gallery(
+      "planning",
+      ["goal", "target", "deadline", "saving"],
+      ({ goals }) => {
+        const count = goals.filter(
+          (goal) => goal.status === "active" && !goal.is_archived,
+        ).length;
+        return count > 0
+          ? `${count} active ${count === 1 ? "goal" : "goals"}; see pace and dates`
+          : null;
+      },
+    ),
     ...legacy("goals"),
   },
   {
@@ -232,6 +284,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Month by month",
     description: "Income, expenses, savings, and budget over time.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["monthly", "trend", "budget", "history"]),
     ...legacy("monthly"),
   },
   {
@@ -239,6 +292,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Income → expenses → savings",
     description: "How the period's income became spending and savings.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["income", "expense", "savings", "waterfall"]),
     ...legacy("waterfall"),
   },
   {
@@ -246,6 +300,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Category over time",
     description: "One category's monthly spending against its budget.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["category", "budget", "history", "trend"]),
     ...legacy("trend"),
   },
   {
@@ -253,6 +308,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Container flows",
     description: "Money transferred into and out of each container.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["container", "account", "transfer", "flow"]),
     ...legacy("flows"),
   },
   {
@@ -260,6 +316,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Investments",
     description: "Value, contributions, and gain or loss for each investment.",
     defaultVisible: true,
+    gallery: gallery("analysis", ["investment", "value", "return", "snapshot"]),
     ...legacy("investments"),
   },
   {
@@ -267,6 +324,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Budget comparison",
     description: "Average spending against allowances by category.",
     defaultVisible: true,
+    gallery: gallery("planning", ["budget", "allowance", "category", "average"]),
     ...legacy("budgets"),
   },
 ];

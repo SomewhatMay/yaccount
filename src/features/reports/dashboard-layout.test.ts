@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SETTING, type Setting } from "@/core/model";
 import type { WidgetDef } from "./registry";
 import {
+  addDashboardWidgetInstance,
   DASHBOARD_DEFAULT_KEY,
   DASHBOARD_ITEM_PREFIX,
   OVERVIEW_DASHBOARD_ID,
@@ -262,6 +263,52 @@ describe("dashboard layout editing", () => {
     expect(setWidgetVisible(initial, "balance", false)).toBe(initial);
     expect(setWidgetSize(initial, "pace", "compact").sizes.pace).toBe("compact");
     expect(setWidgetSize(initial, "balance", "compact")).toBe(initial);
+  });
+});
+
+describe("configured widget instances", () => {
+  it("does not seed repeatable widgets before their subject is configured", () => {
+    const watch = {
+      ...defs("watch-container")[0],
+      gallery: {
+        group: "watch" as const,
+        terms: ["account"],
+        repeatable: true,
+        subject: "container" as const,
+      },
+    };
+
+    expect(
+      defaultDashboardDefinition([...widgets, watch]).instances.map(
+        (instance) => instance.widgetType,
+      ),
+    ).not.toContain("watch-container");
+  });
+
+  it("appends repeatable instances with stable unique subjects and settings", () => {
+    const dashboard = defaultDashboardDefinition(widgets);
+    const ids = ["balance", "watch-2"];
+
+    const next = addDashboardWidgetInstance(
+      dashboard,
+      "watch-container",
+      {
+        size: "compact",
+        subject: { type: "container", id: "general" },
+        settings: { floor: 25000 },
+      },
+      () => ids.shift()!,
+    );
+
+    expect(next.instances.at(-1)).toEqual({
+      instanceId: "watch-2",
+      widgetType: "watch-container",
+      size: "compact",
+      hidden: false,
+      subject: { type: "container", id: "general" },
+      settings: { floor: 25000 },
+    });
+    expect(dashboard.instances).toHaveLength(4);
   });
 });
 

@@ -47,6 +47,17 @@ describe("the dashboard widget registry", () => {
     }
   });
 
+  it("gives every addable widget a user-question group and recognition terms", () => {
+    for (const widget of DASHBOARD_WIDGETS.filter(
+      (candidate) => candidate.id !== "balance",
+    )) {
+      expect(widget.gallery?.group, `${widget.id} needs a gallery group`).toMatch(
+        /^(planning|forecasts|watch|analysis)$/,
+      );
+      expect(widget.gallery?.terms, `${widget.id} needs recognition terms`).toBeDefined();
+    }
+  });
+
   it("ships every widget visible — M11 folds them, it does not hide them", () => {
     expect(DASHBOARD_WIDGETS.every((w) => w.defaultVisible)).toBe(true);
   });
