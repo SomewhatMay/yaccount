@@ -41,6 +41,7 @@ describe("the dashboard widget registry", () => {
   it("gives every widget something to render and a name to render it under", () => {
     for (const w of DASHBOARD_WIDGETS) {
       expect(w.title.trim(), `${w.id} needs a title`).not.toBe("");
+      expect(w.description.trim(), `${w.id} needs a description`).not.toBe("");
       expect(typeof w.render, `${w.id} needs a render`).toBe("function");
     }
   });

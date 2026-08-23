@@ -6,13 +6,8 @@ import { isCalendarDate } from "@/core/model/primitives";
 import { useLocalPref } from "@/features/prefs";
 
 /**
- * The reporting period, remembered between visits (§6.1, M11).
- *
- * Until now the period reset to "Last 3 months" on every refresh — you chose a
- * window, reloaded, and were quietly looking at a different one. It is a view
- * preference, not a fact about your money, so it lives in localStorage per device
- * like every other one (`prefs.ts`), never in the op log: a phone must not decide
- * how a laptop reads its own dashboard.
+ * Reporting periods are browser-local display state (§6.1). They persist through
+ * `prefs.ts` and never enter the synced op log.
  *
  * `useLocalPref` stores strings, so a period is encoded as one — `p:<preset>` or
  * `c:<start>:<end>`. Decoding is strict on purpose: an unknown preset or a

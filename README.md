@@ -17,7 +17,8 @@ Feature-complete and deployed. Milestones M0–M9 and M11 are shipped, along wit
 quality passes (mobile toasts, ledger notes, the FAB money mark and hold chooser, Settings data
 tools, GitHub Pages delivery). Work continues as user-scoped quality-of-life improvements.
 
-Dashboard widgets can be reordered or hidden per device from Home's Customize sheet. Overall
+Home's dashboard edits in place: drag cards to reorder, hide them from the card controls, and
+restore them from the descriptive widget gallery. Layouts sync across connected devices. Overall
 balance stays visible and first.
 
 **Deferred by explicit decision — do not start without a go-ahead:**

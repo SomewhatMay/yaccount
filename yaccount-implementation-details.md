@@ -224,8 +224,8 @@ See spec §3 for the durable-grant model and why the web flow has no refresh tok
   `RowActions`; lists are date-grouped register rows; feedback is `sonner`; soft rules are inline
   arm-then-confirm, never `window.confirm`; a no-undo destructive act uses `ConfirmDestructive`.
 - **State** — new persisted-data atoms go in `src/features/store.ts` and must be refreshed in
-  `refreshAtom`. Device-local view preferences go through `prefs.ts` / `useLocalPref`, never into
-  the op log.
+  `refreshAtom`. Account-wide preferences use synced settings. Browser-local display state goes
+  through `prefs.ts` / `useLocalPref`.
 
 **Add UI components with `npx shadcn@latest add <name>`**, and reach for one before hand-rolling.
 
@@ -334,5 +334,4 @@ history.
 ## 12. Deferred
 
 See spec §8 for the full list. **M10 Capacitor native packaging** remains deferred by explicit
-user decision. Dashboard widget order and visibility are device-local preferences layered over
-the stable-id registry.
+user decision.

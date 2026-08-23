@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
+import { setSetting } from "@/core/commands";
+import { SETTING } from "@/core/model";
+import { dispatchAtom, settingsAtom } from "@/features/store";
 import { useLocalPref } from "@/features/prefs";
 import {
-  DASHBOARD_LAYOUT_KEY,
+  DASHBOARD_LAYOUT_FALLBACK_KEY,
   defaultDashboardLayout,
   encodeDashboardLayout,
   isDashboardLayoutPref,
@@ -17,17 +21,26 @@ const DEFAULT_LAYOUT_PREF = encodeDashboardLayout(DEFAULT_LAYOUT);
 
 export function useDashboardLayout(): [
   DashboardLayout,
-  (layout: DashboardLayout) => void,
+  (layout: DashboardLayout) => Promise<void>,
 ] {
-  const [raw, setRaw] = useLocalPref(
-    DASHBOARD_LAYOUT_KEY,
+  const settings = useAtomValue(settingsAtom);
+  const dispatch = useSetAtom(dispatchAtom);
+  // The browser value is a migration fallback only. A synced setting is the
+  // authoritative source, and every new write goes through the op journal.
+  const [browserRaw] = useLocalPref(
+    DASHBOARD_LAYOUT_FALLBACK_KEY,
     DEFAULT_LAYOUT_PREF,
     isDashboardLayoutPref,
   );
+  const syncedRaw = settings.find(
+    (setting) => setting.key === SETTING.dashboardLayout,
+  )?.value;
+  const raw = syncedRaw ?? browserRaw;
   const layout = useMemo(() => resolveDashboardLayout(raw, DASHBOARD_WIDGETS), [raw]);
   const setLayout = useCallback(
-    (next: DashboardLayout) => setRaw(encodeDashboardLayout(next)),
-    [setRaw],
+    (next: DashboardLayout) =>
+      dispatch(setSetting(SETTING.dashboardLayout, encodeDashboardLayout(next))),
+    [dispatch],
   );
   return [layout, setLayout];
 }

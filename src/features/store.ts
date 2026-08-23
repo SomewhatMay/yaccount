@@ -137,12 +137,9 @@ export const flashRowAtom = atom(
 );
 
 /**
- * The reporting period (§6.1) used to live here as two plain atoms, which meant
- * it reset on every refresh — you chose a window, reloaded, and were quietly
- * looking at a different one. It is a device-local VIEW preference, so M11 moved
- * it to `features/reports/period-pref.ts` over `prefs.ts` (localStorage,
- * `useSyncExternalStore`) alongside the per-widget overrides and folds, which are
- * keyed the same way. Nothing about a period belongs in the synced op log.
+ * Reporting periods, per-widget overrides, and folds are browser-local display
+ * state in `features/reports/period-pref.ts` and `prefs.ts`. Dashboard order and
+ * visibility use a synced setting.
  */
 
 let repoPromise: Promise<Repo> | null = null;

@@ -1,6 +1,6 @@
 import type { WidgetDef } from "./registry";
 
-export const DASHBOARD_LAYOUT_KEY = "yaccount.dashboard.layout";
+export const DASHBOARD_LAYOUT_FALLBACK_KEY = "yaccount.dashboard.layout";
 export const PINNED_WIDGET_ID = "balance";
 
 export interface DashboardLayout {
