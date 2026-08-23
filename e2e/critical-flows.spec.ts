@@ -397,6 +397,67 @@ test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
   );
 });
 
+test("manages named dashboard sets and keeps the active set local", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await expect(
+    page.getByRole("button", { name: "Overview", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+
+  await page.getByRole("button", { name: "Add dashboard" }).click();
+  await expect(page.getByRole("heading", { name: "Add dashboard" })).toBeVisible();
+  await page.getByLabel("Name").fill("Quarterly planning");
+  await page.getByRole("radio", { name: /^Empty/ }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+
+  const quarterlyTab = page.getByRole("button", {
+    name: "Quarterly planning",
+    exact: true,
+  });
+  await expect(quarterlyTab).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("Overall balance", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Budget pace" })).toHaveCount(0);
+
+  await page.reload();
+  await expect(quarterlyTab).toHaveAttribute("aria-current", "page");
+
+  await page.getByRole("button", { name: "Manage dashboards" }).click();
+  const manager = page.getByRole("dialog", { name: "Your dashboards" });
+  await manager.getByRole("button", { name: "Actions for Quarterly planning" }).click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  await page
+    .getByRole("dialog", { name: "Rename dashboard" })
+    .getByLabel("Name")
+    .fill("Focus");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(manager.getByText("Focus", { exact: true })).toBeVisible();
+
+  await manager.getByRole("button", { name: "Actions for Focus", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Duplicate" }).click();
+  await expect(manager.getByText("Focus copy", { exact: true })).toBeVisible();
+  await manager.getByRole("button", { name: "Move Focus copy up" }).click();
+  await manager.getByRole("button", { name: "Actions for Focus copy" }).click();
+  await page.getByRole("menuitem", { name: "Make default" }).click();
+  await expect(manager.getByText("Default", { exact: true })).toHaveCount(1);
+
+  await manager.getByRole("button", { name: "Actions for Focus", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page.getByRole("button", { name: "Delete dashboard" }).click();
+  await expect(manager.getByText("Focus", { exact: true })).toHaveCount(0);
+
+  await manager.getByRole("button", { name: "Actions for Overview" }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page.getByRole("button", { name: "Delete dashboard" }).click();
+  await expect(manager.getByText("Overview", { exact: true })).toHaveCount(0);
+
+  await manager.getByRole("button", { name: "Actions for Focus copy" }).click();
+  await expect(page.getByRole("menuitem", { name: "Delete" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await manager.getByRole("button", { name: "Close" }).click();
+  await expect(
+    page.getByRole("button", { name: "Focus copy", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
 test("logs an expense and shows it in the ledger", async ({ page }) => {
   await createCategory(page, "E2E groceries");
   await openReady(page, "/ledger", "Overall balance");

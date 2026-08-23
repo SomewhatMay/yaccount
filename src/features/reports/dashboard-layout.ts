@@ -61,6 +61,14 @@ export interface DashboardState {
   defaultDashboardId: string;
 }
 
+export type DashboardStarter = "planning" | "trends" | "current" | "empty";
+
+const STARTER_WIDGET_TYPES: Record<Exclude<DashboardStarter, "current">, string[]> = {
+  planning: ["balance", "pace", "upcoming", "goals", "budgets"],
+  trends: ["balance", "saved", "kpis", "monthly", "trend", "investments"],
+  empty: ["balance"],
+};
+
 function defaultInstance(widget: WidgetDef): DashboardWidgetInstance {
   return {
     instanceId: widget.id,
@@ -68,6 +76,25 @@ function defaultInstance(widget: WidgetDef): DashboardWidgetInstance {
     size: "expanded",
     hidden: !widget.defaultVisible && widget.id !== PINNED_WIDGET_ID,
   };
+}
+
+function withPinnedBalance(
+  dashboard: DashboardDefinition,
+  widgets: readonly WidgetDef[],
+): DashboardDefinition {
+  if (dashboard.instances.some((instance) => instance.widgetType === PINNED_WIDGET_ID)) {
+    return dashboard;
+  }
+  const widget = widgets.find((candidate) => candidate.id === PINNED_WIDGET_ID);
+  if (!widget) return dashboard;
+  const instance = defaultInstance(widget);
+  const usedIds = new Set(dashboard.instances.map((candidate) => candidate.instanceId));
+  let suffix = 0;
+  while (usedIds.has(instance.instanceId)) {
+    suffix += 1;
+    instance.instanceId = `${PINNED_WIDGET_ID}:${suffix}`;
+  }
+  return { ...dashboard, instances: [instance, ...dashboard.instances] };
 }
 
 export function defaultDashboardDefinition(
@@ -81,6 +108,85 @@ export function defaultDashboardDefinition(
     isDeleted: false,
     instances: widgets.map(defaultInstance),
   };
+}
+
+export function createDashboardDefinition({
+  id,
+  name,
+  rank,
+  starter,
+  current,
+  widgets,
+  makeId,
+}: {
+  id: string;
+  name: string;
+  rank: number;
+  starter: DashboardStarter;
+  current: DashboardDefinition;
+  widgets: readonly WidgetDef[];
+  makeId: () => string;
+}): DashboardDefinition {
+  const byType = new Map(widgets.map((widget) => [widget.id, widget]));
+  const source =
+    starter === "current"
+      ? current.instances
+      : STARTER_WIDGET_TYPES[starter].flatMap((widgetType) => {
+          const widget = byType.get(widgetType);
+          return widget ? [{ ...defaultInstance(widget), hidden: false }] : [];
+        });
+  const draft = DashboardDefinitionSchema.parse({
+    version: 2,
+    id,
+    name: name.trim(),
+    rank,
+    isDeleted: false,
+    instances: source,
+  });
+  const pinned = withPinnedBalance(draft, widgets);
+  return DashboardDefinitionSchema.parse({
+    ...pinned,
+    instances: pinned.instances.map((instance) => ({
+      ...instance,
+      instanceId: makeId(),
+    })),
+  });
+}
+
+export function renameDashboard(
+  dashboard: DashboardDefinition,
+  name: string,
+): DashboardDefinition {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("dashboard name is required");
+  return { ...dashboard, name: trimmed };
+}
+
+export function reorderDashboards(
+  dashboards: readonly DashboardDefinition[],
+  activeId: string,
+  overId: string,
+): DashboardDefinition[] {
+  if (activeId === overId) return [...dashboards];
+  const ordered = [...dashboards].sort(
+    (a, b) => a.rank - b.rank || a.id.localeCompare(b.id),
+  );
+  const from = ordered.findIndex((dashboard) => dashboard.id === activeId);
+  const to = ordered.findIndex((dashboard) => dashboard.id === overId);
+  if (from < 0 || to < 0) return ordered;
+  ordered.splice(to, 0, ordered.splice(from, 1)[0]);
+  return ordered.map((dashboard, rank) => ({ ...dashboard, rank }));
+}
+
+export function tombstoneDashboard(
+  dashboards: readonly DashboardDefinition[],
+  id: string,
+): DashboardDefinition {
+  const active = dashboards.filter((dashboard) => !dashboard.isDeleted);
+  if (active.length <= 1) throw new Error("cannot delete the last dashboard");
+  const target = active.find((dashboard) => dashboard.id === id);
+  if (!target) throw new Error("dashboard not found");
+  return { ...target, isDeleted: true };
 }
 
 export function dashboardItemKey(id: string): string {
@@ -102,21 +208,6 @@ export function encodeDashboardDefinition(dashboard: DashboardDefinition): strin
   return JSON.stringify(DashboardDefinitionSchema.parse(dashboard));
 }
 
-function withNewRegistryWidgets(
-  dashboard: DashboardDefinition,
-  widgets: readonly WidgetDef[],
-): DashboardDefinition {
-  const existingTypes = new Set(
-    dashboard.instances.map((instance) => instance.widgetType),
-  );
-  const additions = widgets
-    .filter((widget) => !existingTypes.has(widget.id))
-    .map(defaultInstance);
-  return additions.length === 0
-    ? dashboard
-    : { ...dashboard, instances: [...dashboard.instances, ...additions] };
-}
-
 /** Resolve active dashboard records from independent setting keys. */
 export function resolveDashboardState(
   settings: readonly Setting[],
@@ -129,7 +220,7 @@ export function resolveDashboardState(
     if (!keyId) continue;
     const dashboard = decodeDashboardDefinition(setting.value);
     if (!dashboard || dashboard.id !== keyId || dashboard.isDeleted) continue;
-    dashboards.push(withNewRegistryWidgets(dashboard, widgets));
+    dashboards.push(withPinnedBalance(dashboard, widgets));
   }
 
   dashboards.sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id));
@@ -151,11 +242,25 @@ export function resolveDashboardState(
   };
 }
 
-function managedInstance(
-  instance: DashboardWidgetInstance,
+function managedInstanceIds(
+  dashboard: DashboardDefinition,
   known: ReadonlySet<string>,
-): boolean {
-  return known.has(instance.widgetType) && instance.instanceId === instance.widgetType;
+): ReadonlySet<string> {
+  const byType = new Map<string, DashboardWidgetInstance[]>();
+  for (const instance of dashboard.instances) {
+    if (!known.has(instance.widgetType)) continue;
+    const existing = byType.get(instance.widgetType) ?? [];
+    existing.push(instance);
+    byType.set(instance.widgetType, existing);
+  }
+  const managed = new Set<string>();
+  for (const [widgetType, instances] of byType) {
+    const instance =
+      instances.find((candidate) => candidate.instanceId === widgetType) ??
+      (instances.length === 1 ? instances[0] : null);
+    if (instance) managed.add(instance.instanceId);
+  }
+  return managed;
 }
 
 /** Temporary adapter for the current one-instance-per-widget editor. */
@@ -163,10 +268,11 @@ export function layoutFromDashboard(
   dashboard: DashboardDefinition,
   widgets: readonly WidgetDef[],
 ): DashboardLayout {
-  const complete = withNewRegistryWidgets(dashboard, widgets);
+  dashboard = withPinnedBalance(dashboard, widgets);
   const known = new Set(widgets.map((widget) => widget.id));
-  const instances = complete.instances.filter((instance) =>
-    managedInstance(instance, known),
+  const managed = managedInstanceIds(dashboard, known);
+  const instances = dashboard.instances.filter((instance) =>
+    managed.has(instance.instanceId),
   );
   const ids = instances.map((instance) => instance.widgetType);
   const order = ids.includes(PINNED_WIDGET_ID)
@@ -186,11 +292,12 @@ export function applyDashboardLayout(
   layout: DashboardLayout,
   widgets: readonly WidgetDef[],
 ): DashboardDefinition {
-  const complete = withNewRegistryWidgets(dashboard, widgets);
+  dashboard = withPinnedBalance(dashboard, widgets);
   const known = new Set(widgets.map((widget) => widget.id));
+  const managedIds = managedInstanceIds(dashboard, known);
   const managed = new Map(
-    complete.instances
-      .filter((instance) => managedInstance(instance, known))
+    dashboard.instances
+      .filter((instance) => managedIds.has(instance.instanceId))
       .map((instance) => [instance.widgetType, instance]),
   );
   const hidden = new Set(layout.hidden);
@@ -206,13 +313,13 @@ export function applyDashboardLayout(
   });
 
   let nextManaged = 0;
-  const instances = complete.instances.flatMap((instance) => {
-    if (!managedInstance(instance, known)) return [instance];
+  const instances = dashboard.instances.flatMap((instance) => {
+    if (!managedIds.has(instance.instanceId)) return [instance];
     const replacement = reordered[nextManaged++];
     return replacement ? [replacement] : [];
   });
   instances.push(...reordered.slice(nextManaged));
-  return { ...complete, instances };
+  return { ...dashboard, instances };
 }
 
 export function defaultDashboardLayout(widgets: readonly WidgetDef[]): DashboardLayout {

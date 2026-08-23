@@ -10,13 +10,15 @@ import {
   defaultDashboardDefinition,
   defaultDashboardLayout,
   encodeDashboardDefinition,
+  type DashboardDefinition,
   type DashboardLayout,
 } from "./dashboard-layout";
-import { useDashboardLayout } from "./use-dashboard-layout";
+import { useDashboardSets } from "./use-dashboard-layout";
 
 const fixture = vi.hoisted(() => ({
   settings: [] as { key: string; value: string }[],
-  legacyPref: vi.fn(),
+  activeId: "",
+  setActive: vi.fn(),
   dispatch: vi.fn(),
 }));
 
@@ -36,12 +38,11 @@ vi.mock("jotai", () => ({
 
 vi.mock("@/features/store", () => ({
   settingsAtom: "settings",
-  dispatchAtom: "legacy-dispatch",
   dispatchManyAtom: "dispatch-many",
 }));
 
 vi.mock("@/features/prefs", () => ({
-  useLocalPref: fixture.legacyPref,
+  useLocalPref: () => [fixture.activeId, fixture.setActive],
 }));
 
 const fallback = defaultDashboardLayout(DASHBOARD_WIDGETS);
@@ -58,97 +59,104 @@ function moveRecentBeforePace(layout: DashboardLayout): DashboardLayout {
   };
 }
 
-function encodeLegacyLayout(layout: DashboardLayout): string {
-  return JSON.stringify({ version: 1, ...layout });
+function storedDashboard(
+  layout: DashboardLayout,
+  fields: Partial<DashboardDefinition> = {},
+): DashboardDefinition {
+  return {
+    ...applyDashboardLayout(
+      defaultDashboardDefinition(DASHBOARD_WIDGETS),
+      layout,
+      DASHBOARD_WIDGETS,
+    ),
+    ...fields,
+  };
 }
 
-function storedDashboard(layout: DashboardLayout) {
-  return applyDashboardLayout(
-    defaultDashboardDefinition(DASHBOARD_WIDGETS),
-    layout,
-    DASHBOARD_WIDGETS,
-  );
+function settingsFor(...dashboards: DashboardDefinition[]) {
+  return [
+    { key: DASHBOARD_DEFAULT_KEY, value: dashboards[0].id },
+    ...dashboards.map((dashboard) => ({
+      key: dashboardItemKey(dashboard.id),
+      value: encodeDashboardDefinition(dashboard),
+    })),
+  ];
 }
 
-describe("useDashboardLayout", () => {
+function dispatchedOps() {
+  return fixture.dispatch.mock.calls.at(-1)?.[0] as {
+    type: string;
+    payload: { row: { key: string; value: string } };
+  }[];
+}
+
+describe("useDashboardSets", () => {
   beforeEach(() => {
     fixture.settings = [];
-    fixture.legacyPref
-      .mockReset()
-      .mockReturnValue([encodeLegacyLayout(moveRecentBeforePace(fallback)), vi.fn()]);
+    fixture.activeId = "";
+    fixture.setActive.mockReset();
     fixture.dispatch.mockReset().mockResolvedValue(undefined);
   });
 
-  it("reads the default dashboard from independent v2 settings", () => {
-    const synced = moveRecentBeforePace(fallback);
-    const dashboard = storedDashboard(synced);
-    fixture.settings = [
-      { key: DASHBOARD_DEFAULT_KEY, value: OVERVIEW_DASHBOARD_ID },
-      {
-        key: dashboardItemKey(OVERVIEW_DASHBOARD_ID),
-        value: encodeDashboardDefinition(dashboard),
-      },
-    ];
-
-    const [layout] = useDashboardLayout();
-
-    expect(layout).toEqual(synced);
-  });
-
-  it("ignores synced and browser-local v1 layouts", () => {
-    fixture.settings = [
-      {
-        key: SETTING.dashboardLayout,
-        value: encodeLegacyLayout(moveRecentBeforePace(fallback)),
-      },
-    ];
-
-    const [layout] = useDashboardLayout();
-
-    expect(layout).toEqual(fallback);
-    expect(fixture.legacyPref).not.toHaveBeenCalled();
-  });
-
-  it("saves only the active dashboard item and default", async () => {
-    const next = moveRecentBeforePace(fallback);
-    const overview = defaultDashboardDefinition(DASHBOARD_WIDGETS);
-    const planning = {
-      ...overview,
+  it("opens the browser-local active dashboard", () => {
+    const overview = storedDashboard(fallback);
+    const planning = storedDashboard(moveRecentBeforePace(fallback), {
       id: "planning",
       name: "Planning",
       rank: 1,
-    };
+    });
+    fixture.settings = settingsFor(overview, planning);
+    fixture.activeId = planning.id;
+
+    const sets = useDashboardSets();
+
+    expect(sets.activeDashboard.id).toBe(planning.id);
+    expect(sets.layout).toEqual(moveRecentBeforePace(fallback));
+  });
+
+  it("falls back to the synced default when the local id is missing", () => {
+    const overview = storedDashboard(fallback);
+    const planning = storedDashboard(moveRecentBeforePace(fallback), {
+      id: "planning",
+      name: "Planning",
+      rank: 1,
+    });
+    fixture.settings = settingsFor(planning, overview);
+    fixture.activeId = "deleted-dashboard";
+
+    expect(useDashboardSets().activeDashboard.id).toBe(planning.id);
+  });
+
+  it("ignores synced v1 and resolves the deterministic Overview", () => {
     fixture.settings = [
-      { key: DASHBOARD_DEFAULT_KEY, value: OVERVIEW_DASHBOARD_ID },
       {
-        key: dashboardItemKey(overview.id),
-        value: encodeDashboardDefinition(overview),
-      },
-      {
-        key: dashboardItemKey(planning.id),
-        value: encodeDashboardDefinition(planning),
+        key: SETTING.dashboardLayout,
+        value: JSON.stringify({ version: 1, ...moveRecentBeforePace(fallback) }),
       },
     ];
 
-    const [, setLayout] = useDashboardLayout();
-    await setLayout(next);
+    const sets = useDashboardSets();
 
-    const ops = fixture.dispatch.mock.calls[0][0] as {
-      type: string;
-      payload: { row: { key: string; value: string } };
-    }[];
-    expect(ops.map((op) => op.type)).toEqual(["setting.set", "setting.set"]);
-    expect(ops.map((op) => op.payload.row.key)).toEqual([
+    expect(sets.activeDashboard.id).toBe(OVERVIEW_DASHBOARD_ID);
+    expect(sets.layout).toEqual(fallback);
+  });
+
+  it("first layout save writes Overview plus separate default metadata", async () => {
+    const sets = useDashboardSets();
+    const next = moveRecentBeforePace(fallback);
+
+    await sets.saveLayout(next);
+
+    expect(dispatchedOps().map((op) => op.payload.row.key)).toEqual([
       dashboardItemKey(OVERVIEW_DASHBOARD_ID),
       DASHBOARD_DEFAULT_KEY,
     ]);
-    expect(decodeDashboardDefinition(ops[0].payload.row.value)).toEqual(
+    expect(decodeDashboardDefinition(dispatchedOps()[0].payload.row.value)).toEqual(
       storedDashboard(next),
     );
-    expect(ops[1].payload.row.value).toBe(OVERVIEW_DASHBOARD_ID);
   });
 
-  it("preserves an unknown widget instance on save", async () => {
+  it("saves only the active dashboard and preserves unknown instances", async () => {
     const unknown = {
       instanceId: "future-1",
       widgetType: "future-widget",
@@ -156,31 +164,135 @@ describe("useDashboardLayout", () => {
       hidden: false,
       settings: { future: true },
     };
-    const dashboard = {
-      ...defaultDashboardDefinition(DASHBOARD_WIDGETS),
-      instances: [...defaultDashboardDefinition(DASHBOARD_WIDGETS).instances, unknown],
+    const overview = storedDashboard(fallback);
+    const planning = {
+      ...storedDashboard(fallback, { id: "planning", name: "Planning", rank: 1 }),
+      instances: [...storedDashboard(fallback).instances, unknown],
     };
-    fixture.settings = [
-      { key: DASHBOARD_DEFAULT_KEY, value: OVERVIEW_DASHBOARD_ID },
-      {
-        key: dashboardItemKey(OVERVIEW_DASHBOARD_ID),
-        value: encodeDashboardDefinition(dashboard),
-      },
-    ];
+    fixture.settings = settingsFor(overview, planning);
+    fixture.activeId = planning.id;
 
-    const [layout, setLayout] = useDashboardLayout();
-    await setLayout(setWidgetHidden(layout, "pace"));
+    const sets = useDashboardSets();
+    await sets.saveLayout({ ...sets.layout, hidden: ["pace"] });
 
-    const ops = fixture.dispatch.mock.calls[0][0] as {
-      payload: { row: { key: string; value: string } };
-    }[];
-    const saved = decodeDashboardDefinition(ops[0].payload.row.value);
+    expect(dispatchedOps().map((op) => op.payload.row.key)).toEqual([
+      dashboardItemKey(planning.id),
+    ]);
     expect(
-      saved?.instances.find((instance) => instance.instanceId === unknown.instanceId),
+      decodeDashboardDefinition(dispatchedOps()[0].payload.row.value)?.instances.find(
+        (instance) => instance.instanceId === unknown.instanceId,
+      ),
     ).toEqual(unknown);
   });
-});
 
-function setWidgetHidden(layout: DashboardLayout, id: string): DashboardLayout {
-  return { ...layout, hidden: [...layout.hidden, id] };
-}
+  it("creates a starter while materializing the fallback Overview", async () => {
+    await useDashboardSets().createDashboard("Quarterly planning", "planning");
+
+    const ops = dispatchedOps();
+    expect(ops.map((op) => op.payload.row.key)).toEqual([
+      dashboardItemKey(OVERVIEW_DASHBOARD_ID),
+      expect.stringMatching(/^dashboard\.v2\.item\./),
+      DASHBOARD_DEFAULT_KEY,
+    ]);
+    const created = decodeDashboardDefinition(ops[1].payload.row.value)!;
+    expect(created.name).toBe("Quarterly planning");
+    expect(created.instances.map((instance) => instance.widgetType)).toEqual([
+      "balance",
+      "pace",
+      "upcoming",
+      "goals",
+      "budgets",
+    ]);
+    expect(fixture.setActive).toHaveBeenCalledWith(created.id);
+  });
+
+  it("appends a created dashboard after sparse synced ranks", async () => {
+    const overview = storedDashboard(fallback);
+    const planning = storedDashboard(fallback, {
+      id: "planning",
+      name: "Planning",
+      rank: 10,
+    });
+    fixture.settings = settingsFor(overview, planning);
+
+    await useDashboardSets().createDashboard("Last", "empty");
+
+    expect(decodeDashboardDefinition(dispatchedOps()[0].payload.row.value)?.rank).toBe(
+      11,
+    );
+  });
+
+  it("renames and duplicates with independent instance ids", async () => {
+    const overview = storedDashboard(fallback);
+    fixture.settings = settingsFor(overview);
+    const sets = useDashboardSets();
+
+    await sets.renameDashboard(overview.id, "My overview");
+    expect(decodeDashboardDefinition(dispatchedOps()[0].payload.row.value)?.name).toBe(
+      "My overview",
+    );
+
+    await sets.duplicateDashboard(overview.id);
+    const duplicate = decodeDashboardDefinition(dispatchedOps()[0].payload.row.value)!;
+    expect(duplicate.id).not.toBe(overview.id);
+    expect(duplicate.name).toBe("Overview copy");
+    expect(duplicate.instances.map((instance) => instance.instanceId)).not.toEqual(
+      overview.instances.map((instance) => instance.instanceId),
+    );
+    expect(fixture.setActive).toHaveBeenCalledWith(duplicate.id);
+  });
+
+  it("reorders, changes default, and protects the last dashboard", async () => {
+    const overview = storedDashboard(fallback);
+    const planning = storedDashboard(fallback, {
+      id: "planning",
+      name: "Planning",
+      rank: 1,
+    });
+    fixture.settings = settingsFor(overview, planning);
+    const sets = useDashboardSets();
+
+    await sets.reorderDashboard(planning.id, overview.id);
+    expect(
+      dispatchedOps().map((op) => [
+        decodeDashboardDefinition(op.payload.row.value)?.id,
+        decodeDashboardDefinition(op.payload.row.value)?.rank,
+      ]),
+    ).toEqual([
+      [planning.id, 0],
+      [overview.id, 1],
+    ]);
+
+    await sets.makeDefault(planning.id);
+    expect(dispatchedOps()[0].payload.row).toEqual({
+      key: DASHBOARD_DEFAULT_KEY,
+      value: planning.id,
+    });
+
+    fixture.settings = settingsFor(overview);
+    await expect(useDashboardSets().deleteDashboard(overview.id)).rejects.toThrow(
+      "last dashboard",
+    );
+  });
+
+  it("tombstones a dashboard and repairs default and local active selection", async () => {
+    const overview = storedDashboard(fallback);
+    const planning = storedDashboard(fallback, {
+      id: "planning",
+      name: "Planning",
+      rank: 1,
+    });
+    fixture.settings = settingsFor(overview, planning);
+    fixture.activeId = overview.id;
+
+    await useDashboardSets().deleteDashboard(overview.id);
+
+    const ops = dispatchedOps();
+    expect(decodeDashboardDefinition(ops[0].payload.row.value)?.isDeleted).toBe(true);
+    expect(ops[1].payload.row).toEqual({
+      key: DASHBOARD_DEFAULT_KEY,
+      value: planning.id,
+    });
+    expect(fixture.setActive).toHaveBeenCalledWith(planning.id);
+  });
+});

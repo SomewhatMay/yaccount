@@ -6,15 +6,19 @@ import {
   DASHBOARD_ITEM_PREFIX,
   OVERVIEW_DASHBOARD_ID,
   applyDashboardLayout,
+  createDashboardDefinition,
   dashboardItemKey,
   decodeDashboardDefinition,
   defaultDashboardDefinition,
   defaultDashboardLayout,
   encodeDashboardDefinition,
   layoutFromDashboard,
+  renameDashboard,
   reorderDashboardLayout,
+  reorderDashboards,
   resolveDashboardState,
   setWidgetVisible,
+  tombstoneDashboard,
   type DashboardDefinition,
   type DashboardLayout,
 } from "./dashboard-layout";
@@ -179,6 +183,25 @@ describe("dashboard layout v2", () => {
     });
   });
 
+  it("repairs a missing pinned balance without adding other widgets", () => {
+    const planning = {
+      ...defaultDashboardDefinition(widgets),
+      id: "planning",
+      name: "Planning",
+      instances: [defaultDashboardDefinition(widgets).instances[1]],
+    };
+
+    const state = resolveDashboardState(
+      [setting(dashboardItemKey(planning.id), encodeDashboardDefinition(planning))],
+      widgets,
+    );
+
+    expect(state.dashboards[0].instances.map((instance) => instance.widgetType)).toEqual([
+      "balance",
+      "pace",
+    ]);
+  });
+
   it("preserves unknown instances when the current layout is edited", () => {
     const unknown = {
       instanceId: "future-1",
@@ -229,5 +252,107 @@ describe("dashboard layout editing", () => {
     expect(setWidgetVisible(initial, "pace", false).hidden).toEqual(["pace", "later"]);
     expect(setWidgetVisible(initial, "later", true).hidden).toEqual([]);
     expect(setWidgetVisible(initial, "balance", false)).toBe(initial);
+  });
+});
+
+describe("dashboard set lifecycle", () => {
+  const ids = ["dashboard-instance-1", "dashboard-instance-2", "dashboard-instance-3"];
+
+  it("creates a named dashboard from a curated starter", () => {
+    let index = 0;
+    const dashboard = createDashboardDefinition({
+      id: "quarterly",
+      name: "  Quarterly planning  ",
+      rank: 2,
+      starter: "planning",
+      current: defaultDashboardDefinition(widgets),
+      widgets,
+      makeId: () => ids[index++],
+    });
+
+    expect(dashboard).toMatchObject({
+      version: 2,
+      id: "quarterly",
+      name: "Quarterly planning",
+      rank: 2,
+      isDeleted: false,
+    });
+    expect(dashboard.instances.map((instance) => instance.widgetType)).toEqual([
+      "balance",
+      "pace",
+    ]);
+    expect(dashboard.instances.map((instance) => instance.instanceId)).toEqual(
+      ids.slice(0, 2),
+    );
+  });
+
+  it("duplicates current configuration with fresh instance ids", () => {
+    const source: DashboardDefinition = {
+      ...defaultDashboardDefinition(widgets),
+      instances: [
+        {
+          instanceId: "pace-custom",
+          widgetType: "pace",
+          size: "compact",
+          hidden: true,
+          settings: { horizon: 45 },
+        },
+        {
+          instanceId: "future-custom",
+          widgetType: "future-widget",
+          size: "expanded",
+          hidden: false,
+          subject: { type: "container", id: "general" },
+        },
+      ],
+    };
+    let index = 0;
+    const duplicate = createDashboardDefinition({
+      id: "overview-copy",
+      name: "Overview copy",
+      rank: 1,
+      starter: "current",
+      current: source,
+      widgets,
+      makeId: () => ids[index++],
+    });
+
+    expect(duplicate.instances).toEqual([
+      {
+        instanceId: ids[0],
+        widgetType: "balance",
+        size: "expanded",
+        hidden: false,
+      },
+      { ...source.instances[0], instanceId: ids[1] },
+      { ...source.instances[1], instanceId: ids[2] },
+    ]);
+    expect(layoutFromDashboard(duplicate, widgets)).toEqual({
+      order: ["balance", "pace"],
+      hidden: ["pace"],
+    });
+  });
+
+  it("renames, reorders, and tombstones without mutating siblings", () => {
+    const overview = defaultDashboardDefinition(widgets);
+    const planning = { ...overview, id: "planning", name: "Planning", rank: 1 };
+    const trends = { ...overview, id: "trends", name: "Trends", rank: 2 };
+
+    expect(renameDashboard(planning, "  Quarter plan ").name).toBe("Quarter plan");
+    expect(() => renameDashboard(planning, "   ")).toThrow("dashboard name");
+    expect(
+      reorderDashboards([overview, planning, trends], "trends", "overview").map(
+        (dashboard) => [dashboard.id, dashboard.rank],
+      ),
+    ).toEqual([
+      ["trends", 0],
+      ["overview", 1],
+      ["planning", 2],
+    ]);
+    expect(tombstoneDashboard([overview, planning], planning.id)).toEqual({
+      ...planning,
+      isDeleted: true,
+    });
+    expect(() => tombstoneDashboard([overview], overview.id)).toThrow("last dashboard");
   });
 });

@@ -1,8 +1,40 @@
 import { expect, it, vi } from "vitest";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { makeCategory, makeGeneralContainer, makeTransaction } from "@/core/model";
 import { DashboardView } from "./DashboardView";
+import type { WidgetContext, WidgetDef } from "./registry";
 
 const fixture = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
+const dashboardSets = vi.hoisted(() => ({
+  dashboards: [
+    {
+      version: 2 as const,
+      id: "overview",
+      name: "Overview",
+      rank: 0,
+      isDeleted: false,
+      instances: [],
+    },
+  ],
+  activeDashboard: {
+    version: 2 as const,
+    id: "overview",
+    name: "Overview",
+    rank: 0,
+    isDeleted: false,
+    instances: [],
+  },
+  defaultDashboardId: "overview",
+  layout: { order: ["balance", "saved"], hidden: [] },
+  setActiveDashboard: vi.fn(),
+  saveLayout: vi.fn(),
+  createDashboard: vi.fn(),
+  renameDashboard: vi.fn(),
+  duplicateDashboard: vi.fn(),
+  reorderDashboard: vi.fn(),
+  makeDefault: vi.fn(),
+  deleteDashboard: vi.fn(),
+}));
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
@@ -34,11 +66,32 @@ vi.mock("./period-pref", () => ({
 }));
 
 vi.mock("./use-dashboard-layout", () => ({
-  useDashboardLayout: () => [
-    { order: ["balance", "saved"], hidden: [], version: 1 },
-    vi.fn(),
-  ],
+  useDashboardSets: () => dashboardSets,
 }));
+
+function findComponent(
+  node: ReactNode,
+  name: string,
+): ReactElement<Record<string, unknown>> | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findComponent(child, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return null;
+  if (typeof node.type === "function" && node.type.name === name) {
+    return node as ReactElement<Record<string, unknown>>;
+  }
+  return findComponent(node.props.children, name);
+}
+
+function callComponent<P>(element: ReactElement<P>) {
+  return (element.type as (props: P) => ReactElement<Record<string, unknown>>)(
+    element.props,
+  );
+}
 
 it("keeps hidden-from-stats rows in balance while excluding them from reports", () => {
   const included = makeCategory({ id: "included", name: "Included", type: "expense" });
@@ -71,13 +124,22 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.values.set("goals", []);
 
   const dashboard = DashboardView();
-  const columnElement = dashboard.props.children[1];
-  const column = columnElement.type(columnElement.props);
-  const [balanceWidget, savedWidget] = column.props.children;
-  const balanceElement = balanceWidget.props.def.render(balanceWidget.props.base);
-  const savedElement = savedWidget.props.def.render(savedWidget.props.base);
-  const balanceFigure = balanceElement.type(balanceElement.props);
-  const savedFigure = savedElement.type(savedElement.props);
+  const setBar = findComponent(dashboard, "DashboardSetBar")!;
+  expect(setBar.props.activeId).toBe("overview");
+  const columnElement = findComponent(dashboard, "WidgetColumn")!;
+  const column = callComponent(columnElement);
+  const [balanceWidget, savedWidget] = column.props.children as ReactElement<{
+    def: WidgetDef;
+    base: WidgetContext;
+  }>[];
+  const balanceElement = balanceWidget.props.def.render(
+    balanceWidget.props.base,
+  ) as ReactElement;
+  const savedElement = savedWidget.props.def.render(
+    savedWidget.props.base,
+  ) as ReactElement;
+  const balanceFigure = callComponent(balanceElement);
+  const savedFigure = callComponent(savedElement);
 
   expect(balanceFigure.props.cents).toBe(-3000);
   expect(savedFigure.props.cents).toBe(-1000);

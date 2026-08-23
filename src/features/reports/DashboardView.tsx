@@ -26,10 +26,11 @@ import { PeriodPicker } from "./PeriodPicker";
 import { useComparePref, usePeriodPref } from "./period-pref";
 import { DASHBOARD_WIDGETS, type WidgetContext, type WidgetDef } from "./registry";
 import { DashboardEditor } from "./DashboardEditor";
+import { DashboardSetBar } from "./DashboardSets";
 import { DashboardWidget } from "./WidgetShell";
 import { WidgetGallerySheet } from "./WidgetGallerySheet";
 import { setWidgetVisible, type DashboardLayout } from "./dashboard-layout";
-import { useDashboardLayout } from "./use-dashboard-layout";
+import { useDashboardSets } from "./use-dashboard-layout";
 
 /** The window the dashboard opens on when nothing has been chosen yet. */
 const DEFAULT_PERIOD: ReportingPeriod = { kind: "preset", preset: "last-3-months" };
@@ -56,7 +57,8 @@ export function DashboardView() {
   // Reporting windows are browser-local display preferences.
   const [period, setPeriod] = usePeriodPref(PERIOD_KEY, DEFAULT_PERIOD);
   const [comparePeriod, setComparePeriod] = useComparePref(COMPARE_KEY);
-  const [layout, saveLayout] = useDashboardLayout();
+  const dashboardSets = useDashboardSets();
+  const { layout, saveLayout } = dashboardSets;
   const activeLayout = draftLayout ?? layout;
   const visibleWidgets = useMemo(() => {
     const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
@@ -179,6 +181,21 @@ export function DashboardView() {
           ) : undefined
         }
       />
+
+      {ready && !draftLayout && (
+        <DashboardSetBar
+          dashboards={dashboardSets.dashboards}
+          activeId={dashboardSets.activeDashboard.id}
+          defaultId={dashboardSets.defaultDashboardId}
+          onSelect={dashboardSets.setActiveDashboard}
+          onCreate={dashboardSets.createDashboard}
+          onRename={dashboardSets.renameDashboard}
+          onDuplicate={dashboardSets.duplicateDashboard}
+          onReorder={dashboardSets.reorderDashboard}
+          onMakeDefault={dashboardSets.makeDefault}
+          onDelete={dashboardSets.deleteDashboard}
+        />
+      )}
 
       {!ready ? (
         <>
