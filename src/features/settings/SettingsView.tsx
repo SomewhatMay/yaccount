@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 export function SettingsView() {
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Settings" title="Set up yaccount">
-        Choose how it looks, manage your data, and inspect this copy when needed.
+      <PageHeader eyebrow="Settings" title="Under the hood">
+        How yaccount looks, how this copy is running, and what to send when something goes
+        wrong.
       </PageHeader>
 
       <ErrorBoundary label="Appearance">

@@ -157,7 +157,7 @@ test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, test
 });
 
 test("changes theme only in Settings", async ({ page }, testInfo) => {
-  await openReady(page, "/settings", "Set up yaccount");
+  await openReady(page, "/settings", "Under the hood");
   await expect(page.getByLabel("System")).toBeVisible();
   await expect(page.getByLabel("Light")).toBeVisible();
   await expect(page.getByLabel("Dark")).toBeVisible();
@@ -166,7 +166,7 @@ test("changes theme only in Settings", async ({ page }, testInfo) => {
   await page.getByLabel("Dark").click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.reload();
-  await expect(page.getByText("Set up yaccount", { exact: true })).toBeVisible();
+  await expect(page.getByText("Under the hood", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Dark")).toHaveAttribute("data-state", "on");
 
   await page.getByLabel("Light").click();
@@ -693,7 +693,7 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
   await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /to review/ })).toBeVisible();
   const inboxBadge = page
-    .getByRole("link", { name: "Inbox" })
+    .getByRole("link", { name: "Inbox", exact: true })
     .locator('[aria-label="1 pending"]');
   await expect(inboxBadge).toBeVisible();
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();

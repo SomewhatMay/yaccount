@@ -12,7 +12,7 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 73 Vitest files, 1,052 tests passing. Playwright is 57 passes and 7 expected desktop-touch
+- 79 Vitest files, 1,074 tests passing. Playwright is 67 passes and 9 expected desktop-touch
   skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
   issues).
 - **⌘K starts with common and recent actions, then searches everything after typing**
