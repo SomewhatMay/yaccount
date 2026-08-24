@@ -31,6 +31,7 @@ function calculators(): DashboardAggregateCalculators {
       unvaluedCount: 0,
       branches: [],
     })),
+    whatChanged: vi.fn(() => null),
   };
 }
 
@@ -46,12 +47,14 @@ it("shares exact dashboard aggregates within one data revision", () => {
   );
   expect(aggregates.balance()).toBe(aggregates.balance());
   expect(aggregates.moneyMap()).toBe(aggregates.moneyMap());
+  expect(aggregates.whatChanged(range)).toBe(aggregates.whatChanged({ ...range }));
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
   expect(calculate.upcomingOccurrences).toHaveBeenCalledOnce();
   expect(calculate.overallBalance).toHaveBeenCalledOnce();
   expect(calculate.moneyMap).toHaveBeenCalledOnce();
+  expect(calculate.whatChanged).toHaveBeenCalledOnce();
 });
 
 it("does not share cached money across data revisions or ranges", () => {

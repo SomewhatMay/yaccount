@@ -67,6 +67,17 @@ describe("the dashboard widget registry", () => {
     ).toEqual(["money-map"]);
   });
 
+  it("absorbs saved-period reporting into What changed under the stable id", () => {
+    const changed = DASHBOARD_WIDGETS.find((widget) => widget.id === "saved");
+
+    expect(changed).toMatchObject({
+      title: "What changed",
+      defaultVisible: true,
+    });
+    expect(changed?.loadCompact).toBeTypeOf("function");
+    expect(changed?.math).toBeTypeOf("function");
+  });
+
   it("only exempts a widget from the period control when its window is its meaning", () => {
     // Current/recent facts are not period reports; pace and upcoming carry their
     // own windows. A period menu on any of them would be a control that lies.

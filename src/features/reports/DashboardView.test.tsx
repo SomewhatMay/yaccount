@@ -200,12 +200,13 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   const BalanceRenderer = (await balanceWidget.props.def.load!()).default as (
     context: WidgetContext,
   ) => ReactElement<Record<string, unknown>>;
-  const SavedRenderer = (await savedWidget.props.def.load!()).default as (
-    context: WidgetContext,
-  ) => ReactElement<Record<string, unknown>>;
   const balanceFigure = BalanceRenderer(balanceWidget.props.base);
-  const savedFigure = SavedRenderer(savedWidget.props.base);
 
   expect(balanceFigure.props.cents).toBe(-3000);
-  expect(savedFigure.props.cents).toBe(-1000);
+  expect(savedWidget.props.base.reportTransactions.map((row) => row.id)).toEqual([
+    "included-row",
+  ]);
+  expect(savedWidget.props.base.aggregates.period({ start: null, end: null }).saved).toBe(
+    -1000,
+  );
 });

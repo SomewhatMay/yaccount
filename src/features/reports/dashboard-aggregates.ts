@@ -4,6 +4,7 @@ import {
   overallBalance,
   periodSummary,
   upcomingOccurrences,
+  whatChanged as deriveWhatChanged,
   type DateRange,
 } from "@/core/engine";
 import type {
@@ -31,6 +32,7 @@ export interface DashboardAggregateCalculators {
   overallBalance: typeof overallBalance;
   upcomingOccurrences: typeof upcomingOccurrences;
   moneyMap: typeof deriveMoneyMap;
+  whatChanged: typeof deriveWhatChanged;
 }
 
 export interface DashboardAggregates {
@@ -39,6 +41,7 @@ export interface DashboardAggregates {
   balance: () => number;
   occurrences: (from: string, to: string) => ReturnType<typeof upcomingOccurrences>;
   moneyMap: () => ReturnType<typeof deriveMoneyMap>;
+  whatChanged: (range: DateRange) => ReturnType<typeof deriveWhatChanged>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -47,6 +50,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   overallBalance,
   upcomingOccurrences,
   moneyMap: deriveMoneyMap,
+  whatChanged: deriveWhatChanged,
 };
 
 function rangeKey(range: DateRange): string {
@@ -67,6 +71,7 @@ export function createDashboardAggregates(
   let hasBalance = false;
   let balance = 0;
   let cachedMoneyMap: ReturnType<typeof deriveMoneyMap> | null = null;
+  const whatChangedCache = new Map<string, ReturnType<typeof deriveWhatChanged>>();
 
   return {
     monthly(range) {
@@ -120,6 +125,17 @@ export function createDashboardAggregates(
         );
       }
       return cachedMoneyMap;
+    },
+    whatChanged(range) {
+      const key = rangeKey(range);
+      if (whatChangedCache.has(key)) return whatChangedCache.get(key)!;
+      const result = calculate.whatChanged(
+        inputs.reportTransactions,
+        inputs.categories,
+        range,
+      );
+      whatChangedCache.set(key, result);
+      return result;
     },
   };
 }

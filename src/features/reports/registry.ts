@@ -4,7 +4,7 @@ import {
   type LazyExoticComponent,
   type ReactNode,
 } from "react";
-import type { DateRange } from "@/core/engine";
+import { activeRows, inRange, precedingRange, type DateRange } from "@/core/engine";
 import type {
   BudgetTarget,
   Category,
@@ -149,6 +149,15 @@ const loadMoneyMapCompact: WidgetModuleLoader = () =>
     default: module.MoneyMapCompact,
   }));
 
+const loadWhatChanged: WidgetModuleLoader = () =>
+  import("./widget-modules/WhatChangedWidget").then((module) => ({
+    default: module.WhatChangedExpanded,
+  }));
+const loadWhatChangedCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/WhatChangedWidget").then((module) => ({
+    default: module.WhatChangedCompact,
+  }));
+
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
 }
@@ -159,6 +168,71 @@ function gallery(
   suggest?: WidgetGalleryMetadata["suggest"],
 ): WidgetGalleryMetadata {
   return { group, terms, ...(suggest ? { suggest } : {}) };
+}
+
+function whatChangedMath(context: WidgetContext): WidgetMathDisclosure {
+  const result = context.aggregates.whatChanged(context.range);
+  if (!result) {
+    return {
+      range: rangeText(context.range),
+      freshness: "Approved ledger entries in the selected period.",
+      lines: [],
+      exclusions: [
+        "Transfers",
+        "pending and template entries",
+        "stats-hidden categories",
+      ],
+      rule: "Choose a bounded period to create an immediately preceding equal-day comparison.",
+    };
+  }
+  return {
+    range: `${rangeText(result.currentRange)} compared with ${rangeText(result.previousRange)}`,
+    freshness: `Approved ledger entries through ${result.currentRange.end}.`,
+    lines: [
+      { kind: "actual", label: "Current income", amount: result.current.income },
+      {
+        kind: "actual",
+        label: "Current spending (signed ledger)",
+        amount: -result.current.expense,
+      },
+      { kind: "actual", label: "Current kept", amount: result.current.kept },
+      { kind: "context", label: "Prior income", amount: result.previous.income },
+      {
+        kind: "context",
+        label: "Prior spending (signed ledger)",
+        amount: -result.previous.expense,
+      },
+      { kind: "context", label: "Prior kept", amount: result.previous.kept },
+      ...result.allDrivers.map((driver) => ({
+        kind: "context" as const,
+        label: `${driver.kind === "income" ? "Income source" : "Expense category"}: ${driver.label}`,
+        amount: driver.contribution,
+        note: driver.likelyTiming
+          ? "Likely timing only: this source appears near a comparison edge."
+          : undefined,
+      })),
+    ],
+    exclusions: ["Transfers", "pending and template entries", "stats-hidden categories"],
+    rule: "Current kept minus prior kept. Expense reductions contribute positively; increases contribute negatively. The four largest absolute drivers are shown and Everything else closes the exact difference.",
+  };
+}
+
+function whatChangedAvailability(context: WidgetContext): WidgetAvailability {
+  const previous = precedingRange(context.range);
+  if (!previous) return { status: "ready" };
+  const hasComparisonActivity = activeRows(context.reportTransactions).some(
+    (transaction) =>
+      transaction.category_id !== null &&
+      (inRange(transaction.date, context.range) || inRange(transaction.date, previous)),
+  );
+  return hasComparisonActivity
+    ? { status: "ready" }
+    : {
+        status: "empty",
+        title: "Build a comparison history",
+        description: "Approved entries in either matched period unlock this variance.",
+        action: { label: "Open the ledger", href: "/ledger" },
+      };
 }
 
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
@@ -227,11 +301,22 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   },
   {
     id: "saved",
-    title: "Saved this period",
-    description: "Income left after expenses in the selected period.",
+    title: "What changed",
+    description: "Why kept money moved versus the equal-length prior period.",
     defaultVisible: true,
-    gallery: gallery("analysis", ["income", "expense", "savings", "kept"]),
-    ...legacy("saved"),
+    gallery: gallery(
+      "analysis",
+      ["income", "expense", "savings", "kept", "comparison", "drivers", "variance"],
+      ({ reportTransactions }) =>
+        reportTransactions.length > 0
+          ? "See which categories and sources moved kept money"
+          : null,
+    ),
+    load: loadWhatChanged,
+    component: lazy(loadWhatChanged),
+    ...compact(loadWhatChangedCompact),
+    availability: whatChangedAvailability,
+    math: whatChangedMath,
   },
   {
     id: "kpis",
