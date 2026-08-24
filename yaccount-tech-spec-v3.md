@@ -784,6 +784,9 @@ varies per screen is noise wearing a label's clothes.
   by full-strength iris on icon and label, never a tinted plate. **Routes are stable at every
   breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add FAB is present at
   every width.
+- **Appearance belongs in Settings.** System, Light and Dark are explicit choices there; no theme
+  switch is duplicated in the topbar, More or command search. The policy is device-local through
+  `next-themes`, not synced financial/account state.
 - **Dashboard = an ordered widget registry** of stable ids. The synced layout setting reorders and
   hides registry entries; Overall balance is always visible and first. Cards edit directly in
   place, with hidden reports available through a descriptive gallery. Secondary widgets fold;

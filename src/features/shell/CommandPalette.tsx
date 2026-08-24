@@ -3,16 +3,13 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useTheme } from "next-themes";
 import {
   ArrowRightIcon,
   BookmarkIcon,
   ListIcon,
-  MoonIcon,
   PlusIcon,
   RefreshCwIcon,
   RepeatIcon,
-  SunIcon,
   TagsIcon,
   TargetIcon,
   WalletIcon,
@@ -115,7 +112,6 @@ export function CommandPalette() {
   const openQuickAdd = useSetAtom(quickAddAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const sync = useSetAtom(syncAtom);
-  const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -136,7 +132,6 @@ export function CommandPalette() {
     action();
   }
 
-  const dark = resolvedTheme === "dark";
   const actions = useMemo(
     () => [
       {
@@ -163,14 +158,8 @@ export function CommandPalette() {
         icon: RefreshCwIcon,
         go: () => void sync(),
       },
-      {
-        id: "act:theme",
-        title: dark ? "Switch to light theme" : "Switch to dark theme",
-        icon: dark ? SunIcon : MoonIcon,
-        go: () => setTheme(dark ? "light" : "dark"),
-      },
     ],
-    [dark, openQuickAdd, setTheme, sync],
+    [openQuickAdd, sync],
   );
 
   // The shell's own rows — screens and actions — handed to the engine as docs so
@@ -295,11 +284,7 @@ export function CommandPalette() {
               {rows.map((r) => {
                 const Icon = KIND_ICON[kind];
                 return (
-                  <CommandItem
-                    key={r.doc.id}
-                    value={r.doc.id}
-                    onSelect={() => select(r)}
-                  >
+                  <CommandItem key={r.doc.id} value={r.doc.id} onSelect={() => select(r)}>
                     <Icon className="size-4 shrink-0" />
                     <span className="truncate">
                       <Marked text={r.doc.title} words={words} />

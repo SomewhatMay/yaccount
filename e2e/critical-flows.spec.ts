@@ -156,6 +156,28 @@ test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, test
   await expect(page).toHaveURL(/\/inbox\/?$/);
 });
 
+test("changes theme only in Settings", async ({ page }, testInfo) => {
+  await openReady(page, "/settings", "Set up yaccount");
+  await expect(page.getByLabel("System")).toBeVisible();
+  await expect(page.getByLabel("Light")).toBeVisible();
+  await expect(page.getByLabel("Dark")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Switch to .* theme/ })).toHaveCount(0);
+
+  await page.getByLabel("Dark").click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.reload();
+  await expect(page.getByText("Set up yaccount", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Dark")).toHaveAttribute("data-state", "on");
+
+  await page.getByLabel("Light").click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+
+  if (testInfo.project.name === "mobile") {
+    await page.getByRole("button", { name: "More screens" }).click();
+    await expect(page.getByRole("button", { name: /Switch to .* theme/ })).toHaveCount(0);
+  }
+});
+
 test("commits once for a keyboard resize burst and ignores viewport scroll", async ({
   page,
   context,

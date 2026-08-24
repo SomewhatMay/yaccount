@@ -6,7 +6,6 @@ import { ChevronRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ResponsiveSheet } from "@/features/ui";
 import { AuthButton } from "@/features/auth/AuthButton";
-import { ThemeToggle } from "@/features/shell/ThemeToggle";
 import { MORE_DESTINATIONS } from "@/features/shell/nav";
 
 /**
@@ -63,9 +62,6 @@ export function MoreSheet({
 
       <div className="mt-2 flex items-center gap-2 border-t px-5 py-4">
         <AuthButton />
-        <div className="ml-auto">
-          <ThemeToggle />
-        </div>
       </div>
     </ResponsiveSheet>
   );

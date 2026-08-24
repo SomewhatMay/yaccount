@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SyncIndicator } from "@/features/SyncIndicator";
 import { AuthButton } from "@/features/auth/AuthButton";
-import { ThemeToggle } from "@/features/shell/ThemeToggle";
 import { commandPaletteAtom, pendingCountAtom } from "@/features/store";
 import { destinationFor, TOPBAR_DESTINATIONS } from "@/features/shell/nav";
 
@@ -49,7 +48,6 @@ export function TopBar({ maxWidth }: { maxWidth: string }) {
         <div className="ml-auto flex items-center gap-1.5">
           <AuthButton signedOutOnly />
           <SyncIndicator />
-          <ThemeToggle />
           <Link
             href={INBOX.href}
             aria-label={INBOX.label}

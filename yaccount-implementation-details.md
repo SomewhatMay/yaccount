@@ -225,7 +225,8 @@ See spec §3 for the durable-grant model and why the web flow has no refresh tok
   arm-then-confirm, never `window.confirm`; a no-undo destructive act uses `ConfirmDestructive`.
 - **State** — new persisted-data atoms go in `src/features/store.ts` and must be refreshed in
   `refreshAtom`. Account-wide preferences use synced settings. Browser-local display state goes
-  through `prefs.ts` / `useLocalPref`.
+  through `prefs.ts` / `useLocalPref`; the System/Light/Dark policy is the one exception already
+  owned and persisted by `next-themes`, with its only control in Settings.
 
 **Add UI components with `npx shadcn@latest add <name>`**, and reach for one before hand-rolling.
 

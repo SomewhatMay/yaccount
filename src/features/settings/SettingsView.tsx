@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AppearancePanel } from "@/features/settings/AppearancePanel";
 import { DataPanel } from "@/features/settings/DataPanel";
 import { DiagnosticsPanel } from "@/features/settings/DiagnosticsPanel";
 import { ErrorBoundary } from "@/features/ErrorBoundary";
@@ -8,17 +9,18 @@ import { PageHeader } from "@/features/ui";
 import { Button } from "@/components/ui/button";
 
 /**
- * Settings. Today it holds the one thing that has to exist before anything else
- * can be debugged; appearance, account and category colour move in here as they
- * are built.
+ * Device appearance, data controls and the facts needed to diagnose this copy.
  */
 export function SettingsView() {
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Settings" title="Under the hood">
-        How this copy of yaccount is running, and what to send along when something goes
-        wrong.
+      <PageHeader eyebrow="Settings" title="Set up yaccount">
+        Choose how it looks, manage your data, and inspect this copy when needed.
       </PageHeader>
+
+      <ErrorBoundary label="Appearance">
+        <AppearancePanel />
+      </ErrorBoundary>
 
       <ErrorBoundary label="Data tools">
         <DataPanel />
