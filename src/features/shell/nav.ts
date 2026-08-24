@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 
 /**
- * Where the app can take you — one list, read by all four navigation surfaces:
- * the bottom tab bar, the desktop rail, the More sheet and the ⌘K palette.
+ * Where the app can take you — one list, read by all navigation surfaces: the
+ * bottom tab bar, topbar, desktop rail, More sheet and ⌘K palette.
  *
  * Keeping it as data rather than four hand-laid JSX blobs is the point. A screen
  * added to one surface and forgotten on another is unreachable on that surface,
@@ -79,11 +79,9 @@ export function destinationFor(pathname: string): Destination | undefined {
 }
 
 /**
- * The four thumb slots, LOCKED by the user (2026-07-22): Home · Ledger · Inbox ·
- * More. Inbox takes the third slot rather than Plan because it is the screen
- * that asks something of you — recurring occurrences land there needing a yes —
- * and it already carries a live count, so the badge has a subject. Plan is a
- * monthly read and lives one tap away in More.
+ * The four thumb slots, locked by user feedback (2026-08-24): Home · Ledger ·
+ * Goals · More. Inbox and its live count moved into the topbar, opening the
+ * third thumb slot for Goals.
  *
  * The fourth slot has no `href`: it opens a sheet, so nothing is a dead end.
  */
@@ -91,20 +89,25 @@ export type TabSlot = {
   label: string;
   icon: LucideIcon;
   href?: string;
-  /** The pending-count badge (§5.8) — Inbox only. */
-  badge?: "pending";
 };
 
 export const TAB_SLOTS: TabSlot[] = [
   { label: "Home", icon: HomeIcon, href: "/" },
   { label: "Ledger", icon: ListIcon, href: "/ledger" },
-  { label: "Inbox", icon: InboxIcon, href: "/inbox", badge: "pending" },
+  { label: "Goals", icon: TargetIcon, href: "/goals" },
   { label: "More", icon: MoreHorizontalIcon },
 ];
 
-/** Everything the four slots displace — the More sheet's contents. */
+/** Destinations kept directly visible in the compact topbar. */
+export const TOPBAR_DESTINATIONS: Destination[] = DESTINATIONS.filter(
+  (d) => d.href === "/inbox",
+);
+
+/** Everything the compact tabs and topbar displace — the More sheet's contents. */
 export const MORE_DESTINATIONS: Destination[] = DESTINATIONS.filter(
-  (d) => !TAB_SLOTS.some((t) => t.href === d.href),
+  (d) =>
+    !TAB_SLOTS.some((t) => t.href === d.href) &&
+    !TOPBAR_DESTINATIONS.some((t) => t.href === d.href),
 );
 
 /**

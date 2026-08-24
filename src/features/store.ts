@@ -107,8 +107,8 @@ export const defaultContainerIdAtom = atom((get) => {
 export type QuickAddKind = "expense" | "income" | "transfer";
 export const quickAddAtom = atom<QuickAddKind | null>(null);
 
-/** The ⌘K palette. Opened by the shortcut, by the top bar's search affordance,
- * and from the More sheet — so, likewise, state rather than a prop. */
+/** The ⌘K palette. Opened by the shortcut and the topbar search affordance, so,
+ * likewise, state rather than a prop. */
 export const commandPaletteAtom = atom(false);
 
 /**

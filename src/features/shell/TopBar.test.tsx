@@ -3,6 +3,8 @@ import { expect, it, vi } from "vitest";
 import { Button } from "@/components/ui/button";
 import { TopBar } from "@/features/shell/TopBar";
 
+const fixture = vi.hoisted(() => ({ pending: 3 }));
+
 vi.mock("next/link", () => ({ default: "mock-link" }));
 
 vi.mock("next/navigation", () => ({
@@ -10,11 +12,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("jotai", () => ({
+  useAtomValue: () => fixture.pending,
   useSetAtom: () => vi.fn(),
 }));
 
 vi.mock("@/features/store", () => ({
   commandPaletteAtom: "commandPalette",
+  pendingCountAtom: "pendingCount",
 }));
 
 vi.mock("@/features/auth/AuthButton", () => ({
@@ -49,4 +53,18 @@ it("does not duplicate search in More", () => {
 
   expect(more).not.toContain("SearchIcon");
   expect(more).not.toContain("commandPaletteAtom");
+});
+
+it("puts badged Inbox immediately before Search", () => {
+  const topbar = TopBar({ maxWidth: "max-w-2xl" });
+  const children = topbar.props.children.props.children[2].props.children;
+  const inbox = children.find(
+    (child: { type: unknown; props: { href?: string } }) =>
+      child.type === "mock-link" && child.props.href === "/inbox",
+  );
+
+  expect(inbox).toBeTruthy();
+  expect(inbox.props["aria-label"]).toBe("Inbox");
+  expect(inbox.props.children[1].props["aria-label"]).toBe("3 pending");
+  expect(children.at(-2)).toBe(inbox);
 });

@@ -2,10 +2,8 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useAtomValue } from "jotai";
 import { useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { pendingCountAtom } from "@/features/store";
 import { TAB_SLOTS, activeTab, tabSlotState } from "@/features/shell/nav";
 
 const TAB_TOUCH_MOVE_PX = 10;
@@ -43,7 +41,7 @@ function TabLinkContent({
 }
 
 /**
- * The thumb bar (< lg). Four slots, locked: Home · Ledger · Inbox · More.
+ * The thumb bar (< lg). Four slots, locked: Home · Ledger · Goals · More.
  *
  * The active slot uses full-strength iris plus a short top marker. The marker
  * keeps the current location visible without relying on color alone.
@@ -54,7 +52,6 @@ function TabLinkContent({
  */
 export function BottomTabBar({ onMore }: { onMore: () => void }) {
   const pathname = usePathname();
-  const pending = useAtomValue(pendingCountAtom);
   const touchPress = useRef<TabTouchPress | null>(null);
   const active = activeTab(pathname);
 
@@ -71,19 +68,10 @@ export function BottomTabBar({ onMore }: { onMore: () => void }) {
       >
         {TAB_SLOTS.map((slot) => {
           const current = active === (slot.href ?? "more");
-          const badge = slot.badge === "pending" && pending > 0 ? pending : 0;
           const inner = (
             <>
-              <span className="relative">
+              <span>
                 <slot.icon className="size-5" aria-hidden />
-                {badge > 0 && (
-                  <span
-                    className="bg-primary text-primary-foreground tnum absolute -top-1.5 -right-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[10px] leading-none"
-                    aria-label={`${badge} pending`}
-                  >
-                    {badge}
-                  </span>
-                )}
               </span>
               <span className="text-[0.6875rem] leading-none font-medium">
                 {slot.label}

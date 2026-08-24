@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/features/shell/ThemeToggle";
 import { MORE_DESTINATIONS } from "@/features/shell/nav";
 
 /**
- * What the four thumb slots displace (§: tab slots locked 2026-07-22).
+ * What the compact tabs and topbar displace.
  *
  * A sheet rather than a route, so "More" is never somewhere you have to come
  * back from — you tap a screen and the sheet is gone. The routes themselves are

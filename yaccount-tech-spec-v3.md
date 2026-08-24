@@ -777,12 +777,13 @@ varies per screen is noise wearing a label's clothes.
 - **Responsive density.** Below `sm` a sheet rises from the bottom; from `sm` it slides in from
   the right — same component, one rule. Tables collapse to card rows below `sm`. No horizontal
   page scroll, ever.
-- **One navigation registry, two shells.** Below `lg`, fixed bottom tabs: **Home · Ledger · Inbox
-  · More**, with the pending count on Inbox; More holds the remaining destinations and Settings.
-  From `lg`, a sidebar rail shows every destination with Settings in its footer. The active
-  destination is marked by full-strength iris on icon and label, never a tinted plate. **Routes
-  are stable at every breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add
-  FAB is present at every width.
+- **One navigation registry, two shells.** Below `lg`, fixed bottom tabs: **Home · Ledger · Goals
+  · More**. Inbox and its pending count live in the sticky topbar beside global Search; More holds
+  the remaining destinations and Settings. From `lg`, a sidebar rail shows every destination with
+  Settings in its footer; Inbox and Search remain in the topbar. The active destination is marked
+  by full-strength iris on icon and label, never a tinted plate. **Routes are stable at every
+  breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add FAB is present at
+  every width.
 - **Dashboard = an ordered widget registry** of stable ids. The synced layout setting reorders and
   hides registry entries; Overall balance is always visible and first. Cards edit directly in
   place, with hidden reports available through a descriptive gallery. Secondary widgets fold;

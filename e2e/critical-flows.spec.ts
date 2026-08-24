@@ -142,6 +142,20 @@ test("opens search from the mobile topbar", async ({ page }, testInfo) => {
   await expect(page.getByPlaceholder(/Search everything/)).toBeHidden();
 });
 
+test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile navigation regression.");
+
+  await openReady(page, "/", "How the money moved");
+  const primary = page.getByRole("navigation", { name: "Primary" });
+  await expect(primary.getByRole("link", { name: "Goals" })).toBeVisible();
+  await expect(primary.getByRole("link", { name: "Inbox" })).toHaveCount(0);
+
+  await primary.getByRole("link", { name: "Goals" }).tap();
+  await expect(page).toHaveURL(/\/goals\/?$/);
+  await page.getByRole("link", { name: "Inbox" }).tap();
+  await expect(page).toHaveURL(/\/inbox\/?$/);
+});
+
 test("commits once for a keyboard resize burst and ignores viewport scroll", async ({
   page,
   context,
@@ -656,9 +670,14 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
 
   await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /to review/ })).toBeVisible();
+  const inboxBadge = page
+    .getByRole("link", { name: "Inbox" })
+    .locator('[aria-label="1 pending"]');
+  await expect(inboxBadge).toBeVisible();
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Approve E2E recurring" }).click();
   await expect(page.getByRole("heading", { name: "All clear" })).toBeVisible();
+  await expect(inboxBadge).toBeHidden();
 
   await openReady(page, "/ledger", "Overall balance");
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
