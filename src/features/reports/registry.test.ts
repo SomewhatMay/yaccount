@@ -28,6 +28,7 @@ describe("the dashboard widget registry", () => {
       "breakdown",
       "payees",
       "upcoming",
+      "allocation",
       "largest",
       "goals",
       "monthly",
@@ -117,6 +118,19 @@ describe("the dashboard widget registry", () => {
     expect(horizon?.availability).toBeTypeOf("function");
   });
 
+  it("adds Allocation plan as a fixed-current planning widget", () => {
+    const allocation = DASHBOARD_WIDGETS.find((widget) => widget.id === "allocation");
+
+    expect(allocation).toMatchObject({
+      title: "Allocation plan",
+      defaultVisible: true,
+      fixedWindow: true,
+    });
+    expect(allocation?.loadCompact).toBeTypeOf("function");
+    expect(allocation?.math).toBeTypeOf("function");
+    expect(allocation?.availability).toBeTypeOf("function");
+  });
+
   it("only exempts a widget from the period control when its window is its meaning", () => {
     // Current/recent facts are not period reports; pace and upcoming carry their
     // own windows. A period menu on any of them would be a control that lies.
@@ -126,6 +140,7 @@ describe("the dashboard widget registry", () => {
       "pace",
       "recent",
       "upcoming",
+      "allocation",
       "goals",
     ]);
   });

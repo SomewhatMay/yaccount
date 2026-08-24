@@ -12,8 +12,10 @@ import type {
   ContainerSnapshot,
   Goal,
   RecurringRule,
+  Setting,
   Transaction,
 } from "@/core/model";
+import { formatCents } from "@/core/money";
 import type { DashboardAggregates } from "./dashboard-aggregates";
 
 export interface WidgetContext {
@@ -30,6 +32,7 @@ export interface WidgetContext {
   aggregates: DashboardAggregates;
   instanceSettings?: Record<string, unknown>;
   saveInstanceSettings?: (settings: Record<string, unknown>) => Promise<void>;
+  syncedSettings?: Setting[];
 }
 
 export type WidgetAvailability =
@@ -185,6 +188,15 @@ const loadCashHorizon: WidgetModuleLoader = () =>
 const loadCashHorizonCompact: WidgetModuleLoader = () =>
   import("./widget-modules/CashHorizonWidget").then((module) => ({
     default: module.CashHorizonCompact,
+  }));
+
+const loadAllocationPlan: WidgetModuleLoader = () =>
+  import("./widget-modules/AllocationPlanWidget").then((module) => ({
+    default: module.AllocationPlanExpanded,
+  }));
+const loadAllocationPlanCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/AllocationPlanWidget").then((module) => ({
+    default: module.AllocationPlanCompact,
   }));
 
 function compact(loader: WidgetModuleLoader) {
@@ -464,6 +476,141 @@ function cashHorizonMath(context: WidgetContext): WidgetMathDisclosure {
   };
 }
 
+function allocationManualIncome(context: WidgetContext): number {
+  const key = `expected_income:${context.today.slice(0, 7)}`;
+  const value = Number(
+    context.syncedSettings?.find((setting) => setting.key === key)?.value ?? 0,
+  );
+  return Number.isSafeInteger(value) ? value : 0;
+}
+
+function allocationAnchorIds(context: WidgetContext): string[] | undefined {
+  const value = context.instanceSettings?.payCycleAnchorRuleIds;
+  return Array.isArray(value) && value.every((id) => typeof id === "string")
+    ? value
+    : undefined;
+}
+
+function allocationAvailability(context: WidgetContext): WidgetAvailability {
+  const plan = context.aggregates.allocationMonth(
+    context.today,
+    allocationManualIncome(context),
+  );
+  if (!plan.incomeFromRules && plan.expectedIncome === 0) {
+    return {
+      status: "needs-setup",
+      title: "Schedule expected income",
+      description: "A recurring income rule unlocks the allocation plan.",
+      action: { label: "Add recurring income", href: "/recurring" },
+    };
+  }
+  if (plan.planned === 0) {
+    return {
+      status: "needs-setup",
+      title: "Give expected income a job",
+      description: "An expense budget or active goal creates the plan.",
+      action: { label: "Set a budget", href: "/categories" },
+    };
+  }
+  return { status: "ready" };
+}
+
+function allocationMath(context: WidgetContext): WidgetMathDisclosure {
+  const requestedPayCycle = context.instanceSettings?.allocationMode === "pay-cycle";
+  const payCycle = requestedPayCycle
+    ? context.aggregates.allocationPayCycle(context.today, allocationAnchorIds(context))
+    : null;
+  if (payCycle) {
+    return {
+      range: `${rangeText({ start: payCycle.start, end: payCycle.end })} · next income ${payCycle.nextIncome.date}`,
+      freshness: `Current plan and active recurring rules as of ${context.today}.`,
+      lines: [
+        {
+          kind: "scheduled",
+          label: "Income for this cycle",
+          amount: payCycle.income,
+        },
+        ...payCycle.scheduledExpenses.map((expense) => ({
+          kind: "scheduled" as const,
+          label: `${expense.date}: ${expense.label}`,
+          amount: -expense.amount,
+        })),
+        {
+          kind: "inferred",
+          label: "Flexible budget share",
+          amount: -payCycle.flexibleBudgetShare,
+          note: `${formatCents(payCycle.allowanceShare)} of allowances pro-rated over the covered calendar days, less exact scheduled expenses.`,
+        },
+        {
+          kind: "context",
+          label: "Pro-rated goal asks",
+          amount: -payCycle.goalAskShare,
+        },
+        {
+          kind: "context",
+          label: "Unplanned for this cycle",
+          amount: payCycle.unplanned,
+        },
+      ],
+      exclusions: [
+        "Transfers except their effect on existing goal progress",
+        "archived categories and inactive goals",
+        "ordinary unscheduled spending",
+      ],
+      rule: "Selected recurring income rules define the cycle boundaries; every active income occurrence inside the cycle counts. Exact scheduled expenses claim their dates first, flexible allowances and current goal asks are pro-rated by calendar day, and the next-income day is excluded.",
+    };
+  }
+
+  const month = context.aggregates.allocationMonth(
+    context.today,
+    allocationManualIncome(context),
+  );
+  return {
+    range: `${currentMonthText(context.today)} · as of ${context.today}`,
+    freshness: "Approved received income and the current synced plan.",
+    lines: [
+      {
+        kind: "actual",
+        label: "Received income",
+        amount: month.received,
+      },
+      {
+        kind: "scheduled",
+        label: "Still scheduled",
+        amount: month.stillScheduled,
+      },
+      {
+        kind: "context",
+        label: "Expense budgets",
+        amount: -month.totalAllowances,
+      },
+      {
+        kind: "context",
+        label: "Goal asks",
+        amount: -month.totalGoalAsks,
+      },
+      {
+        kind: "context",
+        label: "Unplanned expected income",
+        amount: month.unplanned,
+      },
+    ],
+    exclusions: [
+      "Transfers except their effect on existing goal progress",
+      "archived categories and inactive goals",
+      "cash-balance and safe-to-spend claims",
+    ],
+    rule: "Reuse the monthly plan exactly: recurring income for the month wins when it covers the window, otherwise the synced manual figure applies; subtract effective expense budgets and current goal asks once.",
+  };
+}
+
+function currentMonthText(today: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${today.slice(0, 7)}-01T00:00:00`));
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -613,6 +760,31 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     ...compact(loadCashHorizonCompact),
     availability: cashHorizonAvailability,
     math: cashHorizonMath,
+  },
+  {
+    id: "allocation",
+    title: "Allocation plan",
+    description: "How expected income is claimed by budgets and goal asks.",
+    defaultVisible: true,
+    fixedWindow: true,
+    gallery: gallery(
+      "planning",
+      ["income", "allocation", "plan", "budget", "goal", "pay cycle"],
+      (context) => {
+        const plan = context.aggregates.allocationMonth(
+          context.today,
+          allocationManualIncome(context),
+        );
+        return plan.expectedIncome !== 0 && plan.planned !== 0
+          ? `${formatCents(plan.expectedIncome)} expected; see what remains unplanned`
+          : null;
+      },
+    ),
+    load: loadAllocationPlan,
+    component: lazy(loadAllocationPlan),
+    ...compact(loadAllocationPlanCompact),
+    availability: allocationAvailability,
+    math: allocationMath,
   },
   {
     id: "largest",

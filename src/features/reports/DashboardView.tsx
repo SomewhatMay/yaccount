@@ -12,6 +12,7 @@ import {
   readyAtom,
   recurringRulesAtom,
   snapshotsAtom,
+  settingsAtom,
   transactionsAtom,
 } from "@/features/store";
 import {
@@ -63,6 +64,7 @@ export function DashboardView() {
   const snapshots = useAtomValue(snapshotsAtom);
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
+  const settings = useAtomValue(settingsAtom);
 
   const dashboardSets = useDashboardSets();
   const activeDashboardId = dashboardSets.activeDashboard.id;
@@ -109,6 +111,7 @@ export function DashboardView() {
       snapshots,
       recurringRules,
       goals,
+      syncedSettings: settings,
       aggregates: createDashboardAggregates({
         budgetTargets,
         categories,
@@ -129,6 +132,7 @@ export function DashboardView() {
     snapshots,
     recurringRules,
     goals,
+    settings,
   ]);
 
   function beginEditing() {

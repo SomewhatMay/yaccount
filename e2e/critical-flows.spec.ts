@@ -349,7 +349,7 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
     page.getByText("Period comparison isn't supported for this current view.", {
       exact: true,
     }),
-  ).toHaveCount(4);
+  ).toHaveCount(5);
   await page.getByRole("button", { name: "Compare with another period" }).click();
 
   await page.getByRole("button", { name: "Edit dashboard" }).click();
@@ -445,6 +445,58 @@ test("persists the synced Cash horizon window", async ({ page }) => {
     "aria-pressed",
     "true",
   );
+});
+
+test("persists Allocation plan pay-cycle mode and income anchors", async ({ page }) => {
+  await createCategory(page, "E2E allocation bills");
+  await page.getByRole("button", { name: "Actions for E2E allocation bills" }).click();
+  await page.getByRole("menuitem", { name: "Budget" }).click();
+  await page.getByLabel("Monthly amount").fill("100.00");
+  await page.getByRole("button", { name: "Set budget" }).click();
+
+  await createCategory(page, "E2E allocation income", "Income");
+  for (const income of [
+    { source: "E2E salary", amount: "2900.00", day: "30" },
+    { source: "E2E side income", amount: "100.00", day: "25" },
+  ]) {
+    await openReady(page, "/recurring", "Scheduled transactions");
+    await page.getByRole("button", { name: "New", exact: true }).click();
+    await page.getByLabel("Payee / source").fill(income.source);
+    await page.getByRole("combobox").first().click();
+    await page
+      .getByRole("option", { name: "E2E allocation income · income", exact: true })
+      .click();
+    await page.getByLabel("Amount").fill(income.amount);
+    await page.getByLabel("Day of month").fill(income.day);
+    await page.getByRole("button", { name: "Add recurring" }).click();
+  }
+
+  await openReady(page, "/", "How the money moved");
+  const allocation = page
+    .getByRole("heading", { name: "Allocation plan" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await allocation.scrollIntoViewIfNeeded();
+  await allocation.getByRole("button", { name: "Plan by pay cycle" }).click();
+  await expect(
+    allocation.getByRole("button", { name: "Plan by pay cycle" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await allocation.getByText("Income anchors", { exact: false }).click();
+  await allocation
+    .getByRole("checkbox", { name: "Use E2E side income as a pay-cycle anchor" })
+    .click();
+
+  await page.reload();
+  await allocation.scrollIntoViewIfNeeded();
+  await expect(
+    allocation.getByRole("button", { name: "Plan by pay cycle" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await allocation.getByText("Income anchors", { exact: false }).click();
+  await expect(
+    allocation.getByRole("checkbox", {
+      name: "Use E2E side income as a pay-cycle anchor",
+    }),
+  ).not.toBeChecked();
 });
 
 test("keeps lazy dashboard detail within the mobile viewport", async ({

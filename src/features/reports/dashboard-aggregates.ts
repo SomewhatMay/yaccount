@@ -1,4 +1,6 @@
 import {
+  allocationPlanMonth as deriveAllocationMonth,
+  allocationPlanPayCycle as deriveAllocationPayCycle,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
   goalOutlook as deriveGoalOutlook,
@@ -42,6 +44,8 @@ export interface DashboardAggregateCalculators {
   budgetTriage: typeof deriveBudgetTriage;
   goalOutlook: typeof deriveGoalOutlook;
   cashHorizon: typeof deriveCashHorizon;
+  allocationPlanMonth: typeof deriveAllocationMonth;
+  allocationPlanPayCycle: typeof deriveAllocationPayCycle;
 }
 
 export interface DashboardAggregates {
@@ -57,6 +61,14 @@ export interface DashboardAggregates {
     today: string,
     days: CashHorizonDays,
   ) => ReturnType<typeof deriveCashHorizon>;
+  allocationMonth: (
+    today: string,
+    manualIncome: number,
+  ) => ReturnType<typeof deriveAllocationMonth>;
+  allocationPayCycle: (
+    today: string,
+    anchorRuleIds?: string[],
+  ) => ReturnType<typeof deriveAllocationPayCycle>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -69,6 +81,8 @@ const defaultCalculators: DashboardAggregateCalculators = {
   budgetTriage: deriveBudgetTriage,
   goalOutlook: deriveGoalOutlook,
   cashHorizon: deriveCashHorizon,
+  allocationPlanMonth: deriveAllocationMonth,
+  allocationPlanPayCycle: deriveAllocationPayCycle,
 };
 
 function rangeKey(range: DateRange): string {
@@ -93,6 +107,14 @@ export function createDashboardAggregates(
   const budgetTriageCache = new Map<string, ReturnType<typeof deriveBudgetTriage>>();
   const goalOutlookCache = new Map<string, ReturnType<typeof deriveGoalOutlook>>();
   const cashHorizonCache = new Map<string, ReturnType<typeof deriveCashHorizon>>();
+  const allocationMonthCache = new Map<
+    string,
+    ReturnType<typeof deriveAllocationMonth>
+  >();
+  const allocationPayCycleCache = new Map<
+    string,
+    ReturnType<typeof deriveAllocationPayCycle>
+  >();
 
   return {
     monthly(range) {
@@ -196,6 +218,40 @@ export function createDashboardAggregates(
         days,
       );
       cashHorizonCache.set(key, result);
+      return result;
+    },
+    allocationMonth(today, manualIncome) {
+      const key = `${today}:${manualIncome}`;
+      const cached = allocationMonthCache.get(key);
+      if (cached) return cached;
+      const result = calculate.allocationPlanMonth({
+        today,
+        manualIncome,
+        txns: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        goals: inputs.goals,
+        budgetTargets: inputs.budgetTargets,
+        rules: inputs.recurringRules,
+      });
+      allocationMonthCache.set(key, result);
+      return result;
+    },
+    allocationPayCycle(today, anchorRuleIds) {
+      const normalized = anchorRuleIds ? [...anchorRuleIds].sort() : undefined;
+      const key = `${today}:${normalized?.join(",") ?? "*"}`;
+      if (allocationPayCycleCache.has(key)) {
+        return allocationPayCycleCache.get(key)!;
+      }
+      const result = calculate.allocationPlanPayCycle({
+        today,
+        anchorRuleIds: normalized,
+        txns: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        goals: inputs.goals,
+        budgetTargets: inputs.budgetTargets,
+        rules: inputs.recurringRules,
+      });
+      allocationPayCycleCache.set(key, result);
       return result;
     },
   };

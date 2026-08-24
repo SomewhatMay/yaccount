@@ -62,6 +62,22 @@ function calculators(): DashboardAggregateCalculators {
       events: [],
       unknownEvents: [],
     })),
+    allocationPlanMonth: vi.fn(() => ({
+      mode: "month" as const,
+      yearMonth: "2026-08",
+      expectedIncome: 0,
+      incomeFromRules: false,
+      received: 0,
+      stillScheduled: 0,
+      allowances: [],
+      totalAllowances: 0,
+      goalAsks: [],
+      totalGoalAsks: 0,
+      planned: 0,
+      unplanned: 0,
+      overPlanned: false,
+    })),
+    allocationPlanPayCycle: vi.fn(() => null),
   };
 }
 
@@ -85,6 +101,12 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(aggregates.cashHorizon("2026-08-23", 30)).toBe(
     aggregates.cashHorizon("2026-08-23", 30),
   );
+  expect(aggregates.allocationMonth("2026-08-23", 123)).toBe(
+    aggregates.allocationMonth("2026-08-23", 123),
+  );
+  expect(aggregates.allocationPayCycle("2026-08-23", ["salary"])).toBe(
+    aggregates.allocationPayCycle("2026-08-23", ["salary"]),
+  );
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
@@ -95,6 +117,8 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(calculate.budgetTriage).toHaveBeenCalledOnce();
   expect(calculate.goalOutlook).toHaveBeenCalledOnce();
   expect(calculate.cashHorizon).toHaveBeenCalledOnce();
+  expect(calculate.allocationPlanMonth).toHaveBeenCalledOnce();
+  expect(calculate.allocationPlanPayCycle).toHaveBeenCalledOnce();
 });
 
 it("does not share cached money across data revisions or ranges", () => {

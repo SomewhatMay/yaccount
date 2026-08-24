@@ -95,6 +95,7 @@ vi.mock("@/features/store", () => ({
   snapshotsAtom: "snapshots",
   recurringRulesAtom: "recurringRules",
   goalsAtom: "goals",
+  settingsAtom: "settings",
 }));
 
 vi.mock("./period-pref", () => ({
@@ -181,6 +182,7 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.values.set("snapshots", []);
   fixture.values.set("recurringRules", []);
   fixture.values.set("goals", []);
+  fixture.values.set("settings", [{ key: "expected_income:2026-08", value: "250000" }]);
   fixture.periodKeys = [];
   fixture.compareKeys = [];
 
@@ -201,6 +203,9 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   expect(balanceWidget.props.base.aggregates).toBeDefined();
   expect(balanceWidget.props.base.aggregates).toBe(savedWidget.props.base.aggregates);
   expect(savedWidget.props.base.instanceSettings).toEqual({ horizonDays: 60 });
+  expect(savedWidget.props.base.syncedSettings).toEqual([
+    { key: "expected_income:2026-08", value: "250000" },
+  ]);
   await savedWidget.props.base.saveInstanceSettings?.({ horizonDays: 14 });
   expect(dashboardSets.saveDashboard).toHaveBeenCalledWith({
     ...dashboardSets.activeDashboard,
