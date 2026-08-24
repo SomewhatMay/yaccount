@@ -349,7 +349,7 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
     page.getByText("Period comparison isn't supported for this current view.", {
       exact: true,
     }),
-  ).toHaveCount(5);
+  ).toHaveCount(6);
   await page.getByRole("button", { name: "Compare with another period" }).click();
 
   await page.getByRole("button", { name: "Edit dashboard" }).click();
@@ -497,6 +497,39 @@ test("persists Allocation plan pay-cycle mode and income anchors", async ({ page
       name: "Use E2E side income as a pay-cycle anchor",
     }),
   ).not.toBeChecked();
+});
+
+test("shows Month landing scheduled math before history is available", async ({
+  page,
+}) => {
+  await createCategory(page, "E2E landing bill");
+  await openReady(page, "/recurring", "Scheduled transactions");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Payee / source").fill("E2E month-end bill");
+  await page.getByRole("combobox").first().click();
+  await page
+    .getByRole("option", { name: "E2E landing bill · expense", exact: true })
+    .click();
+  await page.getByLabel("Amount").fill("125.00");
+  await page.getByLabel("Day of month").fill("30");
+  await page.getByRole("button", { name: "Add recurring" }).click();
+
+  await openReady(page, "/", "How the money moved");
+  const landing = page
+    .getByRole("heading", { name: "Month landing" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await landing.scrollIntoViewIfNeeded();
+  await expect(landing.getByText("Early estimate", { exact: false })).toBeVisible();
+  await landing.getByRole("button", { name: "Show the math" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Month landing: show the math" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scheduled" })).toBeVisible();
+  await expect(
+    page
+      .locator('[data-slot="sheet-body"]')
+      .getByText("Remaining scheduled net", { exact: true }),
+  ).toBeVisible();
 });
 
 test("keeps lazy dashboard detail within the mobile viewport", async ({

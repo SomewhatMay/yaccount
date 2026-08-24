@@ -198,6 +198,14 @@ const loadAllocationPlanCompact: WidgetModuleLoader = () =>
   import("./widget-modules/AllocationPlanWidget").then((module) => ({
     default: module.AllocationPlanCompact,
   }));
+const loadMonthLanding: WidgetModuleLoader = () =>
+  import("./widget-modules/MonthLandingWidget").then((module) => ({
+    default: module.MonthLandingExpanded,
+  }));
+const loadMonthLandingCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/MonthLandingWidget").then((module) => ({
+    default: module.MonthLandingCompact,
+  }));
 
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
@@ -611,6 +619,100 @@ function currentMonthText(today: string): string {
   }).format(new Date(`${today.slice(0, 7)}-01T00:00:00`));
 }
 
+function monthLandingAvailability(context: WidgetContext): WidgetAvailability {
+  const landing = context.aggregates.monthLanding(context.today);
+  const hasSchedule =
+    landing.scheduledItems.length > 0 || landing.unknownItems.length > 0;
+  const hasFlexibleHistory =
+    landing.history.length >= 2 &&
+    landing.history.some((item) => item.flexibleSpending !== 0);
+  if (!hasSchedule && !hasFlexibleHistory) {
+    return {
+      status: "insufficient-data",
+      title: "Build a landing signal",
+      description:
+        "Two complete months of flexible spending or a remaining scheduled item unlocks this forecast.",
+      action: { label: "Review activity", href: "/ledger" },
+    };
+  }
+  return { status: "ready" };
+}
+
+function monthLandingRange(today: string): string {
+  const yearMonth = today.slice(0, 7);
+  const [year, month] = yearMonth.split("-").map(Number);
+  const endDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const monthName = new Intl.DateTimeFormat("en-US", { month: "long" }).format(
+    new Date(`${yearMonth}-01T00:00:00`),
+  );
+  return `${monthName} 1–${endDay}, ${year} · actual through ${monthName} ${Number(today.slice(8))}`;
+}
+
+function monthLandingMath(context: WidgetContext): WidgetMathDisclosure {
+  const landing = context.aggregates.monthLanding(context.today);
+  return {
+    range: monthLandingRange(context.today),
+    freshness: `Approved actuals through ${context.today}; known activity through ${landing.end}.`,
+    lines: [
+      {
+        kind: "actual",
+        label: "Income through today",
+        amount: landing.actualIncome,
+      },
+      {
+        kind: "actual",
+        label: "Categorized expenses through today",
+        amount: -landing.actualExpense,
+      },
+      { kind: "actual", label: "Kept so far", amount: landing.keptSoFar },
+      ...landing.scheduledItems.map((item) => ({
+        kind: "scheduled" as const,
+        label: `${item.date}: ${item.label}`,
+        amount: item.amount,
+        note:
+          item.source === "pending"
+            ? "Pending; expected, not actual."
+            : item.source === "approved-future"
+              ? "Approved future row; enters on its date."
+              : "Active recurring occurrence.",
+      })),
+      ...landing.unknownItems.map((item) => ({
+        kind: "scheduled" as const,
+        label: `${item.date}: ${item.label}`,
+        value: "set later",
+      })),
+      {
+        kind: "scheduled",
+        label: "Remaining scheduled net",
+        amount: landing.remainingScheduledNet,
+      },
+      ...landing.history.map((item) => ({
+        kind: "inferred" as const,
+        label: `${item.month}: aligned flexible spending`,
+        amount: -item.flexibleSpending,
+        note: `${item.start} through ${item.end}; recurring-linked rows excluded.`,
+      })),
+      ...(landing.usualFlexibleSpending === null
+        ? []
+        : [
+            {
+              kind: "inferred" as const,
+              label: "Usual flexible spending",
+              amount: -landing.usualFlexibleSpending,
+            },
+          ]),
+      { kind: "context", label: "Likely kept", amount: landing.likelyKept },
+    ],
+    exclusions: [
+      "transfers",
+      "stats-hidden categories",
+      "recurring-linked spending from the flexible-history sample",
+      "the partial current month from comparable history",
+    ],
+    rule: "Actual kept is approved stats-visible income less categorized expense through today. Add de-duplicated future approved, pending, and recurring net once; then subtract the median flexible expense from the aligned remaining slices of the last two or three complete months. The observed minimum and maximum form the range.",
+  };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -817,6 +919,28 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     ...compact(loadGoalOutlookCompact),
     availability: goalOutlookAvailability,
     math: goalOutlookMath,
+  },
+  {
+    id: "landing",
+    title: "Month landing",
+    description: "Where this month may land after known and usual remaining spend.",
+    defaultVisible: true,
+    fixedWindow: true,
+    gallery: gallery(
+      "forecasts",
+      ["month end", "forecast", "kept", "range", "usual spending"],
+      (context) => {
+        const landing = context.aggregates.monthLanding(context.today);
+        return monthLandingAvailability(context).status === "ready"
+          ? `${formatCents(landing.likelyKept)} likely kept by month end`
+          : null;
+      },
+    ),
+    load: loadMonthLanding,
+    component: lazy(loadMonthLanding),
+    ...compact(loadMonthLandingCompact),
+    availability: monthLandingAvailability,
+    math: monthLandingMath,
   },
   {
     id: "monthly",

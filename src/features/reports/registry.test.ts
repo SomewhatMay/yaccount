@@ -31,6 +31,7 @@ describe("the dashboard widget registry", () => {
       "allocation",
       "largest",
       "goals",
+      "landing",
       "monthly",
       "waterfall",
       "trend",
@@ -131,6 +132,19 @@ describe("the dashboard widget registry", () => {
     expect(allocation?.availability).toBeTypeOf("function");
   });
 
+  it("adds Month landing as a fixed-current forecast widget", () => {
+    const landing = DASHBOARD_WIDGETS.find((widget) => widget.id === "landing");
+
+    expect(landing).toMatchObject({
+      title: "Month landing",
+      defaultVisible: true,
+      fixedWindow: true,
+    });
+    expect(landing?.loadCompact).toBeTypeOf("function");
+    expect(landing?.math).toBeTypeOf("function");
+    expect(landing?.availability).toBeTypeOf("function");
+  });
+
   it("only exempts a widget from the period control when its window is its meaning", () => {
     // Current/recent facts are not period reports; pace and upcoming carry their
     // own windows. A period menu on any of them would be a control that lies.
@@ -142,6 +156,7 @@ describe("the dashboard widget registry", () => {
       "upcoming",
       "allocation",
       "goals",
+      "landing",
     ]);
   });
 

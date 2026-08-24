@@ -1,6 +1,7 @@
 import {
   allocationPlanMonth as deriveAllocationMonth,
   allocationPlanPayCycle as deriveAllocationPayCycle,
+  monthLanding as deriveMonthLanding,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
   goalOutlook as deriveGoalOutlook,
@@ -46,6 +47,7 @@ export interface DashboardAggregateCalculators {
   cashHorizon: typeof deriveCashHorizon;
   allocationPlanMonth: typeof deriveAllocationMonth;
   allocationPlanPayCycle: typeof deriveAllocationPayCycle;
+  monthLanding: typeof deriveMonthLanding;
 }
 
 export interface DashboardAggregates {
@@ -69,6 +71,7 @@ export interface DashboardAggregates {
     today: string,
     anchorRuleIds?: string[],
   ) => ReturnType<typeof deriveAllocationPayCycle>;
+  monthLanding: (today: string) => ReturnType<typeof deriveMonthLanding>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -83,6 +86,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   cashHorizon: deriveCashHorizon,
   allocationPlanMonth: deriveAllocationMonth,
   allocationPlanPayCycle: deriveAllocationPayCycle,
+  monthLanding: deriveMonthLanding,
 };
 
 function rangeKey(range: DateRange): string {
@@ -115,6 +119,7 @@ export function createDashboardAggregates(
     string,
     ReturnType<typeof deriveAllocationPayCycle>
   >();
+  const monthLandingCache = new Map<string, ReturnType<typeof deriveMonthLanding>>();
 
   return {
     monthly(range) {
@@ -252,6 +257,18 @@ export function createDashboardAggregates(
         rules: inputs.recurringRules,
       });
       allocationPayCycleCache.set(key, result);
+      return result;
+    },
+    monthLanding(today) {
+      const cached = monthLandingCache.get(today);
+      if (cached) return cached;
+      const result = calculate.monthLanding({
+        today,
+        transactions: inputs.reportTransactions,
+        categories: inputs.categories,
+        recurringRules: inputs.recurringRules,
+      });
+      monthLandingCache.set(today, result);
       return result;
     },
   };

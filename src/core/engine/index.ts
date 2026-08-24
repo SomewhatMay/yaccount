@@ -16,3 +16,4 @@ export * from "./budget-triage";
 export * from "./goal-outlook";
 export * from "./cash-horizon";
 export * from "./allocation-plan";
+export * from "./month-landing";
