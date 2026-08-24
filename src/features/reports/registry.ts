@@ -167,6 +167,15 @@ const loadBudgetTriageCompact: WidgetModuleLoader = () =>
     default: module.BudgetTriageCompact,
   }));
 
+const loadGoalOutlook: WidgetModuleLoader = () =>
+  import("./widget-modules/GoalOutlookWidget").then((module) => ({
+    default: module.GoalOutlookExpanded,
+  }));
+const loadGoalOutlookCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/GoalOutlookWidget").then((module) => ({
+    default: module.GoalOutlookCompact,
+  }));
+
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
 }
@@ -307,6 +316,74 @@ function budgetTriageMath(context: WidgetContext): WidgetMathDisclosure {
       "linear pace during the first six days",
     ],
     rule: "Spent over budget ranks first. Otherwise the greater of linear day pace and spent plus known scheduled expense governs; over budget needs attention, at least 90% is Watch, and the rest is On track.",
+  };
+}
+
+function goalOutlookAvailability(context: WidgetContext): WidgetAvailability {
+  return context.aggregates.goalOutlook(context.today).rows.length > 0
+    ? { status: "ready" }
+    : {
+        status: "needs-setup",
+        title: "Create an active goal",
+        description: "A goal plan unlocks finish lines and monthly asks.",
+        action: { label: "Set up a goal", href: "/goals" },
+      };
+}
+
+function goalOutlookMath(context: WidgetContext): WidgetMathDisclosure {
+  const outlook = context.aggregates.goalOutlook(context.today);
+  return {
+    range: `As of ${context.today}`,
+    freshness: "Approved goal activity and current reserve balances.",
+    lines: outlook.rows.flatMap((row) => [
+      {
+        kind: "actual" as const,
+        label: `${row.name}: ${row.kind === "reserve" ? "reserve balance" : "approved contributions"}`,
+        amount: row.basis,
+      },
+      ...(row.target === null
+        ? []
+        : [
+            {
+              kind: "context" as const,
+              label: `${row.name}: target`,
+              amount: row.target,
+            },
+          ]),
+      ...(row.monthlyAsk === 0
+        ? []
+        : [
+            {
+              kind: "scheduled" as const,
+              label: `${row.name}: monthly ask`,
+              amount: row.monthlyAsk,
+            },
+          ]),
+      ...(row.deadline === null
+        ? []
+        : [
+            {
+              kind: "context" as const,
+              label: `${row.name}: deadline`,
+              value: row.deadline,
+            },
+          ]),
+      ...(row.projectedCompletion === null
+        ? []
+        : [
+            {
+              kind: "inferred" as const,
+              label: `${row.name}: projected completion`,
+              value: row.projectedCompletion,
+            },
+          ]),
+    ]),
+    exclusions: [
+      "Pending transfers",
+      "ordinary spending from contribution progress",
+      "completed, cancelled, and archived goals",
+    ],
+    rule: "Reserve goals use the live container balance. Spend-down goals use approved contributions. Deadline goals show the required monthly ask; fixed goals project from their planned monthly amount; passive goals infer neither.",
   };
 }
 
@@ -466,9 +543,10 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   },
   {
     id: "goals",
-    title: "Goals",
-    description: "Progress and monthly asks for active goals.",
+    title: "Goal outlook",
+    description: "Finish lines, monthly asks, and progress for active goals.",
     defaultVisible: true,
+    fixedWindow: true,
     gallery: gallery(
       "planning",
       ["goal", "target", "deadline", "saving"],
@@ -481,7 +559,11 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
           : null;
       },
     ),
-    ...legacy("goals"),
+    load: loadGoalOutlook,
+    component: lazy(loadGoalOutlook),
+    ...compact(loadGoalOutlookCompact),
+    availability: goalOutlookAvailability,
+    math: goalOutlookMath,
   },
   {
     id: "monthly",

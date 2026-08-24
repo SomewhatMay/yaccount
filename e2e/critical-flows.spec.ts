@@ -349,7 +349,7 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
     page.getByText("Period comparison isn't supported for this current view.", {
       exact: true,
     }),
-  ).toHaveCount(3);
+  ).toHaveCount(4);
   await page.getByRole("button", { name: "Compare with another period" }).click();
 
   await page.getByRole("button", { name: "Edit dashboard" }).click();

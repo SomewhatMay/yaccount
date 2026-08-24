@@ -1,5 +1,6 @@
 import {
   budgetTriage as deriveBudgetTriage,
+  goalOutlook as deriveGoalOutlook,
   monthlyTotals,
   moneyMap as deriveMoneyMap,
   overallBalance,
@@ -37,6 +38,7 @@ export interface DashboardAggregateCalculators {
   moneyMap: typeof deriveMoneyMap;
   whatChanged: typeof deriveWhatChanged;
   budgetTriage: typeof deriveBudgetTriage;
+  goalOutlook: typeof deriveGoalOutlook;
 }
 
 export interface DashboardAggregates {
@@ -47,6 +49,7 @@ export interface DashboardAggregates {
   moneyMap: () => ReturnType<typeof deriveMoneyMap>;
   whatChanged: (range: DateRange) => ReturnType<typeof deriveWhatChanged>;
   budgetTriage: (today: string) => ReturnType<typeof deriveBudgetTriage>;
+  goalOutlook: (today: string) => ReturnType<typeof deriveGoalOutlook>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -57,6 +60,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   moneyMap: deriveMoneyMap,
   whatChanged: deriveWhatChanged,
   budgetTriage: deriveBudgetTriage,
+  goalOutlook: deriveGoalOutlook,
 };
 
 function rangeKey(range: DateRange): string {
@@ -79,6 +83,7 @@ export function createDashboardAggregates(
   let cachedMoneyMap: ReturnType<typeof deriveMoneyMap> | null = null;
   const whatChangedCache = new Map<string, ReturnType<typeof deriveWhatChanged>>();
   const budgetTriageCache = new Map<string, ReturnType<typeof deriveBudgetTriage>>();
+  const goalOutlookCache = new Map<string, ReturnType<typeof deriveGoalOutlook>>();
 
   return {
     monthly(range) {
@@ -155,6 +160,18 @@ export function createDashboardAggregates(
         today,
       );
       budgetTriageCache.set(today, result);
+      return result;
+    },
+    goalOutlook(today) {
+      const cached = goalOutlookCache.get(today);
+      if (cached) return cached;
+      const result = calculate.goalOutlook(
+        inputs.goals,
+        inputs.containers,
+        inputs.ledgerTransactions,
+        today,
+      );
+      goalOutlookCache.set(today, result);
       return result;
     },
   };
