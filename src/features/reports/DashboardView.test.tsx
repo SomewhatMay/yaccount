@@ -9,6 +9,7 @@ const fixture = vi.hoisted(() => ({
   periodKeys: [] as string[],
   compareKeys: [] as string[],
   curations: [] as unknown[],
+  dispatchMany: vi.fn(async () => {}),
 }));
 const dashboardSets = vi.hoisted(() => ({
   dashboards: [
@@ -87,6 +88,7 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("jotai", () => ({
   useAtomValue: (atom: string) => fixture.values.get(atom),
+  useSetAtom: () => fixture.dispatchMany,
 }));
 
 vi.mock("@/features/store", () => ({
@@ -99,6 +101,7 @@ vi.mock("@/features/store", () => ({
   recurringRulesAtom: "recurringRules",
   goalsAtom: "goals",
   settingsAtom: "settings",
+  dispatchManyAtom: "dispatchMany",
 }));
 
 vi.mock("./period-pref", () => ({
@@ -224,6 +227,8 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   expect(savedWidget.props.base.syncedSettings).toEqual([
     { key: "expected_income:2026-08", value: "250000" },
   ]);
+  await savedWidget.props.base.dispatchOps?.([]);
+  expect(fixture.dispatchMany).toHaveBeenCalledWith([]);
   await savedWidget.props.base.saveInstanceSettings?.({ horizonDays: 14 });
   expect(dashboardSets.saveDashboard).toHaveBeenCalledWith({
     ...dashboardSets.activeDashboard,

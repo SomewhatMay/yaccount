@@ -1,5 +1,11 @@
 import { addDays, format } from "date-fns";
-import type { Category, Container, RecurringRule, Transaction } from "../model";
+import {
+  recurringOccurrenceDate,
+  type Category,
+  type Container,
+  type RecurringRule,
+  type Transaction,
+} from "../model";
 import { isLiveLedgerRow } from "./balances";
 import { activeRows, pendingRows } from "./ledger";
 import { upcomingOccurrences } from "./recurring";
@@ -159,13 +165,18 @@ export function cashHorizon(
   const drafts: EventDraft[] = [];
 
   const approvedActive = activeRows(transactions).filter(
-    (row) => row.date >= today && row.date <= end && row.recurring_rule_id !== null,
+    (row) =>
+      row.recurring_rule_id !== null &&
+      recurringOccurrenceDate(row) >= today &&
+      recurringOccurrenceDate(row) <= end,
   );
   const pending = pendingRows(transactions).filter(
-    (row) => row.date >= today && row.date <= end,
+    (row) => recurringOccurrenceDate(row) >= today && recurringOccurrenceDate(row) <= end,
   );
   const approvedLinkedKeys = new Set(
-    approvedActive.map((row) => linkedKey(row.recurring_rule_id!, row.date)),
+    approvedActive.map((row) =>
+      linkedKey(row.recurring_rule_id!, recurringOccurrenceDate(row)),
+    ),
   );
   const represented = new Set(approvedLinkedKeys);
 
@@ -179,7 +190,7 @@ export function cashHorizon(
 
   for (const row of pending) {
     if (row.recurring_rule_id) {
-      const key = linkedKey(row.recurring_rule_id, row.date);
+      const key = linkedKey(row.recurring_rule_id, recurringOccurrenceDate(row));
       represented.add(key);
       if (approvedLinkedKeys.has(key)) continue;
     } else if (row.to_container_id === null) {

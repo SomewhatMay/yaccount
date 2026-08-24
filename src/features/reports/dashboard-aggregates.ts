@@ -6,6 +6,7 @@ import {
   containerWatch as deriveContainerWatch,
   categoryWatch as deriveCategoryWatch,
   commitments as deriveCommitments,
+  monthClose as deriveMonthClose,
   moneyBrief as deriveMoneyBrief,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
@@ -58,6 +59,7 @@ export interface DashboardAggregateCalculators {
   categoryWatch: typeof deriveCategoryWatch;
   moneyBrief: typeof deriveMoneyBrief;
   commitments: typeof deriveCommitments;
+  monthClose: typeof deriveMonthClose;
 }
 
 export interface DashboardAggregates {
@@ -97,6 +99,7 @@ export interface DashboardAggregates {
   ) => ReturnType<typeof deriveCategoryWatch>;
   moneyBrief: (today: string) => ReturnType<typeof deriveMoneyBrief>;
   commitments: (today: string) => ReturnType<typeof deriveCommitments>;
+  monthClose: (today: string) => ReturnType<typeof deriveMonthClose>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -117,6 +120,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   categoryWatch: deriveCategoryWatch,
   moneyBrief: deriveMoneyBrief,
   commitments: deriveCommitments,
+  monthClose: deriveMonthClose,
 };
 
 function rangeKey(range: DateRange): string {
@@ -158,6 +162,7 @@ export function createDashboardAggregates(
   const categoryWatchCache = new Map<string, ReturnType<typeof deriveCategoryWatch>>();
   const moneyBriefCache = new Map<string, ReturnType<typeof deriveMoneyBrief>>();
   const commitmentsCache = new Map<string, ReturnType<typeof deriveCommitments>>();
+  const monthCloseCache = new Map<string, ReturnType<typeof deriveMonthClose>>();
 
   function getBudgetTriage(today: string): ReturnType<typeof deriveBudgetTriage> {
     const cached = budgetTriageCache.get(today);
@@ -387,6 +392,20 @@ export function createDashboardAggregates(
         recurringRules: inputs.recurringRules,
       });
       commitmentsCache.set(today, result);
+      return result;
+    },
+    monthClose(today) {
+      if (monthCloseCache.has(today)) return monthCloseCache.get(today)!;
+      const result = calculate.monthClose({
+        today,
+        transactions: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        containers: inputs.containers,
+        snapshots: inputs.snapshots,
+        budgetTargets: inputs.budgetTargets,
+        recurringRules: inputs.recurringRules,
+      });
+      monthCloseCache.set(today, result);
       return result;
     },
   };

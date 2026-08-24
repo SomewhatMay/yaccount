@@ -22,8 +22,23 @@ describe("makeTransaction (§5.4 expense/income shape)", () => {
     expect(t.container_id).toBe("general"); // implicit default wallet (M2)
     expect(t.is_template).toBe(false);
     expect(t.inbox_status).toBe("approved");
+    expect(t.recurring_occurrence_date).toBeNull();
     expect(t.reverses_id).toBeNull();
     expect(t.id.length).toBeGreaterThan(0);
+  });
+
+  it("keeps an explicit recurring occurrence separate from the payment date", () => {
+    const t = makeTransaction({
+      date: "2026-07-29",
+      amount: -1000,
+      vendor_source: "Power",
+      category_id: "utilities",
+      recurring_rule_id: "power",
+      recurring_occurrence_date: "2026-07-31",
+    });
+
+    expect(t.date).toBe("2026-07-29");
+    expect(t.recurring_occurrence_date).toBe("2026-07-31");
   });
 
   it("keeps the caller-supplied sign (sign ⟂ type is a UI default, §10 #13)", () => {

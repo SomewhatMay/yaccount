@@ -207,7 +207,7 @@ Question: Should the close checklist avoid claiming that recurring items were �
 
 Recommended: Yes. Use only provable copy: pending entries remaining, budgets above allowance, unmatched expected occurrences, and stale values. Let the user explicitly acknowledge the month when satisfied. Do not persist a derived claim that a bill happened. A dismissed recurring proposal may clear Inbox work but must not become an approved actual.
 
-Owner: **Deferred. More context is required. Build every non-dependent item first; defer Month close and other D15-dependent work to the end.**
+Owner: **Approved. Also inspect approved manual entries for exact amount/category/container matches within seven days, but never infer payment. Require an explicit “Use this entry” action, sync the recurring-occurrence association, and only then count it as matched. If its generated proposal remains pending, dismiss that duplicate in the same undoable action.**
 
 ### D16. Future-dated approved rows
 

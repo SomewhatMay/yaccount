@@ -15,8 +15,10 @@ import type {
   Setting,
   Transaction,
 } from "@/core/model";
+import type { Op } from "@/core/oplog";
 import { formatCents } from "@/core/money";
 import type { DashboardAggregates } from "./dashboard-aggregates";
+import { isMonthCloseAcknowledged } from "./month-close-state";
 
 export interface WidgetContext {
   range: DateRange;
@@ -35,6 +37,7 @@ export interface WidgetContext {
   saveInstanceSubject?: (subject: { type: string; id: string }) => Promise<void>;
   saveInstanceSettings?: (settings: Record<string, unknown>) => Promise<void>;
   syncedSettings?: Setting[];
+  dispatchOps?: (ops: Op[]) => Promise<void>;
 }
 
 export type WidgetAvailability =
@@ -1023,6 +1026,10 @@ function categoryWatchMath(context: WidgetContext): WidgetMathDisclosure {
 
 function moneyBriefMath(context: WidgetContext): WidgetMathDisclosure {
   const result = context.aggregates.moneyBrief(context.today);
+  const close = context.aggregates.monthClose(context.today);
+  const closeMonth = close
+    ? incomeMonthLabel(close.yearMonth).replace(/ \d{4}$/, "")
+    : null;
   return {
     range: `${context.today} · known cash through ${context.aggregates.cashHorizon(context.today, 30).end}`,
     freshness: `Complete pending ledger, current-month stats-visible budgets, raw cash, and latest investment values as of ${context.today}.`,
@@ -1084,14 +1091,49 @@ function moneyBriefMath(context: WidgetContext): WidgetMathDisclosure {
             },
           ]
         : []),
+      ...(close && closeMonth
+        ? [
+            {
+              kind: "actual" as const,
+              label: `${closeMonth} pending entries`,
+              value: String(close.pendingCount),
+            },
+            ...close.overBudget.map((item): WidgetMathLine => ({
+              kind: "actual",
+              label: `${closeMonth} ${item.name} over allowance`,
+              amount: item.over,
+              note: `${formatCents(item.spent)} spent against ${formatCents(item.budget)}.`,
+            })),
+            ...close.unmatchedOccurrences.map((item): WidgetMathLine => ({
+              kind: "scheduled",
+              label: `${item.date}: ${item.label} unmatched`,
+              ...(item.amount === null ? {} : { amount: item.amount }),
+              note: `${item.candidates.length} manual ${item.candidates.length === 1 ? "candidate" : "candidates"}; none count until explicitly matched.`,
+            })),
+            {
+              kind: "context" as const,
+              label: `Investment values needing refresh for ${closeMonth} close`,
+              value: String(
+                close.staleValues.staleCount + close.staleValues.missingCount,
+              ),
+            },
+            {
+              kind: "context" as const,
+              label: `${closeMonth} close acknowledgement`,
+              value: isMonthCloseAcknowledged(context.syncedSettings, close.yearMonth)
+                ? "Acknowledged"
+                : "Open",
+            },
+          ]
+        : []),
     ],
     exclusions: [
       "ordinary upcoming bills from attention ranking",
       "stats-hidden categories from budget checks",
       "archived investment containers",
-      "month-close acknowledgement and unmatched-occurrence claims",
+      "manual candidates until explicitly matched to an expected occurrence",
     ],
-    rule: `Rank known cash shortfalls, complete pending review, current-month spent/projected budget overages, then investment values older than 30 days or missing. Show at most three of ${result.totalItems} current matters; ordinary bills appear only as all-clear context.`,
+    rule: `Rank known cash shortfalls, complete pending review, current-month spent/projected budget overages, then investment values older than 30 days or missing. Show at most three of ${result.totalItems} current matters; ordinary bills appear only as all-clear context. During the last three days of a month or first five of the next, separately show provable pending, allowance, expected-occurrence, and investment-value close work until complete or acknowledged.`,
   };
 }
 

@@ -78,7 +78,11 @@ describe("occurrence math — firstOccurrenceOnOrAfter / nextOccurrence (§5.8)"
     expect(nextOccurrence(r, "2026-01-01")).toBe("2026-01-15");
     // From an off-grid date, snap forward to the next multiple.
     expect(firstOccurrenceOnOrAfter(r, "2026-01-10")).toBe("2026-01-15");
-    const monthly = rule("custom", { every: 3, unit: "month" }, { start_date: "2026-01-31" });
+    const monthly = rule(
+      "custom",
+      { every: 3, unit: "month" },
+      { start_date: "2026-01-31" },
+    );
     expect(nextOccurrence(monthly, "2026-01-31")).toBe("2026-04-30"); // date-fns clamps
   });
 });
@@ -95,6 +99,7 @@ describe("generateDueOccurrences — fixed backfills every missed month oldest-f
     ]);
     expect(rows.every((t) => t.inbox_status === "pending")).toBe(true);
     expect(rows.every((t) => t.recurring_rule_id === "r1")).toBe(true);
+    expect(rows.map((t) => t.recurring_occurrence_date)).toEqual(rows.map((t) => t.date));
     expect(rows.every((t) => t.amount === -1500)).toBe(true);
     // Cursor advanced past everything generated → next open generates nothing.
     expect(advanced.next_generation_date).toBe("2026-05-01");

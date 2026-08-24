@@ -1,5 +1,11 @@
 import { addDays, format } from "date-fns";
-import type { BudgetTarget, Category, RecurringRule, Transaction } from "../model";
+import {
+  recurringOccurrenceDate,
+  type BudgetTarget,
+  type Category,
+  type RecurringRule,
+  type Transaction,
+} from "../model";
 import { budgetOnDate } from "./budgets";
 import { activeRows, pendingRows } from "./ledger";
 import { inRange } from "./period";
@@ -64,7 +70,8 @@ function scheduledRows(
   range: { start: string; end: string },
   today: string,
 ): { items: BudgetScheduledItem[]; represented: Set<string> } {
-  const approvedFuture = activeRows(transactions).filter(
+  const approved = activeRows(transactions);
+  const approvedFuture = approved.filter(
     (row) =>
       row.date > today &&
       row.category_id !== null &&
@@ -76,12 +83,21 @@ function scheduledRows(
       row.recurring_rule_id !== null &&
       row.category_id !== null &&
       eligibleIds.has(row.category_id) &&
-      inRange(row.date, range),
+      inRange(recurringOccurrenceDate(row), range),
   );
-  const represented = new Set<string>();
+  const represented = new Set(
+    approved.flatMap((row) =>
+      row.recurring_rule_id !== null &&
+      row.category_id !== null &&
+      eligibleIds.has(row.category_id) &&
+      inRange(recurringOccurrenceDate(row), range)
+        ? [linkedKey(row.recurring_rule_id, recurringOccurrenceDate(row))]
+        : [],
+    ),
+  );
   const items = [...approvedFuture, ...pending].map((row) => {
     if (row.recurring_rule_id) {
-      represented.add(linkedKey(row.recurring_rule_id, row.date));
+      represented.add(linkedKey(row.recurring_rule_id, recurringOccurrenceDate(row)));
     }
     return {
       id: row.id,

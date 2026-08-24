@@ -181,10 +181,13 @@ describe("budgetTriage", () => {
     "lets a linked %s row replace its scheduled occurrence exactly once",
     (status) => {
       const bill = monthlyRule("bill", projected.id, 10_000);
-      const linked = expense("linked", projected.id, 12_000, "2026-08-20", {
-        status,
-        ruleId: bill.id,
-      });
+      const linked = {
+        ...expense("linked", projected.id, 12_000, "2026-08-19", {
+          status,
+          ruleId: bill.id,
+        }),
+        recurring_occurrence_date: "2026-08-20",
+      };
       const row = budgetTriage(
         [expense("actual", projected.id, 5_000), linked],
         [projected],
@@ -197,7 +200,7 @@ describe("budgetTriage", () => {
       expect(row.scheduledRemaining).toBe(12_000);
       expect(row.scheduled).toEqual([
         expect.objectContaining({
-          date: "2026-08-20",
+          date: "2026-08-19",
           amount: 12_000,
           source: status === "pending" ? "pending" : "approved-future",
         }),

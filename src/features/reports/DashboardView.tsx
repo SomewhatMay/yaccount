@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { LayoutDashboardIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   budgetTargetsAtom,
   categoriesAtom,
   containersAtom,
+  dispatchManyAtom,
   goalsAtom,
   readyAtom,
   recurringRulesAtom,
@@ -67,6 +68,7 @@ export function DashboardView() {
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
   const settings = useAtomValue(settingsAtom);
+  const dispatchOps = useSetAtom(dispatchManyAtom);
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
   const data = useMemo(() => {
@@ -82,6 +84,7 @@ export function DashboardView() {
       recurringRules,
       goals,
       syncedSettings: settings,
+      dispatchOps,
       aggregates: createDashboardAggregates({
         budgetTargets,
         categories,
@@ -103,6 +106,7 @@ export function DashboardView() {
     recurringRules,
     goals,
     settings,
+    dispatchOps,
   ]);
   const overviewCuration = useMemo(() => {
     const hasExpenseBudget = data.aggregates.budgetTriage(today).rows.length > 0;

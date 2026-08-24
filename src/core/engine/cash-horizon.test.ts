@@ -160,10 +160,13 @@ describe("cashHorizon", () => {
     "lets a linked %s row replace its rule occurrence exactly once",
     (status) => {
       const bill = monthlyRule("bill", 25, -10_000);
-      const linked = row("linked", "2026-08-25", -12_000, {
-        status,
-        ruleId: bill.id,
-      });
+      const linked = {
+        ...row("linked", "2026-08-24", -12_000, {
+          status,
+          ruleId: bill.id,
+        }),
+        recurring_occurrence_date: "2026-08-25",
+      };
       const result = cashHorizon(
         [row("opening", "2026-08-01", 50_000), linked],
         categories,
@@ -176,6 +179,7 @@ describe("cashHorizon", () => {
       expect(result.events).toHaveLength(1);
       expect(result.events[0]).toMatchObject({
         id: linked.id,
+        date: "2026-08-24",
         amount: -12_000,
         source: status === "pending" ? "pending" : "approved-future",
       });

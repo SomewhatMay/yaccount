@@ -1,5 +1,10 @@
 import { addDays, format } from "date-fns";
-import type { Category, RecurringRule, Transaction } from "../model";
+import {
+  recurringOccurrenceDate,
+  type Category,
+  type RecurringRule,
+  type Transaction,
+} from "../model";
 import { isTransferRule } from "../model";
 import { activeRows, pendingRows } from "./ledger";
 import { upcomingOccurrences } from "./recurring";
@@ -140,14 +145,19 @@ export function monthLanding(input: {
   );
   const currentPending = pendingRows(input.transactions).filter(
     (row) =>
-      row.date >= bounds.start &&
-      row.date <= bounds.end &&
+      recurringOccurrenceDate(row) >= bounds.start &&
+      recurringOccurrenceDate(row) <= bounds.end &&
       row.recurring_rule_id !== null &&
       categorized(row),
   );
   const approvedLinked = new Set(
-    currentApproved.flatMap((row) =>
-      row.recurring_rule_id ? [linkedKey(row.recurring_rule_id, row.date)] : [],
+    approved.flatMap((row) =>
+      row.recurring_rule_id &&
+      recurringOccurrenceDate(row) >= bounds.start &&
+      recurringOccurrenceDate(row) <= bounds.end &&
+      categorized(row)
+        ? [linkedKey(row.recurring_rule_id, recurringOccurrenceDate(row))]
+        : [],
     ),
   );
   const represented = new Set(approvedLinked);
@@ -163,7 +173,7 @@ export function monthLanding(input: {
     }));
 
   for (const row of currentPending) {
-    const key = linkedKey(row.recurring_rule_id!, row.date);
+    const key = linkedKey(row.recurring_rule_id!, recurringOccurrenceDate(row));
     represented.add(key);
     if (approvedLinked.has(key)) continue;
     scheduledItems.push({

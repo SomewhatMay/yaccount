@@ -784,6 +784,54 @@ test("ranks and caps current matters in Money brief", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("explicitly matches a manual entry during month close", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-08-02T12:00:00-04:00"));
+  await createCategory(page, "E2E close income", "Income");
+  await logIncomeOn(
+    page,
+    "E2E salary deposit",
+    "1000.00",
+    "E2E close income",
+    "2026-07-29",
+  );
+
+  await openReady(page, "/recurring", "Scheduled transactions");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Payee / source").fill("E2E salary");
+  await page.locator('[data-slot="sheet-body"]').getByRole("combobox").nth(1).click();
+  await page
+    .getByRole("option", { name: "E2E close income · income", exact: true })
+    .click();
+  await page.getByLabel("Amount").fill("1000.00");
+  await page.getByLabel("Day of month").fill("30");
+  await page.getByLabel("Starts").fill("2026-07-30");
+  await page.getByRole("button", { name: "Add recurring" }).click();
+
+  await openReady(page, "/", "How the money moved");
+  const card = page
+    .getByRole("heading", { name: "Money brief" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText("Close July", { exact: true })).toBeVisible();
+  await expect(
+    card.getByText("1 expected occurrence is unmatched", { exact: true }),
+  ).toBeVisible();
+  await expect(card.getByText("E2E salary deposit", { exact: true })).toBeVisible();
+
+  await card
+    .getByRole("button", {
+      name: "Use E2E salary deposit entry for E2E salary on Jul 30",
+    })
+    .click();
+  await expect(page.getByText("Entry matched", { exact: true })).toBeVisible();
+  await expect(card.getByText("Close July", { exact: true })).toBeHidden();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Money brief" })).toBeVisible();
+  await expect(page.getByText("Close July", { exact: true })).toBeHidden();
+  await openReady(page, "/inbox", "All clear");
+});
+
 test("keeps lazy dashboard detail within the mobile viewport", async ({
   page,
 }, testInfo) => {

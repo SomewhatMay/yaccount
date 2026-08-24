@@ -5,6 +5,7 @@ import {
   archiveCategory,
   createTransaction,
   updateTransaction,
+  linkTransactionToRecurringOccurrence,
   voidTransaction,
   createContainer,
   updateContainer,
@@ -110,6 +111,26 @@ describe("transaction commands", () => {
     expect(op.type).toBe("transaction.update");
     if (op.type !== "transaction.update") throw new Error("narrow");
     expect(op.payload.row.amount).toBe(-1200);
+  });
+
+  it("links a manual row to one exact recurring occurrence without changing its date", () => {
+    const row = makeTransaction({
+      id: "manual",
+      date: "2026-07-29",
+      amount: -1200,
+      vendor_source: "Power paid",
+      category_id: "utilities",
+    });
+    const op = linkTransactionToRecurringOccurrence(row, "power", "2026-07-31", META);
+
+    expect(op.type).toBe("transaction.update");
+    if (op.type !== "transaction.update") throw new Error("narrow");
+    expect(op.payload.row).toMatchObject({
+      id: "manual",
+      date: "2026-07-29",
+      recurring_rule_id: "power",
+      recurring_occurrence_date: "2026-07-31",
+    });
   });
 
   it("voidTransaction builds a reversing row linked to the original (§0.3)", () => {

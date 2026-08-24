@@ -167,7 +167,10 @@ describe("TransactionSchema (§5.4)", () => {
     yearMonth: "2026-07",
   };
   it("accepts an expense (negative amount, category set, no destination)", () => {
-    expect(TransactionSchema.parse(base).amount).toBe(-1000);
+    expect(TransactionSchema.parse(base)).toMatchObject({
+      amount: -1000,
+      recurring_occurrence_date: null,
+    });
   });
   it("permits either sign on any category — sign ⟂ type is a UI default only (§5.4/§10.13)", () => {
     // a +$100 credit row against an expense category (a refund) must be valid
@@ -189,6 +192,21 @@ describe("TransactionSchema (§5.4)", () => {
   });
   it("rejects an unknown inbox_status", () => {
     expect(() => TransactionSchema.parse({ ...base, inbox_status: "draft" })).toThrow();
+  });
+  it("requires a recurring rule when an occurrence date is recorded", () => {
+    expect(() =>
+      TransactionSchema.parse({
+        ...base,
+        recurring_occurrence_date: "2026-07-20",
+      }),
+    ).toThrow();
+    expect(
+      TransactionSchema.parse({
+        ...base,
+        recurring_rule_id: "power",
+        recurring_occurrence_date: "2026-07-20",
+      }).recurring_occurrence_date,
+    ).toBe("2026-07-20");
   });
 });
 

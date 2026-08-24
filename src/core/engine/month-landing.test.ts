@@ -90,14 +90,17 @@ describe("monthLanding", () => {
           vendor_source: "Hidden actual",
           category_id: hidden.id,
         }),
-        makeTransaction({
-          id: "salary-approved",
-          date: "2026-08-30",
-          amount: 100_000,
-          vendor_source: "Salary approved",
-          category_id: income.id,
-          recurring_rule_id: salary.id,
-        }),
+        {
+          ...makeTransaction({
+            id: "salary-approved",
+            date: "2026-08-29",
+            amount: 100_000,
+            vendor_source: "Salary approved",
+            category_id: income.id,
+            recurring_rule_id: salary.id,
+          }),
+          recurring_occurrence_date: "2026-08-30",
+        },
         makeTransaction({
           id: "salary-pending",
           date: "2026-08-30",
@@ -162,7 +165,7 @@ describe("monthLanding", () => {
       }),
       expect.objectContaining({
         id: "salary-approved",
-        date: "2026-08-30",
+        date: "2026-08-29",
         amount: 100_000,
         source: "approved-future",
       }),
