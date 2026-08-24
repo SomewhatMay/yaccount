@@ -130,6 +130,18 @@ test("opens Ledger on the first immediate tab tap", async ({ page }, testInfo) =
   await expect(page).toHaveURL(/\/ledger\/?$/);
 });
 
+test("opens search from the mobile topbar", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile topbar regression.");
+
+  await openReady(page, "/", "How the money moved");
+  const search = page.getByRole("button", { name: "Search yaccount" });
+  await expect(search).toBeVisible();
+  await search.click();
+  await expect(page.getByPlaceholder(/Search everything/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByPlaceholder(/Search everything/)).toBeHidden();
+});
+
 test("commits once for a keyboard resize burst and ignores viewport scroll", async ({
   page,
   context,

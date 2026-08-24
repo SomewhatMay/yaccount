@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSetAtom } from "jotai";
-import { ChevronRightIcon, SearchIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ResponsiveSheet } from "@/features/ui";
 import { AuthButton } from "@/features/auth/AuthButton";
 import { ThemeToggle } from "@/features/shell/ThemeToggle";
 import { MORE_DESTINATIONS } from "@/features/shell/nav";
-import { commandPaletteAtom } from "@/features/store";
 
 /**
  * What the four thumb slots displace (§: tab slots locked 2026-07-22).
@@ -26,7 +24,6 @@ export function MoreSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const pathname = usePathname();
-  const openPalette = useSetAtom(commandPaletteAtom);
 
   return (
     <ResponsiveSheet open={open} onOpenChange={onOpenChange} title="More">
@@ -66,18 +63,7 @@ export function MoreSheet({
 
       <div className="mt-2 flex items-center gap-2 border-t px-5 py-4">
         <AuthButton />
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              onOpenChange(false);
-              openPalette(true);
-            }}
-            aria-label="Search"
-            className="text-muted-foreground hover:text-foreground inline-flex size-9 items-center justify-center rounded-full"
-          >
-            <SearchIcon className="size-4" />
-          </button>
+        <div className="ml-auto">
           <ThemeToggle />
         </div>
       </div>

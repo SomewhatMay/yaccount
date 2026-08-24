@@ -17,10 +17,10 @@ import { destinationFor } from "@/features/shell/nav";
  * navigate with — that is the rail's job on a desktop and the tab bar's on a
  * phone.
  *
- * On a phone it is the wordmark plus the two ambient states (sync, theme); the
+ * On a phone it is the wordmark plus ambient states and global search; the
  * account control moves into the More sheet, where there is room for a sentence
- * about what signing in does. From `lg` it names the screen you are on and adds
- * the ⌘K affordance — discoverability for a shortcut nobody guesses.
+ * about what signing in does. From `lg` it also names the screen you are on and
+ * spells out the ⌘K shortcut.
  *
  * Sticky, because sync status is the one thing you may want to check mid-scroll.
  */
@@ -44,19 +44,21 @@ export function TopBar({ maxWidth }: { maxWidth: string }) {
         </span>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <AuthButton signedOutOnly />
+          <SyncIndicator />
+          <ThemeToggle />
           <Button
             variant="ghost"
             size="sm"
             onClick={() => openPalette(true)}
-            className="text-muted-foreground hidden rounded-full lg:inline-flex"
-            aria-label="Search and jump to a screen"
+            className="text-muted-foreground rounded-full"
+            aria-label="Search yaccount"
           >
             <SearchIcon className="size-4" />
-            <kbd className="text-muted-foreground/80 font-mono text-[0.6875rem]">⌘K</kbd>
+            <kbd className="text-muted-foreground/80 hidden font-mono text-[0.6875rem] lg:inline">
+              ⌘K
+            </kbd>
           </Button>
-          <AuthButton signedOutOnly />
-          <SyncIndicator />
-          <ThemeToggle />
         </div>
       </div>
     </header>
