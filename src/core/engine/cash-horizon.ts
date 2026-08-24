@@ -1,6 +1,6 @@
 import { addDays, format } from "date-fns";
 import type { Category, Container, RecurringRule, Transaction } from "../model";
-import { isLiveLedgerRow, overallBalanceAsOf } from "./balances";
+import { isLiveLedgerRow } from "./balances";
 import { activeRows, pendingRows } from "./ledger";
 import { upcomingOccurrences } from "./recurring";
 
@@ -48,7 +48,16 @@ function linkedKey(ruleId: string, date: string): string {
   return `${ruleId}:${date}`;
 }
 
-function selectedCashContainers(containers: Container[]): Container[] {
+function selectedCashContainers(
+  containers: Container[],
+  requestedIds?: readonly string[],
+): Container[] {
+  if (requestedIds) {
+    const requested = new Set(requestedIds);
+    return containers.filter(
+      (container) => requested.has(container.id) && !container.is_archived,
+    );
+  }
   return containers.filter(
     (container) =>
       container.include_in_overall_balance &&
@@ -62,6 +71,20 @@ function transactionDelta(row: Transaction, included: Set<string>): number {
   if (included.has(row.container_id)) delta += row.amount;
   if (row.to_container_id && included.has(row.to_container_id)) delta -= row.amount;
   return delta;
+}
+
+function selectedBalanceAsOf(
+  transactions: Transaction[],
+  included: Set<string>,
+  today: string,
+): number {
+  return transactions.reduce(
+    (sum, row) =>
+      !isLiveLedgerRow(row) || row.date > today
+        ? sum
+        : sum + transactionDelta(row, included),
+    0,
+  );
 }
 
 function ruleDelta(rule: RecurringRule, amount: number, included: Set<string>): number {
@@ -123,15 +146,16 @@ export function cashHorizon(
   recurringRules: RecurringRule[],
   today: string,
   days: CashHorizonDays,
+  requestedContainerIds?: readonly string[],
 ): CashHorizon {
-  const cashContainers = selectedCashContainers(containers);
+  const cashContainers = selectedCashContainers(containers, requestedContainerIds);
   const containerIds = cashContainers.map((container) => container.id).sort();
   const included = new Set(containerIds);
   const categoryTypes = new Map(
     categories.map((category) => [category.id, category.type]),
   );
   const end = format(addDays(new Date(`${today}T00:00:00`), days), "yyyy-MM-dd");
-  const startingBalance = overallBalanceAsOf(transactions, cashContainers, today);
+  const startingBalance = selectedBalanceAsOf(transactions, included, today);
   const drafts: EventDraft[] = [];
 
   const approvedActive = activeRows(transactions).filter(

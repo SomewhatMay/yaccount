@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import type { DashboardWidgetEntry, DashboardWidgetInstance } from "./dashboard-layout";
 import { buildWidgetGallery, type WidgetGalleryItem } from "./widget-gallery";
 import type { WidgetContext, WidgetDef, WidgetGalleryGroup } from "./registry";
+import { watchSubjectOptions } from "./watch-subjects";
 
 const SECTION_LABELS: Record<"suggested" | WidgetGalleryGroup | "needs-setup", string> = {
   suggested: "Suggested for you",
@@ -191,14 +192,11 @@ function SubjectWidgetCard({
 }) {
   const [selectedId, setSelectedId] = useState("");
   const subjectType = item.subject!;
-  const options =
-    subjectType === "container"
-      ? context.containers
-          .filter((container) => !container.is_archived)
-          .map((container) => ({ id: container.id, name: container.name }))
-      : context.categories
-          .filter((category) => !category.is_archived)
-          .map((category) => ({ id: category.id, name: category.name }));
+  const options = watchSubjectOptions(
+    subjectType,
+    context.containers,
+    context.categories,
+  );
 
   return (
     <div className="bg-card rounded-2xl border p-3">

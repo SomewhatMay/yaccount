@@ -158,6 +158,18 @@ export function DashboardView() {
     });
   }
 
+  function saveInstanceSubject(
+    instanceId: string,
+    subject: { type: string; id: string },
+  ): Promise<void> {
+    return dashboardSets.saveDashboard({
+      ...dashboardSets.activeDashboard,
+      instances: dashboardSets.activeDashboard.instances.map((instance) =>
+        instance.instanceId === instanceId ? { ...instance, subject } : instance,
+      ),
+    });
+  }
+
   function cancelEditing() {
     setGalleryOpen(false);
     setDraftDashboard(null);
@@ -269,6 +281,7 @@ export function DashboardView() {
           data={data}
           widgets={visibleWidgets}
           onSaveInstanceSettings={saveInstanceSettings}
+          onSaveInstanceSubject={saveInstanceSubject}
         />
       ) : (
         <WidgetColumn
@@ -276,6 +289,7 @@ export function DashboardView() {
           data={data}
           widgets={visibleWidgets}
           onSaveInstanceSettings={saveInstanceSettings}
+          onSaveInstanceSubject={saveInstanceSubject}
         />
       )}
       <WidgetGallerySheet
@@ -323,6 +337,7 @@ function WidgetColumn({
   data,
   widgets,
   onSaveInstanceSettings,
+  onSaveInstanceSubject,
 }: {
   range: DateRange;
   data: Omit<WidgetContext, "range">;
@@ -331,6 +346,10 @@ function WidgetColumn({
     instanceId: string,
     settings: Record<string, unknown>,
   ) => Promise<void>;
+  onSaveInstanceSubject: (
+    instanceId: string,
+    subject: { type: string; id: string },
+  ) => Promise<void>;
 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -338,7 +357,10 @@ function WidgetColumn({
         const base: WidgetContext = {
           ...data,
           range,
+          instanceSubject: instance.subject,
           instanceSettings: instance.settings ?? {},
+          saveInstanceSubject: (subject) =>
+            onSaveInstanceSubject(instance.instanceId, subject),
           saveInstanceSettings: (settings) =>
             onSaveInstanceSettings(instance.instanceId, settings),
         };
@@ -366,6 +388,7 @@ function ComparisonWidgets({
   data,
   widgets,
   onSaveInstanceSettings,
+  onSaveInstanceSubject,
 }: {
   primaryRange: DateRange;
   compareRange: DateRange;
@@ -375,6 +398,10 @@ function ComparisonWidgets({
     instanceId: string,
     settings: Record<string, unknown>,
   ) => Promise<void>;
+  onSaveInstanceSubject: (
+    instanceId: string,
+    subject: { type: string; id: string },
+  ) => Promise<void>;
 }) {
   return (
     <div className="space-y-6">
@@ -382,7 +409,10 @@ function ComparisonWidgets({
         const primary: WidgetContext = {
           ...data,
           range: primaryRange,
+          instanceSubject: instance.subject,
           instanceSettings: instance.settings ?? {},
+          saveInstanceSubject: (subject) =>
+            onSaveInstanceSubject(instance.instanceId, subject),
           saveInstanceSettings: (settings) =>
             onSaveInstanceSettings(instance.instanceId, settings),
         };

@@ -18,3 +18,4 @@ export * from "./cash-horizon";
 export * from "./allocation-plan";
 export * from "./month-landing";
 export * from "./income-resilience";
+export * from "./watch";

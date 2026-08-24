@@ -114,6 +114,40 @@ function calculators(): DashboardAggregateCalculators {
       largestSourceShare: null,
       scheduledFixedMonthly: 0,
     })),
+    containerWatch: vi.fn(() => ({
+      containerId: "general",
+      currentBalance: 0,
+      netFlow30Days: 0,
+      forecast: {
+        start: "2026-08-23",
+        end: "2026-09-22",
+        days: 30 as const,
+        containerIds: ["general"],
+        startingBalance: 0,
+        projectedBalance: 0,
+        low: { balance: 0, date: "2026-08-23" },
+        firstBelowZero: null,
+        largestShortfall: 0,
+        nextIncome: null,
+        billsBeforeNextIncome: { count: 0, amount: 0 },
+        events: [],
+        unknownEvents: [],
+      },
+      floor: null,
+      distanceAboveFloor: null,
+      floorBreached: null,
+    })),
+    categoryWatch: vi.fn(() => ({
+      categoryId: "groceries",
+      yearMonth: "2026-08",
+      spent: 0,
+      budget: null,
+      remaining: null,
+      recent7DaySpend: 0,
+      likelyMonthEnd: 0,
+      sixMonthMedian: 0,
+      months: [],
+    })),
   };
 }
 
@@ -149,6 +183,12 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(aggregates.incomeResilience(range, "2026-08-23")).toBe(
     aggregates.incomeResilience({ ...range }, "2026-08-23"),
   );
+  expect(aggregates.containerWatch("general", "2026-08-23", 25_000)).toBe(
+    aggregates.containerWatch("general", "2026-08-23", 25_000),
+  );
+  expect(aggregates.categoryWatch("groceries", "2026-08-23")).toBe(
+    aggregates.categoryWatch("groceries", "2026-08-23"),
+  );
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
@@ -163,6 +203,23 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(calculate.allocationPlanPayCycle).toHaveBeenCalledOnce();
   expect(calculate.monthLanding).toHaveBeenCalledOnce();
   expect(calculate.incomeResilience).toHaveBeenCalledOnce();
+  expect(calculate.containerWatch).toHaveBeenCalledOnce();
+  expect(calculate.categoryWatch).toHaveBeenCalledOnce();
+  expect(calculate.containerWatch).toHaveBeenCalledWith({
+    today: "2026-08-23",
+    containerId: "general",
+    floor: 25_000,
+    transactions: inputs.ledgerTransactions,
+    categories: inputs.categories,
+    containers: inputs.containers,
+    recurringRules: inputs.recurringRules,
+  });
+  expect(calculate.categoryWatch).toHaveBeenCalledWith({
+    today: "2026-08-23",
+    categoryId: "groceries",
+    transactions: inputs.reportTransactions,
+    budgetTargets: inputs.budgetTargets,
+  });
 });
 
 it("does not share cached money across data revisions or ranges", () => {

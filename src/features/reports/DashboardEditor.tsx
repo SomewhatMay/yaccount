@@ -234,7 +234,11 @@ function SortableDashboardWidget({
           instanceId={instance.instanceId}
           size={layout.sizes[instance.instanceId] ?? instance.size}
           def={def}
-          base={{ ...base, instanceSettings: instance.settings ?? {} }}
+          base={{
+            ...base,
+            instanceSubject: instance.subject,
+            instanceSettings: instance.settings ?? {},
+          }}
           editing
         />
       </div>

@@ -591,6 +591,85 @@ test("uses complete selected months for Income resilience", async ({ page }) => 
   await expect(page.getByText("Typical month (median)", { exact: true })).toBeVisible();
 });
 
+test("creates repeatable Watch instances and persists an exact container floor", async ({
+  page,
+}) => {
+  await createContainer(page, "E2E watched reserve");
+  await createCategory(page, "E2E watched groceries");
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E groceries", "54.00", "E2E watched groceries");
+
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+  const gallery = page.getByRole("dialog", { name: "Add widgets" });
+  await choose(
+    gallery.page(),
+    "Choose container for Container watch",
+    "E2E watched reserve",
+  );
+  await gallery.getByRole("button", { name: "Add Container watch" }).click();
+  await choose(gallery.page(), "Choose container for Container watch", "General");
+  await gallery.getByRole("button", { name: "Add Container watch" }).click();
+  await choose(
+    gallery.page(),
+    "Choose category for Category watch",
+    "E2E watched groceries",
+  );
+  await gallery.getByRole("button", { name: "Add Category watch" }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Done" }).click();
+
+  await expect(page.getByRole("heading", { name: "Container watch" })).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Category watch" })).toHaveCount(1);
+  const reserve = page
+    .getByRole("heading", { name: "Container watch" })
+    .nth(0)
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  const general = page
+    .getByRole("heading", { name: "Container watch" })
+    .nth(1)
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  const category = page
+    .getByRole("heading", { name: "Category watch" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await reserve.scrollIntoViewIfNeeded();
+  await expect(
+    reserve.getByText("Watch: E2E watched reserve", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    reserve.getByRole("combobox", { name: "Change watched container" }),
+  ).toHaveText("Change");
+  await general.scrollIntoViewIfNeeded();
+  await expect(general.getByText("Watch: General", { exact: true })).toBeVisible();
+  await category.scrollIntoViewIfNeeded();
+  await expect(
+    category.getByText("Watch: E2E watched groceries", { exact: true }),
+  ).toBeVisible();
+
+  await reserve.scrollIntoViewIfNeeded();
+  await reserve.getByText("Set your floor", { exact: true }).click();
+  await reserve.getByLabel("Container floor amount").fill("-100.00");
+  await reserve.getByRole("button", { name: "Save floor" }).click();
+  await expect(reserve.getByLabel("Distance above your floor: $100.00")).toBeVisible();
+  await reserve.getByRole("button", { name: "Show the math" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Container watch: show the math" }),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-slot="sheet-body"]').getByText("User floor", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Container watch" })).toHaveCount(2);
+  await reserve.scrollIntoViewIfNeeded();
+  await expect(
+    reserve.getByText("Watch: E2E watched reserve", { exact: true }),
+  ).toBeVisible();
+  await expect(reserve.getByLabel("Distance above your floor: $100.00")).toBeVisible();
+});
+
 test("keeps lazy dashboard detail within the mobile viewport", async ({
   page,
 }, testInfo) => {

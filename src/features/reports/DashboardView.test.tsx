@@ -29,6 +29,7 @@ const dashboardSets = vi.hoisted(() => ({
           widgetType: "saved",
           size: "compact" as const,
           hidden: false,
+          subject: { type: "category" as const, id: "included" },
           settings: { horizonDays: 60 },
         },
       ],
@@ -52,6 +53,7 @@ const dashboardSets = vi.hoisted(() => ({
         widgetType: "saved",
         size: "compact" as const,
         hidden: false,
+        subject: { type: "category" as const, id: "included" },
         settings: { horizonDays: 60 },
       },
     ],
@@ -203,6 +205,10 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   expect(balanceWidget.props.base.aggregates).toBeDefined();
   expect(balanceWidget.props.base.aggregates).toBe(savedWidget.props.base.aggregates);
   expect(savedWidget.props.base.instanceSettings).toEqual({ horizonDays: 60 });
+  expect(savedWidget.props.base.instanceSubject).toEqual({
+    type: "category",
+    id: "included",
+  });
   expect(savedWidget.props.base.syncedSettings).toEqual([
     { key: "expected_income:2026-08", value: "250000" },
   ]);
@@ -214,6 +220,21 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
       {
         ...dashboardSets.activeDashboard.instances[1],
         settings: { horizonDays: 14 },
+      },
+    ],
+  });
+  dashboardSets.saveDashboard.mockClear();
+  await savedWidget.props.base.saveInstanceSubject?.({
+    type: "category",
+    id: "excluded",
+  });
+  expect(dashboardSets.saveDashboard).toHaveBeenCalledWith({
+    ...dashboardSets.activeDashboard,
+    instances: [
+      dashboardSets.activeDashboard.instances[0],
+      {
+        ...dashboardSets.activeDashboard.instances[1],
+        subject: { type: "category", id: "excluded" },
       },
     ],
   });

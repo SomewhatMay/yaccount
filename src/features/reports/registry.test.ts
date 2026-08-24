@@ -33,6 +33,8 @@ describe("the dashboard widget registry", () => {
       "goals",
       "landing",
       "resilience",
+      "watch-container",
+      "watch-category",
       "monthly",
       "waterfall",
       "trend",
@@ -159,6 +161,28 @@ describe("the dashboard widget registry", () => {
     expect(resilience?.availability).toBeTypeOf("function");
   });
 
+  it("adds repeatable fixed-current Watch instance types", () => {
+    const container = DASHBOARD_WIDGETS.find((widget) => widget.id === "watch-container");
+    const category = DASHBOARD_WIDGETS.find((widget) => widget.id === "watch-category");
+
+    expect(container).toMatchObject({
+      title: "Container watch",
+      defaultVisible: true,
+      fixedWindow: true,
+      gallery: { group: "watch", repeatable: true, subject: "container" },
+    });
+    expect(category).toMatchObject({
+      title: "Category watch",
+      defaultVisible: true,
+      fixedWindow: true,
+      gallery: { group: "watch", repeatable: true, subject: "category" },
+    });
+    for (const definition of [container, category]) {
+      expect(definition?.loadCompact).toBeTypeOf("function");
+      expect(definition?.math).toBeTypeOf("function");
+    }
+  });
+
   it("only exempts a widget from the period control when its window is its meaning", () => {
     // Current/recent facts are not period reports; pace and upcoming carry their
     // own windows. A period menu on any of them would be a control that lies.
@@ -171,6 +195,8 @@ describe("the dashboard widget registry", () => {
       "allocation",
       "goals",
       "landing",
+      "watch-container",
+      "watch-category",
     ]);
   });
 

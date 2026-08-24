@@ -30,7 +30,9 @@ export interface WidgetContext {
   recurringRules: RecurringRule[];
   goals: Goal[];
   aggregates: DashboardAggregates;
+  instanceSubject?: { type: string; id: string };
   instanceSettings?: Record<string, unknown>;
+  saveInstanceSubject?: (subject: { type: string; id: string }) => Promise<void>;
   saveInstanceSettings?: (settings: Record<string, unknown>) => Promise<void>;
   syncedSettings?: Setting[];
 }
@@ -214,6 +216,22 @@ const loadIncomeResilienceCompact: WidgetModuleLoader = () =>
   import("./widget-modules/IncomeResilienceWidget").then((module) => ({
     default: module.IncomeResilienceCompact,
   }));
+const loadContainerWatch: WidgetModuleLoader = () =>
+  import("./widget-modules/WatchWidget").then((module) => ({
+    default: module.ContainerWatchExpanded,
+  }));
+const loadContainerWatchCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/WatchWidget").then((module) => ({
+    default: module.ContainerWatchCompact,
+  }));
+const loadCategoryWatch: WidgetModuleLoader = () =>
+  import("./widget-modules/WatchWidget").then((module) => ({
+    default: module.CategoryWatchExpanded,
+  }));
+const loadCategoryWatchCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/WatchWidget").then((module) => ({
+    default: module.CategoryWatchCompact,
+  }));
 
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
@@ -223,8 +241,9 @@ function gallery(
   group: WidgetGalleryGroup,
   terms: string[],
   suggest?: WidgetGalleryMetadata["suggest"],
+  instance?: Pick<WidgetGalleryMetadata, "repeatable" | "subject">,
 ): WidgetGalleryMetadata {
-  return { group, terms, ...(suggest ? { suggest } : {}) };
+  return { group, terms, ...(suggest ? { suggest } : {}), ...instance };
 }
 
 function whatChangedMath(context: WidgetContext): WidgetMathDisclosure {
@@ -802,6 +821,136 @@ function incomeResilienceMath(context: WidgetContext): WidgetMathDisclosure {
   };
 }
 
+function watchFloor(context: WidgetContext): number | null {
+  const value = context.instanceSettings?.floor;
+  return typeof value === "number" && Number.isSafeInteger(value) ? value : null;
+}
+
+function watchedContainer(context: WidgetContext) {
+  if (context.instanceSubject?.type !== "container") return null;
+  return (
+    context.containers.find(
+      (container) =>
+        container.id === context.instanceSubject?.id && !container.is_archived,
+    ) ?? null
+  );
+}
+
+function watchedCategory(context: WidgetContext) {
+  if (context.instanceSubject?.type !== "category") return null;
+  return (
+    context.categories.find(
+      (category) =>
+        category.id === context.instanceSubject?.id &&
+        category.type === "expense" &&
+        !category.is_archived &&
+        !category.excluded_from_stats,
+    ) ?? null
+  );
+}
+
+function unavailableWatchMath(type: "container" | "category"): WidgetMathDisclosure {
+  return {
+    range: `Current ${type} watch`,
+    freshness: "The configured subject is unavailable.",
+    lines: [{ kind: "context", label: "Subject", value: "Choose another" }],
+    exclusions: [],
+    rule: `Choose an active ${type} before deriving watch values.`,
+  };
+}
+
+function containerWatchMath(context: WidgetContext): WidgetMathDisclosure {
+  const container = watchedContainer(context);
+  if (!container) return unavailableWatchMath("container");
+  const result = context.aggregates.containerWatch(
+    container.id,
+    context.today,
+    watchFloor(context),
+  );
+  return {
+    range: `${rangeText({ start: result.forecast.start, end: result.forecast.end })} · 30-day subject forecast`,
+    freshness: `Raw approved ${container.name} balance through ${context.today}; dated known events through ${result.forecast.end}.`,
+    lines: [
+      { kind: "actual", label: "Current balance", amount: result.currentBalance },
+      { kind: "actual", label: "Trailing 30-day net flow", amount: result.netFlow30Days },
+      ...result.forecast.events.map((event) => ({
+        kind: "scheduled" as const,
+        label: `${event.date}: ${event.label}`,
+        amount: event.amount,
+        note:
+          event.source === "approved-future"
+            ? "Future-dated approved row"
+            : event.source === "pending"
+              ? "Linked pending row"
+              : "Active recurring occurrence",
+      })),
+      {
+        kind: "context",
+        label: `Scheduled low on ${result.forecast.low.date}`,
+        amount: result.forecast.low.balance,
+      },
+      ...(result.floor === null
+        ? [{ kind: "context" as const, label: "User floor", value: "Not set" }]
+        : [
+            { kind: "context" as const, label: "User floor", amount: result.floor },
+            {
+              kind: "context" as const,
+              label: "Distance above user floor",
+              amount: result.distanceAboveFloor!,
+            },
+          ]),
+    ],
+    exclusions: [
+      "every other container",
+      "templates and cancelled rules",
+      "ordinary unscheduled spending",
+      ...(result.forecast.unknownEvents.length > 0
+        ? [`${result.forecast.unknownEvents.length} recurring amount set later`]
+        : []),
+    ],
+    rule: "Start with this container's raw approved balance as of today. Apply future approved rows, linked pending rows, scheduled transfers, and active fixed recurring occurrences that touch this container once on their dates. Compare the scheduled low with the exact optional user floor; never infer a floor.",
+  };
+}
+
+function categoryWatchMath(context: WidgetContext): WidgetMathDisclosure {
+  const category = watchedCategory(context);
+  if (!category) return unavailableWatchMath("category");
+  const result = context.aggregates.categoryWatch(category.id, context.today);
+  return {
+    range: `${incomeMonthLabel(result.months[0].month).replace(/ \d{4}$/, "")}–${incomeMonthLabel(result.months.at(-1)!.month)} · current month partial`,
+    freshness: `Stats-visible approved ${category.name} expenses through ${context.today}.`,
+    lines: [
+      ...result.months.flatMap((month) => [
+        {
+          kind: "actual" as const,
+          label: `${incomeMonthLabel(month.month)} spending${month.partial ? " through today" : ""}`,
+          amount: month.spent,
+        },
+        ...(month.budget === null
+          ? []
+          : [
+              {
+                kind: "context" as const,
+                label: `${incomeMonthLabel(month.month)} budget`,
+                amount: month.budget,
+              },
+            ]),
+      ]),
+      { kind: "actual", label: "Recent 7-day spending", amount: result.recent7DaySpend },
+      { kind: "inferred", label: "Likely month end", amount: result.likelyMonthEnd },
+      { kind: "context", label: "Six-month median", amount: result.sixMonthMedian },
+    ],
+    exclusions: [
+      "pending and template rows",
+      "future-dated approved rows until their date",
+      "transfers",
+      "stats-hidden categories",
+      "every other category",
+    ],
+    rule: "Net signed approved expenses and refunds within this category. Show the current and preceding five calendar months with each month's effective budget. Likely month end adds the signed recent-7-day daily pace across the remaining calendar days; it is not a scheduled obligation.",
+  };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -1051,6 +1200,40 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     ...compact(loadIncomeResilienceCompact),
     availability: incomeResilienceAvailability,
     math: incomeResilienceMath,
+  },
+  {
+    id: "watch-container",
+    title: "Container watch",
+    description: "Pin one container's balance, scheduled low, and optional floor.",
+    defaultVisible: true,
+    fixedWindow: true,
+    gallery: gallery(
+      "watch",
+      ["container", "account", "balance", "floor", "scheduled low"],
+      undefined,
+      { repeatable: true, subject: "container" },
+    ),
+    load: loadContainerWatch,
+    component: lazy(loadContainerWatch),
+    ...compact(loadContainerWatchCompact),
+    math: containerWatchMath,
+  },
+  {
+    id: "watch-category",
+    title: "Category watch",
+    description: "Pin one expense category's budget, history, and likely month end.",
+    defaultVisible: true,
+    fixedWindow: true,
+    gallery: gallery(
+      "watch",
+      ["category", "spending", "budget", "refund", "recent pace"],
+      undefined,
+      { repeatable: true, subject: "category" },
+    ),
+    load: loadCategoryWatch,
+    component: lazy(loadCategoryWatch),
+    ...compact(loadCategoryWatchCompact),
+    math: categoryWatchMath,
   },
   {
     id: "monthly",

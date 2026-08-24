@@ -3,6 +3,8 @@ import {
   allocationPlanPayCycle as deriveAllocationPayCycle,
   monthLanding as deriveMonthLanding,
   incomeResilience as deriveIncomeResilience,
+  containerWatch as deriveContainerWatch,
+  categoryWatch as deriveCategoryWatch,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
   goalOutlook as deriveGoalOutlook,
@@ -50,6 +52,8 @@ export interface DashboardAggregateCalculators {
   allocationPlanPayCycle: typeof deriveAllocationPayCycle;
   monthLanding: typeof deriveMonthLanding;
   incomeResilience: typeof deriveIncomeResilience;
+  containerWatch: typeof deriveContainerWatch;
+  categoryWatch: typeof deriveCategoryWatch;
 }
 
 export interface DashboardAggregates {
@@ -78,6 +82,15 @@ export interface DashboardAggregates {
     range: DateRange,
     today: string,
   ) => ReturnType<typeof deriveIncomeResilience>;
+  containerWatch: (
+    containerId: string,
+    today: string,
+    floor: number | null,
+  ) => ReturnType<typeof deriveContainerWatch>;
+  categoryWatch: (
+    categoryId: string,
+    today: string,
+  ) => ReturnType<typeof deriveCategoryWatch>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -94,6 +107,8 @@ const defaultCalculators: DashboardAggregateCalculators = {
   allocationPlanPayCycle: deriveAllocationPayCycle,
   monthLanding: deriveMonthLanding,
   incomeResilience: deriveIncomeResilience,
+  containerWatch: deriveContainerWatch,
+  categoryWatch: deriveCategoryWatch,
 };
 
 function rangeKey(range: DateRange): string {
@@ -131,6 +146,8 @@ export function createDashboardAggregates(
     string,
     ReturnType<typeof deriveIncomeResilience>
   >();
+  const containerWatchCache = new Map<string, ReturnType<typeof deriveContainerWatch>>();
+  const categoryWatchCache = new Map<string, ReturnType<typeof deriveCategoryWatch>>();
 
   return {
     monthly(range) {
@@ -294,6 +311,35 @@ export function createDashboardAggregates(
         recurringRules: inputs.recurringRules,
       });
       incomeResilienceCache.set(key, result);
+      return result;
+    },
+    containerWatch(containerId, today, floor) {
+      const key = `${containerId}:${today}:${floor ?? "none"}`;
+      const cached = containerWatchCache.get(key);
+      if (cached) return cached;
+      const result = calculate.containerWatch({
+        today,
+        containerId,
+        floor,
+        transactions: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        containers: inputs.containers,
+        recurringRules: inputs.recurringRules,
+      });
+      containerWatchCache.set(key, result);
+      return result;
+    },
+    categoryWatch(categoryId, today) {
+      const key = `${categoryId}:${today}`;
+      const cached = categoryWatchCache.get(key);
+      if (cached) return cached;
+      const result = calculate.categoryWatch({
+        today,
+        categoryId,
+        transactions: inputs.reportTransactions,
+        budgetTargets: inputs.budgetTargets,
+      });
+      categoryWatchCache.set(key, result);
       return result;
     },
   };
