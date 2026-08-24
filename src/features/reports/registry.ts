@@ -206,6 +206,14 @@ const loadMonthLandingCompact: WidgetModuleLoader = () =>
   import("./widget-modules/MonthLandingWidget").then((module) => ({
     default: module.MonthLandingCompact,
   }));
+const loadIncomeResilience: WidgetModuleLoader = () =>
+  import("./widget-modules/IncomeResilienceWidget").then((module) => ({
+    default: module.IncomeResilienceExpanded,
+  }));
+const loadIncomeResilienceCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/IncomeResilienceWidget").then((module) => ({
+    default: module.IncomeResilienceCompact,
+  }));
 
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
@@ -713,6 +721,87 @@ function monthLandingMath(context: WidgetContext): WidgetMathDisclosure {
   };
 }
 
+function incomeResilienceAvailability(context: WidgetContext): WidgetAvailability {
+  const result = context.aggregates.incomeResilience(context.range, context.today);
+  if (!result.eligible) {
+    return {
+      status: "insufficient-data",
+      title: "Build six complete income months",
+      description: `${result.months.length} of 6 complete months observed; the current partial month is excluded.`,
+      action: { label: "Review income history", href: "/ledger" },
+    };
+  }
+  return { status: "ready" };
+}
+
+function incomeMonthLabel(yearMonth: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${yearMonth}-01T00:00:00`));
+}
+
+function incomeResilienceRange(months: string[]): string {
+  const first = incomeMonthLabel(months[0]);
+  const last = incomeMonthLabel(months.at(-1)!);
+  const sameYear = months[0].slice(0, 4) === months.at(-1)!.slice(0, 4);
+  return `${sameYear ? first.replace(/ \d{4}$/, "") : first}–${last} · ${months.length} complete months`;
+}
+
+function incomeResilienceMath(context: WidgetContext): WidgetMathDisclosure {
+  const result = context.aggregates.incomeResilience(context.range, context.today);
+  return {
+    range: incomeResilienceRange(result.months),
+    freshness: `Approved income through the last complete selected month; current month ${context.today.slice(0, 7)} excluded.`,
+    lines: [
+      ...result.monthly.map((month) => ({
+        kind: "actual" as const,
+        label: `${incomeMonthLabel(month.month)} income`,
+        amount: month.income,
+      })),
+      ...result.sources.map((source) => ({
+        kind: "actual" as const,
+        label: `${source.label} · ${source.classification}`,
+        amount: source.total,
+        note:
+          source.share === null
+            ? "Share unavailable because observed total is zero."
+            : `${Math.round(source.share * 100)}% of observed income.`,
+      })),
+      {
+        kind: "scheduled",
+        label: "Fixed scheduled income, monthly equivalent",
+        amount: result.scheduledFixedMonthly,
+      },
+      {
+        kind: "context",
+        label: "Typical month (median)",
+        amount: result.typicalMonthly!,
+      },
+      {
+        kind: "context",
+        label: "Observed month-to-month range",
+        amount: result.monthToMonthRange!,
+      },
+      {
+        kind: "context",
+        label: "Largest-source share",
+        value:
+          result.largestSourceShare === null
+            ? "—"
+            : `${Math.round(result.largestSourceShare * 100)}%`,
+      },
+    ],
+    exclusions: [
+      "the current partial month",
+      "transfers",
+      "stats-hidden categories",
+      "pending income",
+    ],
+    rule: "Group approved income by a trimmed, whitespace-collapsed, case-folded source key and keep the latest display spelling. Typical is the median of complete-month net income; the range is the observed minimum to maximum. A source is steady only when it appears within 5% of its median in every month; scheduled fixed income remains descriptive, never guaranteed.",
+  };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -941,6 +1030,27 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     ...compact(loadMonthLandingCompact),
     availability: monthLandingAvailability,
     math: monthLandingMath,
+  },
+  {
+    id: "resilience",
+    title: "Income resilience",
+    description: "Observed income variability and concentration by source.",
+    defaultVisible: true,
+    gallery: gallery(
+      "analysis",
+      ["income", "salary", "source", "variable", "steady", "range"],
+      (context) => {
+        const result = context.aggregates.incomeResilience(context.range, context.today);
+        return result.eligible && result.typicalMonthly !== null
+          ? `${formatCents(result.typicalMonthly)} typical across ${result.months.length} complete months`
+          : null;
+      },
+    ),
+    load: loadIncomeResilience,
+    component: lazy(loadIncomeResilience),
+    ...compact(loadIncomeResilienceCompact),
+    availability: incomeResilienceAvailability,
+    math: incomeResilienceMath,
   },
   {
     id: "monthly",

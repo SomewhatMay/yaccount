@@ -112,6 +112,24 @@ async function logExpense(page: Page, payee: string, amount: string, category: s
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
 }
 
+async function logIncomeOn(
+  page: Page,
+  source: string,
+  amount: string,
+  category: string,
+  date: string,
+) {
+  await openReady(page, "/ledger", "Overall balance");
+  await openQuickAdd(page);
+  await page.getByRole("radio", { name: "Income" }).click();
+  await page.getByLabel("Amount").fill(amount);
+  await page.getByLabel("Source").fill(source);
+  await choose(page, "Category", category);
+  await page.getByLabel("Date and time").fill(`${date}T12:00`);
+  await page.getByRole("button", { name: "Log income" }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+}
+
 test.beforeEach(async ({ context }) => {
   // Every test gets a fresh context: no IndexedDB, localStorage, cookies, auth,
   // Drive profile, or ordering dependency can leak from another test.
@@ -530,6 +548,47 @@ test("shows Month landing scheduled math before history is available", async ({
       .locator('[data-slot="sheet-body"]')
       .getByText("Remaining scheduled net", { exact: true }),
   ).toBeVisible();
+});
+
+test("uses complete selected months for Income resilience", async ({ page }) => {
+  await createCategory(page, "E2E resilience income", "Income");
+  for (const [month, amount] of [
+    ["02", "950.00"],
+    ["03", "1000.00"],
+    ["04", "1050.00"],
+    ["05", "1000.00"],
+    ["06", "950.00"],
+    ["07", "1050.00"],
+  ]) {
+    await logIncomeOn(
+      page,
+      "E2E steady salary",
+      amount,
+      "E2E resilience income",
+      `2026-${month}-01`,
+    );
+  }
+
+  await openReady(page, "/", "How the money moved");
+  const card = page
+    .getByRole("heading", { name: "Income resilience" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await card.scrollIntoViewIfNeeded();
+  await expect(
+    card.getByText("3 of 6 complete months observed", { exact: false }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: /Reporting period:/ }).click();
+  await page.getByRole("button", { name: "Last 6 months", exact: true }).click();
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText("last 6 complete months", { exact: true })).toBeVisible();
+  await expect(card.getByText("E2E steady salary", { exact: true })).toBeVisible();
+  await expect(card.getByText("steady", { exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Show the math" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Income resilience: show the math" }),
+  ).toBeVisible();
+  await expect(page.getByText("Typical month (median)", { exact: true })).toBeVisible();
 });
 
 test("keeps lazy dashboard detail within the mobile viewport", async ({

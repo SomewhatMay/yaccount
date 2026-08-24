@@ -2,6 +2,7 @@ import {
   allocationPlanMonth as deriveAllocationMonth,
   allocationPlanPayCycle as deriveAllocationPayCycle,
   monthLanding as deriveMonthLanding,
+  incomeResilience as deriveIncomeResilience,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
   goalOutlook as deriveGoalOutlook,
@@ -48,6 +49,7 @@ export interface DashboardAggregateCalculators {
   allocationPlanMonth: typeof deriveAllocationMonth;
   allocationPlanPayCycle: typeof deriveAllocationPayCycle;
   monthLanding: typeof deriveMonthLanding;
+  incomeResilience: typeof deriveIncomeResilience;
 }
 
 export interface DashboardAggregates {
@@ -72,6 +74,10 @@ export interface DashboardAggregates {
     anchorRuleIds?: string[],
   ) => ReturnType<typeof deriveAllocationPayCycle>;
   monthLanding: (today: string) => ReturnType<typeof deriveMonthLanding>;
+  incomeResilience: (
+    range: DateRange,
+    today: string,
+  ) => ReturnType<typeof deriveIncomeResilience>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -87,6 +93,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   allocationPlanMonth: deriveAllocationMonth,
   allocationPlanPayCycle: deriveAllocationPayCycle,
   monthLanding: deriveMonthLanding,
+  incomeResilience: deriveIncomeResilience,
 };
 
 function rangeKey(range: DateRange): string {
@@ -120,6 +127,10 @@ export function createDashboardAggregates(
     ReturnType<typeof deriveAllocationPayCycle>
   >();
   const monthLandingCache = new Map<string, ReturnType<typeof deriveMonthLanding>>();
+  const incomeResilienceCache = new Map<
+    string,
+    ReturnType<typeof deriveIncomeResilience>
+  >();
 
   return {
     monthly(range) {
@@ -269,6 +280,20 @@ export function createDashboardAggregates(
         recurringRules: inputs.recurringRules,
       });
       monthLandingCache.set(today, result);
+      return result;
+    },
+    incomeResilience(range, today) {
+      const key = `${rangeKey(range)}:${today}`;
+      const cached = incomeResilienceCache.get(key);
+      if (cached) return cached;
+      const result = calculate.incomeResilience({
+        today,
+        range,
+        transactions: inputs.reportTransactions,
+        categories: inputs.categories,
+        recurringRules: inputs.recurringRules,
+      });
+      incomeResilienceCache.set(key, result);
       return result;
     },
   };

@@ -101,6 +101,19 @@ function calculators(): DashboardAggregateCalculators {
       history: [],
       estimate: "scheduled-only" as const,
     })),
+    incomeResilience: vi.fn(() => ({
+      months: [],
+      monthly: [],
+      eligible: false,
+      monthsNeeded: 6,
+      typicalMonthly: null,
+      observedMin: null,
+      observedMax: null,
+      monthToMonthRange: null,
+      sources: [],
+      largestSourceShare: null,
+      scheduledFixedMonthly: 0,
+    })),
   };
 }
 
@@ -133,6 +146,9 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(aggregates.monthLanding("2026-08-23")).toBe(
     aggregates.monthLanding("2026-08-23"),
   );
+  expect(aggregates.incomeResilience(range, "2026-08-23")).toBe(
+    aggregates.incomeResilience({ ...range }, "2026-08-23"),
+  );
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
@@ -146,6 +162,7 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(calculate.allocationPlanMonth).toHaveBeenCalledOnce();
   expect(calculate.allocationPlanPayCycle).toHaveBeenCalledOnce();
   expect(calculate.monthLanding).toHaveBeenCalledOnce();
+  expect(calculate.incomeResilience).toHaveBeenCalledOnce();
 });
 
 it("does not share cached money across data revisions or ranges", () => {

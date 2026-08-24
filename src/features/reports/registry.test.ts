@@ -32,6 +32,7 @@ describe("the dashboard widget registry", () => {
       "largest",
       "goals",
       "landing",
+      "resilience",
       "monthly",
       "waterfall",
       "trend",
@@ -143,6 +144,19 @@ describe("the dashboard widget registry", () => {
     expect(landing?.loadCompact).toBeTypeOf("function");
     expect(landing?.math).toBeTypeOf("function");
     expect(landing?.availability).toBeTypeOf("function");
+  });
+
+  it("adds Income resilience as a period-aware analysis widget", () => {
+    const resilience = DASHBOARD_WIDGETS.find((widget) => widget.id === "resilience");
+
+    expect(resilience).toMatchObject({
+      title: "Income resilience",
+      defaultVisible: true,
+    });
+    expect(resilience?.fixedWindow).not.toBe(true);
+    expect(resilience?.loadCompact).toBeTypeOf("function");
+    expect(resilience?.math).toBeTypeOf("function");
+    expect(resilience?.availability).toBeTypeOf("function");
   });
 
   it("only exempts a widget from the period control when its window is its meaning", () => {
