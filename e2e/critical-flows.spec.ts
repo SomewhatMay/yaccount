@@ -406,6 +406,47 @@ test("persists a useful compact widget mode", async ({ page }) => {
   await expect(recentCard).toHaveAttribute("data-widget-size", "compact");
 });
 
+test("persists the synced Cash horizon window", async ({ page }) => {
+  await createCategory(page, "E2E cash bill");
+  await openReady(page, "/recurring", "Scheduled transactions");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Payee / source").fill("E2E future power");
+  await page.getByRole("combobox").first().click();
+  await page
+    .getByRole("option", { name: "E2E cash bill · expense", exact: true })
+    .click();
+  await page.getByLabel("Amount").fill("25.00");
+  await page.getByLabel("Day of month").fill("30");
+  await page.getByRole("button", { name: "Add recurring" }).click();
+
+  await openReady(page, "/", "How the money moved");
+  const horizon = page
+    .getByRole("heading", { name: "Cash horizon" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await horizon.scrollIntoViewIfNeeded();
+  await horizon.getByRole("button", { name: "Forecast 60 days" }).click();
+  await expect(horizon.getByRole("button", { name: "Forecast 60 days" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await page.reload();
+  await horizon.scrollIntoViewIfNeeded();
+  await expect(horizon.getByRole("button", { name: "Forecast 60 days" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(horizon.getByText("E2E future power", { exact: false })).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  const preview = page.locator('[data-widget-id="upcoming"]');
+  await preview.scrollIntoViewIfNeeded();
+  await expect(preview.getByRole("button", { name: "Forecast 60 days" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
 test("keeps lazy dashboard detail within the mobile viewport", async ({
   page,
 }, testInfo) => {

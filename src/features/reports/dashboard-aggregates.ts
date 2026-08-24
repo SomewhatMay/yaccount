@@ -1,5 +1,6 @@
 import {
   budgetTriage as deriveBudgetTriage,
+  cashHorizon as deriveCashHorizon,
   goalOutlook as deriveGoalOutlook,
   monthlyTotals,
   moneyMap as deriveMoneyMap,
@@ -8,6 +9,7 @@ import {
   upcomingOccurrences,
   whatChanged as deriveWhatChanged,
   type DateRange,
+  type CashHorizonDays,
 } from "@/core/engine";
 import type {
   BudgetTarget,
@@ -39,6 +41,7 @@ export interface DashboardAggregateCalculators {
   whatChanged: typeof deriveWhatChanged;
   budgetTriage: typeof deriveBudgetTriage;
   goalOutlook: typeof deriveGoalOutlook;
+  cashHorizon: typeof deriveCashHorizon;
 }
 
 export interface DashboardAggregates {
@@ -50,6 +53,10 @@ export interface DashboardAggregates {
   whatChanged: (range: DateRange) => ReturnType<typeof deriveWhatChanged>;
   budgetTriage: (today: string) => ReturnType<typeof deriveBudgetTriage>;
   goalOutlook: (today: string) => ReturnType<typeof deriveGoalOutlook>;
+  cashHorizon: (
+    today: string,
+    days: CashHorizonDays,
+  ) => ReturnType<typeof deriveCashHorizon>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -61,6 +68,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   whatChanged: deriveWhatChanged,
   budgetTriage: deriveBudgetTriage,
   goalOutlook: deriveGoalOutlook,
+  cashHorizon: deriveCashHorizon,
 };
 
 function rangeKey(range: DateRange): string {
@@ -84,6 +92,7 @@ export function createDashboardAggregates(
   const whatChangedCache = new Map<string, ReturnType<typeof deriveWhatChanged>>();
   const budgetTriageCache = new Map<string, ReturnType<typeof deriveBudgetTriage>>();
   const goalOutlookCache = new Map<string, ReturnType<typeof deriveGoalOutlook>>();
+  const cashHorizonCache = new Map<string, ReturnType<typeof deriveCashHorizon>>();
 
   return {
     monthly(range) {
@@ -172,6 +181,21 @@ export function createDashboardAggregates(
         today,
       );
       goalOutlookCache.set(today, result);
+      return result;
+    },
+    cashHorizon(today, days) {
+      const key = `${today}:${days}`;
+      const cached = cashHorizonCache.get(key);
+      if (cached) return cached;
+      const result = calculate.cashHorizon(
+        inputs.ledgerTransactions,
+        inputs.categories,
+        inputs.containers,
+        inputs.recurringRules,
+        today,
+        days,
+      );
+      cashHorizonCache.set(key, result);
       return result;
     },
   };

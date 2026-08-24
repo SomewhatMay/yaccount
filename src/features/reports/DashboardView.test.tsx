@@ -29,6 +29,7 @@ const dashboardSets = vi.hoisted(() => ({
           widgetType: "saved",
           size: "compact" as const,
           hidden: false,
+          settings: { horizonDays: 60 },
         },
       ],
     },
@@ -51,6 +52,7 @@ const dashboardSets = vi.hoisted(() => ({
         widgetType: "saved",
         size: "compact" as const,
         hidden: false,
+        settings: { horizonDays: 60 },
       },
     ],
   },
@@ -61,6 +63,7 @@ const dashboardSets = vi.hoisted(() => ({
     sizes: { "balance-instance": "expanded", "saved-instance": "compact" },
   },
   setActiveDashboard: vi.fn(),
+  saveDashboard: vi.fn(),
   saveLayout: vi.fn(),
   createDashboard: vi.fn(),
   renameDashboard: vi.fn(),
@@ -197,6 +200,18 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   }>[];
   expect(balanceWidget.props.base.aggregates).toBeDefined();
   expect(balanceWidget.props.base.aggregates).toBe(savedWidget.props.base.aggregates);
+  expect(savedWidget.props.base.instanceSettings).toEqual({ horizonDays: 60 });
+  await savedWidget.props.base.saveInstanceSettings?.({ horizonDays: 14 });
+  expect(dashboardSets.saveDashboard).toHaveBeenCalledWith({
+    ...dashboardSets.activeDashboard,
+    instances: [
+      dashboardSets.activeDashboard.instances[0],
+      {
+        ...dashboardSets.activeDashboard.instances[1],
+        settings: { horizonDays: 14 },
+      },
+    ],
+  });
   const BalanceRenderer = (await balanceWidget.props.def.load!()).default as (
     context: WidgetContext,
   ) => ReactElement<Record<string, unknown>>;

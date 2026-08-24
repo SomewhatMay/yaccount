@@ -104,6 +104,19 @@ describe("the dashboard widget registry", () => {
     expect(goals?.availability).toBeTypeOf("function");
   });
 
+  it("replaces Coming up with Cash horizon under the stable id", () => {
+    const horizon = DASHBOARD_WIDGETS.find((widget) => widget.id === "upcoming");
+
+    expect(horizon).toMatchObject({
+      title: "Cash horizon",
+      defaultVisible: true,
+      fixedWindow: true,
+    });
+    expect(horizon?.loadCompact).toBeTypeOf("function");
+    expect(horizon?.math).toBeTypeOf("function");
+    expect(horizon?.availability).toBeTypeOf("function");
+  });
+
   it("only exempts a widget from the period control when its window is its meaning", () => {
     // Current/recent facts are not period reports; pace and upcoming carry their
     // own windows. A period menu on any of them would be a control that lies.

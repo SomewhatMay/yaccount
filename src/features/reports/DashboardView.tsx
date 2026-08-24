@@ -142,6 +142,18 @@ export function DashboardView() {
     });
   }
 
+  function saveInstanceSettings(
+    instanceId: string,
+    settings: Record<string, unknown>,
+  ): Promise<void> {
+    return dashboardSets.saveDashboard({
+      ...dashboardSets.activeDashboard,
+      instances: dashboardSets.activeDashboard.instances.map((instance) =>
+        instance.instanceId === instanceId ? { ...instance, settings } : instance,
+      ),
+    });
+  }
+
   function cancelEditing() {
     setGalleryOpen(false);
     setDraftDashboard(null);
@@ -252,9 +264,15 @@ export function DashboardView() {
           compareRange={compareRange}
           data={data}
           widgets={visibleWidgets}
+          onSaveInstanceSettings={saveInstanceSettings}
         />
       ) : (
-        <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
+        <WidgetColumn
+          range={primaryRange}
+          data={data}
+          widgets={visibleWidgets}
+          onSaveInstanceSettings={saveInstanceSettings}
+        />
       )}
       <WidgetGallerySheet
         open={galleryOpen}
@@ -300,27 +318,40 @@ function WidgetColumn({
   range,
   data,
   widgets,
+  onSaveInstanceSettings,
 }: {
   range: DateRange;
   data: Omit<WidgetContext, "range">;
   widgets: readonly DashboardWidgetEntry[];
+  onSaveInstanceSettings: (
+    instanceId: string,
+    settings: Record<string, unknown>,
+  ) => Promise<void>;
 }) {
-  const base: WidgetContext = { ...data, range };
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      {widgets.map(({ instance, def }) => (
-        <div
-          key={instance.instanceId}
-          className={instance.size === "expanded" ? "min-w-0 md:col-span-2" : "min-w-0"}
-        >
-          <DashboardWidget
-            instanceId={instance.instanceId}
-            size={instance.size}
-            def={def}
-            base={base}
-          />
-        </div>
-      ))}
+      {widgets.map(({ instance, def }) => {
+        const base: WidgetContext = {
+          ...data,
+          range,
+          instanceSettings: instance.settings ?? {},
+          saveInstanceSettings: (settings) =>
+            onSaveInstanceSettings(instance.instanceId, settings),
+        };
+        return (
+          <div
+            key={instance.instanceId}
+            className={instance.size === "expanded" ? "min-w-0 md:col-span-2" : "min-w-0"}
+          >
+            <DashboardWidget
+              instanceId={instance.instanceId}
+              size={instance.size}
+              def={def}
+              base={base}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -330,16 +361,27 @@ function ComparisonWidgets({
   compareRange,
   data,
   widgets,
+  onSaveInstanceSettings,
 }: {
   primaryRange: DateRange;
   compareRange: DateRange;
   data: Omit<WidgetContext, "range">;
   widgets: readonly DashboardWidgetEntry[];
+  onSaveInstanceSettings: (
+    instanceId: string,
+    settings: Record<string, unknown>,
+  ) => Promise<void>;
 }) {
   return (
     <div className="space-y-6">
       {widgets.map(({ instance, def }) => {
-        const primary: WidgetContext = { ...data, range: primaryRange };
+        const primary: WidgetContext = {
+          ...data,
+          range: primaryRange,
+          instanceSettings: instance.settings ?? {},
+          saveInstanceSettings: (settings) =>
+            onSaveInstanceSettings(instance.instanceId, settings),
+        };
         if (def.fixedWindow) {
           return (
             <div
@@ -372,7 +414,7 @@ function ComparisonWidgets({
               label={rangeText(compareRange)}
               instance={instance}
               def={def}
-              base={{ ...data, range: compareRange }}
+              base={{ ...primary, range: compareRange }}
             />
           </div>
         );

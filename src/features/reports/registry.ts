@@ -28,6 +28,8 @@ export interface WidgetContext {
   recurringRules: RecurringRule[];
   goals: Goal[];
   aggregates: DashboardAggregates;
+  instanceSettings?: Record<string, unknown>;
+  saveInstanceSettings?: (settings: Record<string, unknown>) => Promise<void>;
 }
 
 export type WidgetAvailability =
@@ -174,6 +176,15 @@ const loadGoalOutlook: WidgetModuleLoader = () =>
 const loadGoalOutlookCompact: WidgetModuleLoader = () =>
   import("./widget-modules/GoalOutlookWidget").then((module) => ({
     default: module.GoalOutlookCompact,
+  }));
+
+const loadCashHorizon: WidgetModuleLoader = () =>
+  import("./widget-modules/CashHorizonWidget").then((module) => ({
+    default: module.CashHorizonExpanded,
+  }));
+const loadCashHorizonCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/CashHorizonWidget").then((module) => ({
+    default: module.CashHorizonCompact,
   }));
 
 function compact(loader: WidgetModuleLoader) {
@@ -387,6 +398,72 @@ function goalOutlookMath(context: WidgetContext): WidgetMathDisclosure {
   };
 }
 
+function cashHorizonDays(context: WidgetContext): 14 | 30 | 60 {
+  const value = context.instanceSettings?.horizonDays;
+  return value === 14 || value === 30 || value === 60 ? value : 30;
+}
+
+function cashHorizonAvailability(context: WidgetContext): WidgetAvailability {
+  const horizon = context.aggregates.cashHorizon(context.today, cashHorizonDays(context));
+  const hasActiveRule = context.recurringRules.some(
+    (rule) => rule.status !== "cancelled",
+  );
+  return hasActiveRule || horizon.events.length > 0 || horizon.unknownEvents.length > 0
+    ? { status: "ready" }
+    : {
+        status: "needs-setup",
+        title: "Schedule an income or bill",
+        description: "An active recurring item unlocks the cash forecast.",
+        action: { label: "Add a recurring item", href: "/recurring" },
+      };
+}
+
+function cashHorizonMath(context: WidgetContext): WidgetMathDisclosure {
+  const horizon = context.aggregates.cashHorizon(context.today, cashHorizonDays(context));
+  return {
+    range: `${rangeText({ start: horizon.start, end: horizon.end })} · ${horizon.days} days`,
+    freshness: `Approved cash through ${horizon.start}; dated known events through ${horizon.end}.`,
+    lines: [
+      {
+        kind: "actual",
+        label: "Included cash as of today",
+        amount: horizon.startingBalance,
+      },
+      ...horizon.events.map((event) => ({
+        kind: "scheduled" as const,
+        label: `${event.date}: ${event.label}`,
+        amount: event.amount,
+        note:
+          event.source === "approved-future"
+            ? "Future-dated approved row"
+            : event.source === "pending"
+              ? "Pending generated row"
+              : "Active recurring occurrence",
+      })),
+      {
+        kind: "context",
+        label: `Projected low on ${horizon.low.date}`,
+        amount: horizon.low.balance,
+      },
+      {
+        kind: "context",
+        label: `Projected balance on ${horizon.end}`,
+        amount: horizon.projectedBalance,
+      },
+    ],
+    exclusions: [
+      "Investment, archived, and overall-balance-excluded containers",
+      "templates and cancelled rules",
+      "ordinary unscheduled spending",
+      "unlinked pending income and expenses",
+      ...(horizon.unknownEvents.length > 0
+        ? [`${horizon.unknownEvents.length} recurring amount set later`]
+        : []),
+    ],
+    rule: "Start with raw approved cash as of today. Apply each future approved row, linked pending row, scheduled transfer, and active fixed recurring occurrence once on its date. Transfers inside included cash net to zero. No flexible spending or cash floor is inferred.",
+  };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -519,8 +596,8 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   },
   {
     id: "upcoming",
-    title: "Coming up",
-    description: "Recurring income and bills due in the next 30 days.",
+    title: "Cash horizon",
+    description: "How known income, bills, and transfers change included cash.",
     defaultVisible: true,
     fixedWindow: true,
     gallery: gallery(
@@ -531,7 +608,11 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
           ? "Scheduled money is ready to review"
           : null,
     ),
-    ...legacy("upcoming"),
+    load: loadCashHorizon,
+    component: lazy(loadCashHorizon),
+    ...compact(loadCashHorizonCompact),
+    availability: cashHorizonAvailability,
+    math: cashHorizonMath,
   },
   {
     id: "largest",

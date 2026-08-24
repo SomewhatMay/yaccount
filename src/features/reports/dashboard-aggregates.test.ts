@@ -47,6 +47,21 @@ function calculators(): DashboardAggregateCalculators {
       totalMonthly: 0,
       counts: { onTrack: 0, needsChange: 0, passive: 0 },
     })),
+    cashHorizon: vi.fn(() => ({
+      start: "2026-08-23",
+      end: "2026-09-22",
+      days: 30 as const,
+      containerIds: [],
+      startingBalance: 0,
+      projectedBalance: 0,
+      low: { balance: 0, date: "2026-08-23" },
+      firstBelowZero: null,
+      largestShortfall: 0,
+      nextIncome: null,
+      billsBeforeNextIncome: { count: 0, amount: 0 },
+      events: [],
+      unknownEvents: [],
+    })),
   };
 }
 
@@ -67,6 +82,9 @@ it("shares exact dashboard aggregates within one data revision", () => {
     aggregates.budgetTriage("2026-08-23"),
   );
   expect(aggregates.goalOutlook("2026-08-23")).toBe(aggregates.goalOutlook("2026-08-23"));
+  expect(aggregates.cashHorizon("2026-08-23", 30)).toBe(
+    aggregates.cashHorizon("2026-08-23", 30),
+  );
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
@@ -76,6 +94,7 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(calculate.whatChanged).toHaveBeenCalledOnce();
   expect(calculate.budgetTriage).toHaveBeenCalledOnce();
   expect(calculate.goalOutlook).toHaveBeenCalledOnce();
+  expect(calculate.cashHorizon).toHaveBeenCalledOnce();
 });
 
 it("does not share cached money across data revisions or ranges", () => {
