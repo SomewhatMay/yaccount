@@ -719,6 +719,28 @@ async function openPalette(page: Page) {
   await expect(page.getByPlaceholder(/Search everything/)).toBeVisible();
 }
 
+test("records an investment value from search", async ({ page }) => {
+  await openReady(page, "/containers", "Where your money lives");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Name").fill("E2E command investment");
+  await page.getByRole("radio", { name: "Investment", exact: true }).click();
+  await page.getByRole("button", { name: "Create container" }).click();
+
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await page
+    .getByRole("option", {
+      name: /Record investment value.*E2E command investment/,
+    })
+    .click();
+
+  const sheet = page.getByRole("dialog", { name: "Reported balances" });
+  await expect(sheet).toBeVisible();
+  await page.getByLabel("Reported value").fill("321.45");
+  await page.getByRole("button", { name: "Save report" }).click();
+  await expect(sheet.getByText("$321.45", { exact: true })).toBeVisible();
+});
+
 test("⌘K finds an entry by a word that is only in its notes", async ({ page }) => {
   await createCategory(page, "E2E palette food");
   await openReady(page, "/ledger", "Overall balance");

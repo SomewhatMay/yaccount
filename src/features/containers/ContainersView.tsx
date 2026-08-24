@@ -17,6 +17,7 @@ import {
   dispatchAtom,
   flashRowAtom,
   readyAtom,
+  reportedBalanceContainerIdAtom,
   snapshotsAtom,
   transactionsAtom,
 } from "@/features/store";
@@ -40,7 +41,6 @@ import {
   ContainerSheet,
   type ContainerFormInput,
 } from "@/features/containers/ContainerSheet";
-import { LogBalanceSheet } from "@/features/containers/LogBalanceSheet";
 import {
   activeContainerFilterCount,
   applyContainerFilter,
@@ -123,12 +123,12 @@ export function ContainersView() {
   const defaultId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
+  const reportBalance = useSetAtom(reportedBalanceContainerIdAtom);
 
   const [creating, setCreating] = useState(false);
 
   // A ⌘K result reveals the row; it does not open the rename field.
   useFocusParam("/containers");
-  const [logging, setLogging] = useState<Container | null>(null);
   const [archiving, setArchiving] = useState<Container | null>(null);
   const archivingBalance = archiving ? containerBalance(transactions, archiving.id) : 0;
 
@@ -301,7 +301,7 @@ export function ContainersView() {
               snapshot={latestSnapshot.get(c.id)}
               isDefault={c.id === defaultId}
               onDispatch={dispatch}
-              onLogBalance={() => setLogging(c)}
+              onLogBalance={() => reportBalance(c.id)}
               onArchive={() => setArchiving(c)}
             />
           ))
@@ -352,13 +352,6 @@ export function ContainersView() {
         siblings={containers}
         onOpenChange={setCreating}
         onSubmit={add}
-      />
-
-      <LogBalanceSheet
-        container={logging}
-        snapshots={snapshots}
-        onOpenChange={(open) => !open && setLogging(null)}
-        onDispatch={dispatch}
       />
 
       <AlertDialog

@@ -6,6 +6,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   ArrowRightIcon,
   BookmarkIcon,
+  LineChartIcon,
   ListIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -32,11 +33,13 @@ import {
   flashRowAtom,
   goalsAtom,
   quickAddAtom,
+  reportedBalanceContainerIdAtom,
   recurringRulesAtom,
   syncAtom,
   transactionsAtom,
 } from "@/features/store";
 import { focusHref } from "@/features/focus-link";
+import { buildInvestmentValueActions } from "@/features/shell/command-actions";
 import { DESTINATIONS } from "@/features/shell/nav";
 import {
   Command,
@@ -110,6 +113,7 @@ export function CommandPalette() {
   const goals = useAtomValue(goalsAtom);
   const rules = useAtomValue(recurringRulesAtom);
   const openQuickAdd = useSetAtom(quickAddAtom);
+  const reportBalance = useSetAtom(reportedBalanceContainerIdAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const sync = useSetAtom(syncAtom);
 
@@ -137,29 +141,38 @@ export function CommandPalette() {
       {
         id: "act:expense",
         title: "Log an expense",
+        subtitle: "",
         icon: PlusIcon,
         go: () => openQuickAdd("expense"),
       },
       {
         id: "act:income",
         title: "Log income",
+        subtitle: "",
         icon: PlusIcon,
         go: () => openQuickAdd("income"),
       },
       {
         id: "act:transfer",
         title: "Move money between containers",
+        subtitle: "",
         icon: ArrowRightIcon,
         go: () => openQuickAdd("transfer"),
       },
+      ...buildInvestmentValueActions(containers).map((action) => ({
+        ...action,
+        icon: LineChartIcon,
+        go: () => reportBalance(action.containerId),
+      })),
       {
         id: "act:sync",
         title: "Sync with Drive now",
+        subtitle: "",
         icon: RefreshCwIcon,
         go: () => void sync(),
       },
     ],
-    [openQuickAdd, sync],
+    [containers, openQuickAdd, reportBalance, sync],
   );
 
   // The shell's own rows — screens and actions — handed to the engine as docs so
@@ -176,7 +189,7 @@ export function CommandPalette() {
         id: a.id,
         kind: "action" as const,
         title: a.title,
-        subtitle: "",
+        subtitle: a.subtitle,
       })),
     ],
     [actions],

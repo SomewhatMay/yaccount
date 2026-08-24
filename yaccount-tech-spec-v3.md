@@ -279,6 +279,10 @@ transaction it may be edited in place or removed, and each container shows the f
 its reports with Edit/Delete. This does not weaken the never-lose-data rule: record, update and
 remove are all journaled ops, and state is their replay.
 
+Each active investment also provides a **Record investment value** command action, identified by
+container name. It opens that same report/history sheet from any screen; it is not a second write
+path.
+
 **Reconstructed balance** fills historical gaps as `nearest known snapshot ± transfers in the
 gap`, using the same two-directional crediting as the balance formula. Rolls forward from a past
 snapshot or backward from a future one. Chosen over carry-forward, which ignores transfers during

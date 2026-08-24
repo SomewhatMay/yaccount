@@ -111,6 +111,10 @@ export const quickAddAtom = atom<QuickAddKind | null>(null);
  * likewise, state rather than a prop. */
 export const commandPaletteAtom = atom(false);
 
+/** The investment whose reported-value history is open. The sheet is global so
+ * a container row and a command action share the exact same write path. */
+export const reportedBalanceContainerIdAtom = atom<string | null>(null);
+
 /**
  * The row the register should mark, and whether to bring it into view.
  *

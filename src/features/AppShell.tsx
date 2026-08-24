@@ -16,6 +16,7 @@ import { QuickAddSheet } from "@/features/shell/QuickAddSheet";
 import { SidebarRail } from "@/features/shell/SidebarRail";
 import { SyncErrorBanner } from "@/features/SyncErrorBanner";
 import { TopBar } from "@/features/shell/TopBar";
+import { ReportedBalanceSheet } from "@/features/containers/ReportedBalanceSheet";
 
 /**
  * The chrome around every screen, and the two whole-app failure states.
@@ -71,6 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <>
           <QuickAddFab />
           <QuickAddSheet />
+          <ReportedBalanceSheet />
         </>
       )}
       <BottomTabBar onMore={() => setMoreOpen(true)} />
