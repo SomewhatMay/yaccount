@@ -74,6 +74,7 @@ function context(range: WidgetContext["range"]): WidgetContext {
     recurringRules: [],
     goals: [],
     aggregates: createDashboardAggregates({
+      budgetTargets: [],
       categories,
       containers: [container],
       ledgerTransactions,
@@ -128,6 +129,7 @@ it("keeps a durable directed empty state when both periods have no activity", ()
     ledgerTransactions: [],
     reportTransactions: [],
     aggregates: createDashboardAggregates({
+      budgetTargets: [],
       categories,
       containers: [container],
       ledgerTransactions: [],

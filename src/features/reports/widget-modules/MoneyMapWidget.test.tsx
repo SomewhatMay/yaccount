@@ -34,6 +34,7 @@ const snapshots = [
   }),
 ];
 const aggregates = createDashboardAggregates({
+  budgetTargets: [],
   categories: [],
   containers: [general, brokerage],
   ledgerTransactions,

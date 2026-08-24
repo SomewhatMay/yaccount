@@ -78,6 +78,19 @@ describe("the dashboard widget registry", () => {
     expect(changed?.math).toBeTypeOf("function");
   });
 
+  it("replaces Budget pace with Budget triage under the stable id", () => {
+    const triage = DASHBOARD_WIDGETS.find((widget) => widget.id === "pace");
+
+    expect(triage).toMatchObject({
+      title: "Budget triage",
+      defaultVisible: true,
+      fixedWindow: true,
+    });
+    expect(triage?.loadCompact).toBeTypeOf("function");
+    expect(triage?.math).toBeTypeOf("function");
+    expect(triage?.availability).toBeTypeOf("function");
+  });
+
   it("only exempts a widget from the period control when its window is its meaning", () => {
     // Current/recent facts are not period reports; pace and upcoming carry their
     // own windows. A period menu on any of them would be a control that lies.

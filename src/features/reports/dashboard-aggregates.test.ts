@@ -6,6 +6,7 @@ import {
 } from "./dashboard-aggregates";
 
 const inputs: DashboardAggregateInputs = {
+  budgetTargets: [],
   categories: [],
   containers: [],
   ledgerTransactions: [],
@@ -32,6 +33,15 @@ function calculators(): DashboardAggregateCalculators {
       branches: [],
     })),
     whatChanged: vi.fn(() => null),
+    budgetTriage: vi.fn(() => ({
+      yearMonth: "2026-08",
+      start: "2026-08-01",
+      end: "2026-08-31",
+      elapsedDays: 23,
+      daysInMonth: 31,
+      rows: [],
+      counts: { needsAttention: 0, watch: 0, onTrack: 0 },
+    })),
   };
 }
 
@@ -48,6 +58,9 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(aggregates.balance()).toBe(aggregates.balance());
   expect(aggregates.moneyMap()).toBe(aggregates.moneyMap());
   expect(aggregates.whatChanged(range)).toBe(aggregates.whatChanged({ ...range }));
+  expect(aggregates.budgetTriage("2026-08-23")).toBe(
+    aggregates.budgetTriage("2026-08-23"),
+  );
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
@@ -55,6 +68,7 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(calculate.overallBalance).toHaveBeenCalledOnce();
   expect(calculate.moneyMap).toHaveBeenCalledOnce();
   expect(calculate.whatChanged).toHaveBeenCalledOnce();
+  expect(calculate.budgetTriage).toHaveBeenCalledOnce();
 });
 
 it("does not share cached money across data revisions or ranges", () => {

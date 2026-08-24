@@ -1,4 +1,5 @@
 import {
+  budgetTriage as deriveBudgetTriage,
   monthlyTotals,
   moneyMap as deriveMoneyMap,
   overallBalance,
@@ -8,6 +9,7 @@ import {
   type DateRange,
 } from "@/core/engine";
 import type {
+  BudgetTarget,
   Category,
   Container,
   ContainerSnapshot,
@@ -17,6 +19,7 @@ import type {
 } from "@/core/model";
 
 export interface DashboardAggregateInputs {
+  budgetTargets: BudgetTarget[];
   categories: Category[];
   containers: Container[];
   ledgerTransactions: Transaction[];
@@ -33,6 +36,7 @@ export interface DashboardAggregateCalculators {
   upcomingOccurrences: typeof upcomingOccurrences;
   moneyMap: typeof deriveMoneyMap;
   whatChanged: typeof deriveWhatChanged;
+  budgetTriage: typeof deriveBudgetTriage;
 }
 
 export interface DashboardAggregates {
@@ -42,6 +46,7 @@ export interface DashboardAggregates {
   occurrences: (from: string, to: string) => ReturnType<typeof upcomingOccurrences>;
   moneyMap: () => ReturnType<typeof deriveMoneyMap>;
   whatChanged: (range: DateRange) => ReturnType<typeof deriveWhatChanged>;
+  budgetTriage: (today: string) => ReturnType<typeof deriveBudgetTriage>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -51,6 +56,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   upcomingOccurrences,
   moneyMap: deriveMoneyMap,
   whatChanged: deriveWhatChanged,
+  budgetTriage: deriveBudgetTriage,
 };
 
 function rangeKey(range: DateRange): string {
@@ -72,6 +78,7 @@ export function createDashboardAggregates(
   let balance = 0;
   let cachedMoneyMap: ReturnType<typeof deriveMoneyMap> | null = null;
   const whatChangedCache = new Map<string, ReturnType<typeof deriveWhatChanged>>();
+  const budgetTriageCache = new Map<string, ReturnType<typeof deriveBudgetTriage>>();
 
   return {
     monthly(range) {
@@ -135,6 +142,19 @@ export function createDashboardAggregates(
         range,
       );
       whatChangedCache.set(key, result);
+      return result;
+    },
+    budgetTriage(today) {
+      const cached = budgetTriageCache.get(today);
+      if (cached) return cached;
+      const result = calculate.budgetTriage(
+        inputs.reportTransactions,
+        inputs.categories,
+        inputs.budgetTargets,
+        inputs.recurringRules,
+        today,
+      );
+      budgetTriageCache.set(today, result);
       return result;
     },
   };

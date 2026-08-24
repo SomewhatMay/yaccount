@@ -158,6 +158,15 @@ const loadWhatChangedCompact: WidgetModuleLoader = () =>
     default: module.WhatChangedCompact,
   }));
 
+const loadBudgetTriage: WidgetModuleLoader = () =>
+  import("./widget-modules/BudgetTriageWidget").then((module) => ({
+    default: module.BudgetTriageExpanded,
+  }));
+const loadBudgetTriageCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/BudgetTriageWidget").then((module) => ({
+    default: module.BudgetTriageCompact,
+  }));
+
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
 }
@@ -235,6 +244,72 @@ function whatChangedAvailability(context: WidgetContext): WidgetAvailability {
       };
 }
 
+function budgetTriageAvailability(context: WidgetContext): WidgetAvailability {
+  return context.aggregates.budgetTriage(context.today).rows.length > 0
+    ? { status: "ready" }
+    : {
+        status: "needs-setup",
+        title: "Set an expense budget",
+        description: "A current category allowance unlocks budget triage.",
+        action: { label: "Set a budget", href: "/categories" },
+      };
+}
+
+function budgetTriageMath(context: WidgetContext): WidgetMathDisclosure {
+  const triage = context.aggregates.budgetTriage(context.today);
+  return {
+    range: `${rangeText({ start: triage.start, end: triage.end })} · as of ${context.today}`,
+    freshness:
+      "Approved actuals through today; linked pending and future rows remain scheduled.",
+    lines: triage.rows.flatMap((row) => [
+      {
+        kind: "actual" as const,
+        label: `${row.name}: approved spend`,
+        amount: -row.spent,
+      },
+      ...(row.scheduled.length > 0
+        ? [
+            {
+              kind: "scheduled" as const,
+              label: `${row.name}: known remaining`,
+              amount: -row.scheduledRemaining,
+              note: row.scheduled
+                .map((item) => `${item.label} on ${item.date}`)
+                .join("; "),
+            },
+          ]
+        : []),
+      ...(row.linearProjection === null
+        ? []
+        : [
+            {
+              kind: "inferred" as const,
+              label: `${row.name}: linear month projection`,
+              amount: -row.linearProjection,
+              note: `${row.elapsedDays} of ${row.daysInMonth} calendar days elapsed.`,
+            },
+          ]),
+      {
+        kind: "context" as const,
+        label: `${row.name}: effective budget`,
+        amount: row.budget,
+      },
+      {
+        kind: "context" as const,
+        label: `${row.name}: governing projection`,
+        amount: -row.projected,
+      },
+    ]),
+    exclusions: [
+      "Transfers",
+      "stats-hidden categories",
+      "pending rows from actual spend",
+      "linear pace during the first six days",
+    ],
+    rule: "Spent over budget ranks first. Otherwise the greater of linear day pace and spent plus known scheduled expense governs; over budget needs attention, at least 90% is Watch, and the rest is On track.",
+  };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -277,17 +352,23 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
   },
   {
     id: "pace",
-    title: "Budget pace",
-    description: "Spending against allowances as this month unfolds.",
+    title: "Budget triage",
+    description: "Which current allowances need a decision and which stay quiet.",
     defaultVisible: true,
     fixedWindow: true,
     gallery: gallery(
       "planning",
-      ["budget", "allowance", "overspending"],
-      ({ budgetTargets }) =>
-        budgetTargets.length > 0 ? "Active allowances need a pace check" : null,
+      ["budget", "allowance", "overspending", "pace", "watch", "on track"],
+      (context) => {
+        const count = context.aggregates.budgetTriage(context.today).rows.length;
+        return count > 0 ? `${count} active allowances ready for triage` : null;
+      },
     ),
-    ...legacy("pace"),
+    load: loadBudgetTriage,
+    component: lazy(loadBudgetTriage),
+    ...compact(loadBudgetTriageCompact),
+    availability: budgetTriageAvailability,
+    math: budgetTriageMath,
   },
   {
     id: "recent",

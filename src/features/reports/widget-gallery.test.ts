@@ -16,6 +16,7 @@ const context = {
   recurringRules: [],
   goals: [],
   aggregates: createDashboardAggregates({
+    budgetTargets: [],
     categories: [],
     containers: [],
     ledgerTransactions: [],

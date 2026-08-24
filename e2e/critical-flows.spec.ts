@@ -324,27 +324,27 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
   await expect(page.getByText("Pinned", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
-  await page.getByRole("menuitem", { name: "Before Budget pace" }).click();
+  await page.getByRole("menuitem", { name: "Before Budget triage" }).click();
   await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
 
-  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await page.getByRole("button", { name: "Hide Budget triage" }).click();
   await expect(page.locator('[data-widget-id="pace"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "How the money moved" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Budget pace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Budget triage" })).toBeVisible();
 
   await page.getByRole("button", { name: "Edit dashboard" }).click();
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
-  await page.getByRole("menuitem", { name: "Before Budget pace" }).click();
-  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await page.getByRole("menuitem", { name: "Before Budget triage" }).click();
+  await page.getByRole("button", { name: "Hide Budget triage" }).click();
   await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByRole("heading", { name: "Budget pace" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Budget triage" })).toBeHidden();
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Budget pace" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Budget triage" })).toBeHidden();
   await page.getByRole("button", { name: "Compare with another period" }).click();
   await expect(page.getByRole("heading", { name: "Recent entries" })).toHaveCount(1);
-  await expect(page.getByRole("heading", { name: "Budget pace" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Budget triage" })).toHaveCount(0);
   await expect(
     page.getByText("Period comparison isn't supported for this current view.", {
       exact: true,
@@ -356,35 +356,37 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
   await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
   await page.getByRole("button", { name: "Reset" }).click();
   await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.locator("h3").first()).toHaveText("Budget pace");
+  await expect(page.locator("h3").first()).toHaveText("Budget triage");
 });
 
 test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Edit dashboard" }).click();
-  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await page.getByRole("button", { name: "Hide Recent entries" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
 
   await expect(page.getByRole("heading", { name: "Add widgets" })).toBeVisible();
   await expect(
-    page.getByText("Spending against allowances as this month unfolds."),
+    page.getByText("The latest approved entries across the ledger."),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Add Budget pace" }).click();
+  await page.getByRole("button", { name: "Add Recent entries" }).click();
   await page.keyboard.press("Escape");
 
-  await expect(page.locator('[data-widget-id="pace"]')).toBeVisible();
+  await expect(page.locator('[data-widget-id="recent"]')).toBeVisible();
 });
 
 test("searches the grouped widget gallery by recognition language", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Edit dashboard" }).click();
-  await page.getByRole("button", { name: "Hide Budget pace" }).click();
+  await page.getByRole("button", { name: "Hide Budget triage" }).click();
   await page.getByRole("button", { name: "Hide Recent entries" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
 
-  await expect(page.getByRole("heading", { name: "Planning" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Needs setup" })).toBeVisible();
   await page.getByRole("searchbox", { name: "Search widgets" }).fill("allowance");
-  await expect(page.getByRole("button", { name: "Add Budget pace" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Set a budget for Budget triage" }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Add Recent entries" })).toHaveCount(0);
 });
 
@@ -410,7 +412,9 @@ test("keeps lazy dashboard detail within the mobile viewport", async ({
   test.skip(testInfo.project.name !== "mobile", "Mobile overflow regression.");
 
   await openReady(page, "/", "How the money moved");
-  await expect(page.getByText(/no allowances set for/)).toBeVisible();
+  await expect(
+    page.getByText("A current category allowance unlocks budget triage."),
+  ).toBeVisible();
   const widths = await page.evaluate(() => ({
     content: document.documentElement.scrollWidth,
     viewport: document.documentElement.clientWidth,
@@ -463,7 +467,7 @@ test("manages named dashboard sets and keeps the active set local", async ({ pag
   });
   await expect(quarterlyTab).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("Overall balance", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Budget pace" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Budget triage" })).toHaveCount(0);
 
   await page.reload();
   await expect(quarterlyTab).toHaveAttribute("aria-current", "page");
