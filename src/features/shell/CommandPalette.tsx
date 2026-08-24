@@ -40,6 +40,12 @@ import {
 } from "@/features/store";
 import { focusHref } from "@/features/focus-link";
 import { buildInvestmentValueActions } from "@/features/shell/command-actions";
+import {
+  commandDefaultGroups,
+  rememberCommandAction,
+  useCommandHistory,
+} from "@/features/shell/command-history";
+import { needsCommandIndex } from "@/features/shell/command-state";
 import { DESTINATIONS } from "@/features/shell/nav";
 import {
   Command,
@@ -52,7 +58,8 @@ import {
 } from "@/components/ui/command";
 
 /**
- * ⌘K — one ranked answer over everything the app holds.
+ * ⌘K — common/recent actions before typing, then one ranked answer over
+ * everything the app holds.
  *
  * Filtering and ranking are the engine's (`core/engine/search.ts`), not cmdk's
  * (`shouldFilter={false}`): the index is built once per data change, so a
@@ -64,7 +71,7 @@ import {
 /** What each kind is called on screen, in the order the groups fall back to. */
 const HEADING: Record<DocKind, string> = {
   destination: "Go to",
-  action: "Do",
+  action: "Actions",
   transaction: "Entries",
   template: "Shortcuts",
   category: "Categories",
@@ -82,6 +89,14 @@ const KIND_ICON: Record<DocKind, LucideIcon> = {
   container: WalletIcon,
   goal: TargetIcon,
   rule: RepeatIcon,
+};
+
+type PaletteAction = {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  go: () => void;
 };
 
 /** The hit, underlined. Nothing matched means nothing marked — not a lie. */
@@ -103,6 +118,25 @@ function Marked({ text, words }: { text: string; words: string[] }) {
   return <>{parts}</>;
 }
 
+function ActionItem({
+  action,
+  onSelect,
+}: {
+  action: PaletteAction;
+  onSelect: () => void;
+}) {
+  const Icon = action.icon;
+  return (
+    <CommandItem value={action.id} onSelect={onSelect}>
+      <Icon className="size-4 shrink-0" />
+      <span className="truncate">{action.title}</span>
+      {action.subtitle && (
+        <span className="text-muted-foreground truncate text-xs">{action.subtitle}</span>
+      )}
+    </CommandItem>
+  );
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useAtom(commandPaletteAtom);
   const [query, setQuery] = useState("");
@@ -116,6 +150,7 @@ export function CommandPalette() {
   const reportBalance = useSetAtom(reportedBalanceContainerIdAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const sync = useSetAtom(syncAtom);
+  const [history, setHistory] = useCommandHistory();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -136,7 +171,7 @@ export function CommandPalette() {
     action();
   }
 
-  const actions = useMemo(
+  const actions = useMemo<PaletteAction[]>(
     () => [
       {
         id: "act:expense",
@@ -174,6 +209,16 @@ export function CommandPalette() {
     ],
     [containers, openQuickAdd, reportBalance, sync],
   );
+  const actionIds = useMemo(() => actions.map((action) => action.id), [actions]);
+  const defaults = useMemo(
+    () => commandDefaultGroups(actions, history),
+    [actions, history],
+  );
+
+  function executeAction(action: PaletteAction) {
+    setHistory(rememberCommandAction(history, action.id, actionIds));
+    action.go();
+  }
 
   // The shell's own rows — screens and actions — handed to the engine as docs so
   // one ranking covers all three, instead of three lists racing each other.
@@ -197,12 +242,13 @@ export function CommandPalette() {
 
   // Only while it is open: the palette lives in the shell, so this would
   // otherwise re-index the whole world on every write, on every screen.
+  const needsIndex = needsCommandIndex(open, query);
   const index = useMemo(
     () =>
-      open
+      needsIndex
         ? buildSearchIndex({ transactions, categories, containers, goals, rules, extras })
         : null,
-    [open, transactions, categories, containers, goals, rules, extras],
+    [needsIndex, transactions, categories, containers, goals, rules, extras],
   );
   const session = useMemo(() => (index ? createSession(index) : null), [index]);
 
@@ -214,19 +260,9 @@ export function CommandPalette() {
 
   const results = useMemo(() => {
     if (!session) return [];
-    // Nothing typed is not "nothing": show where to go, what to do, and the
-    // entries you most recently wrote — a starting page, not an empty one.
-    if (blank) {
-      return session
-        .search("", { limit: 60, perKind: 6 })
-        .filter(
-          (r) =>
-            r.doc.kind === "destination" ||
-            r.doc.kind === "action" ||
-            r.doc.kind === "transaction",
-        )
-        .slice(0, 16);
-    }
+    // Blank is a curated action page below. Engine ranking begins once there is
+    // a query, where destinations and every recorded entity remain searchable.
+    if (blank) return [];
     return session.search(deferred, { limit: 24, perKind: 5 });
   }, [session, deferred, blank]);
 
@@ -246,7 +282,11 @@ export function CommandPalette() {
     const { id, kind } = result.doc;
     run(() => {
       if (kind === "destination") return router.push(id);
-      if (kind === "action") return actions.find((a) => a.id === id)?.go();
+      if (kind === "action") {
+        const action = actions.find((candidate) => candidate.id === id);
+        if (action) executeAction(action);
+        return;
+      }
       if (kind === "transaction") {
         // Land on the register with the row marked and brought into view — a
         // result you can't find is not a result.
@@ -281,7 +321,7 @@ export function CommandPalette() {
         if (!next) setQuery("");
       }}
       title="Search yaccount"
-      description="Jump to a screen, log an entry, or find anything you have recorded."
+      description="Run a common action or find anything you have recorded."
     >
       <Command shouldFilter={false}>
         <CommandInput
@@ -290,31 +330,66 @@ export function CommandPalette() {
           onValueChange={setQuery}
         />
         <CommandList>
-          <CommandEmpty>Nothing matched that.</CommandEmpty>
+          {blank ? (
+            <>
+              {defaults.recent.length > 0 && (
+                <CommandGroup heading="Recent actions">
+                  {defaults.recent.map((action) => (
+                    <ActionItem
+                      key={action.id}
+                      action={action}
+                      onSelect={() => run(() => executeAction(action))}
+                    />
+                  ))}
+                </CommandGroup>
+              )}
+              {defaults.common.length > 0 && (
+                <CommandGroup heading="Common actions">
+                  {defaults.common.map((action) => (
+                    <ActionItem
+                      key={action.id}
+                      action={action}
+                      onSelect={() => run(() => executeAction(action))}
+                    />
+                  ))}
+                </CommandGroup>
+              )}
+            </>
+          ) : (
+            <>
+              <CommandEmpty>Nothing matched that.</CommandEmpty>
 
-          {groups.map(([kind, rows]) => (
-            <CommandGroup key={kind} heading={HEADING[kind]}>
-              {rows.map((r) => {
-                const Icon = KIND_ICON[kind];
-                return (
-                  <CommandItem key={r.doc.id} value={r.doc.id} onSelect={() => select(r)}>
-                    <Icon className="size-4 shrink-0" />
-                    <span className="truncate">
-                      <Marked text={r.doc.title} words={words} />
-                    </span>
-                    {r.doc.subtitle && (
-                      <span className="text-muted-foreground truncate text-xs">
-                        <Marked text={r.doc.subtitle} words={words} />
-                      </span>
-                    )}
-                    {r.doc.meta && (
-                      <span className="tnum ml-auto font-mono text-xs">{r.doc.meta}</span>
-                    )}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          ))}
+              {groups.map(([kind, rows]) => (
+                <CommandGroup key={kind} heading={HEADING[kind]}>
+                  {rows.map((r) => {
+                    const Icon = KIND_ICON[kind];
+                    return (
+                      <CommandItem
+                        key={r.doc.id}
+                        value={r.doc.id}
+                        onSelect={() => select(r)}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        <span className="truncate">
+                          <Marked text={r.doc.title} words={words} />
+                        </span>
+                        {r.doc.subtitle && (
+                          <span className="text-muted-foreground truncate text-xs">
+                            <Marked text={r.doc.subtitle} words={words} />
+                          </span>
+                        )}
+                        {r.doc.meta && (
+                          <span className="tnum ml-auto font-mono text-xs">
+                            {r.doc.meta}
+                          </span>
+                        )}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              ))}
+            </>
+          )}
         </CommandList>
       </Command>
     </CommandDialog>

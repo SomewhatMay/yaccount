@@ -741,6 +741,65 @@ test("records an investment value from search", async ({ page }) => {
   await expect(sheet.getByText("$321.45", { exact: true })).toBeVisible();
 });
 
+test("shows common and recent command actions", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
+  await expect(page.getByText("Go to", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("option", { name: "Log income", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openPalette(page);
+  await expect(page.getByText("Recent actions", { exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Log income", exact: true })).toHaveCount(
+    1,
+  );
+  await page.keyboard.press("Escape");
+
+  await page.reload();
+  await expect(page.getByText("How the money moved", { exact: true })).toBeVisible();
+  await openPalette(page);
+  await expect(page.getByText("Recent actions", { exact: true })).toBeVisible();
+  await page.getByPlaceholder(/Search everything/).fill("settings");
+  await expect(page.getByText("Go to", { exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Settings/ })).toBeVisible();
+});
+
+test("keeps common actions usable when command history storage is blocked", async ({
+  page,
+  context,
+}) => {
+  await context.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.getItem = function (key: string) {
+      if (this === window.localStorage && key === "yaccount.command.history") {
+        throw new DOMException("Storage blocked", "SecurityError");
+      }
+      return getItem.call(this, key);
+    };
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (this === window.localStorage && key === "yaccount.command.history") {
+        throw new DOMException("Storage blocked", "SecurityError");
+      }
+      return setItem.call(this, key, value);
+    };
+  });
+
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
+  await page.getByRole("option", { name: "Log income", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openPalette(page);
+  await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
+  await expect(page.getByText("Recent actions", { exact: true })).toHaveCount(0);
+});
+
 test("⌘K finds an entry by a word that is only in its notes", async ({ page }) => {
   await createCategory(page, "E2E palette food");
   await openReady(page, "/ledger", "Overall balance");

@@ -227,6 +227,9 @@ See spec §3 for the durable-grant model and why the web flow has no refresh tok
   `refreshAtom`. Account-wide preferences use synced settings. Browser-local display state goes
   through `prefs.ts` / `useLocalPref`; the System/Light/Dark policy is the one exception already
   owned and persisted by `next-themes`, with its only control in Settings.
+- **Command history** — `features/shell/command-history.ts` stores at most six opaque action ids in
+  one versioned local preference. It is not journaled, synced or exported. Stored ids resolve
+  through the live action catalog; malformed, blocked and stale state fails open.
 
 **Add UI components with `npx shadcn@latest add <name>`**, and reach for one before hand-rolling.
 

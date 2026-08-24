@@ -41,7 +41,9 @@
 ## Persistence design
 
 - Create `src/features/shell/command-history.ts` with:
-  - versioned storage key `yaccount.command.history.v1`;
+  - stable storage key `yaccount.command.history`;
+  - versioned `{ version: 1, actionIds: [...] }` envelope, so a future parser can migrate one key
+    without leaving versioned keys behind;
   - `parseCommandHistory(raw)` returning a safe, deduplicated, capped id list;
   - `rememberCommandAction(history, id)` moving id to front and capping at six;
   - `useCommandHistory()` built on `useLocalPref<string>` using serialized JSON.

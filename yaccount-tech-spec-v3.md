@@ -791,6 +791,11 @@ varies per screen is noise wearing a label's clothes.
 - **Appearance belongs in Settings.** System, Light and Dark are explicit choices there; no theme
   switch is duplicated in the topbar, More or command search. The policy is device-local through
   `next-themes`, not synced financial/account state.
+- **Command search starts with actions.** A blank palette shows common actions plus up to six
+  recent action invocations; destinations and recorded entities enter only after typing. Recency
+  stores a versioned, bounded list of opaque action ids in device-local preferences — never query
+  text, labels, amounts or timestamps — and blocked/corrupt storage degrades to no history. Typed
+  search still covers every destination and indexed entity.
 - **Dashboard = an ordered widget registry** of stable ids. The synced layout setting reorders and
   hides registry entries; Overall balance is always visible and first. Cards edit directly in
   place, with hidden reports available through a descriptive gallery. Secondary widgets fold;
