@@ -21,6 +21,7 @@ import {
   type DashboardDefinition,
   type DashboardLayout,
   type DashboardStarter,
+  type DashboardWidgetPreset,
 } from "./dashboard-layout";
 import { DASHBOARD_WIDGETS } from "./registry";
 
@@ -46,12 +47,14 @@ export interface DashboardSetsController {
   deleteDashboard: (id: string) => Promise<void>;
 }
 
-export function useDashboardSets(): DashboardSetsController {
+export function useDashboardSets(
+  overviewCuration?: readonly DashboardWidgetPreset[],
+): DashboardSetsController {
   const settings = useAtomValue(settingsAtom);
   const dispatchMany = useSetAtom(dispatchManyAtom);
   const state = useMemo(
-    () => resolveDashboardState(settings, DASHBOARD_WIDGETS),
-    [settings],
+    () => resolveDashboardState(settings, DASHBOARD_WIDGETS, overviewCuration),
+    [overviewCuration, settings],
   );
   const [localActiveId, setLocalActiveId] = useLocalPref(
     ACTIVE_DASHBOARD_KEY,

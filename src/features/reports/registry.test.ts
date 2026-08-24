@@ -23,7 +23,6 @@ describe("the dashboard widget registry", () => {
       "pace",
       "recent",
       "saved",
-      "kpis",
       "flow",
       "calendar",
       "breakdown",
@@ -38,7 +37,6 @@ describe("the dashboard widget registry", () => {
       "watch-category",
       "monthly",
       "waterfall",
-      "trend",
       "flows",
       "investments",
       "budgets",
@@ -65,12 +63,28 @@ describe("the dashboard widget registry", () => {
     }
   });
 
-  it("keeps optional analysis off the initial dashboard", () => {
+  it("marks optional and repeatable widgets outside the curated fallback", () => {
     expect(
       DASHBOARD_WIDGETS.filter((widget) => !widget.defaultVisible).map(
         (widget) => widget.id,
       ),
-    ).toEqual(["money-map"]);
+    ).toEqual([
+      "money-map",
+      "saved",
+      "flow",
+      "calendar",
+      "breakdown",
+      "payees",
+      "largest",
+      "resilience",
+      "watch-container",
+      "watch-category",
+      "monthly",
+      "waterfall",
+      "flows",
+      "investments",
+      "budgets",
+    ]);
   });
 
   it("absorbs saved-period reporting into What changed under the stable id", () => {
@@ -78,7 +92,7 @@ describe("the dashboard widget registry", () => {
 
     expect(changed).toMatchObject({
       title: "What changed",
-      defaultVisible: true,
+      defaultVisible: false,
     });
     expect(changed?.loadCompact).toBeTypeOf("function");
     expect(changed?.math).toBeTypeOf("function");
@@ -167,7 +181,7 @@ describe("the dashboard widget registry", () => {
 
     expect(resilience).toMatchObject({
       title: "Income resilience",
-      defaultVisible: true,
+      defaultVisible: false,
     });
     expect(resilience?.fixedWindow).not.toBe(true);
     expect(resilience?.loadCompact).toBeTypeOf("function");
@@ -181,13 +195,13 @@ describe("the dashboard widget registry", () => {
 
     expect(container).toMatchObject({
       title: "Container watch",
-      defaultVisible: true,
+      defaultVisible: false,
       fixedWindow: true,
       gallery: { group: "watch", repeatable: true, subject: "container" },
     });
     expect(category).toMatchObject({
       title: "Category watch",
-      defaultVisible: true,
+      defaultVisible: false,
       fixedWindow: true,
       gallery: { group: "watch", repeatable: true, subject: "category" },
     });
@@ -217,7 +231,7 @@ describe("the dashboard widget registry", () => {
 
   it("leads with current balance as the sole opening figure", () => {
     const bare = DASHBOARD_WIDGETS.filter((w) => w.bare).map((w) => w.id);
-    expect(bare).toEqual(["balance", "kpis"]);
+    expect(bare).toEqual(["balance"]);
     expect(DASHBOARD_WIDGETS[0].id).toBe("balance");
   });
 

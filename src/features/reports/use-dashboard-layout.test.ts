@@ -217,10 +217,9 @@ describe("useDashboardSets", () => {
     expect(created.name).toBe("Quarterly planning");
     expect(created.instances.map((instance) => instance.widgetType)).toEqual([
       "balance",
-      "pace",
+      "allocation",
       "upcoming",
       "goals",
-      "budgets",
     ]);
     expect(fixture.setActive).toHaveBeenCalledWith(created.id);
   });

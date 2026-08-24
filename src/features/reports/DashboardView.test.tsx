@@ -8,6 +8,7 @@ const fixture = vi.hoisted(() => ({
   values: new Map<string, unknown>(),
   periodKeys: [] as string[],
   compareKeys: [] as string[],
+  curations: [] as unknown[],
 }));
 const dashboardSets = vi.hoisted(() => ({
   dashboards: [
@@ -112,7 +113,10 @@ vi.mock("./period-pref", () => ({
 }));
 
 vi.mock("./use-dashboard-layout", () => ({
-  useDashboardSets: () => dashboardSets,
+  useDashboardSets: (curation: unknown) => {
+    fixture.curations.push(curation);
+    return dashboardSets;
+  },
 }));
 
 function findComponent(
@@ -187,8 +191,16 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.values.set("settings", [{ key: "expected_income:2026-08", value: "250000" }]);
   fixture.periodKeys = [];
   fixture.compareKeys = [];
+  fixture.curations = [];
 
   const dashboard = DashboardView();
+  expect(fixture.curations).toEqual([
+    [
+      { widgetType: "balance", size: "expanded" },
+      { widgetType: "brief", size: "expanded" },
+      { widgetType: "recent", size: "expanded" },
+    ],
+  ]);
   expect(fixture.periodKeys).toEqual(["yaccount.dashboard.period.overview"]);
   expect(fixture.compareKeys).toEqual(["yaccount.dashboard.compare.overview"]);
   const setBar = findComponent(dashboard, "DashboardSetBar")!;

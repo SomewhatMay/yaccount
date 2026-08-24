@@ -69,11 +69,73 @@ export interface DashboardWidgetEntry {
 
 export type DashboardStarter = "planning" | "trends" | "current" | "empty";
 
-const STARTER_WIDGET_TYPES: Record<Exclude<DashboardStarter, "current">, string[]> = {
-  planning: ["balance", "pace", "upcoming", "goals", "budgets"],
-  trends: ["balance", "saved", "kpis", "monthly", "trend", "investments"],
-  empty: ["balance"],
+export interface DashboardWidgetPreset {
+  widgetType: string;
+  size: DashboardWidgetInstance["size"];
+}
+
+export interface OverviewEligibility {
+  hasExpenseBudget: boolean;
+  hasRecurringSchedule: boolean;
+  hasScheduledIncome: boolean;
+  hasActiveGoal: boolean;
+  hasLandingHistory: boolean;
+  hasLandingSignal: boolean;
+}
+
+const STARTER_WIDGETS: Record<
+  Exclude<DashboardStarter, "current">,
+  DashboardWidgetPreset[]
+> = {
+  planning: [
+    { widgetType: "balance", size: "expanded" },
+    { widgetType: "allocation", size: "compact" },
+    { widgetType: "upcoming", size: "expanded" },
+    { widgetType: "goals", size: "compact" },
+  ],
+  trends: [
+    { widgetType: "balance", size: "expanded" },
+    { widgetType: "saved", size: "compact" },
+    { widgetType: "landing", size: "expanded" },
+    { widgetType: "resilience", size: "compact" },
+  ],
+  empty: [{ widgetType: "balance", size: "expanded" }],
 };
+
+export function curatedOverviewWidgets(
+  eligibility: OverviewEligibility,
+): DashboardWidgetPreset[] {
+  return [
+    { widgetType: "balance", size: "expanded" },
+    {
+      widgetType: "brief",
+      size: eligibility.hasExpenseBudget ? "compact" : "expanded",
+    },
+    ...(eligibility.hasExpenseBudget
+      ? [{ widgetType: "pace", size: "compact" as const }]
+      : []),
+    eligibility.hasRecurringSchedule
+      ? { widgetType: "upcoming", size: "expanded" }
+      : { widgetType: "recent", size: "expanded" },
+    ...(eligibility.hasScheduledIncome &&
+    (eligibility.hasExpenseBudget || eligibility.hasActiveGoal)
+      ? [
+          {
+            widgetType: "allocation",
+            size: eligibility.hasActiveGoal
+              ? ("compact" as const)
+              : ("expanded" as const),
+          },
+        ]
+      : []),
+    ...(eligibility.hasActiveGoal
+      ? [{ widgetType: "goals", size: "compact" as const }]
+      : []),
+    ...(eligibility.hasLandingHistory && eligibility.hasLandingSignal
+      ? [{ widgetType: "landing", size: "expanded" as const }]
+      : []),
+  ];
+}
 
 function defaultInstance(widget: WidgetDef): DashboardWidgetInstance {
   return {
@@ -105,16 +167,31 @@ function withPinnedBalance(
 
 export function defaultDashboardDefinition(
   widgets: readonly WidgetDef[],
+  curation?: readonly DashboardWidgetPreset[],
 ): DashboardDefinition {
+  const available = widgets.filter((widget) => !widget.gallery?.repeatable);
+  const byType = new Map(available.map((widget) => [widget.id, widget]));
+  const curatedTypes = new Set<string>();
+  const curated = (curation ?? []).flatMap((preset) => {
+    const widget = byType.get(preset.widgetType);
+    if (!widget || curatedTypes.has(widget.id)) return [];
+    curatedTypes.add(widget.id);
+    return [{ ...defaultInstance(widget), size: preset.size, hidden: false }];
+  });
   return {
     version: 2,
     id: OVERVIEW_DASHBOARD_ID,
     name: "Overview",
     rank: 0,
     isDeleted: false,
-    instances: widgets
-      .filter((widget) => !widget.gallery?.repeatable)
-      .map(defaultInstance),
+    instances: curation
+      ? [
+          ...curated,
+          ...available
+            .filter((widget) => !curatedTypes.has(widget.id))
+            .map((widget) => ({ ...defaultInstance(widget), hidden: true })),
+        ]
+      : available.map(defaultInstance),
   };
 }
 
@@ -174,9 +251,11 @@ export function createDashboardDefinition({
   const source =
     starter === "current"
       ? current.instances
-      : STARTER_WIDGET_TYPES[starter].flatMap((widgetType) => {
-          const widget = byType.get(widgetType);
-          return widget ? [{ ...defaultInstance(widget), hidden: false }] : [];
+      : STARTER_WIDGETS[starter].flatMap((preset) => {
+          const widget = byType.get(preset.widgetType);
+          return widget
+            ? [{ ...defaultInstance(widget), size: preset.size, hidden: false }]
+            : [];
         });
   const draft = DashboardDefinitionSchema.parse({
     version: 2,
@@ -255,6 +334,7 @@ export function encodeDashboardDefinition(dashboard: DashboardDefinition): strin
 export function resolveDashboardState(
   settings: readonly Setting[],
   widgets: readonly WidgetDef[],
+  curation?: readonly DashboardWidgetPreset[],
 ): DashboardState {
   const dashboards: DashboardDefinition[] = [];
   for (const setting of settings) {
@@ -269,7 +349,7 @@ export function resolveDashboardState(
   dashboards.sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id));
   if (dashboards.length === 0) {
     return {
-      dashboards: [defaultDashboardDefinition(widgets)],
+      dashboards: [defaultDashboardDefinition(widgets, curation)],
       defaultDashboardId: OVERVIEW_DASHBOARD_ID,
     };
   }
@@ -359,6 +439,55 @@ export function applyDashboardLayout(
 
 export function defaultDashboardLayout(widgets: readonly WidgetDef[]): DashboardLayout {
   return layoutFromDashboard(defaultDashboardDefinition(widgets), widgets);
+}
+
+export function resetDashboardLayout(
+  dashboard: DashboardDefinition,
+  widgets: readonly WidgetDef[],
+  curation: readonly DashboardWidgetPreset[],
+): DashboardLayout {
+  dashboard = withPinnedBalance(dashboard, widgets);
+  const knownTypes = new Set(widgets.map((widget) => widget.id));
+  const registryRank = new Map(widgets.map((widget, index) => [widget.id, index]));
+  const curatedRank = new Map(
+    curation.map((preset, index) => [preset.widgetType, index]),
+  );
+  const curatedSize = new Map(curation.map((preset) => [preset.widgetType, preset.size]));
+  const instances = dashboard.instances
+    .filter((instance) => knownTypes.has(instance.widgetType))
+    .sort((a, b) => {
+      const aCurated = curatedRank.get(a.widgetType);
+      const bCurated = curatedRank.get(b.widgetType);
+      if (aCurated !== undefined || bCurated !== undefined) {
+        if (aCurated === undefined) return 1;
+        if (bCurated === undefined) return -1;
+        return aCurated - bCurated;
+      }
+      return (
+        (registryRank.get(a.widgetType) ?? Number.MAX_SAFE_INTEGER) -
+          (registryRank.get(b.widgetType) ?? Number.MAX_SAFE_INTEGER) ||
+        a.instanceId.localeCompare(b.instanceId)
+      );
+    });
+  const visibleTypes = new Set(curation.map((preset) => preset.widgetType));
+  return {
+    order: instances.map((instance) => instance.instanceId),
+    hidden: instances
+      .filter(
+        (instance) =>
+          instance.widgetType !== PINNED_WIDGET_ID &&
+          !visibleTypes.has(instance.widgetType),
+      )
+      .map((instance) => instance.instanceId),
+    sizes: Object.fromEntries(
+      instances.map((instance) => [
+        instance.instanceId,
+        instance.widgetType === PINNED_WIDGET_ID
+          ? "expanded"
+          : (curatedSize.get(instance.widgetType) ?? "expanded"),
+      ]),
+    ),
+  };
 }
 
 export function dashboardWidgetEntries(

@@ -8,6 +8,7 @@ import {
   OVERVIEW_DASHBOARD_ID,
   applyDashboardLayout,
   createDashboardDefinition,
+  curatedOverviewWidgets,
   dashboardItemKey,
   decodeDashboardDefinition,
   defaultDashboardDefinition,
@@ -15,6 +16,7 @@ import {
   encodeDashboardDefinition,
   layoutFromDashboard,
   renameDashboard,
+  resetDashboardLayout,
   reorderDashboardLayout,
   reorderDashboards,
   resolveDashboardState,
@@ -80,6 +82,83 @@ describe("dashboard layout v2", () => {
         },
       ],
     });
+  });
+
+  it("orders a curated Overview first and keeps every optional widget hidden", () => {
+    const curated = curatedOverviewWidgets({
+      hasExpenseBudget: true,
+      hasRecurringSchedule: true,
+      hasScheduledIncome: true,
+      hasActiveGoal: true,
+      hasLandingHistory: true,
+      hasLandingSignal: true,
+    });
+    const definitions = defs(
+      "balance",
+      "brief",
+      "pace",
+      "recent",
+      "saved",
+      "upcoming",
+      "allocation",
+      "goals",
+      "landing",
+      "later",
+    );
+    const dashboard = defaultDashboardDefinition(definitions, curated);
+
+    expect(
+      dashboard.instances
+        .slice(0, curated.length)
+        .map((instance) => [instance.widgetType, instance.size, instance.hidden]),
+    ).toEqual([
+      ["balance", "expanded", false],
+      ["brief", "compact", false],
+      ["pace", "compact", false],
+      ["upcoming", "expanded", false],
+      ["allocation", "compact", false],
+      ["goals", "compact", false],
+      ["landing", "expanded", false],
+    ]);
+    expect(
+      dashboard.instances
+        .slice(curated.length)
+        .map((instance) => [instance.widgetType, instance.hidden]),
+    ).toEqual([
+      ["recent", true],
+      ["saved", true],
+      ["later", true],
+    ]);
+  });
+
+  it("falls back to Recent entries and waits for complete landing history", () => {
+    expect(
+      curatedOverviewWidgets({
+        hasExpenseBudget: false,
+        hasRecurringSchedule: false,
+        hasScheduledIncome: false,
+        hasActiveGoal: false,
+        hasLandingHistory: false,
+        hasLandingSignal: true,
+      }),
+    ).toEqual([
+      { widgetType: "balance", size: "expanded" },
+      { widgetType: "brief", size: "expanded" },
+      { widgetType: "recent", size: "expanded" },
+    ]);
+  });
+
+  it("expands Allocation plan when Goal outlook cannot complete its pair", () => {
+    expect(
+      curatedOverviewWidgets({
+        hasExpenseBudget: true,
+        hasRecurringSchedule: true,
+        hasScheduledIncome: true,
+        hasActiveGoal: false,
+        hasLandingHistory: false,
+        hasLandingSignal: false,
+      }),
+    ).toContainEqual({ widgetType: "allocation", size: "expanded" });
   });
 
   it("round-trips subjects, settings, and unknown widget types", () => {
@@ -264,6 +343,32 @@ describe("dashboard layout editing", () => {
     expect(setWidgetSize(initial, "pace", "compact").sizes.pace).toBe("compact");
     expect(setWidgetSize(initial, "balance", "compact")).toBe(initial);
   });
+
+  it("resets an edited dashboard to the same curated order, visibility, and sizes", () => {
+    const definitions = defs("balance", "brief", "pace", "recent", "saved", "upcoming");
+    const dashboard = defaultDashboardDefinition(definitions);
+    const curation = curatedOverviewWidgets({
+      hasExpenseBudget: false,
+      hasRecurringSchedule: false,
+      hasScheduledIncome: false,
+      hasActiveGoal: false,
+      hasLandingHistory: false,
+      hasLandingSignal: false,
+    });
+
+    expect(resetDashboardLayout(dashboard, definitions, curation)).toEqual({
+      order: ["balance", "brief", "recent", "pace", "saved", "upcoming"],
+      hidden: ["pace", "saved", "upcoming"],
+      sizes: {
+        balance: "expanded",
+        brief: "expanded",
+        recent: "expanded",
+        pace: "expanded",
+        saved: "expanded",
+        upcoming: "expanded",
+      },
+    });
+  });
 });
 
 describe("configured widget instances", () => {
@@ -313,17 +418,31 @@ describe("configured widget instances", () => {
 });
 
 describe("dashboard set lifecycle", () => {
-  const ids = ["dashboard-instance-1", "dashboard-instance-2", "dashboard-instance-3"];
+  const ids = [
+    "dashboard-instance-1",
+    "dashboard-instance-2",
+    "dashboard-instance-3",
+    "dashboard-instance-4",
+  ];
 
   it("creates a named dashboard from a curated starter", () => {
+    const starterWidgets = defs(
+      "balance",
+      "allocation",
+      "upcoming",
+      "goals",
+      "saved",
+      "landing",
+      "resilience",
+    );
     let index = 0;
     const dashboard = createDashboardDefinition({
       id: "quarterly",
       name: "  Quarterly planning  ",
       rank: 2,
       starter: "planning",
-      current: defaultDashboardDefinition(widgets),
-      widgets,
+      current: defaultDashboardDefinition(starterWidgets),
+      widgets: starterWidgets,
       makeId: () => ids[index++],
     });
 
@@ -336,11 +455,40 @@ describe("dashboard set lifecycle", () => {
     });
     expect(dashboard.instances.map((instance) => instance.widgetType)).toEqual([
       "balance",
-      "pace",
+      "allocation",
+      "upcoming",
+      "goals",
     ]);
-    expect(dashboard.instances.map((instance) => instance.instanceId)).toEqual(
-      ids.slice(0, 2),
-    );
+    expect(dashboard.instances.map((instance) => instance.instanceId)).toEqual(ids);
+    expect(dashboard.instances.map((instance) => instance.size)).toEqual([
+      "expanded",
+      "compact",
+      "expanded",
+      "compact",
+    ]);
+  });
+
+  it("creates the Trends starter from the replacement widgets", () => {
+    const starterWidgets = defs("balance", "saved", "landing", "resilience", "monthly");
+    let index = 0;
+    const instanceIds = ["trend-1", "trend-2", "trend-3", "trend-4"];
+
+    const dashboard = createDashboardDefinition({
+      id: "trends",
+      name: "Trends",
+      rank: 2,
+      starter: "trends",
+      current: defaultDashboardDefinition(starterWidgets),
+      widgets: starterWidgets,
+      makeId: () => instanceIds[index++],
+    });
+
+    expect(dashboard.instances.map((instance) => instance.widgetType)).toEqual([
+      "balance",
+      "saved",
+      "landing",
+      "resilience",
+    ]);
   });
 
   it("duplicates current configuration with fresh instance ids", () => {

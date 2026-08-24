@@ -39,21 +39,21 @@ import {
   type DashboardLayout,
   type DashboardWidgetEntry,
 } from "./dashboard-layout";
-import { DASHBOARD_WIDGETS, type WidgetContext } from "./registry";
+import type { WidgetContext } from "./registry";
 import { DashboardWidget } from "./WidgetShell";
 
 export function DashboardEditor({
   base,
   widgets,
-  allWidgets,
   layout,
+  resetLayout: curatedResetLayout,
   onLayoutChange,
   onAddWidgets,
 }: {
   base: WidgetContext;
   widgets: readonly DashboardWidgetEntry[];
-  allWidgets: readonly DashboardWidgetEntry[];
   layout: DashboardLayout;
+  resetLayout: DashboardLayout;
   onLayoutChange: (layout: DashboardLayout) => void;
   onAddWidgets: () => void;
 }) {
@@ -77,25 +77,7 @@ export function DashboardEditor({
   }
 
   function resetLayout() {
-    const registryRank = new Map(
-      DASHBOARD_WIDGETS.map((widget, index) => [widget.id, index]),
-    );
-    const ordered = [...allWidgets].sort(
-      (a, b) =>
-        (registryRank.get(a.def.id) ?? Number.MAX_SAFE_INTEGER) -
-        (registryRank.get(b.def.id) ?? Number.MAX_SAFE_INTEGER),
-    );
-    onLayoutChange({
-      order: ordered.map(({ instance }) => instance.instanceId),
-      hidden: ordered.flatMap(({ instance, def }) =>
-        !def.defaultVisible && instance.widgetType !== PINNED_WIDGET_ID
-          ? [instance.instanceId]
-          : [],
-      ),
-      sizes: Object.fromEntries(
-        ordered.map(({ instance }) => [instance.instanceId, "expanded"]),
-      ),
-    });
+    onLayoutChange(curatedResetLayout);
   }
 
   return (

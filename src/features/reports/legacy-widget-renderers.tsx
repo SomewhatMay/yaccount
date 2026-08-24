@@ -7,7 +7,6 @@ import {
   budgetPace,
   categoryBreakdown,
   categoryBreakdownMonthlyAverage,
-  categoryMonthlySpend,
   categoryTrendSeries,
   comparePeriodSummary,
   containerFlows,
@@ -17,12 +16,10 @@ import {
   investmentReport,
   largestTransactions,
   overallBalanceSeries,
-  overallBalanceAsOf,
   precedingRange,
   requiredMonthly,
   recentRows,
   sankeyFlows,
-  savingsRateSeries,
   topPayees,
   totalExpenseBudgetOnDate,
   trailingDays,
@@ -38,7 +35,6 @@ import { EmptyNote } from "./chart-ui";
 import {
   BudgetPaceMeter,
   GoalsRail,
-  KpiStrip,
   LargestList,
   MoneyFlowChart,
   PayeeList,
@@ -46,12 +42,10 @@ import {
   SpendingCalendar,
   UpcomingList,
   spendByDay,
-  type Kpi,
 } from "./dashboard-widgets";
 import {
   BudgetComparisonTable,
   CategoryDoughnut,
-  CategoryDrilldown,
   ContainerFlowsTable,
   InvestmentCard,
   MonthlyBarsChart,
@@ -153,79 +147,6 @@ function SavedFigure({
       {note && <Marginalia className="mt-1.5 text-sm">{note}</Marginalia>}
     </Figure>
   );
-}
-
-// ── The KPI strip ────────────────────────────────────────────────────────────
-
-function Kpis({
-  range,
-  today,
-  containers,
-  ledgerTransactions,
-  aggregates,
-}: WidgetContext) {
-  const { kpis, note } = useMemo(() => {
-    const before = precedingRange(range);
-    const current = aggregates.period(range);
-    const previous = before ? aggregates.period(before) : null;
-    const delta = previous ? comparePeriodSummary(current, previous) : null;
-
-    const asOf = range.end ?? today;
-    const balance = overallBalanceAsOf(ledgerTransactions, containers, asOf);
-    const balanceBefore = before
-      ? overallBalanceAsOf(ledgerTransactions, containers, before.end!)
-      : null;
-
-    const rates = savingsRateSeries(aggregates.monthly(range))
-      .map((r) => r.rate)
-      .filter((r): r is number => r !== null);
-
-    const list: Kpi[] = [
-      {
-        id: "in",
-        label: "In",
-        value: <Money cents={current.income} tone="in" />,
-        delta: delta?.incomePct ?? null,
-      },
-      {
-        id: "out",
-        label: "Out",
-        value: <Money cents={current.expense} />,
-        delta: delta?.expensePct ?? null,
-      },
-      {
-        id: "rate",
-        label: "Savings rate",
-        value: (
-          <span className="tnum font-mono">
-            {current.savingsRate === null
-              ? "—"
-              : `${Math.round(current.savingsRate * 100)}%`}
-          </span>
-        ),
-        delta: delta?.ratePoints ?? null,
-        unit: "pts",
-        spark: rates,
-      },
-      {
-        id: "balance",
-        label: "Balance",
-        value: <Money cents={balance} tone={balance < 0 ? "alert" : "neutral"} />,
-        delta:
-          balanceBefore === null || balanceBefore === 0
-            ? null
-            : ((balance - balanceBefore) / Math.abs(balanceBefore)) * 100,
-      },
-    ];
-    return {
-      kpis: list,
-      note: before
-        ? `Compared with ${rangeText(before).toLowerCase()}, the window of the same length before this one.`
-        : undefined,
-    };
-  }, [range, today, containers, ledgerTransactions, aggregates]);
-
-  return <KpiStrip kpis={kpis} note={note} />;
 }
 
 // ── Budget pace ──────────────────────────────────────────────────────────────
@@ -487,25 +408,6 @@ function Waterfall({ range, aggregates }: WidgetContext) {
   return <WaterfallChart income={w.income} expenses={w.expenses} savings={w.savings} />;
 }
 
-function Trend({ range, categories, reportTransactions, budgetTargets }: WidgetContext) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const series = useMemo(
-    () =>
-      selected
-        ? categoryMonthlySpend(reportTransactions, selected, range, budgetTargets)
-        : [],
-    [reportTransactions, selected, range, budgetTargets],
-  );
-  return (
-    <CategoryDrilldown
-      categories={categories}
-      selectedId={selected}
-      onSelect={setSelected}
-      series={series}
-    />
-  );
-}
-
 function Flows({ range, containers, ledgerTransactions }: WidgetContext) {
   const flows = useMemo(
     () => containerFlows(ledgerTransactions, containers, range),
@@ -563,7 +465,6 @@ export const LEGACY_WIDGET_RENDERERS = {
   pace: Pace,
   recent: Recent,
   saved: SavedFigure,
-  kpis: Kpis,
   flow: Flow,
   calendar: Calendar,
   breakdown: Breakdown,
@@ -573,7 +474,6 @@ export const LEGACY_WIDGET_RENDERERS = {
   goals: Goals,
   monthly: Monthly,
   waterfall: Waterfall,
-  trend: Trend,
   flows: Flows,
   investments: Investments,
   budgets: Budgets,

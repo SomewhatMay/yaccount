@@ -34,8 +34,10 @@ import { WidgetGallerySheet } from "./WidgetGallerySheet";
 import {
   addDashboardWidgetInstance,
   applyDashboardLayout,
+  curatedOverviewWidgets,
   dashboardWidgetEntries,
   layoutFromDashboard,
+  resetDashboardLayout,
   setWidgetVisible,
   type DashboardDefinition,
   type DashboardWidgetEntry,
@@ -65,40 +67,8 @@ export function DashboardView() {
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
   const settings = useAtomValue(settingsAtom);
-
-  const dashboardSets = useDashboardSets();
-  const activeDashboardId = dashboardSets.activeDashboard.id;
-  // Reporting windows are browser-local and independent for every dashboard.
-  const [period, setPeriod] = usePeriodPref(
-    `${PERIOD_KEY_PREFIX}.${activeDashboardId}`,
-    DEFAULT_PERIOD,
-  );
-  const [comparePeriod, setComparePeriod] = useComparePref(
-    `${COMPARE_KEY_PREFIX}.${activeDashboardId}`,
-  );
-  const activeDashboard = draftDashboard ?? dashboardSets.activeDashboard;
-  const activeLayout = draftDashboard
-    ? layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS)
-    : dashboardSets.layout;
-  const widgetEntries = useMemo(
-    () => dashboardWidgetEntries(activeDashboard, activeLayout, DASHBOARD_WIDGETS),
-    [activeDashboard, activeLayout],
-  );
-  const visibleWidgets = useMemo(
-    () =>
-      widgetEntries.filter(
-        ({ instance }) => !activeLayout.hidden.includes(instance.instanceId),
-      ),
-    [activeLayout.hidden, widgetEntries],
-  );
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
-  const primaryRange = useMemo(() => resolvePeriod(period, today), [period, today]);
-  const compareRange = useMemo(
-    () => (comparePeriod ? resolvePeriod(comparePeriod, today) : null),
-    [comparePeriod, today],
-  );
-
   const data = useMemo(() => {
     const reportTransactions = statsTransactions(transactions, categories);
     return {
@@ -134,6 +104,64 @@ export function DashboardView() {
     goals,
     settings,
   ]);
+  const overviewCuration = useMemo(() => {
+    const hasExpenseBudget = data.aggregates.budgetTriage(today).rows.length > 0;
+    const hasActiveGoal = data.aggregates.goalOutlook(today).rows.length > 0;
+    const landing = data.aggregates.monthLanding(today);
+    const incomeCategoryIds = new Set(
+      categories
+        .filter((category) => category.type === "income" && !category.is_archived)
+        .map((category) => category.id),
+    );
+    return curatedOverviewWidgets({
+      hasExpenseBudget,
+      hasRecurringSchedule: recurringRules.some((rule) => rule.status === "active"),
+      hasScheduledIncome: recurringRules.some(
+        (rule) =>
+          rule.status === "active" &&
+          rule.template_category_id !== null &&
+          incomeCategoryIds.has(rule.template_category_id) &&
+          (rule.template_amount ?? 0) > 0,
+      ),
+      hasActiveGoal,
+      hasLandingHistory: landing.history.length >= 2,
+      hasLandingSignal:
+        landing.scheduledItems.length > 0 ||
+        landing.unknownItems.length > 0 ||
+        landing.history.some((item) => item.flexibleSpending !== 0),
+    });
+  }, [categories, data.aggregates, recurringRules, today]);
+
+  const dashboardSets = useDashboardSets(overviewCuration);
+  const activeDashboardId = dashboardSets.activeDashboard.id;
+  // Reporting windows are browser-local and independent for every dashboard.
+  const [period, setPeriod] = usePeriodPref(
+    `${PERIOD_KEY_PREFIX}.${activeDashboardId}`,
+    DEFAULT_PERIOD,
+  );
+  const [comparePeriod, setComparePeriod] = useComparePref(
+    `${COMPARE_KEY_PREFIX}.${activeDashboardId}`,
+  );
+  const activeDashboard = draftDashboard ?? dashboardSets.activeDashboard;
+  const activeLayout = draftDashboard
+    ? layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS)
+    : dashboardSets.layout;
+  const widgetEntries = useMemo(
+    () => dashboardWidgetEntries(activeDashboard, activeLayout, DASHBOARD_WIDGETS),
+    [activeDashboard, activeLayout],
+  );
+  const visibleWidgets = useMemo(
+    () =>
+      widgetEntries.filter(
+        ({ instance }) => !activeLayout.hidden.includes(instance.instanceId),
+      ),
+    [activeLayout.hidden, widgetEntries],
+  );
+  const primaryRange = useMemo(() => resolvePeriod(period, today), [period, today]);
+  const compareRange = useMemo(
+    () => (comparePeriod ? resolvePeriod(comparePeriod, today) : null),
+    [comparePeriod, today],
+  );
 
   function beginEditing() {
     setDraftDashboard({
@@ -265,8 +293,12 @@ export function DashboardView() {
         <DashboardEditor
           base={{ ...data, range: primaryRange }}
           widgets={visibleWidgets}
-          allWidgets={widgetEntries}
           layout={activeLayout}
+          resetLayout={resetDashboardLayout(
+            draftDashboard,
+            DASHBOARD_WIDGETS,
+            overviewCuration,
+          )}
           onLayoutChange={(next) =>
             setDraftDashboard((current) =>
               current ? applyDashboardLayout(current, next, DASHBOARD_WIDGETS) : current,

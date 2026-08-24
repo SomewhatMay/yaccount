@@ -330,7 +330,35 @@ test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo)
   await expect(body.getByLabel("Amount")).toBeVisible();
 });
 
+test("curates a fresh Overview without empty cards", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+
+  const brief = page
+    .getByRole("heading", { name: "Money brief" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  const recent = page
+    .getByRole("heading", { name: "Recent entries" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await expect(brief).toHaveAttribute("data-widget-size", "expanded");
+  await expect(recent).toHaveAttribute("data-widget-size", "expanded");
+  for (const title of [
+    "Budget triage",
+    "Cash horizon",
+    "Allocation plan",
+    "Goal outlook",
+    "Month landing",
+    "What changed",
+  ]) {
+    await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
+  }
+});
+
 test("edits dashboard cards in place and commits on Done", async ({ page }) => {
+  await createCategory(page, "E2E editor budget");
+  await page.getByRole("button", { name: "Actions for E2E editor budget" }).click();
+  await page.getByRole("menuitem", { name: "Budget" }).click();
+  await page.getByLabel("Monthly amount").fill("100.00");
+  await page.getByRole("button", { name: "Set budget" }).click();
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Edit dashboard" }).click();
   await expect(
@@ -367,7 +395,7 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
     page.getByText("Period comparison isn't supported for this current view.", {
       exact: true,
     }),
-  ).toHaveCount(7);
+  ).toHaveCount(3);
   await page.getByRole("button", { name: "Compare with another period" }).click();
 
   await page.getByRole("button", { name: "Edit dashboard" }).click();
@@ -396,7 +424,6 @@ test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
 test("searches the grouped widget gallery by recognition language", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Edit dashboard" }).click();
-  await page.getByRole("button", { name: "Hide Budget triage" }).click();
   await page.getByRole("button", { name: "Hide Recent entries" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
 
@@ -533,6 +560,11 @@ test("shows Month landing scheduled math before history is available", async ({
   await page.getByRole("button", { name: "Add recurring" }).click();
 
   await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+  await page.getByRole("button", { name: "Add Month landing" }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Done" }).click();
   const landing = page
     .getByRole("heading", { name: "Month landing" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
@@ -570,16 +602,17 @@ test("uses complete selected months for Income resilience", async ({ page }) => 
   }
 
   await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: /Reporting period:/ }).click();
+  await page.getByRole("button", { name: "Last 6 months", exact: true }).click();
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+  await page.getByRole("button", { name: "Add Income resilience" }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Done" }).click();
   const card = page
     .getByRole("heading", { name: "Income resilience" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
   await card.scrollIntoViewIfNeeded();
-  await expect(
-    card.getByText("3 of 6 complete months observed", { exact: false }),
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: /Reporting period:/ }).click();
-  await page.getByRole("button", { name: "Last 6 months", exact: true }).click();
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByText("last 6 complete months", { exact: true })).toBeVisible();
   await expect(card.getByText("E2E steady salary", { exact: true })).toBeVisible();
@@ -698,16 +731,11 @@ test("ranks and caps current matters in Money brief", async ({ page }) => {
     .getByRole("heading", { name: "Money brief" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
   await card.scrollIntoViewIfNeeded();
-  await expect(card.getByText("3 things need you", { exact: true })).toBeVisible();
-  await expect(
-    card.getByText("Known cash falls below zero on Aug 23.", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    card.getByText("1 pending entry is ready to review.", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    card.getByText("E2E brief groceries is projected", { exact: false }),
-  ).toBeVisible();
+  await expect(card).toHaveAttribute("data-widget-size", "compact");
+  await expect(card.getByText("3 need you", { exact: true })).toBeVisible();
+  await expect(card.getByText("Cash below zero Aug 23", { exact: true })).toBeVisible();
+  await expect(card.getByText("1 pending entry", { exact: true })).toBeVisible();
+  await expect(card.getByText("E2E brief groceries:", { exact: false })).toBeVisible();
   await card.getByRole("button", { name: "Show the math" }).click();
   await expect(
     page.getByRole("heading", { name: "Money brief: show the math" }),
@@ -723,9 +751,7 @@ test("keeps lazy dashboard detail within the mobile viewport", async ({
   test.skip(testInfo.project.name !== "mobile", "Mobile overflow regression.");
 
   await openReady(page, "/", "How the money moved");
-  await expect(
-    page.getByText("A current category allowance unlocks budget triage."),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Money brief" })).toBeVisible();
   const widths = await page.evaluate(() => ({
     content: document.documentElement.scrollWidth,
     viewport: document.documentElement.clientWidth,
@@ -744,12 +770,12 @@ test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
     exact: true,
   });
   const recentBox = await recentHandle.boundingBox();
-  const paceBox = await page.locator('[data-widget-id="pace"]').boundingBox();
-  if (!recentBox || !paceBox) throw new Error("Dashboard cards are not visible.");
+  const briefBox = await page.locator('[data-widget-id="brief"]').boundingBox();
+  if (!recentBox || !briefBox) throw new Error("Dashboard cards are not visible.");
   await dragUpByTouch(
     page,
     recentHandle,
-    recentBox.y + recentBox.height / 2 - (paceBox.y + paceBox.height / 2),
+    recentBox.y + recentBox.height / 2 - (briefBox.y + briefBox.height / 2),
   );
   await expect(page.locator("[data-widget-id]").nth(1)).toHaveAttribute(
     "data-widget-id",

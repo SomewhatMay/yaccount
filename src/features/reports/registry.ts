@@ -115,7 +115,6 @@ type LegacyWidgetId =
   | "pace"
   | "recent"
   | "saved"
-  | "kpis"
   | "flow"
   | "calendar"
   | "breakdown"
@@ -125,7 +124,6 @@ type LegacyWidgetId =
   | "goals"
   | "monthly"
   | "waterfall"
-  | "trend"
   | "flows"
   | "investments"
   | "budgets";
@@ -1129,7 +1127,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "saved",
     title: "What changed",
     description: "Why kept money moved versus the equal-length prior period.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery(
       "analysis",
       ["income", "expense", "savings", "kept", "comparison", "drivers", "variance"],
@@ -1145,19 +1143,10 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     math: whatChangedMath,
   },
   {
-    id: "kpis",
-    title: "Headline figures",
-    description: "Income, spending, savings rate, and ending balance at a glance.",
-    defaultVisible: true,
-    bare: true,
-    gallery: gallery("analysis", ["summary", "income", "spending", "balance"]),
-    ...legacy("kpis"),
-  },
-  {
     id: "flow",
     title: "Money flow",
     description: "How income moved through categories and into savings.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["income", "expense", "savings", "sankey"]),
     ...legacy("flow"),
   },
@@ -1165,7 +1154,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "calendar",
     title: "Spending calendar",
     description: "Daily spending rhythm across the latest eight weeks.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["daily", "spending", "heatmap", "calendar"]),
     ...legacy("calendar"),
   },
@@ -1173,7 +1162,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "breakdown",
     title: "Where it went",
     description: "Income and expenses by category, with recent trends.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["category", "breakdown", "doughnut"]),
     ...legacy("breakdown"),
   },
@@ -1181,7 +1170,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "payees",
     title: "Top payees",
     description: "The largest destinations for spending in the selected period.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["merchant", "vendor", "payee", "spending"]),
     ...legacy("payees"),
   },
@@ -1234,7 +1223,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "largest",
     title: "Largest entries",
     description: "The highest-value entries in the selected period.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["transaction", "purchase", "largest"]),
     ...legacy("largest"),
   },
@@ -1288,7 +1277,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "resilience",
     title: "Income resilience",
     description: "Observed income variability and concentration by source.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery(
       "analysis",
       ["income", "salary", "source", "variable", "steady", "range"],
@@ -1309,7 +1298,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "watch-container",
     title: "Container watch",
     description: "Pin one container's balance, scheduled low, and optional floor.",
-    defaultVisible: true,
+    defaultVisible: false,
     fixedWindow: true,
     gallery: gallery(
       "watch",
@@ -1326,7 +1315,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "watch-category",
     title: "Category watch",
     description: "Pin one expense category's budget, history, and likely month end.",
-    defaultVisible: true,
+    defaultVisible: false,
     fixedWindow: true,
     gallery: gallery(
       "watch",
@@ -1343,7 +1332,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "monthly",
     title: "Month by month",
     description: "Income, expenses, savings, and budget over time.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["monthly", "trend", "budget", "history"]),
     ...legacy("monthly"),
   },
@@ -1351,23 +1340,15 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "waterfall",
     title: "Income → expenses → savings",
     description: "How the period's income became spending and savings.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["income", "expense", "savings", "waterfall"]),
     ...legacy("waterfall"),
-  },
-  {
-    id: "trend",
-    title: "Category over time",
-    description: "One category's monthly spending against its budget.",
-    defaultVisible: true,
-    gallery: gallery("analysis", ["category", "budget", "history", "trend"]),
-    ...legacy("trend"),
   },
   {
     id: "flows",
     title: "Container flows",
     description: "Money transferred into and out of each container.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["container", "account", "transfer", "flow"]),
     ...legacy("flows"),
   },
@@ -1375,7 +1356,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "investments",
     title: "Investments",
     description: "Value, contributions, and gain or loss for each investment.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("analysis", ["investment", "value", "return", "snapshot"]),
     ...legacy("investments"),
   },
@@ -1383,7 +1364,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     id: "budgets",
     title: "Budget comparison",
     description: "Average spending against allowances by category.",
-    defaultVisible: true,
+    defaultVisible: false,
     gallery: gallery("planning", ["budget", "allowance", "category", "average"]),
     ...legacy("budgets"),
   },
