@@ -147,6 +147,15 @@ const loadRecentCompact: WidgetModuleLoader = () =>
     default: module.LEGACY_COMPACT_RENDERERS.recent,
   }));
 
+const loadMoneyBrief: WidgetModuleLoader = () =>
+  import("./widget-modules/MoneyBriefWidget").then((module) => ({
+    default: module.MoneyBriefExpanded,
+  }));
+const loadMoneyBriefCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/MoneyBriefWidget").then((module) => ({
+    default: module.MoneyBriefCompact,
+  }));
+
 const loadMoneyMap: WidgetModuleLoader = () =>
   import("./widget-modules/MoneyMapWidget").then((module) => ({
     default: module.MoneyMapExpanded,
@@ -951,6 +960,80 @@ function categoryWatchMath(context: WidgetContext): WidgetMathDisclosure {
   };
 }
 
+function moneyBriefMath(context: WidgetContext): WidgetMathDisclosure {
+  const result = context.aggregates.moneyBrief(context.today);
+  return {
+    range: `${context.today} · known cash through ${context.aggregates.cashHorizon(context.today, 30).end}`,
+    freshness: `Complete pending ledger, current-month stats-visible budgets, raw cash, and latest investment values as of ${context.today}.`,
+    lines: [
+      ...result.items.flatMap((item): WidgetMathLine[] => {
+        if (item.kind === "cash-risk") {
+          return [
+            {
+              kind: "scheduled",
+              label: `Known cash low on ${item.date}`,
+              amount: item.balance,
+              note: `Largest known shortfall ${formatCents(item.shortfall)}.`,
+            },
+          ];
+        }
+        if (item.kind === "pending") {
+          return [
+            {
+              kind: "actual",
+              label: "Pending entries ready to review",
+              value: String(item.count),
+            },
+          ];
+        }
+        if (item.kind === "budget") {
+          return [
+            {
+              kind: "actual",
+              label: `${item.name} spending through today`,
+              amount: item.spent,
+            },
+            { kind: "context", label: `${item.name} budget`, amount: item.budget },
+            {
+              kind: "inferred",
+              label: `${item.name} projected month end`,
+              amount: item.projected,
+            },
+          ];
+        }
+        return [
+          {
+            kind: "context",
+            label: "Investment values needing refresh",
+            value: String(item.staleCount + item.missingCount),
+            note:
+              item.oldestAgeDays === null
+                ? "No reported value."
+                : `Oldest reported value is ${item.oldestAgeDays} days old.`,
+          },
+        ];
+      }),
+      ...(result.nextKnownBill
+        ? [
+            {
+              kind: "scheduled" as const,
+              label: `${result.nextKnownBill.date}: ${result.nextKnownBill.label}`,
+              amount: result.nextKnownBill.amount,
+              note: "All-clear context only; not an attention item.",
+            },
+          ]
+        : []),
+    ],
+    exclusions: [
+      "ordinary upcoming bills from attention ranking",
+      "stats-hidden categories from budget checks",
+      "archived investment containers",
+      "month-close acknowledgement and unmatched-occurrence claims",
+    ],
+    rule: `Rank known cash shortfalls, complete pending review, current-month spent/projected budget overages, then investment values older than 30 days or missing. Show at most three of ${result.totalItems} current matters; ordinary bills appear only as all-clear context.`,
+  };
+}
+
 /** Lightweight descriptors only. Render code enters through dynamic imports. */
 export const DASHBOARD_WIDGETS: WidgetDef[] = [
   {
@@ -961,6 +1044,27 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     bare: true,
     fixedWindow: true,
     ...legacy("balance"),
+  },
+  {
+    id: "brief",
+    title: "Money brief",
+    description: "The highest-priority current matters across cash, review, and plans.",
+    defaultVisible: true,
+    fixedWindow: true,
+    gallery: gallery(
+      "planning",
+      ["attention", "today", "pending", "budget", "investment", "review"],
+      (context) => {
+        const count = context.aggregates.moneyBrief(context.today).totalItems;
+        return count > 0
+          ? `${count} current ${count === 1 ? "matter" : "matters"}`
+          : null;
+      },
+    ),
+    load: loadMoneyBrief,
+    component: lazy(loadMoneyBrief),
+    ...compact(loadMoneyBriefCompact),
+    math: moneyBriefMath,
   },
   {
     id: "money-map",

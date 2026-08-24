@@ -148,6 +148,13 @@ function calculators(): DashboardAggregateCalculators {
       sixMonthMedian: 0,
       months: [],
     })),
+    moneyBrief: vi.fn(() => ({
+      items: [],
+      totalItems: 0,
+      hiddenItemCount: 0,
+      nextKnownBill: null,
+      hasScheduledContext: false,
+    })),
   };
 }
 
@@ -189,6 +196,7 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(aggregates.categoryWatch("groceries", "2026-08-23")).toBe(
     aggregates.categoryWatch("groceries", "2026-08-23"),
   );
+  expect(aggregates.moneyBrief("2026-08-23")).toBe(aggregates.moneyBrief("2026-08-23"));
 
   expect(calculate.monthlyTotals).toHaveBeenCalledOnce();
   expect(calculate.periodSummary).toHaveBeenCalledOnce();
@@ -205,6 +213,7 @@ it("shares exact dashboard aggregates within one data revision", () => {
   expect(calculate.incomeResilience).toHaveBeenCalledOnce();
   expect(calculate.containerWatch).toHaveBeenCalledOnce();
   expect(calculate.categoryWatch).toHaveBeenCalledOnce();
+  expect(calculate.moneyBrief).toHaveBeenCalledOnce();
   expect(calculate.containerWatch).toHaveBeenCalledWith({
     today: "2026-08-23",
     containerId: "general",
@@ -219,6 +228,15 @@ it("shares exact dashboard aggregates within one data revision", () => {
     categoryId: "groceries",
     transactions: inputs.reportTransactions,
     budgetTargets: inputs.budgetTargets,
+  });
+  expect(calculate.moneyBrief).toHaveBeenCalledWith({
+    today: "2026-08-23",
+    ledgerTransactions: inputs.ledgerTransactions,
+    containers: inputs.containers,
+    snapshots: inputs.snapshots,
+    recurringRules: inputs.recurringRules,
+    budgetTriage: expect.objectContaining({ yearMonth: "2026-08" }),
+    cashHorizon: expect.objectContaining({ days: 30 }),
   });
 });
 

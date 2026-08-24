@@ -19,3 +19,4 @@ export * from "./allocation-plan";
 export * from "./month-landing";
 export * from "./income-resilience";
 export * from "./watch";
+export * from "./money-brief";

@@ -343,7 +343,7 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
 
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
   await page.getByRole("menuitem", { name: "Before Budget triage" }).click();
-  await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
+  await expect(rows.nth(2)).toHaveAttribute("data-widget-id", "recent");
 
   await page.getByRole("button", { name: "Hide Budget triage" }).click();
   await expect(page.locator('[data-widget-id="pace"]')).toHaveCount(0);
@@ -367,14 +367,14 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
     page.getByText("Period comparison isn't supported for this current view.", {
       exact: true,
     }),
-  ).toHaveCount(6);
+  ).toHaveCount(7);
   await page.getByRole("button", { name: "Compare with another period" }).click();
 
   await page.getByRole("button", { name: "Edit dashboard" }).click();
-  await expect(rows.nth(1)).toHaveAttribute("data-widget-id", "recent");
+  await expect(rows.nth(2)).toHaveAttribute("data-widget-id", "recent");
   await page.getByRole("button", { name: "Reset" }).click();
   await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.locator("h3").first()).toHaveText("Budget triage");
+  await expect(page.locator("h3").first()).toHaveText("Money brief");
 });
 
 test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
@@ -668,6 +668,53 @@ test("creates repeatable Watch instances and persists an exact container floor",
     reserve.getByText("Watch: E2E watched reserve", { exact: true }),
   ).toBeVisible();
   await expect(reserve.getByLabel("Distance above your floor: $100.00")).toBeVisible();
+});
+
+test("ranks and caps current matters in Money brief", async ({ page }) => {
+  await createCategory(page, "E2E brief groceries");
+  await page.getByRole("button", { name: "Actions for E2E brief groceries" }).click();
+  await page.getByRole("menuitem", { name: "Budget" }).click();
+  await page.getByLabel("Monthly amount").fill("100.00");
+  await page.getByRole("button", { name: "Set budget" }).click();
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E brief market", "95.00", "E2E brief groceries");
+
+  await openReady(page, "/recurring", "Scheduled transactions");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Payee / source").fill("E2E due review");
+  await page.locator('[data-slot="sheet-body"]').getByRole("combobox").nth(1).click();
+  await page
+    .getByRole("option", { name: "E2E brief groceries · expense", exact: true })
+    .click();
+  await page.getByLabel("Amount").fill("10.00");
+  await page.getByLabel("Day of month").fill("23");
+  await page.getByLabel("Starts").fill("2026-08-23");
+  await page.getByRole("button", { name: "Add recurring" }).click();
+  await page.reload();
+  await expect(page.getByText("E2E due review", { exact: true })).toBeVisible();
+
+  await openReady(page, "/", "How the money moved");
+  const card = page
+    .getByRole("heading", { name: "Money brief" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText("3 things need you", { exact: true })).toBeVisible();
+  await expect(
+    card.getByText("Known cash falls below zero on Aug 23.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    card.getByText("1 pending entry is ready to review.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    card.getByText("E2E brief groceries is projected", { exact: false }),
+  ).toBeVisible();
+  await card.getByRole("button", { name: "Show the math" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Money brief: show the math" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Pending entries ready to review", { exact: true }),
+  ).toBeVisible();
 });
 
 test("keeps lazy dashboard detail within the mobile viewport", async ({

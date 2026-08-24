@@ -5,6 +5,7 @@ import {
   incomeResilience as deriveIncomeResilience,
   containerWatch as deriveContainerWatch,
   categoryWatch as deriveCategoryWatch,
+  moneyBrief as deriveMoneyBrief,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
   goalOutlook as deriveGoalOutlook,
@@ -54,6 +55,7 @@ export interface DashboardAggregateCalculators {
   incomeResilience: typeof deriveIncomeResilience;
   containerWatch: typeof deriveContainerWatch;
   categoryWatch: typeof deriveCategoryWatch;
+  moneyBrief: typeof deriveMoneyBrief;
 }
 
 export interface DashboardAggregates {
@@ -91,6 +93,7 @@ export interface DashboardAggregates {
     categoryId: string,
     today: string,
   ) => ReturnType<typeof deriveCategoryWatch>;
+  moneyBrief: (today: string) => ReturnType<typeof deriveMoneyBrief>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -109,6 +112,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   incomeResilience: deriveIncomeResilience,
   containerWatch: deriveContainerWatch,
   categoryWatch: deriveCategoryWatch,
+  moneyBrief: deriveMoneyBrief,
 };
 
 function rangeKey(range: DateRange): string {
@@ -148,6 +152,40 @@ export function createDashboardAggregates(
   >();
   const containerWatchCache = new Map<string, ReturnType<typeof deriveContainerWatch>>();
   const categoryWatchCache = new Map<string, ReturnType<typeof deriveCategoryWatch>>();
+  const moneyBriefCache = new Map<string, ReturnType<typeof deriveMoneyBrief>>();
+
+  function getBudgetTriage(today: string): ReturnType<typeof deriveBudgetTriage> {
+    const cached = budgetTriageCache.get(today);
+    if (cached) return cached;
+    const result = calculate.budgetTriage(
+      inputs.reportTransactions,
+      inputs.categories,
+      inputs.budgetTargets,
+      inputs.recurringRules,
+      today,
+    );
+    budgetTriageCache.set(today, result);
+    return result;
+  }
+
+  function getCashHorizon(
+    today: string,
+    days: CashHorizonDays,
+  ): ReturnType<typeof deriveCashHorizon> {
+    const key = `${today}:${days}`;
+    const cached = cashHorizonCache.get(key);
+    if (cached) return cached;
+    const result = calculate.cashHorizon(
+      inputs.ledgerTransactions,
+      inputs.categories,
+      inputs.containers,
+      inputs.recurringRules,
+      today,
+      days,
+    );
+    cashHorizonCache.set(key, result);
+    return result;
+  }
 
   return {
     monthly(range) {
@@ -214,17 +252,7 @@ export function createDashboardAggregates(
       return result;
     },
     budgetTriage(today) {
-      const cached = budgetTriageCache.get(today);
-      if (cached) return cached;
-      const result = calculate.budgetTriage(
-        inputs.reportTransactions,
-        inputs.categories,
-        inputs.budgetTargets,
-        inputs.recurringRules,
-        today,
-      );
-      budgetTriageCache.set(today, result);
-      return result;
+      return getBudgetTriage(today);
     },
     goalOutlook(today) {
       const cached = goalOutlookCache.get(today);
@@ -239,19 +267,7 @@ export function createDashboardAggregates(
       return result;
     },
     cashHorizon(today, days) {
-      const key = `${today}:${days}`;
-      const cached = cashHorizonCache.get(key);
-      if (cached) return cached;
-      const result = calculate.cashHorizon(
-        inputs.ledgerTransactions,
-        inputs.categories,
-        inputs.containers,
-        inputs.recurringRules,
-        today,
-        days,
-      );
-      cashHorizonCache.set(key, result);
-      return result;
+      return getCashHorizon(today, days);
     },
     allocationMonth(today, manualIncome) {
       const key = `${today}:${manualIncome}`;
@@ -340,6 +356,21 @@ export function createDashboardAggregates(
         budgetTargets: inputs.budgetTargets,
       });
       categoryWatchCache.set(key, result);
+      return result;
+    },
+    moneyBrief(today) {
+      const cached = moneyBriefCache.get(today);
+      if (cached) return cached;
+      const result = calculate.moneyBrief({
+        today,
+        ledgerTransactions: inputs.ledgerTransactions,
+        containers: inputs.containers,
+        snapshots: inputs.snapshots,
+        recurringRules: inputs.recurringRules,
+        budgetTriage: getBudgetTriage(today),
+        cashHorizon: getCashHorizon(today, 30),
+      });
+      moneyBriefCache.set(today, result);
       return result;
     },
   };

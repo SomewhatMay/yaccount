@@ -18,6 +18,7 @@ describe("the dashboard widget registry", () => {
     // live. Add freely; rename nothing.
     expect(DASHBOARD_WIDGETS.map((w) => w.id)).toEqual([
       "balance",
+      "brief",
       "money-map",
       "pace",
       "recent",
@@ -81,6 +82,19 @@ describe("the dashboard widget registry", () => {
     });
     expect(changed?.loadCompact).toBeTypeOf("function");
     expect(changed?.math).toBeTypeOf("function");
+  });
+
+  it("adds Money brief as the always-available fixed-current note", () => {
+    const brief = DASHBOARD_WIDGETS.find((widget) => widget.id === "brief");
+
+    expect(brief).toMatchObject({
+      title: "Money brief",
+      defaultVisible: true,
+      fixedWindow: true,
+    });
+    expect(brief?.loadCompact).toBeTypeOf("function");
+    expect(brief?.math).toBeTypeOf("function");
+    expect(brief?.availability).toBeUndefined();
   });
 
   it("replaces Budget pace with Budget triage under the stable id", () => {
@@ -188,6 +202,7 @@ describe("the dashboard widget registry", () => {
     // own windows. A period menu on any of them would be a control that lies.
     expect(DASHBOARD_WIDGETS.filter((w) => w.fixedWindow).map((w) => w.id)).toEqual([
       "balance",
+      "brief",
       "money-map",
       "pace",
       "recent",
@@ -206,11 +221,11 @@ describe("the dashboard widget registry", () => {
     expect(DASHBOARD_WIDGETS[0].id).toBe("balance");
   });
 
-  it("puts budget pace directly below overall balance", () => {
+  it("puts Money brief before Budget triage in the curated opening order", () => {
     expect(
       DASHBOARD_WIDGETS.filter((widget) => widget.defaultVisible)
         .slice(0, 3)
         .map((widget) => widget.id),
-    ).toEqual(["balance", "pace", "recent"]);
+    ).toEqual(["balance", "brief", "pace"]);
   });
 });
