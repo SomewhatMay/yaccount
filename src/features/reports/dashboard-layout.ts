@@ -90,6 +90,7 @@ const STARTER_WIDGETS: Record<
   planning: [
     { widgetType: "balance", size: "expanded" },
     { widgetType: "allocation", size: "compact" },
+    { widgetType: "commitments", size: "expanded" },
     { widgetType: "upcoming", size: "expanded" },
     { widgetType: "goals", size: "compact" },
   ],

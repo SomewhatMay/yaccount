@@ -423,12 +423,14 @@ describe("dashboard set lifecycle", () => {
     "dashboard-instance-2",
     "dashboard-instance-3",
     "dashboard-instance-4",
+    "dashboard-instance-5",
   ];
 
   it("creates a named dashboard from a curated starter", () => {
     const starterWidgets = defs(
       "balance",
       "allocation",
+      "commitments",
       "upcoming",
       "goals",
       "saved",
@@ -456,6 +458,7 @@ describe("dashboard set lifecycle", () => {
     expect(dashboard.instances.map((instance) => instance.widgetType)).toEqual([
       "balance",
       "allocation",
+      "commitments",
       "upcoming",
       "goals",
     ]);
@@ -463,6 +466,7 @@ describe("dashboard set lifecycle", () => {
     expect(dashboard.instances.map((instance) => instance.size)).toEqual([
       "expanded",
       "compact",
+      "expanded",
       "expanded",
       "compact",
     ]);

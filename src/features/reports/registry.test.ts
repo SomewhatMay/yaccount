@@ -27,6 +27,7 @@ describe("the dashboard widget registry", () => {
       "calendar",
       "breakdown",
       "payees",
+      "commitments",
       "upcoming",
       "allocation",
       "largest",
@@ -75,6 +76,7 @@ describe("the dashboard widget registry", () => {
       "calendar",
       "breakdown",
       "payees",
+      "commitments",
       "largest",
       "resilience",
       "watch-container",
@@ -150,6 +152,19 @@ describe("the dashboard widget registry", () => {
     expect(horizon?.availability).toBeTypeOf("function");
   });
 
+  it("adds Commitments as an optional fixed-current planning widget", () => {
+    const commitments = DASHBOARD_WIDGETS.find((widget) => widget.id === "commitments");
+
+    expect(commitments).toMatchObject({
+      title: "Commitments",
+      defaultVisible: false,
+      fixedWindow: true,
+    });
+    expect(commitments?.loadCompact).toBeTypeOf("function");
+    expect(commitments?.math).toBeTypeOf("function");
+    expect(commitments?.availability).toBeTypeOf("function");
+  });
+
   it("adds Allocation plan as a fixed-current planning widget", () => {
     const allocation = DASHBOARD_WIDGETS.find((widget) => widget.id === "allocation");
 
@@ -220,6 +235,7 @@ describe("the dashboard widget registry", () => {
       "money-map",
       "pace",
       "recent",
+      "commitments",
       "upcoming",
       "allocation",
       "goals",

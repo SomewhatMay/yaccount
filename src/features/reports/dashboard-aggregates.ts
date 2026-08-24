@@ -5,6 +5,7 @@ import {
   incomeResilience as deriveIncomeResilience,
   containerWatch as deriveContainerWatch,
   categoryWatch as deriveCategoryWatch,
+  commitments as deriveCommitments,
   moneyBrief as deriveMoneyBrief,
   budgetTriage as deriveBudgetTriage,
   cashHorizon as deriveCashHorizon,
@@ -56,6 +57,7 @@ export interface DashboardAggregateCalculators {
   containerWatch: typeof deriveContainerWatch;
   categoryWatch: typeof deriveCategoryWatch;
   moneyBrief: typeof deriveMoneyBrief;
+  commitments: typeof deriveCommitments;
 }
 
 export interface DashboardAggregates {
@@ -94,6 +96,7 @@ export interface DashboardAggregates {
     today: string,
   ) => ReturnType<typeof deriveCategoryWatch>;
   moneyBrief: (today: string) => ReturnType<typeof deriveMoneyBrief>;
+  commitments: (today: string) => ReturnType<typeof deriveCommitments>;
 }
 
 const defaultCalculators: DashboardAggregateCalculators = {
@@ -113,6 +116,7 @@ const defaultCalculators: DashboardAggregateCalculators = {
   containerWatch: deriveContainerWatch,
   categoryWatch: deriveCategoryWatch,
   moneyBrief: deriveMoneyBrief,
+  commitments: deriveCommitments,
 };
 
 function rangeKey(range: DateRange): string {
@@ -153,6 +157,7 @@ export function createDashboardAggregates(
   const containerWatchCache = new Map<string, ReturnType<typeof deriveContainerWatch>>();
   const categoryWatchCache = new Map<string, ReturnType<typeof deriveCategoryWatch>>();
   const moneyBriefCache = new Map<string, ReturnType<typeof deriveMoneyBrief>>();
+  const commitmentsCache = new Map<string, ReturnType<typeof deriveCommitments>>();
 
   function getBudgetTriage(today: string): ReturnType<typeof deriveBudgetTriage> {
     const cached = budgetTriageCache.get(today);
@@ -371,6 +376,17 @@ export function createDashboardAggregates(
         cashHorizon: getCashHorizon(today, 30),
       });
       moneyBriefCache.set(today, result);
+      return result;
+    },
+    commitments(today) {
+      const cached = commitmentsCache.get(today);
+      if (cached) return cached;
+      const result = calculate.commitments({
+        today,
+        categories: inputs.categories,
+        recurringRules: inputs.recurringRules,
+      });
+      commitmentsCache.set(today, result);
       return result;
     },
   };

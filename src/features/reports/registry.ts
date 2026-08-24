@@ -199,6 +199,15 @@ const loadCashHorizonCompact: WidgetModuleLoader = () =>
     default: module.CashHorizonCompact,
   }));
 
+const loadCommitments: WidgetModuleLoader = () =>
+  import("./widget-modules/CommitmentsWidget").then((module) => ({
+    default: module.CommitmentsExpanded,
+  }));
+const loadCommitmentsCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/CommitmentsWidget").then((module) => ({
+    default: module.CommitmentsCompact,
+  }));
+
 const loadAllocationPlan: WidgetModuleLoader = () =>
   import("./widget-modules/AllocationPlanWidget").then((module) => ({
     default: module.AllocationPlanExpanded,
@@ -455,6 +464,60 @@ function goalOutlookMath(context: WidgetContext): WidgetMathDisclosure {
 function cashHorizonDays(context: WidgetContext): 14 | 30 | 60 {
   const value = context.instanceSettings?.horizonDays;
   return value === 14 || value === 30 || value === 60 ? value : 30;
+}
+
+function commitmentsAvailability(context: WidgetContext): WidgetAvailability {
+  return context.aggregates.commitments(context.today).activeExpenseRuleCount > 0
+    ? { status: "ready" }
+    : {
+        status: "needs-setup",
+        title: "Schedule an expense",
+        description: "An active recurring expense unlocks commitment planning.",
+        action: { label: "Add a recurring expense", href: "/recurring" },
+      };
+}
+
+function commitmentsMath(context: WidgetContext): WidgetMathDisclosure {
+  const result = context.aggregates.commitments(context.today);
+  const ruleLines = [...result.regular.rules, ...result.irregular.rules].map((rule) => {
+    const label = `${rule.label} · ${rule.occurrenceCount} ${rule.occurrenceCount === 1 ? "occurrence" : "occurrences"}`;
+    const total = rule.occurrences.reduce(
+      (sum, occurrence) => sum + (occurrence.amount ?? 0),
+      0,
+    );
+    return rule.amount === null
+      ? ({ kind: "scheduled", label, value: "set later" } as const)
+      : ({ kind: "scheduled", label, amount: -total } as const);
+  });
+  return {
+    range: rangeText({ start: result.start, end: result.end }),
+    freshness: `Active recurring expense rules as of ${context.today}; no ledger inference.`,
+    lines: [
+      ...ruleLines,
+      {
+        kind: "context",
+        label: "Regular monthly load",
+        amount: -result.regular.monthlyEquivalent,
+      },
+      {
+        kind: "context",
+        label: "Irregular known next 12 months",
+        amount: -result.irregular.knownNext12Months,
+      },
+      {
+        kind: "context",
+        label: "Irregular monthly equivalent",
+        amount: -result.irregular.monthlyEquivalent,
+      },
+    ],
+    exclusions: [
+      "income and transfers",
+      "cancelled and out-of-window rules",
+      "unknown goal-derived amounts from numeric totals",
+      "repeated ledger entries without a recurring rule",
+    ],
+    rule: "Regular means a configured cadence no longer than one average Gregorian month; slower custom and annual cadences are Irregular. Exact occurrences from today through the day before next year's date are divided by 12 and rounded once to cents.",
+  };
 }
 
 function cashHorizonAvailability(context: WidgetContext): WidgetAvailability {
@@ -1173,6 +1236,28 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     defaultVisible: false,
     gallery: gallery("analysis", ["merchant", "vendor", "payee", "spending"]),
     ...legacy("payees"),
+  },
+  {
+    id: "commitments",
+    title: "Commitments",
+    description: "Regular monthly load and known irregular expense costs.",
+    defaultVisible: false,
+    fixedWindow: true,
+    gallery: gallery(
+      "planning",
+      ["recurring", "expense", "subscription", "annual", "irregular", "bill"],
+      (context) => {
+        const result = context.aggregates.commitments(context.today);
+        return result.activeExpenseRuleCount > 0
+          ? `${result.activeExpenseRuleCount} active expense ${result.activeExpenseRuleCount === 1 ? "rule" : "rules"}`
+          : null;
+      },
+    ),
+    load: loadCommitments,
+    component: lazy(loadCommitments),
+    ...compact(loadCommitmentsCompact),
+    availability: commitmentsAvailability,
+    math: commitmentsMath,
   },
   {
     id: "upcoming",

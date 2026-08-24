@@ -153,7 +153,7 @@ Recommended:
 - Irregular monthly equivalent uses the same 12-month horizon.
 - Goal-derived/null amounts remain **set later** and do not enter numeric totals.
 
-Owner: **Deferred. More context is required. Build every non-dependent item first; defer Commitments and other D10-dependent work to the end.**
+Owner: **Approved. Use the recommended automatic cadence split.**
 
 ### D11. Synced versus browser-local dashboard state
 

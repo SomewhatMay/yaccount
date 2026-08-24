@@ -492,6 +492,45 @@ test("persists the synced Cash horizon window", async ({ page }) => {
   );
 });
 
+test("adds Commitments and persists its cadence view", async ({ page }) => {
+  await createCategory(page, "E2E commitment bills");
+  await openReady(page, "/recurring", "Scheduled transactions");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Payee / source").fill("E2E internet");
+  await page.getByRole("combobox").first().click();
+  await page
+    .getByRole("option", { name: "E2E commitment bills · expense", exact: true })
+    .click();
+  await page.getByLabel("Amount").fill("65.00");
+  await page.getByLabel("Day of month").fill("27");
+  await page.getByRole("button", { name: "Add recurring" }).click();
+
+  await openReady(page, "/", "How the money moved");
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+  await page.getByRole("button", { name: "Add Commitments" }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Done" }).click();
+
+  const card = page
+    .getByRole("heading", { name: "Commitments" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByLabel("Scheduled monthly load: $65.00").first()).toBeVisible();
+  await expect(card.getByText("E2E internet", { exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Show irregular commitments" }).click();
+  await expect(
+    card.getByRole("button", { name: "Show irregular commitments" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.reload();
+  await card.scrollIntoViewIfNeeded();
+  await expect(
+    card.getByRole("button", { name: "Show irregular commitments" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(card.getByLabel("Known in the next 12 months: $0.00")).toBeVisible();
+});
+
 test("persists Allocation plan pay-cycle mode and income anchors", async ({ page }) => {
   await createCategory(page, "E2E allocation bills");
   await page.getByRole("button", { name: "Actions for E2E allocation bills" }).click();

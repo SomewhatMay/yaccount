@@ -218,6 +218,7 @@ describe("useDashboardSets", () => {
     expect(created.instances.map((instance) => instance.widgetType)).toEqual([
       "balance",
       "allocation",
+      "commitments",
       "upcoming",
       "goals",
     ]);
