@@ -12,14 +12,16 @@ repeat them — it says where things stand and what will bite you.
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 73 Vitest files, 1,052 tests passing. Playwright is 57 passes and 7 expected desktop-touch
+- 79 Vitest files, 1,074 tests passing. Playwright is 67 passes and 9 expected desktop-touch
   skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
   issues).
-- **⌘K searches everything** (`src/core/engine/search.ts`): notes, amounts, dates and container
-  names as well as payees, plus categories, containers, goals, recurring rules, shortcuts,
-  screens and actions — one ranked list, not three. `parseQuery` reads `>100`, `<50`, `20-80`,
-  `$42.50`, `2026-07`, `is:`, `in:`, `cat:`; any token that is not exactly one of those stays a
-  word, so no query can fail. Results deep-link with `?focus=` (`src/features/focus-link.ts`,
+- **⌘K starts with common and recent actions, then searches everything after typing**
+  (`src/core/engine/search.ts`): notes, amounts, dates and container names as well as payees, plus
+  categories, containers, goals, recurring rules, shortcuts, screens and actions. The bounded
+  six-id action history is device-local, fails open, and never stores queries or financial data.
+  Blank search skips full-data indexing. `parseQuery` reads `>100`, `<50`, `20-80`, `$42.50`,
+  `2026-07`, `is:`, `in:`, `cat:`; any token that is not exactly one of those stays a word, so no
+  query can fail. Results deep-link with `?focus=` (`src/features/focus-link.ts`,
   `useFocusParam`); Goals and Recurring also open the row's sheet, Categories and Containers
   deliberately do not.
 - `DB_VERSION = 3`. The Drive layout is `snapshot.json`, `ledger_<id>.json`,

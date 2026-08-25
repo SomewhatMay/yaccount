@@ -3,6 +3,7 @@ import {
   DESTINATIONS,
   MORE_DESTINATIONS,
   TAB_SLOTS,
+  TOPBAR_DESTINATIONS,
   activeTab,
   destinationFor,
   normalizePathname,
@@ -52,28 +53,31 @@ describe("normalizePathname", () => {
   });
 });
 
-describe("TAB_SLOTS — locked by the user (2026-07-22)", () => {
-  it("is exactly Home · Ledger · Inbox · More, in that order", () => {
-    expect(TAB_SLOTS.map((t) => t.label)).toEqual(["Home", "Ledger", "Inbox", "More"]);
+describe("TAB_SLOTS — locked by user feedback (2026-08-24)", () => {
+  it("is exactly Home · Ledger · Goals · More, in that order", () => {
+    expect(TAB_SLOTS.map((t) => t.label)).toEqual(["Home", "Ledger", "Goals", "More"]);
   });
 
   it("routes the first three and opens a sheet for the fourth", () => {
-    expect(TAB_SLOTS.slice(0, 3).map((t) => t.href)).toEqual(["/", "/ledger", "/inbox"]);
+    expect(TAB_SLOTS.slice(0, 3).map((t) => t.href)).toEqual(["/", "/ledger", "/goals"]);
     expect(TAB_SLOTS[3].href).toBeUndefined();
   });
 
-  it("puts the pending badge on Inbox, not on More", () => {
-    // Inbox took the third slot precisely because it carries a live count; a
-    // badge on "More" would be a number with no subject.
-    expect(TAB_SLOTS.filter((t) => t.badge).map((t) => t.label)).toEqual(["Inbox"]);
+  it("does not put Inbox's pending badge on another tab", () => {
+    expect(TAB_SLOTS.some((t) => "badge" in t)).toBe(false);
   });
 });
 
-describe("MORE_DESTINATIONS — what the four slots displace", () => {
+describe("TOPBAR_DESTINATIONS — always one tap away", () => {
+  it("holds Inbox and nothing else", () => {
+    expect(TOPBAR_DESTINATIONS.map((d) => d.href)).toEqual(["/inbox"]);
+  });
+});
+
+describe("MORE_DESTINATIONS — what compact direct navigation displaces", () => {
   it("holds every destination that is not a tab route", () => {
     expect(MORE_DESTINATIONS.map((d) => d.href)).toEqual([
       "/plan",
-      "/goals",
       "/recurring",
       "/containers",
       "/categories",
@@ -81,9 +85,13 @@ describe("MORE_DESTINATIONS — what the four slots displace", () => {
     ]);
   });
 
-  it("loses nothing: tabs ∪ More = every destination", () => {
+  it("loses nothing: tabs ∪ topbar ∪ More = every destination", () => {
     const tabbed = TAB_SLOTS.map((t) => t.href).filter((h): h is string => Boolean(h));
-    const reachable = new Set([...tabbed, ...MORE_DESTINATIONS.map((d) => d.href)]);
+    const reachable = new Set([
+      ...tabbed,
+      ...TOPBAR_DESTINATIONS.map((d) => d.href),
+      ...MORE_DESTINATIONS.map((d) => d.href),
+    ]);
     expect(reachable.size).toBe(DESTINATIONS.length);
     for (const d of DESTINATIONS) expect(reachable.has(d.href)).toBe(true);
   });
@@ -94,7 +102,7 @@ describe("activeTab — which slot lights up", () => {
     expect(activeTab("/")).toBe("/");
     expect(activeTab("/ledger")).toBe("/ledger");
     expect(activeTab("/ledger/")).toBe("/ledger");
-    expect(activeTab("/inbox")).toBe("/inbox");
+    expect(activeTab("/goals")).toBe("/goals");
   });
 
   it("marks More for anything reached through it", () => {
@@ -102,8 +110,11 @@ describe("activeTab — which slot lights up", () => {
     // on a phone — the tab bar has to say how you got there.
     expect(activeTab("/plan")).toBe("more");
     expect(activeTab("/plan/")).toBe("more");
-    expect(activeTab("/goals")).toBe("more");
     expect(activeTab("/settings")).toBe("more");
+  });
+
+  it("marks no bottom slot for Inbox in the topbar", () => {
+    expect(activeTab("/inbox")).toBeNull();
   });
 
   it("marks nothing for a route the shell does not know", () => {

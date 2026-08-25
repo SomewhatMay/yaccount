@@ -130,6 +130,54 @@ test("opens Ledger on the first immediate tab tap", async ({ page }, testInfo) =
   await expect(page).toHaveURL(/\/ledger\/?$/);
 });
 
+test("opens search from the mobile topbar", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile topbar regression.");
+
+  await openReady(page, "/", "How the money moved");
+  const search = page.getByRole("button", { name: "Search yaccount" });
+  await expect(search).toBeVisible();
+  await search.click();
+  await expect(page.getByPlaceholder(/Search everything/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByPlaceholder(/Search everything/)).toBeHidden();
+});
+
+test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile navigation regression.");
+
+  await openReady(page, "/", "How the money moved");
+  const primary = page.getByRole("navigation", { name: "Primary" });
+  await expect(primary.getByRole("link", { name: "Goals" })).toBeVisible();
+  await expect(primary.getByRole("link", { name: "Inbox" })).toHaveCount(0);
+
+  await primary.getByRole("link", { name: "Goals" }).tap();
+  await expect(page).toHaveURL(/\/goals\/?$/);
+  await page.getByRole("link", { name: "Inbox" }).tap();
+  await expect(page).toHaveURL(/\/inbox\/?$/);
+});
+
+test("changes theme only in Settings", async ({ page }, testInfo) => {
+  await openReady(page, "/settings", "Under the hood");
+  await expect(page.getByLabel("System")).toBeVisible();
+  await expect(page.getByLabel("Light")).toBeVisible();
+  await expect(page.getByLabel("Dark")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Switch to .* theme/ })).toHaveCount(0);
+
+  await page.getByLabel("Dark").click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.reload();
+  await expect(page.getByText("Under the hood", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Dark")).toHaveAttribute("data-state", "on");
+
+  await page.getByLabel("Light").click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+
+  if (testInfo.project.name === "mobile") {
+    await page.getByRole("button", { name: "More screens" }).click();
+    await expect(page.getByRole("button", { name: /Switch to .* theme/ })).toHaveCount(0);
+  }
+});
+
 test("commits once for a keyboard resize burst and ignores viewport scroll", async ({
   page,
   context,
@@ -644,9 +692,14 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
 
   await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /to review/ })).toBeVisible();
+  const inboxBadge = page
+    .getByRole("link", { name: "Inbox", exact: true })
+    .locator('[aria-label="1 pending"]');
+  await expect(inboxBadge).toBeVisible();
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Approve E2E recurring" }).click();
   await expect(page.getByRole("heading", { name: "All clear" })).toBeVisible();
+  await expect(inboxBadge).toBeHidden();
 
   await openReady(page, "/ledger", "Overall balance");
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
@@ -665,6 +718,87 @@ async function openPalette(page: Page) {
   await page.keyboard.press("ControlOrMeta+k");
   await expect(page.getByPlaceholder(/Search everything/)).toBeVisible();
 }
+
+test("records an investment value from search", async ({ page }) => {
+  await openReady(page, "/containers", "Where your money lives");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("Name").fill("E2E command investment");
+  await page.getByRole("radio", { name: "Investment", exact: true }).click();
+  await page.getByRole("button", { name: "Create container" }).click();
+
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await page
+    .getByRole("option", {
+      name: /Record investment value.*E2E command investment/,
+    })
+    .click();
+
+  const sheet = page.getByRole("dialog", { name: "Reported balances" });
+  await expect(sheet).toBeVisible();
+  await page.getByLabel("Reported value").fill("321.45");
+  await page.getByRole("button", { name: "Save report" }).click();
+  await expect(sheet.getByText("$321.45", { exact: true })).toBeVisible();
+});
+
+test("shows common and recent command actions", async ({ page }) => {
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
+  await expect(page.getByText("Go to", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("option", { name: "Log income", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openPalette(page);
+  await expect(page.getByText("Recent actions", { exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Log income", exact: true })).toHaveCount(
+    1,
+  );
+  await page.keyboard.press("Escape");
+
+  await page.reload();
+  await expect(page.getByText("How the money moved", { exact: true })).toBeVisible();
+  await openPalette(page);
+  await expect(page.getByText("Recent actions", { exact: true })).toBeVisible();
+  await page.getByPlaceholder(/Search everything/).fill("settings");
+  await expect(page.getByText("Go to", { exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Settings/ })).toBeVisible();
+});
+
+test("keeps common actions usable when command history storage is blocked", async ({
+  page,
+  context,
+}) => {
+  await context.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.getItem = function (key: string) {
+      if (this === window.localStorage && key === "yaccount.command.history") {
+        throw new DOMException("Storage blocked", "SecurityError");
+      }
+      return getItem.call(this, key);
+    };
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (this === window.localStorage && key === "yaccount.command.history") {
+        throw new DOMException("Storage blocked", "SecurityError");
+      }
+      return setItem.call(this, key, value);
+    };
+  });
+
+  await openReady(page, "/", "How the money moved");
+  await openPalette(page);
+  await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
+  await page.getByRole("option", { name: "Log income", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openPalette(page);
+  await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
+  await expect(page.getByText("Recent actions", { exact: true })).toHaveCount(0);
+});
 
 test("⌘K finds an entry by a word that is only in its notes", async ({ page }) => {
   await createCategory(page, "E2E palette food");

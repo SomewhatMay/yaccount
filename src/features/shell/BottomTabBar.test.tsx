@@ -19,15 +19,6 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
-vi.mock("jotai", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("jotai")>();
-
-  return {
-    ...actual,
-    useAtomValue: () => 0,
-  };
-});
-
 describe("BottomTabBar", () => {
   it("activates a stationary touch on pointerup but cancels movement", () => {
     const slots = BottomTabBar({ onMore: vi.fn() }).props.children.props.children;

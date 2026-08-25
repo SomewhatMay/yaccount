@@ -279,6 +279,10 @@ transaction it may be edited in place or removed, and each container shows the f
 its reports with Edit/Delete. This does not weaken the never-lose-data rule: record, update and
 remove are all journaled ops, and state is their replay.
 
+Each active investment also provides a **Record investment value** command action, identified by
+container name. It opens that same report/history sheet from any screen; it is not a second write
+path.
+
 **Reconstructed balance** fills historical gaps as `nearest known snapshot ± transfers in the
 gap`, using the same two-directional crediting as the balance formula. Rolls forward from a past
 snapshot or backward from a future one. Chosen over carry-forward, which ignores transfers during
@@ -777,12 +781,21 @@ varies per screen is noise wearing a label's clothes.
 - **Responsive density.** Below `sm` a sheet rises from the bottom; from `sm` it slides in from
   the right — same component, one rule. Tables collapse to card rows below `sm`. No horizontal
   page scroll, ever.
-- **One navigation registry, two shells.** Below `lg`, fixed bottom tabs: **Home · Ledger · Inbox
-  · More**, with the pending count on Inbox; More holds the remaining destinations and Settings.
-  From `lg`, a sidebar rail shows every destination with Settings in its footer. The active
-  destination is marked by full-strength iris on icon and label, never a tinted plate. **Routes
-  are stable at every breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add
-  FAB is present at every width.
+- **One navigation registry, two shells.** Below `lg`, fixed bottom tabs: **Home · Ledger · Goals
+  · More**. Inbox and its pending count live in the sticky topbar beside global Search; More holds
+  the remaining destinations and Settings. From `lg`, a sidebar rail shows every destination with
+  Settings in its footer; Inbox and Search remain in the topbar. The active destination is marked
+  by full-strength iris on icon and label, never a tinted plate. **Routes are stable at every
+  breakpoint:** `/` is the dashboard, `/ledger` is the ledger. The quick-add FAB is present at
+  every width.
+- **Appearance belongs in Settings.** System, Light and Dark are explicit choices there; no theme
+  switch is duplicated in the topbar, More or command search. The policy is device-local through
+  `next-themes`, not synced financial/account state.
+- **Command search starts with actions.** A blank palette shows common actions plus up to six
+  recent action invocations; destinations and recorded entities enter only after typing. Recency
+  stores a versioned, bounded list of opaque action ids in device-local preferences — never query
+  text, labels, amounts or timestamps — and blocked/corrupt storage degrades to no history. Typed
+  search still covers every destination and indexed entity.
 - **Dashboard = an ordered widget registry** of stable ids. The synced layout setting reorders and
   hides registry entries; Overall balance is always visible and first. Cards edit directly in
   place, with hidden reports available through a descriptive gallery. Secondary widgets fold;

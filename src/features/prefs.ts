@@ -3,8 +3,9 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 /**
- * Browser-local display preferences, including filters, folds, and reporting
- * windows. Account-wide preferences use synced settings instead.
+ * Browser-local preferences, including filters, folds, reporting windows, and
+ * bounded command-action recency. Account-wide preferences use synced settings
+ * instead.
  *
  * Storage is a convenience, never a dependency: private browsing, a blocked
  * storage setting or a server prerender all leave it unreadable, and every one of

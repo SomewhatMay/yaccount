@@ -107,9 +107,13 @@ export const defaultContainerIdAtom = atom((get) => {
 export type QuickAddKind = "expense" | "income" | "transfer";
 export const quickAddAtom = atom<QuickAddKind | null>(null);
 
-/** The ⌘K palette. Opened by the shortcut, by the top bar's search affordance,
- * and from the More sheet — so, likewise, state rather than a prop. */
+/** The ⌘K palette. Opened by the shortcut and the topbar search affordance, so,
+ * likewise, state rather than a prop. */
 export const commandPaletteAtom = atom(false);
+
+/** The investment whose reported-value history is open. The sheet is global so
+ * a container row and a command action share the exact same write path. */
+export const reportedBalanceContainerIdAtom = atom<string | null>(null);
 
 /**
  * The row the register should mark, and whether to bring it into view.
