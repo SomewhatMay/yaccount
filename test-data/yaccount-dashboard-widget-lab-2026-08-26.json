@@ -1,0 +1,4723 @@
+{
+  "format": "yaccount.export",
+  "version": 1,
+  "exportedAt": "2026-08-26T12:00:00.000Z",
+  "appDbVersion": 3,
+  "deviceId": "dashboard-widget-lab",
+  "opCount": 212,
+  "ops": [
+    {
+      "id": "widget-lab-op-0001",
+      "ts": "2026-08-26T12:00:01.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "opening",
+          "name": "Opening balance",
+          "type": "income",
+          "is_archived": false,
+          "excluded_from_stats": true,
+          "color": null,
+          "icon": "Landmark"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0002",
+      "ts": "2026-08-26T12:00:02.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "salary",
+          "name": "Salary",
+          "type": "income",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "BriefcaseBusiness"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0003",
+      "ts": "2026-08-26T12:00:03.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "freelance",
+          "name": "Freelance",
+          "type": "income",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Laptop"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0004",
+      "ts": "2026-08-26T12:00:04.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "interest",
+          "name": "Interest",
+          "type": "income",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "TrendingUp"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0005",
+      "ts": "2026-08-26T12:00:05.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "housing",
+          "name": "Housing",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "House"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0006",
+      "ts": "2026-08-26T12:00:06.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "groceries",
+          "name": "Groceries",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "ShoppingCart"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0007",
+      "ts": "2026-08-26T12:00:07.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "dining",
+          "name": "Dining",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Utensils"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0008",
+      "ts": "2026-08-26T12:00:08.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "utilities",
+          "name": "Utilities",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Zap"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0009",
+      "ts": "2026-08-26T12:00:09.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "transport",
+          "name": "Transport",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Car"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0010",
+      "ts": "2026-08-26T12:00:10.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "subscriptions",
+          "name": "Subscriptions",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Repeat2"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0011",
+      "ts": "2026-08-26T12:00:11.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "travel",
+          "name": "Travel",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Plane"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0012",
+      "ts": "2026-08-26T12:00:12.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "medical",
+          "name": "Medical",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "HeartPulse"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0013",
+      "ts": "2026-08-26T12:00:13.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "gifts",
+          "name": "Gifts",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "Gift"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0014",
+      "ts": "2026-08-26T12:00:14.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "insurance",
+          "name": "Insurance",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "ShieldCheck"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0015",
+      "ts": "2026-08-26T12:00:15.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "education",
+          "name": "Education",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "GraduationCap"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0016",
+      "ts": "2026-08-26T12:00:16.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "taxes",
+          "name": "Taxes",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": false,
+          "color": null,
+          "icon": "ReceiptText"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0017",
+      "ts": "2026-08-26T12:00:17.000Z",
+      "type": "category.create",
+      "payload": {
+        "row": {
+          "id": "reimbursable",
+          "name": "Reimbursable",
+          "type": "expense",
+          "is_archived": false,
+          "excluded_from_stats": true,
+          "color": null,
+          "icon": "EyeOff"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0018",
+      "ts": "2026-08-26T12:00:18.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "general",
+          "name": "General",
+          "is_investment": false,
+          "include_in_overall_balance": true,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0019",
+      "ts": "2026-08-26T12:00:19.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "checking",
+          "name": "Household checking",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0020",
+      "ts": "2026-08-26T12:00:20.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "savings",
+          "name": "Long-term savings",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0021",
+      "ts": "2026-08-26T12:00:21.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "emergency",
+          "name": "Emergency reserve",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0022",
+      "ts": "2026-08-26T12:00:22.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "vacation",
+          "name": "Japan 2027",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0023",
+      "ts": "2026-08-26T12:00:23.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "laptop",
+          "name": "Laptop fund",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0024",
+      "ts": "2026-08-26T12:00:24.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "skills",
+          "name": "Skills fund",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0025",
+      "ts": "2026-08-26T12:00:25.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "health",
+          "name": "Health reserve",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0026",
+      "ts": "2026-08-26T12:00:26.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "brokerage",
+          "name": "Brokerage",
+          "is_investment": true,
+          "include_in_overall_balance": true,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0027",
+      "ts": "2026-08-26T12:00:27.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "retirement",
+          "name": "Retirement",
+          "is_investment": true,
+          "include_in_overall_balance": false,
+          "is_archived": false
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0028",
+      "ts": "2026-08-26T12:00:28.000Z",
+      "type": "container.create",
+      "payload": {
+        "row": {
+          "id": "old-wallet",
+          "name": "Old wallet",
+          "is_investment": false,
+          "include_in_overall_balance": false,
+          "is_archived": true
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0029",
+      "ts": "2026-08-26T12:00:29.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-general",
+          "date": "2026-08-01",
+          "amount": 250000,
+          "vendor_source": "General opening balance",
+          "category_id": "opening",
+          "container_id": "general",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:29.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0030",
+      "ts": "2026-08-26T12:00:30.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-checking",
+          "date": "2026-01-01",
+          "amount": 100000,
+          "vendor_source": "Checking opening balance",
+          "category_id": "opening",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:30.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0031",
+      "ts": "2026-08-26T12:00:31.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-savings",
+          "date": "2026-01-01",
+          "amount": 200000,
+          "vendor_source": "Savings opening balance",
+          "category_id": "opening",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:31.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0032",
+      "ts": "2026-08-26T12:00:32.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-emergency",
+          "date": "2026-01-01",
+          "amount": 650000,
+          "vendor_source": "emergency opening balance",
+          "category_id": "opening",
+          "container_id": "emergency",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:32.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0033",
+      "ts": "2026-08-26T12:00:33.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-vacation",
+          "date": "2026-01-01",
+          "amount": 150000,
+          "vendor_source": "vacation opening balance",
+          "category_id": "opening",
+          "container_id": "vacation",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:33.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0034",
+      "ts": "2026-08-26T12:00:34.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-laptop",
+          "date": "2026-01-01",
+          "amount": 60000,
+          "vendor_source": "laptop opening balance",
+          "category_id": "opening",
+          "container_id": "laptop",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:34.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0035",
+      "ts": "2026-08-26T12:00:35.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-skills",
+          "date": "2026-01-01",
+          "amount": 20000,
+          "vendor_source": "skills opening balance",
+          "category_id": "opening",
+          "container_id": "skills",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:35.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0036",
+      "ts": "2026-08-26T12:00:36.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "opening-health",
+          "date": "2026-01-01",
+          "amount": 100000,
+          "vendor_source": "health opening balance",
+          "category_id": "opening",
+          "container_id": "health",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:36.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0037",
+      "ts": "2026-08-26T12:00:37.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-01",
+          "date": "2026-01-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-01-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:37.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0038",
+      "ts": "2026-08-26T12:00:38.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "freelance-01",
+          "date": "2026-01-18",
+          "amount": 50000,
+          "vendor_source": "Studio invoices",
+          "category_id": "freelance",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:38.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0039",
+      "ts": "2026-08-26T12:00:39.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-01",
+          "date": "2026-01-20",
+          "amount": 1100,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:39.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0040",
+      "ts": "2026-08-26T12:00:40.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-01",
+          "date": "2026-01-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-01-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:40.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0041",
+      "ts": "2026-08-26T12:00:41.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-01",
+          "date": "2026-01-08",
+          "amount": -37700,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:41.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0042",
+      "ts": "2026-08-26T12:00:42.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-01",
+          "date": "2026-01-22",
+          "amount": -20300,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:42.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0043",
+      "ts": "2026-08-26T12:00:43.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-01",
+          "date": "2026-01-12",
+          "amount": -13200,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:43.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0044",
+      "ts": "2026-08-26T12:00:44.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-01",
+          "date": "2026-01-24",
+          "amount": -8800,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:44.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0045",
+      "ts": "2026-08-26T12:00:45.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-01",
+          "date": "2026-01-30",
+          "amount": -24000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-01-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:45.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0046",
+      "ts": "2026-08-26T12:00:46.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-01",
+          "date": "2026-01-16",
+          "amount": -12700,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:46.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0047",
+      "ts": "2026-08-26T12:00:47.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-01",
+          "date": "2026-01-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-01-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:47.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0048",
+      "ts": "2026-08-26T12:00:48.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "travel-01",
+          "date": "2026-01-14",
+          "amount": -8000,
+          "vendor_source": "Regional rail",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:48.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0049",
+      "ts": "2026-08-26T12:00:49.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-01",
+          "date": "2026-01-11",
+          "amount": -12500,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:49.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0050",
+      "ts": "2026-08-26T12:00:50.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-01",
+          "date": "2026-01-19",
+          "amount": -6000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:50.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0051",
+      "ts": "2026-08-26T12:00:51.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-01",
+          "date": "2026-01-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:51.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0052",
+      "ts": "2026-08-26T12:00:52.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-01",
+          "date": "2026-01-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:52.000Z",
+          "yearMonth": "2026-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0053",
+      "ts": "2026-08-26T12:00:53.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-02",
+          "date": "2026-02-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-02-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:53.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0054",
+      "ts": "2026-08-26T12:00:54.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "freelance-02",
+          "date": "2026-02-18",
+          "amount": 80000,
+          "vendor_source": "Studio invoices",
+          "category_id": "freelance",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:54.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0055",
+      "ts": "2026-08-26T12:00:55.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-02",
+          "date": "2026-02-20",
+          "amount": 1200,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:55.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0056",
+      "ts": "2026-08-26T12:00:56.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-02",
+          "date": "2026-02-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-02-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:56.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0057",
+      "ts": "2026-08-26T12:00:57.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-02",
+          "date": "2026-02-08",
+          "amount": -39650,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:57.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0058",
+      "ts": "2026-08-26T12:00:58.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-02",
+          "date": "2026-02-22",
+          "amount": -21350,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:58.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0059",
+      "ts": "2026-08-26T12:00:59.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-02",
+          "date": "2026-02-12",
+          "amount": -15000,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:00:59.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0060",
+      "ts": "2026-08-26T12:01:00.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-02",
+          "date": "2026-02-24",
+          "amount": -10000,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:00.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0061",
+      "ts": "2026-08-26T12:01:01.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-02",
+          "date": "2026-02-28",
+          "amount": -31000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-02-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:01.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0062",
+      "ts": "2026-08-26T12:01:02.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-02",
+          "date": "2026-02-16",
+          "amount": -13400,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:02.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0063",
+      "ts": "2026-08-26T12:01:03.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-02",
+          "date": "2026-02-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-02-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:03.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0064",
+      "ts": "2026-08-26T12:01:04.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-02",
+          "date": "2026-02-11",
+          "amount": -20000,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:04.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0065",
+      "ts": "2026-08-26T12:01:05.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-02",
+          "date": "2026-02-19",
+          "amount": -7000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:05.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0066",
+      "ts": "2026-08-26T12:01:06.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-02",
+          "date": "2026-02-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:06.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0067",
+      "ts": "2026-08-26T12:01:07.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-02",
+          "date": "2026-02-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:07.000Z",
+          "yearMonth": "2026-02"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0068",
+      "ts": "2026-08-26T12:01:08.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-03",
+          "date": "2026-03-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-03-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:08.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0069",
+      "ts": "2026-08-26T12:01:09.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-03",
+          "date": "2026-03-20",
+          "amount": 1300,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:09.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0070",
+      "ts": "2026-08-26T12:01:10.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-03",
+          "date": "2026-03-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-03-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:10.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0071",
+      "ts": "2026-08-26T12:01:11.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-03",
+          "date": "2026-03-08",
+          "amount": -35750,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:11.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0072",
+      "ts": "2026-08-26T12:01:12.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-03",
+          "date": "2026-03-22",
+          "amount": -19250,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:12.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0073",
+      "ts": "2026-08-26T12:01:13.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-03",
+          "date": "2026-03-12",
+          "amount": -11400,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:13.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0074",
+      "ts": "2026-08-26T12:01:14.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-03",
+          "date": "2026-03-24",
+          "amount": -7600,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:14.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0075",
+      "ts": "2026-08-26T12:01:15.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-03",
+          "date": "2026-03-30",
+          "amount": -22000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-03-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:15.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0076",
+      "ts": "2026-08-26T12:01:16.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-03",
+          "date": "2026-03-16",
+          "amount": -14100,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:16.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0077",
+      "ts": "2026-08-26T12:01:17.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-03",
+          "date": "2026-03-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-03-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:17.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0078",
+      "ts": "2026-08-26T12:01:18.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "travel-03",
+          "date": "2026-03-14",
+          "amount": -12000,
+          "vendor_source": "Regional rail",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:18.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0079",
+      "ts": "2026-08-26T12:01:19.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-03",
+          "date": "2026-03-11",
+          "amount": -5000,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:19.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0080",
+      "ts": "2026-08-26T12:01:20.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-03",
+          "date": "2026-03-19",
+          "amount": -8000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:20.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0081",
+      "ts": "2026-08-26T12:01:21.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "grocery-refund-03",
+          "date": "2026-03-25",
+          "amount": 6000,
+          "vendor_source": "Market Square refund",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:21.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0082",
+      "ts": "2026-08-26T12:01:22.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-03",
+          "date": "2026-03-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:22.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0083",
+      "ts": "2026-08-26T12:01:23.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-03",
+          "date": "2026-03-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:23.000Z",
+          "yearMonth": "2026-03"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0084",
+      "ts": "2026-08-26T12:01:24.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-04",
+          "date": "2026-04-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-04-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:24.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0085",
+      "ts": "2026-08-26T12:01:25.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "freelance-04",
+          "date": "2026-04-18",
+          "amount": 140000,
+          "vendor_source": "Studio invoices",
+          "category_id": "freelance",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:25.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0086",
+      "ts": "2026-08-26T12:01:26.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-04",
+          "date": "2026-04-20",
+          "amount": 1400,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:26.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0087",
+      "ts": "2026-08-26T12:01:27.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-04",
+          "date": "2026-04-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-04-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:27.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0088",
+      "ts": "2026-08-26T12:01:28.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-04",
+          "date": "2026-04-08",
+          "amount": -42900,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:28.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0089",
+      "ts": "2026-08-26T12:01:29.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-04",
+          "date": "2026-04-22",
+          "amount": -23100,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:29.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0090",
+      "ts": "2026-08-26T12:01:30.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-04",
+          "date": "2026-04-12",
+          "amount": -16800,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:30.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0091",
+      "ts": "2026-08-26T12:01:31.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-04",
+          "date": "2026-04-24",
+          "amount": -11200,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:31.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0092",
+      "ts": "2026-08-26T12:01:32.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-04",
+          "date": "2026-04-30",
+          "amount": -29000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-04-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:32.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0093",
+      "ts": "2026-08-26T12:01:33.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-04",
+          "date": "2026-04-16",
+          "amount": -14800,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:33.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0094",
+      "ts": "2026-08-26T12:01:34.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-04",
+          "date": "2026-04-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-04-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:34.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0095",
+      "ts": "2026-08-26T12:01:35.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "travel-04",
+          "date": "2026-04-14",
+          "amount": -6000,
+          "vendor_source": "Regional rail",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:35.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0096",
+      "ts": "2026-08-26T12:01:36.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-04",
+          "date": "2026-04-11",
+          "amount": -12500,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:36.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0097",
+      "ts": "2026-08-26T12:01:37.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-04",
+          "date": "2026-04-19",
+          "amount": -9000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:37.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0098",
+      "ts": "2026-08-26T12:01:38.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-04",
+          "date": "2026-04-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:38.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0099",
+      "ts": "2026-08-26T12:01:39.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-04",
+          "date": "2026-04-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:39.000Z",
+          "yearMonth": "2026-04"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0100",
+      "ts": "2026-08-26T12:01:40.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-05",
+          "date": "2026-05-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-05-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:40.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0101",
+      "ts": "2026-08-26T12:01:41.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "freelance-05",
+          "date": "2026-05-18",
+          "amount": 60000,
+          "vendor_source": "Studio invoices",
+          "category_id": "freelance",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:41.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0102",
+      "ts": "2026-08-26T12:01:42.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-05",
+          "date": "2026-05-20",
+          "amount": 1500,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:42.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0103",
+      "ts": "2026-08-26T12:01:43.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-05",
+          "date": "2026-05-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-05-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:43.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0104",
+      "ts": "2026-08-26T12:01:44.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-05",
+          "date": "2026-05-08",
+          "amount": -40950,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:44.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0105",
+      "ts": "2026-08-26T12:01:45.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-05",
+          "date": "2026-05-22",
+          "amount": -22050,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:45.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0106",
+      "ts": "2026-08-26T12:01:46.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-05",
+          "date": "2026-05-12",
+          "amount": -18600,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:46.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0107",
+      "ts": "2026-08-26T12:01:47.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-05",
+          "date": "2026-05-24",
+          "amount": -12400,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:47.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0108",
+      "ts": "2026-08-26T12:01:48.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-05",
+          "date": "2026-05-30",
+          "amount": -27000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-05-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:48.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0109",
+      "ts": "2026-08-26T12:01:49.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-05",
+          "date": "2026-05-16",
+          "amount": -15500,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:49.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0110",
+      "ts": "2026-08-26T12:01:50.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-05",
+          "date": "2026-05-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-05-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:50.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0111",
+      "ts": "2026-08-26T12:01:51.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "travel-05",
+          "date": "2026-05-14",
+          "amount": -20000,
+          "vendor_source": "Regional rail",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:51.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0112",
+      "ts": "2026-08-26T12:01:52.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-05",
+          "date": "2026-05-11",
+          "amount": -20000,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:52.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0113",
+      "ts": "2026-08-26T12:01:53.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-05",
+          "date": "2026-05-19",
+          "amount": -10000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:53.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0114",
+      "ts": "2026-08-26T12:01:54.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-05",
+          "date": "2026-05-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:54.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0115",
+      "ts": "2026-08-26T12:01:55.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-05",
+          "date": "2026-05-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:55.000Z",
+          "yearMonth": "2026-05"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0116",
+      "ts": "2026-08-26T12:01:56.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-06",
+          "date": "2026-06-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-06-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:56.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0117",
+      "ts": "2026-08-26T12:01:57.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "freelance-06",
+          "date": "2026-06-18",
+          "amount": 220000,
+          "vendor_source": "Studio invoices",
+          "category_id": "freelance",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:57.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0118",
+      "ts": "2026-08-26T12:01:58.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-06",
+          "date": "2026-06-20",
+          "amount": 1600,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:58.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0119",
+      "ts": "2026-08-26T12:01:59.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-06",
+          "date": "2026-06-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-06-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:01:59.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0120",
+      "ts": "2026-08-26T12:02:00.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-06",
+          "date": "2026-06-08",
+          "amount": -46800,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:00.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0121",
+      "ts": "2026-08-26T12:02:01.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-06",
+          "date": "2026-06-22",
+          "amount": -25200,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:01.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0122",
+      "ts": "2026-08-26T12:02:02.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-06",
+          "date": "2026-06-12",
+          "amount": -25200,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:02.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0123",
+      "ts": "2026-08-26T12:02:03.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-06",
+          "date": "2026-06-24",
+          "amount": -16800,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:03.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0124",
+      "ts": "2026-08-26T12:02:04.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-06",
+          "date": "2026-06-30",
+          "amount": -34000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-06-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:04.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0125",
+      "ts": "2026-08-26T12:02:05.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-06",
+          "date": "2026-06-16",
+          "amount": -16200,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:05.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0126",
+      "ts": "2026-08-26T12:02:06.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-06",
+          "date": "2026-06-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-06-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:06.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0127",
+      "ts": "2026-08-26T12:02:07.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "travel-06",
+          "date": "2026-06-14",
+          "amount": -55000,
+          "vendor_source": "Japan planning",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:07.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0128",
+      "ts": "2026-08-26T12:02:08.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-06",
+          "date": "2026-06-11",
+          "amount": -5000,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:08.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0129",
+      "ts": "2026-08-26T12:02:09.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-06",
+          "date": "2026-06-19",
+          "amount": -11000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:09.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0130",
+      "ts": "2026-08-26T12:02:10.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-06",
+          "date": "2026-06-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:10.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0131",
+      "ts": "2026-08-26T12:02:11.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-06",
+          "date": "2026-06-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:11.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0132",
+      "ts": "2026-08-26T12:02:12.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "salary-07",
+          "date": "2026-07-27",
+          "amount": 500000,
+          "vendor_source": "Northstar Payroll",
+          "category_id": "salary",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-salary",
+          "recurring_occurrence_date": "2026-07-28",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:12.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0133",
+      "ts": "2026-08-26T12:02:13.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "freelance-07",
+          "date": "2026-07-18",
+          "amount": 100000,
+          "vendor_source": "Studio invoices",
+          "category_id": "freelance",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:13.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0134",
+      "ts": "2026-08-26T12:02:14.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "interest-07",
+          "date": "2026-07-20",
+          "amount": 1700,
+          "vendor_source": "Savings interest",
+          "category_id": "interest",
+          "container_id": "savings",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:14.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0135",
+      "ts": "2026-08-26T12:02:15.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "rent-07",
+          "date": "2026-07-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-07-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:15.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0136",
+      "ts": "2026-08-26T12:02:16.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-market-07",
+          "date": "2026-07-08",
+          "amount": -44850,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:16.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0137",
+      "ts": "2026-08-26T12:02:17.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "groceries-fresh-07",
+          "date": "2026-07-22",
+          "amount": -24150,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:17.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0138",
+      "ts": "2026-08-26T12:02:18.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-cafe-07",
+          "date": "2026-07-12",
+          "amount": -27000,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:18.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0139",
+      "ts": "2026-08-26T12:02:19.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "dining-kitchen-07",
+          "date": "2026-07-24",
+          "amount": -18000,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:19.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0140",
+      "ts": "2026-08-26T12:02:20.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "utilities-07",
+          "date": "2026-07-30",
+          "amount": -26000,
+          "vendor_source": "City Utilities",
+          "category_id": "utilities",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-07-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:20.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0141",
+      "ts": "2026-08-26T12:02:21.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "transport-07",
+          "date": "2026-07-16",
+          "amount": -16900,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:21.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0142",
+      "ts": "2026-08-26T12:02:22.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "streaming-07",
+          "date": "2026-07-27",
+          "amount": -10000,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-07-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:22.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0143",
+      "ts": "2026-08-26T12:02:23.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "travel-07",
+          "date": "2026-07-14",
+          "amount": -65000,
+          "vendor_source": "Japan planning",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:23.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0144",
+      "ts": "2026-08-26T12:02:24.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "medical-07",
+          "date": "2026-07-11",
+          "amount": -12500,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:24.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0145",
+      "ts": "2026-08-26T12:02:25.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "gifts-07",
+          "date": "2026-07-19",
+          "amount": -12000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:25.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0146",
+      "ts": "2026-08-26T12:02:26.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "grocery-refund-07",
+          "date": "2026-07-25",
+          "amount": 6000,
+          "vendor_source": "Market Square refund",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:26.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0147",
+      "ts": "2026-08-26T12:02:27.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "savings-sweep-07",
+          "date": "2026-07-28",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:27.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0148",
+      "ts": "2026-08-26T12:02:28.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "brokerage-contribution-07",
+          "date": "2026-07-28",
+          "amount": -30000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:28.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0149",
+      "ts": "2026-08-26T12:02:29.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-rent",
+          "date": "2026-08-01",
+          "amount": -180000,
+          "vendor_source": "Parkside Property",
+          "category_id": "housing",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-rent",
+          "recurring_occurrence_date": "2026-08-01",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:29.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0150",
+      "ts": "2026-08-26T12:02:30.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-groceries-market",
+          "date": "2026-08-05",
+          "amount": -50000,
+          "vendor_source": "Market Square",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:30.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0151",
+      "ts": "2026-08-26T12:02:31.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-groceries-fresh",
+          "date": "2026-08-23",
+          "amount": -24000,
+          "vendor_source": "Fresh Foods",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:31.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0152",
+      "ts": "2026-08-26T12:02:32.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-grocery-refund",
+          "date": "2026-08-24",
+          "amount": 6000,
+          "vendor_source": "Market Square refund",
+          "category_id": "groceries",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:32.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0153",
+      "ts": "2026-08-26T12:02:33.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-dining-cafe",
+          "date": "2026-08-10",
+          "amount": -18000,
+          "vendor_source": "Corner Cafe",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:33.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0154",
+      "ts": "2026-08-26T12:02:34.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-dining-kitchen",
+          "date": "2026-08-25",
+          "amount": -15000,
+          "vendor_source": "Neighborhood Kitchen",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:34.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0155",
+      "ts": "2026-08-26T12:02:35.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-utilities-early",
+          "date": "2026-08-20",
+          "amount": -30000,
+          "vendor_source": "City Utilities paid early",
+          "category_id": "utilities",
+          "container_id": "general",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": "rule-utilities",
+          "recurring_occurrence_date": "2026-08-30",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:35.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0156",
+      "ts": "2026-08-26T12:02:36.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-transport",
+          "date": "2026-08-18",
+          "amount": -10000,
+          "vendor_source": "Metro and fuel",
+          "category_id": "transport",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:36.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0157",
+      "ts": "2026-08-26T12:02:37.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-subscriptions",
+          "date": "2026-08-12",
+          "amount": -10000,
+          "vendor_source": "Cloud storage",
+          "category_id": "subscriptions",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:37.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0158",
+      "ts": "2026-08-26T12:02:38.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-travel",
+          "date": "2026-08-21",
+          "amount": -40000,
+          "vendor_source": "Japan planning",
+          "category_id": "travel",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:38.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0159",
+      "ts": "2026-08-26T12:02:39.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-medical",
+          "date": "2026-08-22",
+          "amount": -5000,
+          "vendor_source": "Neighborhood Clinic",
+          "category_id": "medical",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:39.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0160",
+      "ts": "2026-08-26T12:02:40.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-gifts",
+          "date": "2026-08-17",
+          "amount": -8000,
+          "vendor_source": "Gifts and celebrations",
+          "category_id": "gifts",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:40.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0161",
+      "ts": "2026-08-26T12:02:41.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-hidden-expense",
+          "date": "2026-08-24",
+          "amount": -120000,
+          "vendor_source": "Client travel reimbursement pending",
+          "category_id": "reimbursable",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:41.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0162",
+      "ts": "2026-08-26T12:02:42.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-retainer-manual",
+          "date": "2026-08-23",
+          "amount": 120000,
+          "vendor_source": "Studio retainer deposit",
+          "category_id": "freelance",
+          "container_id": "general",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": "Month-close manual-match candidate",
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:42.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0163",
+      "ts": "2026-08-26T12:02:43.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "pending-retainer",
+          "date": "2026-08-24",
+          "amount": 120000,
+          "vendor_source": "Studio retainer",
+          "category_id": "freelance",
+          "container_id": "general",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "pending",
+          "recurring_rule_id": "rule-retainer",
+          "recurring_occurrence_date": "2026-08-24",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:43.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0164",
+      "ts": "2026-08-26T12:02:44.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "pending-streaming",
+          "date": "2026-08-27",
+          "amount": -2500,
+          "vendor_source": "Stream bundle",
+          "category_id": "subscriptions",
+          "container_id": "general",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "pending",
+          "recurring_rule_id": "rule-streaming",
+          "recurring_occurrence_date": "2026-08-27",
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:44.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0165",
+      "ts": "2026-08-26T12:02:45.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "pending-coffee",
+          "date": "2026-08-26",
+          "amount": -4500,
+          "vendor_source": "Card charge to review",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "pending",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:45.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0166",
+      "ts": "2026-08-26T12:02:46.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "voided-dinner",
+          "date": "2026-07-20",
+          "amount": -9000,
+          "vendor_source": "Duplicate dinner",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:46.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0167",
+      "ts": "2026-08-26T12:02:47.000Z",
+      "type": "transaction.void",
+      "payload": {
+        "row": {
+          "id": "voided-dinner-reversal",
+          "date": "2026-07-20",
+          "amount": 9000,
+          "vendor_source": "Duplicate dinner",
+          "category_id": "dining",
+          "container_id": "checking",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": "voided-dinner",
+          "entered_at": "2026-08-26T12:02:47.000Z",
+          "yearMonth": "2026-07"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0168",
+      "ts": "2026-08-26T12:02:48.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-savings-sweep",
+          "date": "2026-08-15",
+          "amount": -100000,
+          "vendor_source": "Monthly savings sweep",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:48.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0169",
+      "ts": "2026-08-26T12:02:49.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-brokerage-contribution",
+          "date": "2026-08-16",
+          "amount": -50000,
+          "vendor_source": "Brokerage contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "brokerage",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:49.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0170",
+      "ts": "2026-08-26T12:02:50.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-vacation-contribution",
+          "date": "2026-08-15",
+          "amount": -30000,
+          "vendor_source": "Japan goal contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "vacation",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:50.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0171",
+      "ts": "2026-08-26T12:02:51.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "aug-emergency-contribution",
+          "date": "2026-08-15",
+          "amount": -20000,
+          "vendor_source": "Emergency reserve contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "emergency",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:51.000Z",
+          "yearMonth": "2026-08"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0172",
+      "ts": "2026-08-26T12:02:52.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "retirement-contribution",
+          "date": "2026-06-10",
+          "amount": -100000,
+          "vendor_source": "Retirement contribution",
+          "category_id": null,
+          "container_id": "checking",
+          "to_container_id": "retirement",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-08-26T12:02:52.000Z",
+          "yearMonth": "2026-06"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0173",
+      "ts": "2026-08-26T12:02:53.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-housing",
+          "category_id": "housing",
+          "amount": 180000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0174",
+      "ts": "2026-08-26T12:02:54.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-groceries",
+          "category_id": "groceries",
+          "amount": 70000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0175",
+      "ts": "2026-08-26T12:02:55.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-dining",
+          "category_id": "dining",
+          "amount": 30000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0176",
+      "ts": "2026-08-26T12:02:56.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-utilities",
+          "category_id": "utilities",
+          "amount": 45000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0177",
+      "ts": "2026-08-26T12:02:57.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-transport",
+          "category_id": "transport",
+          "amount": 25000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0178",
+      "ts": "2026-08-26T12:02:58.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-subscriptions",
+          "category_id": "subscriptions",
+          "amount": 15000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0179",
+      "ts": "2026-08-26T12:02:59.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-travel",
+          "category_id": "travel",
+          "amount": 50000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0180",
+      "ts": "2026-08-26T12:03:00.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-medical",
+          "category_id": "medical",
+          "amount": 30000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0181",
+      "ts": "2026-08-26T12:03:01.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-gifts",
+          "category_id": "gifts",
+          "amount": 20000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0182",
+      "ts": "2026-08-26T12:03:02.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-insurance",
+          "category_id": "insurance",
+          "amount": 15000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0183",
+      "ts": "2026-08-26T12:03:03.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-education",
+          "category_id": "education",
+          "amount": 50000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0184",
+      "ts": "2026-08-26T12:03:04.000Z",
+      "type": "budgetTarget.set",
+      "payload": {
+        "row": {
+          "id": "budget-taxes",
+          "category_id": "taxes",
+          "amount": 20000,
+          "start_date": "2026-01-01"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0185",
+      "ts": "2026-08-26T12:03:05.000Z",
+      "type": "goal.create",
+      "payload": {
+        "row": {
+          "id": "goal-vacation",
+          "container_id": "vacation",
+          "name": "Japan 2027",
+          "kind": "spend_down",
+          "mode": "deadline",
+          "target_amount": 400000,
+          "deadline": "2026-12-31",
+          "planned_monthly": null,
+          "opening_contributed": 150000,
+          "status": "active",
+          "is_archived": false,
+          "created_date": "2026-01-01",
+          "completed_date": null
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0186",
+      "ts": "2026-08-26T12:03:06.000Z",
+      "type": "goal.create",
+      "payload": {
+        "row": {
+          "id": "goal-emergency",
+          "container_id": "emergency",
+          "name": "Emergency reserve",
+          "kind": "reserve",
+          "mode": "fixed",
+          "target_amount": 1000000,
+          "deadline": null,
+          "planned_monthly": 50000,
+          "opening_contributed": 0,
+          "status": "active",
+          "is_archived": false,
+          "created_date": "2026-01-01",
+          "completed_date": null
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0187",
+      "ts": "2026-08-26T12:03:07.000Z",
+      "type": "goal.create",
+      "payload": {
+        "row": {
+          "id": "goal-laptop",
+          "container_id": "laptop",
+          "name": "Laptop replacement",
+          "kind": "spend_down",
+          "mode": "passive",
+          "target_amount": 200000,
+          "deadline": null,
+          "planned_monthly": null,
+          "opening_contributed": 60000,
+          "status": "active",
+          "is_archived": false,
+          "created_date": "2026-01-01",
+          "completed_date": null
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0188",
+      "ts": "2026-08-26T12:03:08.000Z",
+      "type": "goal.create",
+      "payload": {
+        "row": {
+          "id": "goal-skills",
+          "container_id": "skills",
+          "name": "Skills fund",
+          "kind": "spend_down",
+          "mode": "fixed",
+          "target_amount": null,
+          "deadline": null,
+          "planned_monthly": 15000,
+          "opening_contributed": 20000,
+          "status": "active",
+          "is_archived": false,
+          "created_date": "2026-01-01",
+          "completed_date": null
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0189",
+      "ts": "2026-08-26T12:03:09.000Z",
+      "type": "goal.create",
+      "payload": {
+        "row": {
+          "id": "goal-health",
+          "container_id": "health",
+          "name": "Health reserve",
+          "kind": "reserve",
+          "mode": "deadline",
+          "target_amount": 300000,
+          "deadline": "2026-11-30",
+          "planned_monthly": null,
+          "opening_contributed": 0,
+          "status": "active",
+          "is_archived": false,
+          "created_date": "2026-01-01",
+          "completed_date": null
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0190",
+      "ts": "2026-08-26T12:03:10.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-salary",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 28 },
+          "template_amount": 500000,
+          "template_vendor_source": "Northstar Payroll",
+          "template_category_id": "salary",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-08-28",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0191",
+      "ts": "2026-08-26T12:03:11.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-retainer",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 24 },
+          "template_amount": 120000,
+          "template_vendor_source": "Studio retainer",
+          "template_category_id": "freelance",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-24",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0192",
+      "ts": "2026-08-26T12:03:12.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-rent",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 1 },
+          "template_amount": -180000,
+          "template_vendor_source": "Parkside Property",
+          "template_category_id": "housing",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-01",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0193",
+      "ts": "2026-08-26T12:03:13.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-utilities",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 30 },
+          "template_amount": -17500,
+          "template_vendor_source": "City Utilities",
+          "template_category_id": "utilities",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-30",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0194",
+      "ts": "2026-08-26T12:03:14.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-groceries",
+          "frequency": "weekly",
+          "interval_config": { "day_of_week": 6 },
+          "template_amount": -14000,
+          "template_vendor_source": "Weekly groceries",
+          "template_category_id": "groceries",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-08-29",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0195",
+      "ts": "2026-08-26T12:03:15.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-cleaner",
+          "frequency": "biweekly",
+          "interval_config": { "days_of_month": [5, 20] },
+          "template_amount": -9000,
+          "template_vendor_source": "Home cleaning",
+          "template_category_id": "housing",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-05",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0196",
+      "ts": "2026-08-26T12:03:16.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-streaming",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 27 },
+          "template_amount": -2500,
+          "template_vendor_source": "Stream bundle",
+          "template_category_id": "subscriptions",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-27",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0197",
+      "ts": "2026-08-26T12:03:17.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-gym",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 15 },
+          "template_amount": -5500,
+          "template_vendor_source": "Neighborhood gym",
+          "template_category_id": "medical",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-15",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0198",
+      "ts": "2026-08-26T12:03:18.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-insurance",
+          "frequency": "annually",
+          "interval_config": { "month": 9, "day": 15 },
+          "template_amount": -120000,
+          "template_vendor_source": "Annual insurance",
+          "template_category_id": "insurance",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-09-15",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0199",
+      "ts": "2026-08-26T12:03:19.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-property-tax",
+          "frequency": "custom",
+          "interval_config": { "every": 3, "unit": "month" },
+          "template_amount": -60000,
+          "template_vendor_source": "Quarterly property tax",
+          "template_category_id": "taxes",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-09-20",
+          "end_date": null,
+          "next_generation_date": "2026-09-20",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0200",
+      "ts": "2026-08-26T12:03:20.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-tuition",
+          "frequency": "annually",
+          "interval_config": { "month": 8, "day": 27 },
+          "template_amount": -450000,
+          "template_vendor_source": "Annual tuition",
+          "template_category_id": "education",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-08-27",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0201",
+      "ts": "2026-08-26T12:03:21.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-medical-flex",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 31 },
+          "template_amount": null,
+          "template_vendor_source": "Medical flex estimate",
+          "template_category_id": "medical",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "goal_derived",
+          "linked_goal_id": "goal-health",
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-08-31",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0202",
+      "ts": "2026-08-26T12:03:22.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-auto-invest",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 29 },
+          "template_amount": 50000,
+          "template_vendor_source": "Brokerage auto-invest",
+          "template_category_id": null,
+          "template_container_id": "general",
+          "template_to_container_id": "brokerage",
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-08-29",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0203",
+      "ts": "2026-08-26T12:03:23.000Z",
+      "type": "recurringRule.create",
+      "payload": {
+        "row": {
+          "id": "rule-old-phone",
+          "frequency": "monthly",
+          "interval_config": { "day_of_month": 15 },
+          "template_amount": -8000,
+          "template_vendor_source": "Cancelled phone plan",
+          "template_category_id": "subscriptions",
+          "template_container_id": "general",
+          "template_to_container_id": null,
+          "amount_mode": "fixed",
+          "linked_goal_id": null,
+          "start_date": "2026-01-01",
+          "end_date": null,
+          "next_generation_date": "2026-08-15",
+          "status": "cancelled"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0204",
+      "ts": "2026-08-26T12:03:24.000Z",
+      "type": "snapshot.record",
+      "payload": {
+        "row": {
+          "id": "brokerage-feb",
+          "container_id": "brokerage",
+          "date": "2026-02-01",
+          "reported_balance": 500000
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0205",
+      "ts": "2026-08-26T12:03:25.000Z",
+      "type": "snapshot.record",
+      "payload": {
+        "row": {
+          "id": "brokerage-may",
+          "container_id": "brokerage",
+          "date": "2026-05-01",
+          "reported_balance": 560000
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0206",
+      "ts": "2026-08-26T12:03:26.000Z",
+      "type": "snapshot.record",
+      "payload": {
+        "row": {
+          "id": "brokerage-aug",
+          "container_id": "brokerage",
+          "date": "2026-08-25",
+          "reported_balance": 620000
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0207",
+      "ts": "2026-08-26T12:03:27.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "dashboard.v2.item.lab-planning",
+          "value": "{\"version\":2,\"id\":\"lab-planning\",\"name\":\"01 · Planning\",\"rank\":0,\"isDeleted\":false,\"instances\":[{\"instanceId\":\"planning-balance\",\"widgetType\":\"balance\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"planning-brief\",\"widgetType\":\"brief\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"planning-pace\",\"widgetType\":\"pace\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"planning-commitments\",\"widgetType\":\"commitments\",\"size\":\"expanded\",\"hidden\":false,\"settings\":{\"commitmentsMode\":\"regular\"}},{\"instanceId\":\"planning-upcoming\",\"widgetType\":\"upcoming\",\"size\":\"expanded\",\"hidden\":false,\"settings\":{\"horizonDays\":60}},{\"instanceId\":\"planning-allocation\",\"widgetType\":\"allocation\",\"size\":\"expanded\",\"hidden\":false,\"settings\":{\"allocationMode\":\"month\",\"payCycleAnchorRuleIds\":[\"rule-salary\"]}},{\"instanceId\":\"planning-goals\",\"widgetType\":\"goals\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"planning-recent\",\"widgetType\":\"recent\",\"size\":\"expanded\",\"hidden\":false}]}"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0208",
+      "ts": "2026-08-26T12:03:28.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "dashboard.v2.item.lab-forecast",
+          "value": "{\"version\":2,\"id\":\"lab-forecast\",\"name\":\"02 · Forecast & Watch\",\"rank\":1,\"isDeleted\":false,\"instances\":[{\"instanceId\":\"forecast-balance\",\"widgetType\":\"balance\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"forecast-map\",\"widgetType\":\"money-map\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"forecast-landing\",\"widgetType\":\"landing\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"forecast-general\",\"widgetType\":\"watch-container\",\"size\":\"expanded\",\"hidden\":false,\"subject\":{\"type\":\"container\",\"id\":\"general\"},\"settings\":{\"floor\":100000}},{\"instanceId\":\"forecast-emergency\",\"widgetType\":\"watch-container\",\"size\":\"expanded\",\"hidden\":false,\"subject\":{\"type\":\"container\",\"id\":\"emergency\"},\"settings\":{\"floor\":500000}},{\"instanceId\":\"forecast-old\",\"widgetType\":\"watch-container\",\"size\":\"expanded\",\"hidden\":false,\"subject\":{\"type\":\"container\",\"id\":\"old-wallet\"}},{\"instanceId\":\"forecast-groceries\",\"widgetType\":\"watch-category\",\"size\":\"expanded\",\"hidden\":false,\"subject\":{\"type\":\"category\",\"id\":\"groceries\"}},{\"instanceId\":\"forecast-dining\",\"widgetType\":\"watch-category\",\"size\":\"expanded\",\"hidden\":false,\"subject\":{\"type\":\"category\",\"id\":\"dining\"}}]}"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0209",
+      "ts": "2026-08-26T12:03:29.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "dashboard.v2.item.lab-analysis",
+          "value": "{\"version\":2,\"id\":\"lab-analysis\",\"name\":\"03 · Analysis\",\"rank\":2,\"isDeleted\":false,\"instances\":[{\"instanceId\":\"analysis-balance\",\"widgetType\":\"balance\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-saved\",\"widgetType\":\"saved\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-flow\",\"widgetType\":\"flow\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-calendar\",\"widgetType\":\"calendar\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-breakdown\",\"widgetType\":\"breakdown\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-payees\",\"widgetType\":\"payees\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-largest\",\"widgetType\":\"largest\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-resilience\",\"widgetType\":\"resilience\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-monthly\",\"widgetType\":\"monthly\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-waterfall\",\"widgetType\":\"waterfall\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-flows\",\"widgetType\":\"flows\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-investments\",\"widgetType\":\"investments\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-budgets\",\"widgetType\":\"budgets\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"analysis-recent\",\"widgetType\":\"recent\",\"size\":\"expanded\",\"hidden\":false}]}"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0210",
+      "ts": "2026-08-26T12:03:30.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "dashboard.v2.item.lab-compact",
+          "value": "{\"version\":2,\"id\":\"lab-compact\",\"name\":\"04 · Compact\",\"rank\":3,\"isDeleted\":false,\"instances\":[{\"instanceId\":\"compact-balance\",\"widgetType\":\"balance\",\"size\":\"expanded\",\"hidden\":false},{\"instanceId\":\"compact-brief\",\"widgetType\":\"brief\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-map\",\"widgetType\":\"money-map\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-pace\",\"widgetType\":\"pace\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-saved\",\"widgetType\":\"saved\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-commitments\",\"widgetType\":\"commitments\",\"size\":\"compact\",\"hidden\":false,\"settings\":{\"commitmentsMode\":\"irregular\"}},{\"instanceId\":\"compact-upcoming\",\"widgetType\":\"upcoming\",\"size\":\"compact\",\"hidden\":false,\"settings\":{\"horizonDays\":14}},{\"instanceId\":\"compact-allocation\",\"widgetType\":\"allocation\",\"size\":\"compact\",\"hidden\":false,\"settings\":{\"allocationMode\":\"pay-cycle\",\"payCycleAnchorRuleIds\":[\"rule-salary\"]}},{\"instanceId\":\"compact-goals\",\"widgetType\":\"goals\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-landing\",\"widgetType\":\"landing\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-resilience\",\"widgetType\":\"resilience\",\"size\":\"compact\",\"hidden\":false},{\"instanceId\":\"compact-general\",\"widgetType\":\"watch-container\",\"size\":\"compact\",\"hidden\":false,\"subject\":{\"type\":\"container\",\"id\":\"general\"},\"settings\":{\"floor\":100000}},{\"instanceId\":\"compact-groceries\",\"widgetType\":\"watch-category\",\"size\":\"compact\",\"hidden\":false,\"subject\":{\"type\":\"category\",\"id\":\"groceries\"}},{\"instanceId\":\"compact-recent\",\"widgetType\":\"recent\",\"size\":\"compact\",\"hidden\":false}]}"
+        }
+      }
+    },
+    {
+      "id": "widget-lab-op-0211",
+      "ts": "2026-08-26T12:03:31.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": { "key": "dashboard.v2.default", "value": "lab-planning" }
+      }
+    },
+    {
+      "id": "widget-lab-op-0212",
+      "ts": "2026-08-26T12:03:32.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": { "key": "default_container_id", "value": "general" }
+      }
+    }
+  ]
+}
