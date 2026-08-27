@@ -2,13 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowRightLeftIcon, BookmarkIcon, DollarSignIcon, PlusIcon } from "lucide-react";
+import {
+  ArrowRightLeftIcon,
+  BookmarkIcon,
+  DollarSignIcon,
+  PiggyBankIcon,
+  PlusIcon,
+} from "lucide-react";
 import { logTemplate } from "@/core/commands";
 import { rankShortcutsByUsage } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
 import { todayIso } from "@/features/clock";
 import {
   dispatchAtom,
+  cravingWinSheetAtom,
   flashRowAtom,
   quickAddAtom,
   templatesAtom,
@@ -43,6 +50,7 @@ import {
  */
 export function QuickAddFab() {
   const openQuickAdd = useSetAtom(quickAddAtom);
+  const openCravingWin = useSetAtom(cravingWinSheetAtom);
   const templates = useAtomValue(templatesAtom);
   const transactions = useAtomValue(transactionsAtom);
   const dispatch = useSetAtom(dispatchAtom);
@@ -234,7 +242,7 @@ export function QuickAddFab() {
           id="fab-create-chooser"
           role="menu"
           tabIndex={-1}
-          aria-label="Quick shortcuts"
+          aria-label="Quick actions"
           onKeyDown={(event) => {
             const items = [
               ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
@@ -258,13 +266,25 @@ export function QuickAddFab() {
           className="bg-popover text-popover-foreground ring-foreground/10 fixed right-5 bottom-[calc(8.5rem_+_env(safe-area-inset-bottom,0px))] z-50 w-48 touch-manipulation rounded-xl p-1.5 shadow-lg ring-1 select-none [-webkit-user-select:none] lg:right-8 lg:bottom-24"
         >
           <p className="text-muted-foreground px-1.5 py-1 text-xs font-medium">
-            Shortcuts
+            Quick actions
           </p>
+          <button
+            type="button"
+            role="menuitem"
+            aria-label="Log a craving win"
+            onClick={() => {
+              setChooserOpen(false);
+              openCravingWin("new");
+            }}
+            className="focus:bg-accent focus:text-accent-foreground flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm outline-none"
+          >
+            <PiggyBankIcon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Log a craving win</span>
+          </button>
           {rankedTemplates.length === 0 ? (
             <div className="px-2.5 pt-1 pb-2">
-              <p className="text-sm font-medium">No shortcuts yet</p>
               <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Open an entry&apos;s actions in the ledger, then choose Save as shortcut.
+                No saved transaction shortcuts yet.
               </p>
             </div>
           ) : (

@@ -7,12 +7,14 @@ import { replay, MemoryTx, type Op } from "@/core/oplog";
 import {
   makeCategory,
   makeContainer,
+  makeCravingWin,
   makeTransaction,
   GENERAL_CONTAINER_ID,
   type Category,
   type Container,
   type Transaction,
 } from "@/core/model";
+import { createCravingWin } from "@/core/commands";
 
 const at = (ms: number): string => new Date(ms).toISOString();
 
@@ -300,6 +302,61 @@ describe("Repo — schema upgrades never drop local data (§8.6 local-first)", (
       payload: { row: { key: "default_container_id", value: "general" } },
     });
     expect(await repo.getAll(STORE.settings)).toHaveLength(1);
+  });
+
+  it("carries v3 rows into v4 and adds the craving wins store", async () => {
+    const V3_STORES = [
+      "categories",
+      "containers",
+      "budget_targets",
+      "transactions",
+      "container_snapshots",
+      "recurring_rules",
+      "goals",
+      "settings",
+      "oplog",
+      "app_meta",
+      "outbox",
+    ];
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open("yaccount", 3);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        for (const name of V3_STORES) {
+          db.createObjectStore(name, {
+            keyPath: name === "settings" || name === "app_meta" ? "key" : "id",
+          });
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction(["categories", "app_meta"], "readwrite");
+        tx.objectStore("categories").put(
+          makeCategory({ id: "c1", name: "Groceries", type: "expense" }),
+        );
+        tx.objectStore("app_meta").put({ key: "deviceId", value: "device-from-v3" });
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    const repo = await Repo.open();
+    expect((await repo.get<Category>(STORE.categories, "c1"))?.name).toBe("Groceries");
+    expect(await repo.getDeviceId()).toBe("device-from-v3");
+
+    const win = makeCravingWin({
+      id: "win-1",
+      description: "Takeout",
+      amount_kept: 2400,
+      date: "2026-08-26",
+      occurred_at: "2026-08-26T23:15:00.000Z",
+    });
+    await repo.dispatch(createCravingWin(win));
+    expect(await repo.get(STORE.cravingWins, win.id)).toEqual(win);
   });
 });
 

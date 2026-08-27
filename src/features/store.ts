@@ -8,6 +8,7 @@ import {
   type Category,
   type Container,
   type ContainerSnapshot,
+  type CravingWin,
   type Goal,
   type RecurringRule,
   type Setting,
@@ -35,14 +36,10 @@ import { buildExport, exportFileName, serializeExport } from "@/core/data";
 import { getAuthProvider } from "@/auth/web";
 import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
-import { requiredMonthly, isAchieved } from "@/core/engine/goals";
+import { requiredMonthly } from "@/core/engine/goals";
 import { pendingRows } from "@/core/engine/ledger";
-import {
-  cancelRecurringRule,
-  completeGoal,
-  recordGeneratedOccurrence,
-  updateRecurringRule,
-} from "@/core/commands";
+import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands";
+import { goalMaintenanceOps } from "@/features/goals/maintenance";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -74,6 +71,7 @@ export const settingsAtom = atom<Setting[]>([]);
 export const budgetTargetsAtom = atom<BudgetTarget[]>([]);
 export const recurringRulesAtom = atom<RecurringRule[]>([]);
 export const goalsAtom = atom<Goal[]>([]);
+export const cravingWinsAtom = atom<CravingWin[]>([]);
 
 /** The synced-setting key holding a month's manually-entered expected income
  * (§6.8 fallback when no income recurring rules cover the month). */
@@ -115,6 +113,9 @@ export const commandPaletteAtom = atom(false);
  * a container row and a command action share the exact same write path. */
 export const reportedBalanceContainerIdAtom = atom<string | null>(null);
 
+/** Global Cravings Savings entry sheet: new from quick actions, edit by row id. */
+export const cravingWinSheetAtom = atom<"new" | string | null>(null);
+
 /**
  * The row the register should mark, and whether to bring it into view.
  *
@@ -155,7 +156,7 @@ function getRepo(): Promise<Repo> {
 /** Re-read the materialized tables into the atoms (local-first read path). */
 export const refreshAtom = atom(null, async (_get, set) => {
   const repo = await getRepo();
-  const [cats, conts, txns, snaps, settings, budgetTargets, rules, goals] =
+  const [cats, conts, txns, snaps, settings, budgetTargets, rules, goals, cravingWins] =
     await Promise.all([
       repo.getAll<Category>(STORE.categories),
       repo.getAll<Container>(STORE.containers),
@@ -165,6 +166,7 @@ export const refreshAtom = atom(null, async (_get, set) => {
       repo.getAll<BudgetTarget>(STORE.budgetTargets),
       repo.getAll<RecurringRule>(STORE.recurringRules),
       repo.getAll<Goal>(STORE.goals),
+      repo.getAll<CravingWin>(STORE.cravingWins),
     ]);
   set(categoriesAtom, cats);
   set(containersAtom, conts);
@@ -174,6 +176,7 @@ export const refreshAtom = atom(null, async (_get, set) => {
   set(budgetTargetsAtom, budgetTargets);
   set(recurringRulesAtom, rules);
   set(goalsAtom, goals);
+  set(cravingWinsAtom, cravingWins);
 });
 
 /**
@@ -518,20 +521,12 @@ export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
   const today = todayIso();
   const txns = get(transactionsAtom);
   const rules = get(recurringRulesAtom);
-  const goals = get(goalsAtom).filter((g) => g.status === "active" && !g.is_archived);
+  const goals = get(goalsAtom);
   const repo = await getRepo();
-  let changed = false;
-  for (const goal of goals) {
-    if (!isAchieved(goal, txns)) continue;
-    await repo.dispatch(completeGoal(goal.id, today));
-    for (const r of rules) {
-      if (r.linked_goal_id === goal.id && r.status === "active") {
-        await repo.dispatch(cancelRecurringRule(r.id));
-      }
-    }
-    changed = true;
-  }
-  if (changed) await set(refreshAtom);
+  const ops = goalMaintenanceOps(goals, txns, rules, today);
+  if (ops.length === 0) return;
+  await repo.dispatchMany(ops);
+  await set(refreshAtom);
 });
 
 /** Open the repo (seeds 'general' + deviceId on first run), load, mark ready,

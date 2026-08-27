@@ -92,6 +92,7 @@ describe("dashboard layout v2", () => {
       hasActiveGoal: true,
       hasLandingHistory: true,
       hasLandingSignal: true,
+      hasCravingWins: false,
     });
     const definitions = defs(
       "balance",
@@ -140,11 +141,31 @@ describe("dashboard layout v2", () => {
         hasActiveGoal: false,
         hasLandingHistory: false,
         hasLandingSignal: true,
+        hasCravingWins: false,
       }),
     ).toEqual([
       { widgetType: "balance", size: "expanded" },
       { widgetType: "brief", size: "expanded" },
       { widgetType: "recent", size: "expanded" },
+    ]);
+  });
+
+  it("curates Cravings Savings after activity exists", () => {
+    expect(
+      curatedOverviewWidgets({
+        hasExpenseBudget: false,
+        hasRecurringSchedule: false,
+        hasScheduledIncome: false,
+        hasActiveGoal: false,
+        hasLandingHistory: false,
+        hasLandingSignal: false,
+        hasCravingWins: true,
+      }),
+    ).toEqual([
+      { widgetType: "balance", size: "expanded" },
+      { widgetType: "brief", size: "expanded" },
+      { widgetType: "recent", size: "expanded" },
+      { widgetType: "cravings", size: "compact" },
     ]);
   });
 
@@ -157,6 +178,7 @@ describe("dashboard layout v2", () => {
         hasActiveGoal: false,
         hasLandingHistory: false,
         hasLandingSignal: false,
+        hasCravingWins: false,
       }),
     ).toContainEqual({ widgetType: "allocation", size: "expanded" });
   });
@@ -354,6 +376,7 @@ describe("dashboard layout editing", () => {
       hasActiveGoal: false,
       hasLandingHistory: false,
       hasLandingSignal: false,
+      hasCravingWins: false,
     });
 
     expect(resetDashboardLayout(dashboard, definitions, curation)).toEqual({

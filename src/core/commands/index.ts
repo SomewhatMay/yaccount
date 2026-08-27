@@ -19,6 +19,7 @@ import {
   type CategoryType,
   type Container,
   type ContainerSnapshot,
+  type CravingWin,
   type Frequency,
   type Goal,
   type GoalKind,
@@ -471,6 +472,21 @@ export function archiveGoal(id: string, m?: OpMeta): Op {
 /** Put an archived goal back into the active list. */
 export function unarchiveGoal(id: string, m?: OpMeta): Op {
   return { ...meta(m), type: "goal.unarchive", payload: { id } };
+}
+
+// ── Cravings Savings ──────────────────────────────────────────────────────
+
+export function createCravingWin(row: CravingWin, m?: OpMeta): Op {
+  return { ...meta(m), type: "cravingWin.create", payload: { row } };
+}
+
+export function updateCravingWin(row: CravingWin, m?: OpMeta): Op {
+  return { ...meta(m), type: "cravingWin.update", payload: { row } };
+}
+
+/** A win is motivational history, not a ledger amount; removal stays in the journal. */
+export function removeCravingWin(id: string, m?: OpMeta): Op {
+  return { ...meta(m), type: "cravingWin.remove", payload: { id } };
 }
 
 /** Convenience re-export for callers reading the row types. */

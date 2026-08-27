@@ -4,12 +4,19 @@ import {
   type LazyExoticComponent,
   type ReactNode,
 } from "react";
-import { activeRows, inRange, precedingRange, type DateRange } from "@/core/engine";
+import {
+  activeRows,
+  cravingWinSummary,
+  inRange,
+  precedingRange,
+  type DateRange,
+} from "@/core/engine";
 import type {
   BudgetTarget,
   Category,
   Container,
   ContainerSnapshot,
+  CravingWin,
   Goal,
   RecurringRule,
   Setting,
@@ -25,6 +32,7 @@ export interface WidgetContext {
   today: string;
   categories: Category[];
   containers: Container[];
+  cravingWins: CravingWin[];
   ledgerTransactions: Transaction[];
   reportTransactions: Transaction[];
   budgetTargets: BudgetTarget[];
@@ -149,6 +157,15 @@ function legacy(id: LegacyWidgetId) {
 const loadRecentCompact: WidgetModuleLoader = () =>
   import("./legacy-widget-renderers").then((module) => ({
     default: module.LEGACY_COMPACT_RENDERERS.recent,
+  }));
+
+const loadCravingsSavings: WidgetModuleLoader = () =>
+  import("./widget-modules/CravingsSavingsWidget").then((module) => ({
+    default: module.CravingsSavingsExpanded,
+  }));
+const loadCravingsSavingsCompact: WidgetModuleLoader = () =>
+  import("./widget-modules/CravingsSavingsWidget").then((module) => ({
+    default: module.CravingsSavingsCompact,
   }));
 
 const loadMoneyBrief: WidgetModuleLoader = () =>
@@ -355,6 +372,52 @@ function whatChangedAvailability(context: WidgetContext): WidgetAvailability {
         description: "Approved entries in either matched period unlock this variance.",
         action: { label: "Open the ledger", href: "/ledger" },
       };
+}
+
+function cravingsSavingsAvailability(context: WidgetContext): WidgetAvailability {
+  return context.cravingWins.length > 0
+    ? { status: "ready" }
+    : {
+        status: "empty",
+        title: "Log a craving win",
+        description: "Record money you chose to keep instead of spending.",
+        action: { label: "Open Cravings Savings", href: "/cravings" },
+      };
+}
+
+function cravingsSavingsMath(context: WidgetContext): WidgetMathDisclosure {
+  const summary = cravingWinSummary(
+    context.cravingWins,
+    context.ledgerTransactions,
+    context.today,
+  );
+  return {
+    range: `All time · as of ${context.today}`,
+    freshness: "User-recorded craving wins and current linked transfer status.",
+    lines: [
+      {
+        kind: "actual",
+        label: "Estimated spending avoided",
+        amount: summary.totalKept,
+      },
+      {
+        kind: "actual",
+        label: "Actually moved to goals",
+        amount: summary.movedToGoals,
+      },
+      {
+        kind: "context",
+        label: "Kept this month",
+        amount: summary.thisMonthKept,
+      },
+      { kind: "context", label: "Recorded wins", value: String(summary.winCount) },
+    ],
+    exclusions: [
+      "Craving wins from income, spending, budgets, and account balances",
+      "Voided or unlinked goal transfers from the moved-to-goals total",
+    ],
+    rule: "Estimated spending avoided sums every recorded win. Money moved to goals sums only live transfers explicitly linked to those wins.",
+  };
 }
 
 function budgetTriageAvailability(context: WidgetContext): WidgetAvailability {
@@ -1254,6 +1317,26 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     gallery: gallery("analysis", ["transaction", "entry", "activity", "ledger"]),
     ...legacy("recent"),
     ...compact(loadRecentCompact),
+  },
+  {
+    id: "cravings",
+    title: "Cravings Savings",
+    description: "Money you chose to keep instead of spending on a craving.",
+    defaultVisible: false,
+    fixedWindow: true,
+    gallery: gallery(
+      "analysis",
+      ["craving", "impulse", "avoided spending", "saved", "self-control"],
+      ({ cravingWins }) =>
+        cravingWins.length > 0
+          ? `${cravingWins.length} recorded ${cravingWins.length === 1 ? "win" : "wins"}`
+          : null,
+    ),
+    load: loadCravingsSavings,
+    component: lazy(loadCravingsSavings),
+    ...compact(loadCravingsSavingsCompact),
+    availability: cravingsSavingsAvailability,
+    math: cravingsSavingsMath,
   },
   {
     id: "saved",

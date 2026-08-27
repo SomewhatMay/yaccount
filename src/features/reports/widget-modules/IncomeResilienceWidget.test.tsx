@@ -52,6 +52,7 @@ function context(rows: Transaction[] = transactions): WidgetContext {
   return {
     range: { start: "2026-02-23", end: "2026-08-23" },
     today: "2026-08-23",
+    cravingWins: [],
     categories,
     containers: [general],
     ledgerTransactions: rows,

@@ -8,6 +8,7 @@ import {
   budgetTargetsAtom,
   categoriesAtom,
   containersAtom,
+  cravingWinsAtom,
   dispatchManyAtom,
   flashRowAtom,
   goalsAtom,
@@ -64,6 +65,7 @@ export function DashboardView() {
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
+  const cravingWins = useAtomValue(cravingWinsAtom);
   const transactions = useAtomValue(transactionsAtom);
   const budgetTargets = useAtomValue(budgetTargetsAtom);
   const snapshots = useAtomValue(snapshotsAtom);
@@ -80,6 +82,7 @@ export function DashboardView() {
       today,
       categories,
       containers,
+      cravingWins,
       ledgerTransactions: transactions,
       reportTransactions,
       budgetTargets,
@@ -103,6 +106,7 @@ export function DashboardView() {
     today,
     categories,
     containers,
+    cravingWins,
     transactions,
     budgetTargets,
     snapshots,
@@ -136,8 +140,9 @@ export function DashboardView() {
         landing.scheduledItems.length > 0 ||
         landing.unknownItems.length > 0 ||
         landing.history.some((item) => item.flexibleSpending !== 0),
+      hasCravingWins: cravingWins.length > 0,
     });
-  }, [categories, data.aggregates, recurringRules, today]);
+  }, [categories, cravingWins.length, data.aggregates, recurringRules, today]);
 
   const dashboardSets = useDashboardSets(overviewCuration);
   const activeDashboardId = dashboardSets.activeDashboard.id;

@@ -12,9 +12,11 @@ import { replay, MemoryTx } from "@/core/oplog";
 import { STORE } from "@/core/repo/db";
 import {
   makeCategory,
+  makeCravingWin,
   makeGeneralContainer,
   makeTransaction,
   type Category,
+  type CravingWin,
 } from "@/core/model";
 
 const at = (ms: number): string => new Date(ms).toISOString();
@@ -49,6 +51,21 @@ const txnOp = (id: string, ms: number): Op => ({
 });
 
 const goodOps: Op[] = [seedOp, catOp("c1", "Groceries", 1000), txnOp("t1", 2000)];
+
+const cravingOp: Op = {
+  id: "op-craving-win",
+  ts: at(3000),
+  type: "cravingWin.create",
+  payload: {
+    row: makeCravingWin({
+      id: "win-1",
+      description: "Takeout",
+      amount_kept: 2400,
+      date: "2026-07-04",
+      occurred_at: "2026-07-04T18:00:00.000Z",
+    }),
+  },
+};
 
 /** A valid export file as the app would write it. */
 function goodFile(ops: Op[] = goodOps): string {
@@ -133,6 +150,27 @@ describe("export envelope (versioned, §8.2 op set)", () => {
     );
     expect(await after.getAll(STORE.transactions)).toEqual(
       await before.getAll(STORE.transactions),
+    );
+  });
+
+  it("round-trips craving wins and validates their materialized rows", async () => {
+    const ops = [...goodOps, cravingOp];
+    const result = await validateExport(goodFile(ops));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const state = new MemoryTx(await replay(result.ops));
+    expect(await state.getAll<CravingWin>(STORE.cravingWins)).toEqual([
+      cravingOp.payload.row,
+    ]);
+
+    await expectRejected(
+      tweak((file) => {
+        const op = (file.ops as { payload: { row?: Record<string, unknown> } }[]).find(
+          (candidate) => candidate.payload.row?.id === "win-1",
+        );
+        if (op?.payload.row) op.payload.row.amount_kept = 0;
+      }, ops),
+      /craving_wins|amount_kept/i,
     );
   });
 

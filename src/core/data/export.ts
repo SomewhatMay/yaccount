@@ -15,6 +15,7 @@ import { TransactionSchema } from "../model/transaction";
 import { ContainerSnapshotSchema } from "../model/containerSnapshot";
 import { RecurringRuleSchema } from "../model/recurringRule";
 import { GoalSchema } from "../model/goal";
+import { CravingWinSchema } from "../model/cravingWin";
 import { SettingSchema } from "../model/setting";
 
 /**
@@ -92,6 +93,7 @@ const ROW_SCHEMA: Record<string, { safeParse: (v: unknown) => SafeParse }> = {
   [STORE.containerSnapshots]: ContainerSnapshotSchema,
   [STORE.recurringRules]: RecurringRuleSchema,
   [STORE.goals]: GoalSchema,
+  [STORE.cravingWins]: CravingWinSchema,
   [STORE.settings]: SettingSchema,
 };
 

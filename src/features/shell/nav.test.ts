@@ -18,13 +18,14 @@ import {
  */
 
 describe("DESTINATIONS — every screen the app has", () => {
-  it("lists all nine routes exactly once", () => {
+  it("lists all ten routes exactly once", () => {
     expect(DESTINATIONS.map((d) => d.href)).toEqual([
       "/",
       "/ledger",
       "/inbox",
       "/plan",
       "/goals",
+      "/cravings",
       "/recurring",
       "/containers",
       "/categories",
@@ -78,6 +79,7 @@ describe("MORE_DESTINATIONS — what compact direct navigation displaces", () =>
   it("holds every destination that is not a tab route", () => {
     expect(MORE_DESTINATIONS.map((d) => d.href)).toEqual([
       "/plan",
+      "/cravings",
       "/recurring",
       "/containers",
       "/categories",

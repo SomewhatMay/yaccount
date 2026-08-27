@@ -192,6 +192,13 @@ export async function applyOp(tx: Tx, op: Op): Promise<void> {
       if (cur) await tx.put(STORE.goals, { ...cur, is_archived });
       return;
     }
+    case "cravingWin.create":
+    case "cravingWin.update":
+      await tx.put(STORE.cravingWins, op.payload.row);
+      return;
+    case "cravingWin.remove":
+      await tx.delete(STORE.cravingWins, op.payload.id);
+      return;
     default: {
       const never: never = op;
       throw new Error(`applyOp: unhandled op type: ${(never as { type: string }).type}`);

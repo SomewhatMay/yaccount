@@ -1,12 +1,10 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 export const DB_NAME = "yaccount";
-// v3 (M9): adds the device-local `outbox` store — op-ids this device authored but
-// hasn't yet flushed to its own Drive ledger (§8.4). Guarded upgrade, so a
-// populated v2 cache carries over untouched.
-export const DB_VERSION = 3;
+// v4: adds Cravings Savings. Guarded upgrade keeps every populated older cache.
+export const DB_VERSION = 4;
 
-/** Object-store registry. Seven materialized tables (§7) + infra stores. */
+/** Object-store registry. Materialized tables (§7) + infra stores. */
 export const STORE = {
   categories: "categories",
   containers: "containers",
@@ -15,6 +13,7 @@ export const STORE = {
   containerSnapshots: "container_snapshots",
   recurringRules: "recurring_rules",
   goals: "goals",
+  cravingWins: "craving_wins",
   settings: "settings", // synced user preferences (M3) — key/value, keyPath 'key'
   oplog: "oplog", // append-only journal (§8.2)
   appMeta: "app_meta", // device-local metadata (deviceId, …) — never synced (§8.4)
@@ -23,7 +22,7 @@ export const STORE = {
 
 export type StoreName = (typeof STORE)[keyof typeof STORE];
 
-/** The synced materialized stores: the seven tables (§7) + `settings` (M3). */
+/** The synced materialized stores, including `settings` (M3). */
 export const STATE_STORES: StoreName[] = [
   STORE.categories,
   STORE.containers,
@@ -32,6 +31,7 @@ export const STATE_STORES: StoreName[] = [
   STORE.containerSnapshots,
   STORE.recurringRules,
   STORE.goals,
+  STORE.cravingWins,
   STORE.settings,
 ];
 
@@ -82,6 +82,7 @@ export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
       store(STORE.containerSnapshots);
       store(STORE.recurringRules);
       store(STORE.goals);
+      store(STORE.cravingWins);
       store(STORE.settings, "key"); // added in DB v2 (M3)
 
       const oplog = store(STORE.oplog);
