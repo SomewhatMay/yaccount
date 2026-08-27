@@ -53,6 +53,10 @@ import { CHART, EmptyNote, formatAxisCents, monthLabel, MoneyTooltip } from "./c
 
 const axisTick = { fontSize: 11, fill: CHART.axis };
 
+// Recharts' browser-default entrance motion calls React state on every animation
+// frame. A dashboard can mount several charts together, so that decorative work
+// must not compete with dashboard-tab input. Every data shape below opts out.
+
 /** True if the month keys straddle more than one calendar year (→ show years). */
 function spansYears(months: string[]): boolean {
   return new Set(months.map((m) => m.slice(0, 4))).size > 1;
@@ -93,6 +97,7 @@ export function CategoryDoughnut({
               data={slices}
               dataKey="amount"
               nameKey="name"
+              isAnimationActive={false}
               innerRadius={54}
               outerRadius={82}
               paddingAngle={slices.length > 1 ? 2 : 0}
@@ -183,18 +188,26 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
           cursor={{ fill: "var(--muted)", opacity: 0.4 }}
         />
         <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="income" name="Income" fill={CHART.income} radius={[3, 3, 0, 0]} />
+        <Bar
+          dataKey="income"
+          name="Income"
+          fill={CHART.income}
+          radius={[3, 3, 0, 0]}
+          isAnimationActive={false}
+        />
         <Bar
           dataKey="expense"
           name="Expenses"
           fill={CHART.expense}
           radius={[3, 3, 0, 0]}
+          isAnimationActive={false}
         />
         <Bar
           dataKey="savings"
           name="Savings"
           fill={CHART.savings}
           radius={[3, 3, 0, 0]}
+          isAnimationActive={false}
         />
         <Line
           dataKey="budget"
@@ -204,6 +217,7 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
           strokeDasharray="5 4"
           strokeWidth={1.5}
           dot={false}
+          isAnimationActive={false}
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -256,8 +270,18 @@ export function WaterfallChart({
           content={<MoneyTooltip />}
           cursor={{ fill: "var(--muted)", opacity: 0.4 }}
         />
-        <Bar dataKey="base" stackId="w" fill="transparent" />
-        <Bar dataKey="bar" stackId="w" radius={[3, 3, 0, 0]}>
+        <Bar
+          dataKey="base"
+          stackId="w"
+          fill="transparent"
+          isAnimationActive={false}
+        />
+        <Bar
+          dataKey="bar"
+          stackId="w"
+          radius={[3, 3, 0, 0]}
+          isAnimationActive={false}
+        >
           {data.map((d) => (
             <Cell key={d.name} fill={d.tipColor} />
           ))}
@@ -329,6 +353,7 @@ export function CategoryDrilldown({
               name="Spent"
               fill={selectedId ? categoryColorFor(selectedId, categories) : CHART.expense}
               radius={[3, 3, 0, 0]}
+              isAnimationActive={false}
             />
             <Line
               dataKey="budget"
@@ -339,6 +364,7 @@ export function CategoryDrilldown({
               strokeWidth={1.5}
               dot={false}
               connectNulls
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -614,6 +640,7 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               stroke={CHART.expense}
               strokeWidth={1.75}
               dot={data.length === 1}
+              isAnimationActive={false}
             />
             <Line
               dataKey="value"
@@ -622,6 +649,7 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               stroke={CHART.savings}
               strokeWidth={1.75}
               dot={data.length === 1}
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
