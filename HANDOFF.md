@@ -8,12 +8,13 @@ repeat them — it says where things stand and what will bite you.
 ## State
 
 - `main` is clean and deployed. Live at <https://somewhatmay.github.io/yaccount/>.
-- M0–M9 and M11 are shipped, plus local diagnostics and fourteen post-M11 quality passes: mobile toast placement, ledger
+- M0–M9 and M11 are shipped, plus local diagnostics and fifteen post-M11 quality passes: mobile toast placement, ledger
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, starter categories, creation autocomplete,
-  iOS keyboard-aware sheets/Search, and compact page/Dashboard hierarchy.
-- 133 Vitest files, 1,324 tests passing. Playwright is 106 passes and 14 expected platform
+  iOS keyboard-aware sheets/Search, compact page/Dashboard hierarchy, and provisional phone
+  density tuning.
+- 134 Vitest files, 1,326 tests passing. Playwright is 106 passes and 14 expected platform
   skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
   issues).
 - **Quick Add and new recurring forms use accessible searchable comboboxes** for vendor/source,
@@ -29,6 +30,10 @@ repeat them — it says where things stand and what will bite you.
   and horizontally scrolling set tabs on row 2. Comparison lives inside the single period picker.
   Overall balance now has ordinary card/fold/menu chrome and can move, hide, and restore without
   rewriting existing synced layout order/settings.
+- **Phone spacing is provisionally tighter:** 16px non-Dashboard section gaps, 12px main top
+  inset, 12px Dashboard widget gaps, and 16px Dashboard card padding. Desktop spacing is
+  unchanged. Automated overflow/touch coverage and phone screenshots pass; real-phone approval is
+  still open in [#51](https://github.com/SomewhatMay/yaccount/issues/51).
 - **Diagnostics survive reloads and financial-DB failures** in a separate `yaccount-diagnostics`
   IndexedDB. Writes batch off-path; retention is 2,000 records/14 days. Copy/download is explicit
   and local-only. Deployed builds carry exact version/SHA/build time; local builds say `local`.
@@ -49,10 +54,14 @@ repeat them — it says where things stand and what will bite you.
 
 ## Next
 
-Continue the approved sequence in [`next-features-build-plan.md`](next-features-build-plan.md).
-Next: true Ledger paging from the accepted
-[`ledger-paging-architecture.md`](ledger-paging-architecture.md), on fresh pulled `main` with strict
-parity/atomicity/performance gates.
+True Ledger paging is **stopped before merge**. Draft
+[#50](https://github.com/SomewhatMay/yaccount/pull/50) implements the accepted ADR with DB v5 read
+stores, but its real-Chromium 50k first projection did not commit within 120 seconds; the approved
+gate is 10 seconds. Batched/native writes and compact compound keys did not clear the stop. Review
+a lower-write-amplification architecture in
+[#49](https://github.com/SomewhatMay/yaccount/issues/49); do not raise the timeout. `main` remains
+DB v4 with no paging migration. The later-list boundary is
+[#48](https://github.com/SomewhatMay/yaccount/issues/48).
 
 **Deferred — do not start without an explicit go-ahead:**
 
