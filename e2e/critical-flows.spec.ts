@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
  * margin here rather than trimming the worker count.
  */
 const FAB_HOLD_PAST_THRESHOLD_MS = 800;
+const hydrationFailures = new WeakMap<Page, string[]>();
 
 async function openReady(page: Page, path: string, marker: string | RegExp) {
   await page.goto(path);
@@ -138,7 +139,14 @@ async function addDashboardWidget(page: Page, title: string) {
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 }
 
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context, page }) => {
+  const complaints: string[] = [];
+  hydrationFailures.set(page, complaints);
+  page.on("pageerror", (error) => {
+    const text = String(error);
+    if (/hydrat|server rendered text didn't match/i.test(text)) complaints.push(text);
+  });
+
   // Every test gets a fresh context: no IndexedDB, localStorage, cookies, auth,
   // Drive profile, or ordering dependency can leak from another test.
   await context.addInitScript(() => {
@@ -146,6 +154,10 @@ test.beforeEach(async ({ context }) => {
     localStorage.clear();
     sessionStorage.setItem("yaccount.e2e.storage-cleared", "true");
   });
+});
+
+test.afterEach(async ({ page }) => {
+  expect(hydrationFailures.get(page) ?? []).toEqual([]);
 });
 
 test("opens Ledger on the first immediate tab tap", async ({ page }, testInfo) => {
