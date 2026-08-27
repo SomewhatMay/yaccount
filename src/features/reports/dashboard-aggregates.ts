@@ -1,0 +1,412 @@
+import {
+  allocationPlanMonth as deriveAllocationMonth,
+  allocationPlanPayCycle as deriveAllocationPayCycle,
+  monthLanding as deriveMonthLanding,
+  incomeResilience as deriveIncomeResilience,
+  containerWatch as deriveContainerWatch,
+  categoryWatch as deriveCategoryWatch,
+  commitments as deriveCommitments,
+  monthClose as deriveMonthClose,
+  moneyBrief as deriveMoneyBrief,
+  budgetTriage as deriveBudgetTriage,
+  cashHorizon as deriveCashHorizon,
+  goalOutlook as deriveGoalOutlook,
+  monthlyTotals,
+  moneyMap as deriveMoneyMap,
+  overallBalance,
+  periodSummary,
+  upcomingOccurrences,
+  whatChanged as deriveWhatChanged,
+  type DateRange,
+  type CashHorizonDays,
+} from "@/core/engine";
+import type {
+  BudgetTarget,
+  Category,
+  Container,
+  ContainerSnapshot,
+  Goal,
+  RecurringRule,
+  Transaction,
+} from "@/core/model";
+
+export interface DashboardAggregateInputs {
+  budgetTargets: BudgetTarget[];
+  categories: Category[];
+  containers: Container[];
+  ledgerTransactions: Transaction[];
+  reportTransactions: Transaction[];
+  recurringRules: RecurringRule[];
+  snapshots: ContainerSnapshot[];
+  goals: Goal[];
+}
+
+export interface DashboardAggregateCalculators {
+  monthlyTotals: typeof monthlyTotals;
+  periodSummary: typeof periodSummary;
+  overallBalance: typeof overallBalance;
+  upcomingOccurrences: typeof upcomingOccurrences;
+  moneyMap: typeof deriveMoneyMap;
+  whatChanged: typeof deriveWhatChanged;
+  budgetTriage: typeof deriveBudgetTriage;
+  goalOutlook: typeof deriveGoalOutlook;
+  cashHorizon: typeof deriveCashHorizon;
+  allocationPlanMonth: typeof deriveAllocationMonth;
+  allocationPlanPayCycle: typeof deriveAllocationPayCycle;
+  monthLanding: typeof deriveMonthLanding;
+  incomeResilience: typeof deriveIncomeResilience;
+  containerWatch: typeof deriveContainerWatch;
+  categoryWatch: typeof deriveCategoryWatch;
+  moneyBrief: typeof deriveMoneyBrief;
+  commitments: typeof deriveCommitments;
+  monthClose: typeof deriveMonthClose;
+}
+
+export interface DashboardAggregates {
+  monthly: (range: DateRange) => ReturnType<typeof monthlyTotals>;
+  period: (range: DateRange) => ReturnType<typeof periodSummary>;
+  balance: () => number;
+  occurrences: (from: string, to: string) => ReturnType<typeof upcomingOccurrences>;
+  moneyMap: () => ReturnType<typeof deriveMoneyMap>;
+  whatChanged: (range: DateRange) => ReturnType<typeof deriveWhatChanged>;
+  budgetTriage: (today: string) => ReturnType<typeof deriveBudgetTriage>;
+  goalOutlook: (today: string) => ReturnType<typeof deriveGoalOutlook>;
+  cashHorizon: (
+    today: string,
+    days: CashHorizonDays,
+  ) => ReturnType<typeof deriveCashHorizon>;
+  allocationMonth: (
+    today: string,
+    manualIncome: number,
+  ) => ReturnType<typeof deriveAllocationMonth>;
+  allocationPayCycle: (
+    today: string,
+    anchorRuleIds?: string[],
+  ) => ReturnType<typeof deriveAllocationPayCycle>;
+  monthLanding: (today: string) => ReturnType<typeof deriveMonthLanding>;
+  incomeResilience: (
+    range: DateRange,
+    today: string,
+  ) => ReturnType<typeof deriveIncomeResilience>;
+  containerWatch: (
+    containerId: string,
+    today: string,
+    floor: number | null,
+  ) => ReturnType<typeof deriveContainerWatch>;
+  categoryWatch: (
+    categoryId: string,
+    today: string,
+  ) => ReturnType<typeof deriveCategoryWatch>;
+  moneyBrief: (today: string) => ReturnType<typeof deriveMoneyBrief>;
+  commitments: (today: string) => ReturnType<typeof deriveCommitments>;
+  monthClose: (today: string) => ReturnType<typeof deriveMonthClose>;
+}
+
+const defaultCalculators: DashboardAggregateCalculators = {
+  monthlyTotals,
+  periodSummary,
+  overallBalance,
+  upcomingOccurrences,
+  moneyMap: deriveMoneyMap,
+  whatChanged: deriveWhatChanged,
+  budgetTriage: deriveBudgetTriage,
+  goalOutlook: deriveGoalOutlook,
+  cashHorizon: deriveCashHorizon,
+  allocationPlanMonth: deriveAllocationMonth,
+  allocationPlanPayCycle: deriveAllocationPayCycle,
+  monthLanding: deriveMonthLanding,
+  incomeResilience: deriveIncomeResilience,
+  containerWatch: deriveContainerWatch,
+  categoryWatch: deriveCategoryWatch,
+  moneyBrief: deriveMoneyBrief,
+  commitments: deriveCommitments,
+  monthClose: deriveMonthClose,
+};
+
+function rangeKey(range: DateRange): string {
+  return `${range.start ?? ""}:${range.end ?? ""}`;
+}
+
+/**
+ * One render-scoped cache. DashboardView replaces it whenever any input array
+ * changes, so no money survives a data revision and every cache key stays exact.
+ */
+export function createDashboardAggregates(
+  inputs: DashboardAggregateInputs,
+  calculate: DashboardAggregateCalculators = defaultCalculators,
+): DashboardAggregates {
+  const monthlyCache = new Map<string, ReturnType<typeof monthlyTotals>>();
+  const periodCache = new Map<string, ReturnType<typeof periodSummary>>();
+  const occurrenceCache = new Map<string, ReturnType<typeof upcomingOccurrences>>();
+  let hasBalance = false;
+  let balance = 0;
+  let cachedMoneyMap: ReturnType<typeof deriveMoneyMap> | null = null;
+  const whatChangedCache = new Map<string, ReturnType<typeof deriveWhatChanged>>();
+  const budgetTriageCache = new Map<string, ReturnType<typeof deriveBudgetTriage>>();
+  const goalOutlookCache = new Map<string, ReturnType<typeof deriveGoalOutlook>>();
+  const cashHorizonCache = new Map<string, ReturnType<typeof deriveCashHorizon>>();
+  const allocationMonthCache = new Map<
+    string,
+    ReturnType<typeof deriveAllocationMonth>
+  >();
+  const allocationPayCycleCache = new Map<
+    string,
+    ReturnType<typeof deriveAllocationPayCycle>
+  >();
+  const monthLandingCache = new Map<string, ReturnType<typeof deriveMonthLanding>>();
+  const incomeResilienceCache = new Map<
+    string,
+    ReturnType<typeof deriveIncomeResilience>
+  >();
+  const containerWatchCache = new Map<string, ReturnType<typeof deriveContainerWatch>>();
+  const categoryWatchCache = new Map<string, ReturnType<typeof deriveCategoryWatch>>();
+  const moneyBriefCache = new Map<string, ReturnType<typeof deriveMoneyBrief>>();
+  const commitmentsCache = new Map<string, ReturnType<typeof deriveCommitments>>();
+  const monthCloseCache = new Map<string, ReturnType<typeof deriveMonthClose>>();
+
+  function getBudgetTriage(today: string): ReturnType<typeof deriveBudgetTriage> {
+    const cached = budgetTriageCache.get(today);
+    if (cached) return cached;
+    const result = calculate.budgetTriage(
+      inputs.reportTransactions,
+      inputs.categories,
+      inputs.budgetTargets,
+      inputs.recurringRules,
+      today,
+    );
+    budgetTriageCache.set(today, result);
+    return result;
+  }
+
+  function getCashHorizon(
+    today: string,
+    days: CashHorizonDays,
+  ): ReturnType<typeof deriveCashHorizon> {
+    const key = `${today}:${days}`;
+    const cached = cashHorizonCache.get(key);
+    if (cached) return cached;
+    const result = calculate.cashHorizon(
+      inputs.ledgerTransactions,
+      inputs.categories,
+      inputs.containers,
+      inputs.recurringRules,
+      today,
+      days,
+    );
+    cashHorizonCache.set(key, result);
+    return result;
+  }
+
+  return {
+    monthly(range) {
+      const key = rangeKey(range);
+      const cached = monthlyCache.get(key);
+      if (cached) return cached;
+      const result = calculate.monthlyTotals(
+        inputs.reportTransactions,
+        inputs.categories,
+        range,
+      );
+      monthlyCache.set(key, result);
+      return result;
+    },
+    period(range) {
+      const key = rangeKey(range);
+      const cached = periodCache.get(key);
+      if (cached) return cached;
+      const result = calculate.periodSummary(
+        inputs.reportTransactions,
+        inputs.categories,
+        range,
+      );
+      periodCache.set(key, result);
+      return result;
+    },
+    balance() {
+      if (!hasBalance) {
+        balance = calculate.overallBalance(inputs.ledgerTransactions, inputs.containers);
+        hasBalance = true;
+      }
+      return balance;
+    },
+    occurrences(from, to) {
+      const key = `${from}:${to}`;
+      const cached = occurrenceCache.get(key);
+      if (cached) return cached;
+      const result = calculate.upcomingOccurrences(inputs.recurringRules, from, to, {
+        limit: Number.MAX_SAFE_INTEGER,
+      });
+      occurrenceCache.set(key, result);
+      return result;
+    },
+    moneyMap() {
+      if (!cachedMoneyMap) {
+        cachedMoneyMap = calculate.moneyMap(
+          inputs.containers,
+          inputs.snapshots,
+          inputs.ledgerTransactions,
+          inputs.goals,
+        );
+      }
+      return cachedMoneyMap;
+    },
+    whatChanged(range) {
+      const key = rangeKey(range);
+      if (whatChangedCache.has(key)) return whatChangedCache.get(key)!;
+      const result = calculate.whatChanged(
+        inputs.reportTransactions,
+        inputs.categories,
+        range,
+      );
+      whatChangedCache.set(key, result);
+      return result;
+    },
+    budgetTriage(today) {
+      return getBudgetTriage(today);
+    },
+    goalOutlook(today) {
+      const cached = goalOutlookCache.get(today);
+      if (cached) return cached;
+      const result = calculate.goalOutlook(
+        inputs.goals,
+        inputs.containers,
+        inputs.ledgerTransactions,
+        today,
+      );
+      goalOutlookCache.set(today, result);
+      return result;
+    },
+    cashHorizon(today, days) {
+      return getCashHorizon(today, days);
+    },
+    allocationMonth(today, manualIncome) {
+      const key = `${today}:${manualIncome}`;
+      const cached = allocationMonthCache.get(key);
+      if (cached) return cached;
+      const result = calculate.allocationPlanMonth({
+        today,
+        manualIncome,
+        txns: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        goals: inputs.goals,
+        budgetTargets: inputs.budgetTargets,
+        rules: inputs.recurringRules,
+      });
+      allocationMonthCache.set(key, result);
+      return result;
+    },
+    allocationPayCycle(today, anchorRuleIds) {
+      const normalized = anchorRuleIds ? [...anchorRuleIds].sort() : undefined;
+      const key = `${today}:${normalized?.join(",") ?? "*"}`;
+      if (allocationPayCycleCache.has(key)) {
+        return allocationPayCycleCache.get(key)!;
+      }
+      const result = calculate.allocationPlanPayCycle({
+        today,
+        anchorRuleIds: normalized,
+        txns: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        goals: inputs.goals,
+        budgetTargets: inputs.budgetTargets,
+        rules: inputs.recurringRules,
+      });
+      allocationPayCycleCache.set(key, result);
+      return result;
+    },
+    monthLanding(today) {
+      const cached = monthLandingCache.get(today);
+      if (cached) return cached;
+      const result = calculate.monthLanding({
+        today,
+        transactions: inputs.reportTransactions,
+        categories: inputs.categories,
+        recurringRules: inputs.recurringRules,
+      });
+      monthLandingCache.set(today, result);
+      return result;
+    },
+    incomeResilience(range, today) {
+      const key = `${rangeKey(range)}:${today}`;
+      const cached = incomeResilienceCache.get(key);
+      if (cached) return cached;
+      const result = calculate.incomeResilience({
+        today,
+        range,
+        transactions: inputs.reportTransactions,
+        categories: inputs.categories,
+        recurringRules: inputs.recurringRules,
+      });
+      incomeResilienceCache.set(key, result);
+      return result;
+    },
+    containerWatch(containerId, today, floor) {
+      const key = `${containerId}:${today}:${floor ?? "none"}`;
+      const cached = containerWatchCache.get(key);
+      if (cached) return cached;
+      const result = calculate.containerWatch({
+        today,
+        containerId,
+        floor,
+        transactions: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        containers: inputs.containers,
+        recurringRules: inputs.recurringRules,
+      });
+      containerWatchCache.set(key, result);
+      return result;
+    },
+    categoryWatch(categoryId, today) {
+      const key = `${categoryId}:${today}`;
+      const cached = categoryWatchCache.get(key);
+      if (cached) return cached;
+      const result = calculate.categoryWatch({
+        today,
+        categoryId,
+        transactions: inputs.reportTransactions,
+        budgetTargets: inputs.budgetTargets,
+      });
+      categoryWatchCache.set(key, result);
+      return result;
+    },
+    moneyBrief(today) {
+      const cached = moneyBriefCache.get(today);
+      if (cached) return cached;
+      const result = calculate.moneyBrief({
+        today,
+        ledgerTransactions: inputs.ledgerTransactions,
+        containers: inputs.containers,
+        snapshots: inputs.snapshots,
+        recurringRules: inputs.recurringRules,
+        budgetTriage: getBudgetTriage(today),
+        cashHorizon: getCashHorizon(today, 30),
+      });
+      moneyBriefCache.set(today, result);
+      return result;
+    },
+    commitments(today) {
+      const cached = commitmentsCache.get(today);
+      if (cached) return cached;
+      const result = calculate.commitments({
+        today,
+        categories: inputs.categories,
+        recurringRules: inputs.recurringRules,
+      });
+      commitmentsCache.set(today, result);
+      return result;
+    },
+    monthClose(today) {
+      if (monthCloseCache.has(today)) return monthCloseCache.get(today)!;
+      const result = calculate.monthClose({
+        today,
+        transactions: inputs.ledgerTransactions,
+        categories: inputs.categories,
+        containers: inputs.containers,
+        snapshots: inputs.snapshots,
+        budgetTargets: inputs.budgetTargets,
+        recurringRules: inputs.recurringRules,
+      });
+      monthCloseCache.set(today, result);
+      return result;
+    },
+  };
+}

@@ -1,20 +1,108 @@
 import { expect, it, vi } from "vitest";
-import { makeCategory, makeTransaction } from "@/core/model";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { makeCategory, makeGeneralContainer, makeTransaction } from "@/core/model";
 import { DashboardView } from "./DashboardView";
+import type { WidgetContext, WidgetDef } from "./registry";
 
-const fixture = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
+const fixture = vi.hoisted(() => ({
+  values: new Map<string, unknown>(),
+  periodKeys: [] as string[],
+  compareKeys: [] as string[],
+  curations: [] as unknown[],
+  dispatchMany: vi.fn(async () => {}),
+  flashRow: vi.fn(),
+  draftDashboard: undefined as unknown,
+  stateSetters: [] as ReturnType<typeof vi.fn>[],
+}));
+const dashboardSets = vi.hoisted(() => ({
+  dashboards: [
+    {
+      version: 2 as const,
+      id: "overview",
+      name: "Overview",
+      rank: 0,
+      isDeleted: false,
+      instances: [
+        {
+          instanceId: "balance-instance",
+          widgetType: "balance",
+          size: "expanded" as const,
+          hidden: false,
+        },
+        {
+          instanceId: "saved-instance",
+          widgetType: "saved",
+          size: "compact" as const,
+          hidden: false,
+          subject: { type: "category" as const, id: "included" },
+          settings: { horizonDays: 60 },
+        },
+      ],
+    },
+  ],
+  activeDashboard: {
+    version: 2 as const,
+    id: "overview",
+    name: "Overview",
+    rank: 0,
+    isDeleted: false,
+    instances: [
+      {
+        instanceId: "balance-instance",
+        widgetType: "balance",
+        size: "expanded" as const,
+        hidden: false,
+      },
+      {
+        instanceId: "saved-instance",
+        widgetType: "saved",
+        size: "compact" as const,
+        hidden: false,
+        subject: { type: "category" as const, id: "included" },
+        settings: { horizonDays: 60 },
+      },
+    ],
+  },
+  defaultDashboardId: "overview",
+  layout: {
+    order: ["balance-instance", "saved-instance"],
+    hidden: [],
+    sizes: { "balance-instance": "expanded", "saved-instance": "compact" },
+  },
+  setActiveDashboard: vi.fn(),
+  saveDashboard: vi.fn(),
+  saveLayout: vi.fn(),
+  createDashboard: vi.fn(),
+  renameDashboard: vi.fn(),
+  duplicateDashboard: vi.fn(),
+  reorderDashboard: vi.fn(),
+  makeDefault: vi.fn(),
+  deleteDashboard: vi.fn(),
+}));
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
     ...actual,
     useMemo: <T,>(factory: () => T) => factory(),
-    useState: <T,>(initialValue: T) => [initialValue, vi.fn()],
+    useState: <T,>(initialValue: T) => {
+      const index = fixture.stateSetters.length;
+      const setter = vi.fn();
+      fixture.stateSetters.push(setter);
+      return [
+        index === 0 && fixture.draftDashboard !== undefined
+          ? (fixture.draftDashboard as T)
+          : initialValue,
+        setter,
+      ];
+    },
   };
 });
 
 vi.mock("jotai", () => ({
   useAtomValue: (atom: string) => fixture.values.get(atom),
+  useSetAtom: (atom: string) =>
+    atom === "flashRow" ? fixture.flashRow : fixture.dispatchMany,
 }));
 
 vi.mock("@/features/store", () => ({
@@ -26,18 +114,70 @@ vi.mock("@/features/store", () => ({
   snapshotsAtom: "snapshots",
   recurringRulesAtom: "recurringRules",
   goalsAtom: "goals",
+  settingsAtom: "settings",
+  dispatchManyAtom: "dispatchMany",
+  flashRowAtom: "flashRow",
 }));
 
 vi.mock("./period-pref", () => ({
-  usePeriodPref: () => [{ kind: "preset", preset: "all" }, vi.fn()],
-  useComparePref: () => [null, vi.fn()],
+  usePeriodPref: (key: string) => {
+    fixture.periodKeys.push(key);
+    return [{ kind: "preset", preset: "all" }, vi.fn()];
+  },
+  useComparePref: (key: string) => {
+    fixture.compareKeys.push(key);
+    return [null, vi.fn()];
+  },
 }));
 
 vi.mock("./use-dashboard-layout", () => ({
-  useDashboardLayout: () => [{ order: ["saved"], hidden: [], version: 1 }, vi.fn()],
+  useDashboardSets: (curation: unknown) => {
+    fixture.curations.push(curation);
+    return dashboardSets;
+  },
 }));
 
-it("passes stats-filtered transactions to every dashboard widget", () => {
+function findComponent(
+  node: ReactNode,
+  name: string,
+): ReactElement<Record<string, unknown>> | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findComponent(child, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return null;
+  if (typeof node.type === "function" && node.type.name === name) {
+    return node as ReactElement<Record<string, unknown>>;
+  }
+  return findComponent(node.props.children, name);
+}
+
+function findComponents(
+  node: ReactNode,
+  name: string,
+): ReactElement<Record<string, unknown>>[] {
+  if (Array.isArray(node)) {
+    return node.flatMap((child) => findComponents(child, name));
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return [];
+  return [
+    ...(typeof node.type === "function" && node.type.name === name
+      ? [node as ReactElement<Record<string, unknown>>]
+      : []),
+    ...findComponents(node.props.children, name),
+  ];
+}
+
+function callComponent<P>(element: ReactElement<P>) {
+  return (element.type as (props: P) => ReactElement<Record<string, unknown>>)(
+    element.props,
+  );
+}
+
+it("keeps hidden-from-stats rows in balance while excluding them from reports", async () => {
   const included = makeCategory({ id: "included", name: "Included", type: "expense" });
   const excluded = {
     ...makeCategory({ id: "excluded", name: "Excluded", type: "expense" }),
@@ -45,7 +185,7 @@ it("passes stats-filtered transactions to every dashboard widget", () => {
   };
   fixture.values.set("ready", true);
   fixture.values.set("categories", [included, excluded]);
-  fixture.values.set("containers", []);
+  fixture.values.set("containers", [makeGeneralContainer()]);
   fixture.values.set("transactions", [
     makeTransaction({
       id: "included-row",
@@ -66,13 +206,122 @@ it("passes stats-filtered transactions to every dashboard widget", () => {
   fixture.values.set("snapshots", []);
   fixture.values.set("recurringRules", []);
   fixture.values.set("goals", []);
+  fixture.values.set("settings", [{ key: "expected_income:2026-08", value: "250000" }]);
+  fixture.periodKeys = [];
+  fixture.compareKeys = [];
+  fixture.curations = [];
+  fixture.draftDashboard = undefined;
+  fixture.stateSetters = [];
 
   const dashboard = DashboardView();
-  const columnElement = dashboard.props.children[1];
-  const column = columnElement.type(columnElement.props);
-  const widget = column.props.children[0];
+  expect(fixture.curations).toEqual([
+    [
+      { widgetType: "balance", size: "expanded" },
+      { widgetType: "brief", size: "expanded" },
+      { widgetType: "recent", size: "expanded" },
+    ],
+  ]);
+  expect(fixture.periodKeys).toEqual(["yaccount.dashboard.period.overview"]);
+  expect(fixture.compareKeys).toEqual(["yaccount.dashboard.compare.overview"]);
+  const setBar = findComponent(dashboard, "DashboardSetBar")!;
+  expect(setBar.props.activeId).toBe("overview");
+  const columnElement = findComponent(dashboard, "WidgetColumn")!;
+  const column = callComponent(columnElement);
+  const [balanceWidget, savedWidget] = findComponents(
+    column,
+    "DashboardWidget",
+  ) as ReactElement<{
+    def: WidgetDef;
+    base: WidgetContext;
+    onSizeChange: (size: "compact" | "expanded") => Promise<void>;
+  }>[];
+  expect(balanceWidget.props.base.aggregates).toBeDefined();
+  expect(balanceWidget.props.base.aggregates).toBe(savedWidget.props.base.aggregates);
+  expect(savedWidget.props.base.instanceSettings).toEqual({ horizonDays: 60 });
+  expect(savedWidget.props.base.instanceSubject).toEqual({
+    type: "category",
+    id: "included",
+  });
+  expect(savedWidget.props.base.syncedSettings).toEqual([
+    { key: "expected_income:2026-08", value: "250000" },
+  ]);
+  await savedWidget.props.base.dispatchOps?.([]);
+  expect(fixture.dispatchMany).toHaveBeenCalledWith([]);
+  await savedWidget.props.base.saveInstanceSettings?.({ horizonDays: 14 });
+  expect(dashboardSets.saveDashboard).toHaveBeenCalledWith({
+    ...dashboardSets.activeDashboard,
+    instances: [
+      dashboardSets.activeDashboard.instances[0],
+      {
+        ...dashboardSets.activeDashboard.instances[1],
+        settings: { horizonDays: 14 },
+      },
+    ],
+  });
+  dashboardSets.saveDashboard.mockClear();
+  await savedWidget.props.base.saveInstanceSubject?.({
+    type: "category",
+    id: "excluded",
+  });
+  expect(dashboardSets.saveDashboard).toHaveBeenCalledWith({
+    ...dashboardSets.activeDashboard,
+    instances: [
+      dashboardSets.activeDashboard.instances[0],
+      {
+        ...dashboardSets.activeDashboard.instances[1],
+        subject: { type: "category", id: "excluded" },
+      },
+    ],
+  });
+  const BalanceRenderer = (await balanceWidget.props.def.load!()).default as (
+    context: WidgetContext,
+  ) => ReactElement<Record<string, unknown>>;
+  const balanceFigure = BalanceRenderer(balanceWidget.props.base);
 
-  expect(widget.props.base.transactions.map((row: { id: string }) => row.id)).toEqual([
+  expect(balanceFigure.props.cents).toBe(-3000);
+  expect(savedWidget.props.base.reportTransactions.map((row) => row.id)).toEqual([
     "included-row",
   ]);
+  expect(savedWidget.props.base.aggregates.period({ start: null, end: null }).saved).toBe(
+    -1000,
+  );
+  dashboardSets.saveLayout.mockClear();
+  await savedWidget.props.onSizeChange("expanded");
+  expect(dashboardSets.saveLayout).toHaveBeenCalledWith({
+    ...dashboardSets.layout,
+    sizes: {
+      ...dashboardSets.layout.sizes,
+      "saved-instance": "expanded",
+    },
+  });
+});
+
+it("closes the gallery and targets an added widget for scroll feedback", () => {
+  fixture.values.set("ready", true);
+  fixture.values.set("categories", []);
+  fixture.values.set("containers", []);
+  fixture.values.set("transactions", []);
+  fixture.values.set("budgetTargets", []);
+  fixture.values.set("snapshots", []);
+  fixture.values.set("recurringRules", []);
+  fixture.values.set("goals", []);
+  fixture.values.set("settings", []);
+  fixture.draftDashboard = dashboardSets.activeDashboard;
+  fixture.stateSetters = [];
+  fixture.flashRow.mockClear();
+
+  const dashboard = DashboardView();
+  const gallery = findComponent(dashboard, "WidgetGallerySheet")!;
+  const onCreate = gallery.props.onCreate as (
+    widgetType: string,
+    configuration: Record<string, unknown>,
+  ) => void;
+
+  onCreate("commitments", {});
+
+  const next = fixture.stateSetters[0].mock.calls[0][0];
+  const addedId = next.instances.at(-1).instanceId;
+  expect(next.instances.at(-1).widgetType).toBe("commitments");
+  expect(fixture.stateSetters[1]).toHaveBeenCalledWith(false);
+  expect(fixture.flashRow).toHaveBeenCalledWith({ id: addedId, scroll: true });
 });

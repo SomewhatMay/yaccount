@@ -182,6 +182,7 @@ function occurrenceRow(rule: RecurringRule, date: ISO, amount: number): Transact
       vendor_source: rule.template_vendor_source,
       inbox_status: "pending",
       recurring_rule_id: rule.id,
+      recurring_occurrence_date: date,
     });
   }
   return makeTransaction({
@@ -193,6 +194,7 @@ function occurrenceRow(rule: RecurringRule, date: ISO, amount: number): Transact
     container_id: rule.template_container_id,
     inbox_status: "pending",
     recurring_rule_id: rule.id,
+    recurring_occurrence_date: date,
   });
 }
 

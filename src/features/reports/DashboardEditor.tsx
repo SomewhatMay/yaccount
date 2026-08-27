@@ -25,30 +25,35 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { RowActions } from "@/features/ui";
+import { RowActions, useFlashRow } from "@/features/ui";
 import { cn } from "@/lib/utils";
 import {
   PINNED_WIDGET_ID,
-  defaultDashboardLayout,
   reorderDashboardLayout,
+  setWidgetSize,
   setWidgetVisible,
   type DashboardLayout,
+  type DashboardWidgetEntry,
 } from "./dashboard-layout";
-import { DASHBOARD_WIDGETS, type WidgetContext, type WidgetDef } from "./registry";
+import type { WidgetContext } from "./registry";
 import { DashboardWidget } from "./WidgetShell";
 
 export function DashboardEditor({
   base,
   widgets,
   layout,
+  resetLayout: curatedResetLayout,
   onLayoutChange,
   onAddWidgets,
 }: {
   base: WidgetContext;
-  widgets: readonly WidgetDef[];
+  widgets: readonly DashboardWidgetEntry[];
   layout: DashboardLayout;
+  resetLayout: DashboardLayout;
   onLayoutChange: (layout: DashboardLayout) => void;
   onAddWidgets: () => void;
 }) {
@@ -58,9 +63,21 @@ export function DashboardEditor({
 
   function finishDrag(event: DragEndEvent) {
     if (!event.over) return;
+    const pinnedId = widgets.find(
+      ({ instance }) => instance.widgetType === PINNED_WIDGET_ID,
+    )?.instance.instanceId;
     onLayoutChange(
-      reorderDashboardLayout(layout, String(event.active.id), String(event.over.id)),
+      reorderDashboardLayout(
+        layout,
+        String(event.active.id),
+        String(event.over.id),
+        pinnedId,
+      ),
     );
+  }
+
+  function resetLayout() {
+    onLayoutChange(curatedResetLayout);
   }
 
   return (
@@ -73,12 +90,7 @@ export function DashboardEditor({
           <PlusIcon aria-hidden />
           Add widgets
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onLayoutChange(defaultDashboardLayout(DASHBOARD_WIDGETS))}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={resetLayout}>
           <RotateCcwIcon aria-hidden />
           Reset
         </Button>
@@ -90,14 +102,14 @@ export function DashboardEditor({
         onDragEnd={finishDrag}
       >
         <SortableContext
-          items={widgets.map((widget) => widget.id)}
+          items={widgets.map(({ instance }) => instance.instanceId)}
           strategy={verticalListSortingStrategy}
         >
           <div className="space-y-4">
-            {widgets.map((widget) => (
+            {widgets.map((entry) => (
               <SortableDashboardWidget
-                key={widget.id}
-                widget={widget}
+                key={entry.instance.instanceId}
+                entry={entry}
                 base={base}
                 widgets={widgets}
                 layout={layout}
@@ -112,19 +124,23 @@ export function DashboardEditor({
 }
 
 function SortableDashboardWidget({
-  widget,
+  entry,
   base,
   widgets,
   layout,
   onLayoutChange,
 }: {
-  widget: WidgetDef;
+  entry: DashboardWidgetEntry;
   base: WidgetContext;
-  widgets: readonly WidgetDef[];
+  widgets: readonly DashboardWidgetEntry[];
   layout: DashboardLayout;
   onLayoutChange: (layout: DashboardLayout) => void;
 }) {
-  const pinned = widget.id === PINNED_WIDGET_ID;
+  const { def, instance } = entry;
+  const pinned = instance.widgetType === PINNED_WIDGET_ID;
+  const pinnedId = widgets.find(
+    (candidate) => candidate.instance.widgetType === PINNED_WIDGET_ID,
+  )?.instance.instanceId;
   const {
     attributes,
     listeners,
@@ -134,15 +150,23 @@ function SortableDashboardWidget({
     transition,
     isDragging,
     isOver,
-  } = useSortable({ id: widget.id, disabled: pinned });
+  } = useSortable({ id: instance.instanceId, disabled: pinned });
+  const { ref: flashRef, flashed } = useFlashRow<HTMLElement>(instance.instanceId);
 
   return (
     <section
-      ref={setNodeRef}
-      data-widget-id={widget.id}
+      ref={(node) => {
+        setNodeRef(node);
+        flashRef.current = node;
+      }}
+      data-widget-id={def.id}
+      data-widget-instance-id={instance.instanceId}
+      data-highlighted={flashed ? "" : undefined}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "bg-card relative overflow-clip rounded-2xl border",
+        flashed &&
+          "bg-primary/15 ring-primary/40 ring-2 transition-[background-color,box-shadow] duration-[var(--dur-2)]",
         isDragging && "z-20 opacity-80 shadow-xl",
         isOver &&
           !isDragging &&
@@ -161,19 +185,19 @@ function SortableDashboardWidget({
             type="button"
             {...attributes}
             {...listeners}
-            aria-label={`Move ${widget.title}`}
+            aria-label={`Move ${def.title}`}
             className="text-muted-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg focus-visible:ring-3 focus-visible:outline-none active:cursor-grabbing"
           >
             <GripVerticalIcon className="size-4" aria-hidden />
           </button>
         )}
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{widget.title}</h2>
+        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{def.title}</h2>
         {pinned ? (
           <span className="text-muted-foreground text-xs">Pinned</span>
         ) : (
           <>
             <MoveMenu
-              widget={widget}
+              entry={entry}
               widgets={widgets}
               layout={layout}
               onLayoutChange={onLayoutChange}
@@ -182,8 +206,12 @@ function SortableDashboardWidget({
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label={`Hide ${widget.title}`}
-              onClick={() => onLayoutChange(setWidgetVisible(layout, widget.id, false))}
+              aria-label={`Hide ${def.title}`}
+              onClick={() =>
+                onLayoutChange(
+                  setWidgetVisible(layout, instance.instanceId, false, pinnedId),
+                )
+              }
             >
               <EyeOffIcon aria-hidden />
             </Button>
@@ -191,49 +219,97 @@ function SortableDashboardWidget({
         )}
       </div>
       <div inert className="pointer-events-none select-none">
-        <DashboardWidget def={widget} base={base} editing />
+        <DashboardWidget
+          instanceId={instance.instanceId}
+          size={layout.sizes[instance.instanceId] ?? instance.size}
+          def={def}
+          base={{
+            ...base,
+            instanceSubject: instance.subject,
+            instanceSettings: instance.settings ?? {},
+          }}
+          editing
+        />
       </div>
     </section>
   );
 }
 
 function MoveMenu({
-  widget,
+  entry,
   widgets,
   layout,
   onLayoutChange,
 }: {
-  widget: WidgetDef;
-  widgets: readonly WidgetDef[];
+  entry: DashboardWidgetEntry;
+  widgets: readonly DashboardWidgetEntry[];
   layout: DashboardLayout;
   onLayoutChange: (layout: DashboardLayout) => void;
 }) {
-  const index = widgets.findIndex((candidate) => candidate.id === widget.id);
-  const first = widgets.find((candidate) => candidate.id !== PINNED_WIDGET_ID);
+  const { def, instance } = entry;
+  const index = widgets.findIndex(
+    (candidate) => candidate.instance.instanceId === instance.instanceId,
+  );
+  const first = widgets.find(
+    (candidate) => candidate.instance.widgetType !== PINNED_WIDGET_ID,
+  );
   const previous = index > 1 ? widgets[index - 1] : null;
   const next = index >= 0 && index < widgets.length - 1 ? widgets[index + 1] : null;
   const last = widgets.at(-1);
-  const moveOver = (target: WidgetDef | undefined | null) => {
+  const pinnedId = widgets.find(
+    (candidate) => candidate.instance.widgetType === PINNED_WIDGET_ID,
+  )?.instance.instanceId;
+  const moveOver = (target: DashboardWidgetEntry | undefined | null) => {
     if (target) {
-      onLayoutChange(reorderDashboardLayout(layout, widget.id, target.id));
+      onLayoutChange(
+        reorderDashboardLayout(
+          layout,
+          instance.instanceId,
+          target.instance.instanceId,
+          pinnedId,
+        ),
+      );
     }
   };
 
   return (
-    <RowActions label={`Move ${widget.title} without dragging`} className="opacity-100">
-      <DropdownMenuLabel>Move {widget.title}</DropdownMenuLabel>
+    <RowActions label={`Configure ${def.title}`} className="opacity-100">
+      <DropdownMenuLabel>Size</DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={layout.sizes[instance.instanceId] ?? instance.size}
+        onValueChange={(size) =>
+          onLayoutChange(
+            setWidgetSize(
+              layout,
+              instance.instanceId,
+              size === "compact" ? "compact" : "expanded",
+              pinnedId,
+            ),
+          )
+        }
+      >
+        <DropdownMenuRadioItem
+          value="compact"
+          disabled={!def.renderCompact && !def.compactComponent}
+        >
+          Compact
+        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="expanded">Expanded</DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>Move {def.title}</DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem disabled={index <= 1} onSelect={() => moveOver(first)}>
         To top
       </DropdownMenuItem>
       <DropdownMenuItem disabled={!previous} onSelect={() => moveOver(previous)}>
-        {previous ? `Before ${previous.title}` : "Before previous"}
+        {previous ? `Before ${previous.def.title}` : "Before previous"}
       </DropdownMenuItem>
       <DropdownMenuItem disabled={!next} onSelect={() => moveOver(next)}>
-        {next ? `After ${next.title}` : "After next"}
+        {next ? `After ${next.def.title}` : "After next"}
       </DropdownMenuItem>
       <DropdownMenuItem
-        disabled={!last || last.id === widget.id}
+        disabled={!last || last.instance.instanceId === instance.instanceId}
         onSelect={() => moveOver(last)}
       >
         To bottom

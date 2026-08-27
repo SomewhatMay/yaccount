@@ -1,17 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { LayoutDashboardIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   budgetTargetsAtom,
   categoriesAtom,
   containersAtom,
+  dispatchManyAtom,
+  flashRowAtom,
   goalsAtom,
   readyAtom,
   recurringRulesAtom,
   snapshotsAtom,
+  settingsAtom,
   transactionsAtom,
 } from "@/features/store";
 import {
@@ -20,28 +23,42 @@ import {
   type DateRange,
   type ReportingPeriod,
 } from "@/core/engine";
+import { newId } from "@/core/model";
 import { todayIso } from "@/features/clock";
 import { FigureSkeleton, ListSkeleton, PageHeader } from "@/features/ui";
 import { PeriodPicker } from "./PeriodPicker";
 import { useComparePref, usePeriodPref } from "./period-pref";
-import { DASHBOARD_WIDGETS, type WidgetContext, type WidgetDef } from "./registry";
+import { DASHBOARD_WIDGETS, rangeText, type WidgetContext } from "./registry";
 import { DashboardEditor } from "./DashboardEditor";
+import { DashboardSetBar } from "./DashboardSets";
 import { DashboardWidget } from "./WidgetShell";
 import { WidgetGallerySheet } from "./WidgetGallerySheet";
-import { setWidgetVisible, type DashboardLayout } from "./dashboard-layout";
-import { useDashboardLayout } from "./use-dashboard-layout";
+import {
+  addDashboardWidgetInstance,
+  applyDashboardLayout,
+  curatedOverviewWidgets,
+  dashboardWidgetEntries,
+  layoutFromDashboard,
+  resetDashboardLayout,
+  setWidgetVisible,
+  setWidgetSize,
+  type DashboardDefinition,
+  type DashboardWidgetEntry,
+} from "./dashboard-layout";
+import { useDashboardSets } from "./use-dashboard-layout";
+import { createDashboardAggregates } from "./dashboard-aggregates";
 
 /** The window the dashboard opens on when nothing has been chosen yet. */
 const DEFAULT_PERIOD: ReportingPeriod = { kind: "preset", preset: "last-3-months" };
-const PERIOD_KEY = "yaccount.dashboard.period";
-const COMPARE_KEY = "yaccount.dashboard.compare";
+const PERIOD_KEY_PREFIX = "yaccount.dashboard.period";
+const COMPARE_KEY_PREFIX = "yaccount.dashboard.compare";
 
 /**
  * The dashboard (§6). It owns browser-local reporting windows, the synced layout,
  * and the data every widget reads.
  */
 export function DashboardView() {
-  const [draftLayout, setDraftLayout] = useState<DashboardLayout | null>(null);
+  const [draftDashboard, setDraftDashboard] = useState<DashboardDefinition | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
   const ready = useAtomValue(readyAtom);
@@ -52,74 +69,166 @@ export function DashboardView() {
   const snapshots = useAtomValue(snapshotsAtom);
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
-
-  // Reporting windows are browser-local display preferences.
-  const [period, setPeriod] = usePeriodPref(PERIOD_KEY, DEFAULT_PERIOD);
-  const [comparePeriod, setComparePeriod] = useComparePref(COMPARE_KEY);
-  const [layout, saveLayout] = useDashboardLayout();
-  const activeLayout = draftLayout ?? layout;
-  const visibleWidgets = useMemo(() => {
-    const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
-    return activeLayout.order.flatMap((id) => {
-      const widget = byId.get(id);
-      return widget && !activeLayout.hidden.includes(id) ? [widget] : [];
-    });
-  }, [activeLayout]);
-  const hiddenWidgets = useMemo(() => {
-    const byId = new Map(DASHBOARD_WIDGETS.map((widget) => [widget.id, widget]));
-    return activeLayout.order.flatMap((id) => {
-      const widget = byId.get(id);
-      return widget && activeLayout.hidden.includes(id) ? [widget] : [];
-    });
-  }, [activeLayout]);
-
+  const settings = useAtomValue(settingsAtom);
+  const dispatchOps = useSetAtom(dispatchManyAtom);
+  const flashRow = useSetAtom(flashRowAtom);
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
+  const data = useMemo(() => {
+    const reportTransactions = statsTransactions(transactions, categories);
+    return {
+      today,
+      categories,
+      containers,
+      ledgerTransactions: transactions,
+      reportTransactions,
+      budgetTargets,
+      snapshots,
+      recurringRules,
+      goals,
+      syncedSettings: settings,
+      dispatchOps,
+      aggregates: createDashboardAggregates({
+        budgetTargets,
+        categories,
+        containers,
+        ledgerTransactions: transactions,
+        reportTransactions,
+        recurringRules,
+        snapshots,
+        goals,
+      }),
+    };
+  }, [
+    today,
+    categories,
+    containers,
+    transactions,
+    budgetTargets,
+    snapshots,
+    recurringRules,
+    goals,
+    settings,
+    dispatchOps,
+  ]);
+  const overviewCuration = useMemo(() => {
+    const hasExpenseBudget = data.aggregates.budgetTriage(today).rows.length > 0;
+    const hasActiveGoal = data.aggregates.goalOutlook(today).rows.length > 0;
+    const landing = data.aggregates.monthLanding(today);
+    const incomeCategoryIds = new Set(
+      categories
+        .filter((category) => category.type === "income" && !category.is_archived)
+        .map((category) => category.id),
+    );
+    return curatedOverviewWidgets({
+      hasExpenseBudget,
+      hasRecurringSchedule: recurringRules.some((rule) => rule.status === "active"),
+      hasScheduledIncome: recurringRules.some(
+        (rule) =>
+          rule.status === "active" &&
+          rule.template_category_id !== null &&
+          incomeCategoryIds.has(rule.template_category_id) &&
+          (rule.template_amount ?? 0) > 0,
+      ),
+      hasActiveGoal,
+      hasLandingHistory: landing.history.length >= 2,
+      hasLandingSignal:
+        landing.scheduledItems.length > 0 ||
+        landing.unknownItems.length > 0 ||
+        landing.history.some((item) => item.flexibleSpending !== 0),
+    });
+  }, [categories, data.aggregates, recurringRules, today]);
+
+  const dashboardSets = useDashboardSets(overviewCuration);
+  const activeDashboardId = dashboardSets.activeDashboard.id;
+  // Reporting windows are browser-local and independent for every dashboard.
+  const [period, setPeriod] = usePeriodPref(
+    `${PERIOD_KEY_PREFIX}.${activeDashboardId}`,
+    DEFAULT_PERIOD,
+  );
+  const [comparePeriod, setComparePeriod] = useComparePref(
+    `${COMPARE_KEY_PREFIX}.${activeDashboardId}`,
+  );
+  const activeDashboard = draftDashboard ?? dashboardSets.activeDashboard;
+  const activeLayout = draftDashboard
+    ? layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS)
+    : dashboardSets.layout;
+  const widgetEntries = useMemo(
+    () => dashboardWidgetEntries(activeDashboard, activeLayout, DASHBOARD_WIDGETS),
+    [activeDashboard, activeLayout],
+  );
+  const visibleWidgets = useMemo(
+    () =>
+      widgetEntries.filter(
+        ({ instance }) => !activeLayout.hidden.includes(instance.instanceId),
+      ),
+    [activeLayout.hidden, widgetEntries],
+  );
   const primaryRange = useMemo(() => resolvePeriod(period, today), [period, today]);
   const compareRange = useMemo(
     () => (comparePeriod ? resolvePeriod(comparePeriod, today) : null),
     [comparePeriod, today],
   );
 
-  const data = useMemo(
-    () => ({
-      today,
-      categories,
-      containers,
-      transactions: statsTransactions(transactions, categories),
-      budgetTargets,
-      snapshots,
-      recurringRules,
-      goals,
-    }),
-    [
-      today,
-      categories,
-      containers,
-      transactions,
-      budgetTargets,
-      snapshots,
-      recurringRules,
-      goals,
-    ],
-  );
-
   function beginEditing() {
-    setDraftLayout({ order: [...layout.order], hidden: [...layout.hidden] });
+    setDraftDashboard({
+      ...dashboardSets.activeDashboard,
+      instances: dashboardSets.activeDashboard.instances.map((instance) => ({
+        ...instance,
+        ...(instance.subject ? { subject: { ...instance.subject } } : {}),
+        ...(instance.settings ? { settings: { ...instance.settings } } : {}),
+      })),
+    });
+  }
+
+  function saveInstanceSettings(
+    instanceId: string,
+    settings: Record<string, unknown>,
+  ): Promise<void> {
+    return dashboardSets.saveDashboard({
+      ...dashboardSets.activeDashboard,
+      instances: dashboardSets.activeDashboard.instances.map((instance) =>
+        instance.instanceId === instanceId ? { ...instance, settings } : instance,
+      ),
+    });
+  }
+
+  function saveInstanceSubject(
+    instanceId: string,
+    subject: { type: string; id: string },
+  ): Promise<void> {
+    return dashboardSets.saveDashboard({
+      ...dashboardSets.activeDashboard,
+      instances: dashboardSets.activeDashboard.instances.map((instance) =>
+        instance.instanceId === instanceId ? { ...instance, subject } : instance,
+      ),
+    });
+  }
+
+  function saveInstanceSize(
+    instanceId: string,
+    size: "compact" | "expanded",
+  ): Promise<void> {
+    const pinnedId = dashboardSets.activeDashboard.instances.find(
+      (instance) => instance.widgetType === "balance",
+    )?.instanceId;
+    return dashboardSets.saveLayout(
+      setWidgetSize(dashboardSets.layout, instanceId, size, pinnedId),
+    );
   }
 
   function cancelEditing() {
     setGalleryOpen(false);
-    setDraftLayout(null);
+    setDraftDashboard(null);
   }
 
   async function finishEditing() {
-    if (!draftLayout) return;
+    if (!draftDashboard) return;
     setSavingLayout(true);
     try {
-      await saveLayout(draftLayout);
+      await dashboardSets.saveDashboard(draftDashboard);
       setGalleryOpen(false);
-      setDraftLayout(null);
+      setDraftDashboard(null);
     } catch {
       // `dispatchAtom` reports the write failure; keep the draft available to retry.
     } finally {
@@ -131,10 +240,10 @@ export function DashboardView() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Dashboard"
-        title={draftLayout ? "Arrange your dashboard" : "How the money moved"}
+        title={draftDashboard ? "Arrange your dashboard" : "How the money moved"}
         action={
           ready ? (
-            draftLayout ? (
+            draftDashboard ? (
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -179,35 +288,101 @@ export function DashboardView() {
         }
       />
 
+      {ready && !draftDashboard && (
+        <DashboardSetBar
+          dashboards={dashboardSets.dashboards}
+          activeId={dashboardSets.activeDashboard.id}
+          defaultId={dashboardSets.defaultDashboardId}
+          onSelect={dashboardSets.setActiveDashboard}
+          onCreate={dashboardSets.createDashboard}
+          onRename={dashboardSets.renameDashboard}
+          onDuplicate={dashboardSets.duplicateDashboard}
+          onReorder={dashboardSets.reorderDashboard}
+          onMakeDefault={dashboardSets.makeDefault}
+          onDelete={dashboardSets.deleteDashboard}
+        />
+      )}
+
       {!ready ? (
         <>
           <FigureSkeleton />
           <ListSkeleton rows={4} />
         </>
-      ) : draftLayout ? (
+      ) : draftDashboard ? (
         <DashboardEditor
           base={{ ...data, range: primaryRange }}
           widgets={visibleWidgets}
-          layout={draftLayout}
-          onLayoutChange={setDraftLayout}
+          layout={activeLayout}
+          resetLayout={resetDashboardLayout(
+            draftDashboard,
+            DASHBOARD_WIDGETS,
+            overviewCuration,
+          )}
+          onLayoutChange={(next) =>
+            setDraftDashboard((current) =>
+              current ? applyDashboardLayout(current, next, DASHBOARD_WIDGETS) : current,
+            )
+          }
           onAddWidgets={() => setGalleryOpen(true)}
         />
       ) : compareRange ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
-          <WidgetColumn range={compareRange} data={data} widgets={visibleWidgets} />
-        </div>
+        <ComparisonWidgets
+          primaryRange={primaryRange}
+          compareRange={compareRange}
+          data={data}
+          widgets={visibleWidgets}
+          onSaveInstanceSettings={saveInstanceSettings}
+          onSaveInstanceSubject={saveInstanceSubject}
+          onSaveInstanceSize={saveInstanceSize}
+        />
       ) : (
-        <WidgetColumn range={primaryRange} data={data} widgets={visibleWidgets} />
+        <WidgetColumn
+          range={primaryRange}
+          data={data}
+          widgets={visibleWidgets}
+          onSaveInstanceSettings={saveInstanceSettings}
+          onSaveInstanceSubject={saveInstanceSubject}
+          onSaveInstanceSize={saveInstanceSize}
+        />
       )}
       <WidgetGallerySheet
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
-        widgets={hiddenWidgets}
-        onAdd={(id) => {
-          setDraftLayout((current) =>
-            current ? setWidgetVisible(current, id, true) : current,
+        definitions={DASHBOARD_WIDGETS}
+        entries={widgetEntries}
+        hiddenInstanceIds={activeLayout.hidden}
+        context={{ ...data, range: primaryRange }}
+        onRestore={(instanceId) => {
+          if (!draftDashboard) return;
+          const layout = layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS);
+          setDraftDashboard(
+            applyDashboardLayout(
+              draftDashboard,
+              setWidgetVisible(
+                layout,
+                instanceId,
+                true,
+                widgetEntries.find(({ instance }) => instance.widgetType === "balance")
+                  ?.instance.instanceId,
+              ),
+              DASHBOARD_WIDGETS,
+            ),
           );
+          setGalleryOpen(false);
+          flashRow({ id: instanceId, scroll: true });
+        }}
+        onCreate={(widgetType, configuration) => {
+          if (!draftDashboard) return;
+          const next = addDashboardWidgetInstance(
+            draftDashboard,
+            widgetType,
+            configuration,
+            newId,
+          );
+          const instanceId = next.instances.at(-1)!.instanceId;
+          setDraftDashboard(next);
+          setGalleryOpen(false);
+          flashRow({ id: instanceId, scroll: true });
         }}
       />
     </div>
@@ -222,17 +397,161 @@ function WidgetColumn({
   range,
   data,
   widgets,
+  onSaveInstanceSettings,
+  onSaveInstanceSubject,
+  onSaveInstanceSize,
 }: {
   range: DateRange;
   data: Omit<WidgetContext, "range">;
-  widgets: readonly WidgetDef[];
+  widgets: readonly DashboardWidgetEntry[];
+  onSaveInstanceSettings: (
+    instanceId: string,
+    settings: Record<string, unknown>,
+  ) => Promise<void>;
+  onSaveInstanceSubject: (
+    instanceId: string,
+    subject: { type: string; id: string },
+  ) => Promise<void>;
+  onSaveInstanceSize: (instanceId: string, size: "compact" | "expanded") => Promise<void>;
 }) {
-  const base: WidgetContext = { ...data, range };
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      {widgets.map(({ instance, def }) => {
+        const base: WidgetContext = {
+          ...data,
+          range,
+          instanceSubject: instance.subject,
+          instanceSettings: instance.settings ?? {},
+          saveInstanceSubject: (subject) =>
+            onSaveInstanceSubject(instance.instanceId, subject),
+          saveInstanceSettings: (settings) =>
+            onSaveInstanceSettings(instance.instanceId, settings),
+        };
+        return (
+          <div
+            key={instance.instanceId}
+            className={instance.size === "expanded" ? "min-w-0 md:col-span-2" : "min-w-0"}
+          >
+            <DashboardWidget
+              instanceId={instance.instanceId}
+              size={instance.size}
+              def={def}
+              base={base}
+              onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ComparisonWidgets({
+  primaryRange,
+  compareRange,
+  data,
+  widgets,
+  onSaveInstanceSettings,
+  onSaveInstanceSubject,
+  onSaveInstanceSize,
+}: {
+  primaryRange: DateRange;
+  compareRange: DateRange;
+  data: Omit<WidgetContext, "range">;
+  widgets: readonly DashboardWidgetEntry[];
+  onSaveInstanceSettings: (
+    instanceId: string,
+    settings: Record<string, unknown>,
+  ) => Promise<void>;
+  onSaveInstanceSubject: (
+    instanceId: string,
+    subject: { type: string; id: string },
+  ) => Promise<void>;
+  onSaveInstanceSize: (instanceId: string, size: "compact" | "expanded") => Promise<void>;
+}) {
   return (
     <div className="space-y-6">
-      {widgets.map((w) => (
-        <DashboardWidget key={w.id} def={w} base={base} />
-      ))}
+      {widgets.map(({ instance, def }) => {
+        const primary: WidgetContext = {
+          ...data,
+          range: primaryRange,
+          instanceSubject: instance.subject,
+          instanceSettings: instance.settings ?? {},
+          saveInstanceSubject: (subject) =>
+            onSaveInstanceSubject(instance.instanceId, subject),
+          saveInstanceSettings: (settings) =>
+            onSaveInstanceSettings(instance.instanceId, settings),
+        };
+        if (def.fixedWindow) {
+          return (
+            <div
+              key={instance.instanceId}
+              className={
+                instance.size === "compact" ? "md:w-[calc(50%-0.75rem)]" : undefined
+              }
+            >
+              <DashboardWidget
+                instanceId={instance.instanceId}
+                size={instance.size}
+                def={def}
+                base={primary}
+                comparisonUnsupported
+                onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+              />
+            </div>
+          );
+        }
+        return (
+          <div key={instance.instanceId} className="grid gap-6 lg:grid-cols-2">
+            <ComparisonCell
+              side="primary"
+              label={rangeText(primaryRange)}
+              instance={instance}
+              def={def}
+              base={primary}
+              onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+            />
+            <ComparisonCell
+              side="compare"
+              label={rangeText(compareRange)}
+              instance={instance}
+              def={def}
+              base={{ ...primary, range: compareRange }}
+              onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+            />
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+function ComparisonCell({
+  side,
+  label,
+  instance,
+  def,
+  base,
+  onSizeChange,
+}: {
+  side: "primary" | "compare";
+  label: string;
+  instance: DashboardWidgetEntry["instance"];
+  def: DashboardWidgetEntry["def"];
+  base: WidgetContext;
+  onSizeChange: (size: "compact" | "expanded") => Promise<void>;
+}) {
+  return (
+    <section className="space-y-2" aria-label={`${def.title}, ${label}`}>
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <DashboardWidget
+        instanceId={instance.instanceId}
+        surfaceId={`${instance.instanceId}-${side}`}
+        size={instance.size}
+        def={def}
+        base={base}
+        onSizeChange={onSizeChange}
+      />
+    </section>
   );
 }

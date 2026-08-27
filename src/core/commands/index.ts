@@ -12,6 +12,7 @@ import {
   makeVoidRow,
   newId,
   SETTING,
+  TransactionSchema,
   type AmountMode,
   type BudgetTarget,
   type Category,
@@ -106,6 +107,23 @@ export function createTransaction(
 /** Edit: the caller passes the whole edited row (entity-LWW). */
 export function updateTransaction(row: Transaction, m?: OpMeta): Op {
   return { ...meta(m), type: "transaction.update", payload: { row } };
+}
+
+/** Explicitly associate a real manual row with the schedule occurrence it satisfies. */
+export function linkTransactionToRecurringOccurrence(
+  row: Transaction,
+  ruleId: string,
+  occurrenceDate: string,
+  m?: OpMeta,
+): Op {
+  return updateTransaction(
+    TransactionSchema.parse({
+      ...row,
+      recurring_rule_id: ruleId,
+      recurring_occurrence_date: occurrenceDate,
+    }),
+    m,
+  );
 }
 
 /**

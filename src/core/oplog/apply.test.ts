@@ -247,6 +247,28 @@ describe("applyOp — container, snapshot & setting ops (M3)", () => {
     const rows = await readAll<Setting>(state, STORE.settings);
     expect(rows).toEqual([{ key: SETTING.defaultContainerId, value: "vacation" }]);
   });
+
+  it("replays independent dashboard settings without overwriting siblings", async () => {
+    const dashboardOp = (id: string, value: string, ts: number): Op => ({
+      id: `op-dashboard-${id}-${ts}`,
+      ts: at(ts),
+      type: "setting.set",
+      payload: { row: { key: `dashboard.v2.item.${id}`, value } },
+    });
+    const ops = [
+      dashboardOp("overview", "overview-v1", 5000),
+      dashboardOp("planning", "planning-v1", 6000),
+      dashboardOp("overview", "overview-v2", 7000),
+    ];
+
+    const state = await replay([ops[2], ops[0], ops[1]]);
+    const rows = await readAll<Setting>(state, STORE.settings);
+
+    expect(rows).toEqual([
+      { key: "dashboard.v2.item.overview", value: "overview-v2" },
+      { key: "dashboard.v2.item.planning", value: "planning-v1" },
+    ]);
+  });
 });
 
 describe("applyOp — correcting a reported balance (snapshot.update / .remove)", () => {

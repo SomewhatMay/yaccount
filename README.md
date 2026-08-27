@@ -23,6 +23,7 @@ balance stays visible and first.
 
 **Deferred by explicit decision — do not start without a go-ahead:**
 
+- **[Future-dated transaction handling #35](https://github.com/SomewhatMay/yaccount/issues/35)** — revisit the interim dashboard rule after dashboard widgets.
 - **M10 — Capacitor native packaging** (iOS/Android shell, native OAuth, secure token storage).
 
 ## Stack
