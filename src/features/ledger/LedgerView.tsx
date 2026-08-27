@@ -344,7 +344,7 @@ export function LedgerView() {
     return (
       <div className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton />
-        <FigureSkeleton />
+        <FigureSkeleton className="pt-0 sm:pt-3" />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton />
         </div>
@@ -364,6 +364,7 @@ export function LedgerView() {
         </p>
       </section>
       <Figure
+        className="pt-0 sm:pt-3"
         label="Overall balance"
         cents={balance}
         series={live.length > 0 ? curve : undefined}

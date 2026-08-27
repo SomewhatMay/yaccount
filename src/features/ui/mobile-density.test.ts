@@ -31,3 +31,14 @@ it("tightens only top-level non-dashboard phone stacks", () => {
     expect(read(path), path).toContain('className="space-y-4 sm:space-y-6"');
   }
 });
+
+it("keeps Ledger and Settings title transitions on the compact phone rhythm", () => {
+  const ledger = read("../ledger/LedgerView.tsx");
+  expect(
+    ledger.match(/<Figure(?:Skeleton)?\s+className="pt-0 sm:pt-3"/g),
+  ).toHaveLength(2);
+
+  expect(read("../settings/SettingsView.tsx")).toContain(
+    'className="space-y-4 sm:space-y-8"',
+  );
+});
