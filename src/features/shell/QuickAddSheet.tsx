@@ -7,7 +7,7 @@ import { ArrowRightIcon, XIcon } from "lucide-react";
 import { createTemplate, logTemplate, removeTemplate } from "@/core/commands";
 import { rankShortcutsByUsage } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
-import type { Container, Transaction } from "@/core/model";
+import type { Transaction } from "@/core/model";
 import { todayIso } from "@/features/clock";
 import {
   categoriesAtom,
@@ -23,18 +23,14 @@ import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import { VendorSourceInput } from "@/features/ledger/VendorSourceInput";
+import {
+  CreationEntityCombobox,
+  CreationTextCombobox,
+} from "@/features/ledger/CreationCombobox";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
 import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -233,57 +229,51 @@ function QuickAddForm({
         <FieldLabel>
           {f.kind === "transfer" ? "Label" : f.kind === "income" ? "Source" : "Vendor"}
         </FieldLabel>
-        <VendorSourceInput
-          value={f.vendor}
-          onChange={(e) => f.setVendor(e.target.value)}
-          suggestions={f.kind === "transfer" ? [] : f.vendorSources}
-          placeholder={
-            f.kind === "transfer"
-              ? "Optional"
-              : f.kind === "income"
-                ? "e.g. Employer"
-                : "e.g. Blue Bottle"
-          }
-          aria-label={
-            f.kind === "transfer"
-              ? "Transfer label"
-              : f.kind === "income"
-                ? "Source"
-                : "Vendor"
-          }
-          className="h-9"
-        />
+        {f.kind === "transfer" ? (
+          <Input
+            value={f.vendor}
+            onChange={(e) => f.setVendor(e.target.value)}
+            placeholder="Optional"
+            aria-label="Transfer label"
+            className="h-9"
+          />
+        ) : (
+          <CreationTextCombobox
+            value={f.vendor}
+            onValueChange={f.setVendor}
+            onMatch={f.recallVendor}
+            suggestions={f.vendorSources}
+            placeholder={f.kind === "income" ? "e.g. Employer" : "e.g. Blue Bottle"}
+            aria-label={f.kind === "income" ? "Source" : "Vendor"}
+            className="h-9"
+          />
+        )}
 
         {f.kind !== "transfer" && (
           <>
             <FieldLabel>Category</FieldLabel>
-            <Select value={f.categoryId} onValueChange={f.setCategoryId}>
-              <SelectTrigger aria-label="Category" className="h-9 w-full">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {f.categoriesOfKind.length === 0 && (
-                  <SelectItem value="none" disabled>
-                    No {f.kind} categories yet
-                  </SelectItem>
-                )}
-                {f.categoriesOfKind.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CreationEntityCombobox
+              value={f.categoryId}
+              onValueChange={f.setCategoryId}
+              options={f.categoriesOfKind.map((c) => ({
+                value: c.id,
+                label: c.name,
+                leading: <CategoryGlyph icon={c.icon} color={categoryColor(c)} />,
+              }))}
+              placeholder={`No ${f.kind} categories yet`}
+              aria-label="Category"
+              className="h-9"
+            />
           </>
         )}
 
         <FieldLabel>{f.kind === "transfer" ? "From" : "Container"}</FieldLabel>
-        <ContainerSelect
+        <CreationEntityCombobox
           value={f.containerId}
-          onChange={f.setPickedContainerId}
-          containers={f.activeContainers}
-          label={f.kind === "transfer" ? "From container" : "Container"}
+          onValueChange={f.setPickedContainerId}
+          options={f.activeContainers.map((c) => ({ value: c.id, label: c.name }))}
+          aria-label={f.kind === "transfer" ? "From container" : "Container"}
+          className="h-9"
         />
 
         {f.kind === "transfer" && (
@@ -292,12 +282,15 @@ function QuickAddForm({
               <ArrowRightIcon className="mr-1 inline size-3" aria-hidden />
               To
             </FieldLabel>
-            <ContainerSelect
+            <CreationEntityCombobox
               value={f.toContainerId}
-              onChange={f.setToContainerId}
-              containers={f.activeContainers.filter((c) => c.id !== f.containerId)}
-              label="To container"
+              onValueChange={f.setToContainerId}
+              options={f.activeContainers
+                .filter((c) => c.id !== f.containerId)
+                .map((c) => ({ value: c.id, label: c.name }))}
+              aria-label="To container"
               placeholder="To…"
+              className="h-9"
             />
           </>
         )}
@@ -334,35 +327,6 @@ function QuickAddForm({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-muted-foreground text-sm">{children}</span>;
-}
-
-function ContainerSelect({
-  value,
-  onChange,
-  containers,
-  label,
-  placeholder = "Container",
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  containers: Container[];
-  label: string;
-  placeholder?: string;
-}) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger aria-label={label} className="h-9 w-full">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {containers.map((c) => (
-          <SelectItem key={c.id} value={c.id}>
-            {c.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }
 
 /** A transfer has no direction to print — the arrow carries it (§12.2). */

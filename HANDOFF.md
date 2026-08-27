@@ -8,13 +8,16 @@ repeat them — it says where things stand and what will bite you.
 ## State
 
 - `main` is clean and deployed. Live at <https://somewhatmay.github.io/yaccount/>.
-- M0–M9 and M11 are shipped, plus local diagnostics and eleven post-M11 quality passes: mobile toast placement, ledger
+- M0–M9 and M11 are shipped, plus local diagnostics and twelve post-M11 quality passes: mobile toast placement, ledger
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
-  feedback with fewer toasts, usage-ranked selectors, and starter categories.
-- 127 Vitest files, 1,302 tests passing. Playwright is 96 passes and 10 expected platform
+  feedback with fewer toasts, usage-ranked selectors, starter categories, and creation autocomplete.
+- 129 Vitest files, 1,309 tests passing. Playwright is 99 passes and 11 expected platform
   skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
   issues).
+- **Quick Add and new recurring forms use accessible searchable comboboxes** for vendor/source,
+  category, and containers. Vendor matches stay within kind and recall only the latest category
+  and container; amount/kind stay untouched. Transaction and recurring edit forms remain plain.
 - **Diagnostics survive reloads and financial-DB failures** in a separate `yaccount-diagnostics`
   IndexedDB. Writes batch off-path; retention is 2,000 records/14 days. Copy/download is explicit
   and local-only. Deployed builds carry exact version/SHA/build time; local builds say `local`.
@@ -36,7 +39,7 @@ repeat them — it says where things stand and what will bite you.
 ## Next
 
 Continue the approved sequence in [`next-features-build-plan.md`](next-features-build-plan.md).
-Next: creation-only autocomplete plus iOS keyboard/Search repair, on fresh pulled `main`.
+Next: iOS keyboard/Search repair, on fresh pulled `main`.
 
 **Deferred — do not start without an explicit go-ahead:**
 
