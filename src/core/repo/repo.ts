@@ -1,5 +1,13 @@
 import type { IDBPDatabase, IDBPTransaction } from "idb";
-import { openDb, STORE, ALL_STORES, STATE_STORES, type StoreName } from "./db";
+import {
+  openDb,
+  DB_NAME,
+  DB_VERSION,
+  STORE,
+  ALL_STORES,
+  STATE_STORES,
+  type StoreName,
+} from "./db";
 import {
   applyOp,
   applyInOrder,
@@ -54,6 +62,15 @@ export function withGeneralWallet(ops: Op[]): Op[] {
   return hasWallet ? ops : [seedGeneralOp(), ...ops];
 }
 
+export interface RepoDiagnosticEvent {
+  message: string;
+  facts: Record<string, string | number | boolean>;
+}
+
+type RepoDiagnosticSink = (event: RepoDiagnosticEvent) => void;
+const ignoreDiagnostics: RepoDiagnosticSink = () => {};
+const elapsed = (startedAt: number): number => Math.max(0, Date.now() - startedAt);
+
 /** `Tx` backed by a live IndexedDB transaction — the same reducer runs here. */
 class IdbTx implements Tx {
   constructor(private readonly tx: IDBPTransaction<unknown, StoreName[], "readwrite">) {}
@@ -78,13 +95,41 @@ class IdbTx implements Tx {
  * between the two would desync the log from state.
  */
 export class Repo {
-  private constructor(private readonly db: IDBPDatabase) {}
+  private constructor(
+    private readonly db: IDBPDatabase,
+    private readonly diagnostic: RepoDiagnosticSink,
+  ) {}
 
-  static async open(name?: string): Promise<Repo> {
-    const db = await openDb(name);
-    const repo = new Repo(db);
-    await repo.init();
-    return repo;
+  static async open(
+    name?: string,
+    diagnostic: RepoDiagnosticSink = ignoreDiagnostics,
+  ): Promise<Repo> {
+    const report: RepoDiagnosticSink = (event) => {
+      try {
+        diagnostic(event);
+      } catch {
+        // Diagnostics is optional evidence, never part of database correctness.
+      }
+    };
+    const startedAt = Date.now();
+    const facts = { database: name ?? DB_NAME, schemaVersion: DB_VERSION };
+    report({ message: "database open started", facts });
+    try {
+      const db = await openDb(name);
+      const repo = new Repo(db, report);
+      await repo.init();
+      report({
+        message: "database open succeeded",
+        facts: { ...facts, durationMs: elapsed(startedAt) },
+      });
+      return repo;
+    } catch (error) {
+      report({
+        message: "database open failed",
+        facts: { ...facts, durationMs: elapsed(startedAt) },
+      });
+      throw error;
+    }
   }
 
   close(): void {
@@ -122,6 +167,7 @@ export class Repo {
   private async backfillEnteredAt(): Promise<void> {
     if (await this.db.get(STORE.appMeta, MIGRATION_ENTERED_AT)) return;
 
+    const startedAt = Date.now();
     const tx = this.db.transaction(
       [STORE.oplog, STORE.transactions, STORE.appMeta],
       "readwrite",
@@ -151,6 +197,10 @@ export class Repo {
         value: new Date().toISOString(),
       });
       await tx.done;
+      this.diagnostic({
+        message: "database data migration succeeded",
+        facts: { migration: "entered_at", durationMs: elapsed(startedAt) },
+      });
     } catch (err) {
       try {
         tx.abort();
@@ -158,6 +208,10 @@ export class Repo {
         // already settled
       }
       await tx.done.catch(() => {});
+      this.diagnostic({
+        message: "database data migration failed",
+        facts: { migration: "entered_at", durationMs: elapsed(startedAt) },
+      });
       throw err;
     }
   }
@@ -309,7 +363,7 @@ export class Repo {
    * — it is simply re-seen (and re-skipped) on the next pull until this client
    * ships that op type.
    */
-  async applyRemoteOps(remoteOps: Op[]): Promise<void> {
+  async applyRemoteOps(remoteOps: Op[]): Promise<boolean> {
     // Which pulled ops are genuinely new? A steady-state sync re-sees only ops
     // already journaled, so this is empty and we skip the rebuild entirely — the
     // common tick costs one oplog read, not a full clear+replay. Done OUTSIDE the
@@ -318,7 +372,7 @@ export class Repo {
     // own already-applied op, so deciding "new" here can't miss a remote change.
     const existing = new Set((await this.listOps()).map((o) => o.id));
     const candidates = remoteOps.filter((o) => !existing.has(o.id));
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) return false;
 
     // Drop ops this client can't apply (a newer client's op type), so one
     // futuristic op can't wedge sync. Only the NEW candidates are probed —
@@ -332,8 +386,9 @@ export class Repo {
         // unknown op type from a newer client — skip; re-evaluated next pull
       }
     }
-    if (applicable.length === 0) return;
+    if (applicable.length === 0) return false;
 
+    const startedAt = Date.now();
     const tx = this.db.transaction(ALL_STORES, "readwrite");
     try {
       const oplog = tx.objectStore(STORE.oplog);
@@ -348,6 +403,16 @@ export class Repo {
       for (const store of STATE_STORES) await tx.objectStore(store).clear();
       await applyInOrder(itx, all);
       await tx.done;
+      this.diagnostic({
+        message: "database rebuild succeeded",
+        facts: {
+          received: remoteOps.length,
+          applied: applicable.length,
+          journal: all.length,
+          durationMs: elapsed(startedAt),
+        },
+      });
+      return true;
     } catch (err) {
       try {
         tx.abort();
@@ -355,6 +420,14 @@ export class Repo {
         // already settled
       }
       await tx.done.catch(() => {});
+      this.diagnostic({
+        message: "database rebuild failed",
+        facts: {
+          received: remoteOps.length,
+          applied: applicable.length,
+          durationMs: elapsed(startedAt),
+        },
+      });
       throw err;
     }
   }

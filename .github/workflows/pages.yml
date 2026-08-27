@@ -48,6 +48,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Stamp build identity
+        run: |
+          echo "NEXT_PUBLIC_YACCOUNT_VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_YACCOUNT_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_YACCOUNT_REPOSITORY_URL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_YACCOUNT_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
       - name: Build static export
         run: npm run build
 

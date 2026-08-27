@@ -49,6 +49,15 @@ export function redact(text: string): string {
   return out;
 }
 
+/** Redact a whole record before it reaches any memory or persistent queue. */
+export function redactRecord(record: LogRecord): LogRecord {
+  return {
+    ...record,
+    message: redact(record.message),
+    detail: record.detail === undefined ? undefined : redact(record.detail),
+  };
+}
+
 const PAD: Record<LogLevel, string> = {
   trace: "TRACE",
   debug: "DEBUG",
@@ -67,11 +76,7 @@ export class LogBuffer {
 
   /** Append one record, redacted, evicting the oldest once full. */
   push(record: LogRecord): void {
-    this.records_.push({
-      ...record,
-      message: redact(record.message),
-      detail: record.detail === undefined ? undefined : redact(record.detail),
-    });
+    this.records_.push(redactRecord(record));
     if (this.records_.length > this.capacity) {
       this.records_.splice(0, this.records_.length - this.capacity);
     }
@@ -88,14 +93,19 @@ export class LogBuffer {
 
   /** Oldest first, one record per line, ready to paste into an issue. */
   toText(): string {
-    if (this.records_.length === 0) return "(no log records yet)";
-    return this.records_
-      .map((r) => {
-        const head = `${r.at}  ${PAD[r.level]}  [${r.scope}]  ${r.message}`;
-        return r.detail ? `${head}\n${indent(r.detail)}` : head;
-      })
-      .join("\n");
+    return logRecordsToText(this.records_);
   }
+}
+
+/** Oldest first, one record per line, ready to paste into an issue. */
+export function logRecordsToText(records: LogRecord[]): string {
+  if (records.length === 0) return "(no log records yet)";
+  return records
+    .map((r) => {
+      const head = `${r.at}  ${PAD[r.level]}  [${r.scope}]  ${r.message}`;
+      return r.detail ? `${head}\n${indent(r.detail)}` : head;
+    })
+    .join("\n");
 }
 
 function indent(text: string): string {

@@ -62,9 +62,11 @@ describe("Checkpointer — two-client convergence (§8.4/§8.5)", () => {
 
     await a.dispatch(createCat("c1", "Groceries", 1000));
     await syncA(); // push A's op to ledger_<A>.json
-    await syncB(); // B pulls it
+    const pulled = await syncB(); // B pulls it
 
     expect((await catsById(b))["c1"]?.name).toBe("Groceries");
+    expect(pulled.rebuilt).toBe(true);
+    expect((await syncB()).rebuilt).toBe(false);
   });
 
   it("concurrent creates on both devices merge to the union", async () => {

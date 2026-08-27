@@ -299,7 +299,7 @@ Status: approved 2026-08-27. Implementation authorized through the overnight loo
 
 - iOS keyboard architecture after fresh research/repro?
 - Paging architecture after 10+ approach ADR?
-- Persistent logging design after research?
+- Persistent logging: separate IndexedDB, short timer batches, age/count pruning, memory fallback.
 - Final density values after hand test?
 
 ## Implementation sequence

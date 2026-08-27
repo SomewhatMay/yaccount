@@ -2,15 +2,11 @@
 
 import { useEffect } from "react";
 import { useSetAtom } from "jotai";
-import { toast } from "sonner";
 import { bootstrapAtom, syncAtom } from "@/features/store";
-import { isHandled } from "@/lib/errors";
 import { createLogger } from "@/lib/logger";
+import { reportUnhandledError } from "@/lib/unhandled-error";
 
 const SYNC_INTERVAL_MS = 45_000;
-/** One toast per burst — a render loop can throw hundreds of times a second. */
-const TOAST_THROTTLE_MS = 4_000;
-
 const log = createLogger("app");
 
 /**
@@ -39,15 +35,7 @@ export function RepoBootstrap({ children }: { children: React.ReactNode }) {
   // Errors already reported at their own seam (a failed dispatch) are marked
   // handled and skipped here — one mistake, one message.
   useEffect(() => {
-    let lastToastAt = 0;
-    const report = (err: unknown, kind: string) => {
-      if (isHandled(err)) return;
-      const summary = log.capture(kind, err);
-      const now = Date.now();
-      if (now - lastToastAt < TOAST_THROTTLE_MS) return; // a render loop must not spam
-      lastToastAt = now;
-      toast.error("Something went wrong.", { description: summary });
-    };
+    const report = (err: unknown, kind: string) => reportUnhandledError(log, err, kind);
     const onError = (e: ErrorEvent) => report(e.error ?? e.message, "uncaught error");
     const onRejection = (e: PromiseRejectionEvent) =>
       report(e.reason, "unhandled promise rejection");

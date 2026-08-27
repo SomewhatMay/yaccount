@@ -5,7 +5,11 @@ import { usePathname } from "next/navigation";
 import { useAtomValue } from "jotai";
 import { AlertTriangleIcon, RotateCcwIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ErrorBoundary, CopyButton } from "@/features/ErrorBoundary";
+import {
+  ErrorBoundary,
+  CopyButton,
+  DownloadDiagnosticsButton,
+} from "@/features/ErrorBoundary";
 import { bootErrorAtom } from "@/features/store";
 import { Button } from "@/components/ui/button";
 import { BottomTabBar } from "@/features/shell/BottomTabBar";
@@ -18,6 +22,9 @@ import { SyncErrorBanner } from "@/features/SyncErrorBanner";
 import { TopBar } from "@/features/shell/TopBar";
 import { ReportedBalanceSheet } from "@/features/containers/ReportedBalanceSheet";
 import { CravingWinSheet } from "@/features/cravings/CravingWinSheet";
+import { BUILD_INFO, buildInfoFacts } from "@/lib/build-info";
+import { collectDiagnostics } from "@/lib/diagnostics-export";
+import { DB_NAME, DB_VERSION } from "@/core/repo/db";
 
 /**
  * The chrome around every screen, and the two whole-app failure states.
@@ -89,7 +96,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
  * no ledger to read, so the screen has to explain the likely cause rather than
  * leave every view spinning on "Loading…" the way it used to.
  */
-function BootFailure({ detail }: { detail: string }) {
+export function BootFailure({ detail }: { detail: string }) {
+  const facts = () => ({
+    ...buildInfoFacts(BUILD_INFO),
+    database: `${DB_NAME} v${DB_VERSION}`,
+    "boot error": detail,
+  });
   return (
     <div
       role="alert"
@@ -109,8 +121,14 @@ function BootFailure({ detail }: { detail: string }) {
             means private browsing, a browser setting that blocks site storage, or another
             tab running a different version of the app.
           </p>
-          <p className="text-muted-foreground/80 mt-3 font-mono text-xs break-words">
-            {detail}
+          <details className="text-muted-foreground mt-3 text-xs">
+            <summary className="w-fit cursor-pointer select-none">Details</summary>
+            <pre className="text-muted-foreground/80 mt-2 max-h-24 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap">
+              {detail}
+            </pre>
+          </details>
+          <p className="text-muted-foreground mt-3 text-xs">
+            Build {BUILD_INFO.version} · {BUILD_INFO.shortSha}
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <Button
@@ -121,7 +139,11 @@ function BootFailure({ detail }: { detail: string }) {
               <RotateCcwIcon className="size-3.5" />
               Try again
             </Button>
-            <CopyButton text={detail} />
+            <CopyButton
+              text={() => collectDiagnostics(facts())}
+              label="Copy diagnostics"
+            />
+            <DownloadDiagnosticsButton text={() => collectDiagnostics(facts())} />
           </div>
         </div>
       </div>

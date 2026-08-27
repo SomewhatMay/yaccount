@@ -48,7 +48,7 @@ export interface SyncDeps {
   /** This device's full local journal (== the global known op set after a merge). */
   listOps: () => Promise<Op[]>;
   /** Merge remote ops into local state under the total order (§8.5, repo). */
-  applyRemoteOps: (ops: Op[]) => Promise<void>;
+  applyRemoteOps: (ops: Op[]) => Promise<void | boolean>;
   /** Locally-authored ops not yet flushed to this device's ledger. */
   getOutboxOps: () => Promise<Op[]>;
   /** Drop flushed op-ids from the outbox after a successful ledger append. */
@@ -64,6 +64,8 @@ export interface SyncDeps {
 export interface SyncResult {
   pushed: number;
   collapsed: boolean;
+  /** Whether this cycle replayed local state after receiving new remote ops. */
+  rebuilt: boolean;
   /** Set only on the cycle where this device adopted a reset made elsewhere. */
   adopted?: {
     resetId: string;
@@ -192,7 +194,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   const [snapshotOps, ledgerOps] = await Promise.all([readSnapshot(fs), readLedgers(fs)]);
 
   // 2 — MERGE into local state (idempotent, LWW under the total order).
-  await applyRemoteOps([...snapshotOps, ...ledgerOps]);
+  const rebuilt = (await applyRemoteOps([...snapshotOps, ...ledgerOps])) === true;
 
   // 3 — PUSH: append this device's queued ops to its own ledger, then clear them.
   const outbox = await getOutboxOps();
@@ -216,7 +218,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncResult> {
   // 5 — TRUNCATE this device's ledger to ops not already in the snapshot.
   await truncateOwnLedger(fs, deviceId, foldedIds);
 
-  return { pushed: outbox.length, collapsed, adopted };
+  return { pushed: outbox.length, collapsed, rebuilt, adopted };
 }
 
 /**
