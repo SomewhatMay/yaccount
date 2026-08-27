@@ -24,6 +24,27 @@ beforeEach(() => {
 });
 
 describe("Repo — first-init seeding (§5.2)", () => {
+  it("reports database open and one-shot migration outcomes without row content", async () => {
+    const events: { message: string; facts: Record<string, unknown> }[] = [];
+    const repo = await Repo.open("diagnostic-open", (event) => events.push(event));
+
+    expect(events.map((event) => event.message)).toEqual([
+      "database open started",
+      "database data migration succeeded",
+      "database open succeeded",
+    ]);
+    expect(JSON.stringify(events)).not.toMatch(/vendor_source|amount|category|container/);
+    repo.close();
+  });
+
+  it("does not let a diagnostics callback block database open", async () => {
+    const repo = await Repo.open("diagnostic-failure", () => {
+      throw new Error("diagnostics unavailable");
+    });
+    expect(await repo.getDeviceId()).toBeTruthy();
+    repo.close();
+  });
+
   it("auto-creates the 'general' wallet, opted into overall balance", async () => {
     const repo = await Repo.open();
     const general = await repo.get<Container>(STORE.containers, GENERAL_CONTAINER_ID);

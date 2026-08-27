@@ -37,13 +37,20 @@ beforeEach(() => {
 
 describe("Repo.applyRemoteOps — merge under the total order (§8.5, impl §10 #33)", () => {
   it("merges genuinely-new remote ops; live state == replay(listOps())", async () => {
-    const repo = await Repo.open();
+    const events: { message: string; facts: Record<string, unknown> }[] = [];
+    const repo = await Repo.open(undefined, (event) => events.push(event));
     await repo.dispatch(createCat("c1", "Groceries", 1000));
 
-    await repo.applyRemoteOps([
+    const didRebuild = await repo.applyRemoteOps([
       createCat("c2", "Rent", 2000),
       updateCat("c1", "Food", 3000),
     ]);
+    expect(didRebuild).toBe(true);
+    expect(events.at(-1)).toMatchObject({
+      message: "database rebuild succeeded",
+      facts: { received: 2, applied: 2 },
+    });
+    expect(JSON.stringify(events.at(-1))).not.toMatch(/Groceries|Rent|Food/);
 
     const c1 = await repo.get<Category>(STORE.categories, "c1");
     const c2 = await repo.get<Category>(STORE.categories, "c2");
@@ -61,9 +68,9 @@ describe("Repo.applyRemoteOps — merge under the total order (§8.5, impl §10 
   it("re-applying the same remote ops is idempotent (dedupe by id, §8.2)", async () => {
     const repo = await Repo.open();
     const ops = [createCat("c1", "Groceries", 1000)];
-    await repo.applyRemoteOps(ops);
+    expect(await repo.applyRemoteOps(ops)).toBe(true);
     const before = (await repo.listOps()).length;
-    await repo.applyRemoteOps(ops);
+    expect(await repo.applyRemoteOps(ops)).toBe(false);
     expect((await repo.listOps()).length).toBe(before);
   });
 

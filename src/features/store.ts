@@ -1,6 +1,6 @@
 import { atom, type Setter } from "jotai";
 import { Repo, withGeneralWallet } from "@/core/repo";
-import { STORE } from "@/core/repo/db";
+import { DB_VERSION, STORE } from "@/core/repo/db";
 import {
   GENERAL_CONTAINER_ID,
   SETTING,
@@ -40,6 +40,8 @@ import { requiredMonthly } from "@/core/engine/goals";
 import { pendingRows } from "@/core/engine/ledger";
 import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands";
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
+import { BUILD_INFO } from "@/lib/build-info";
+import { operationLogFacts } from "@/lib/strategic-logging";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -149,7 +151,9 @@ export const flashRowAtom = atom(
 
 let repoPromise: Promise<Repo> | null = null;
 function getRepo(): Promise<Repo> {
-  if (!repoPromise) repoPromise = Repo.open();
+  if (!repoPromise) {
+    repoPromise = Repo.open(undefined, (event) => log.info(event.message, event.facts));
+  }
   return repoPromise;
 }
 
@@ -194,11 +198,15 @@ export const refreshAtom = atom(null, async (_get, set) => {
  * quiet about an error the user has already been shown.
  */
 export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
+  const startedAt = Date.now();
+  const facts = operationLogFacts([op]);
+  log.info("write started", facts);
   try {
     const repo = await getRepo();
     await repo.dispatch(op);
     await set(refreshAtom);
     scheduleSync(set);
+    log.info("write succeeded", { ...facts, durationMs: Date.now() - startedAt });
   } catch (err) {
     const summary = log.capture(`dispatch ${op.type} failed`, err);
     toast.error("Couldn't save that change.", { description: summary });
@@ -208,11 +216,15 @@ export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
 
 /** Commit a multi-op user intent in one IndexedDB transaction. */
 export const dispatchManyAtom = atom(null, async (_get, set, ops: Op[]) => {
+  const startedAt = Date.now();
+  const facts = operationLogFacts(ops);
+  log.info("write started", facts);
   try {
     const repo = await getRepo();
     await repo.dispatchMany(ops);
     await set(refreshAtom);
     scheduleSync(set);
+    log.info("write succeeded", { ...facts, durationMs: Date.now() - startedAt });
   } catch (err) {
     const summary = log.capture("dispatch batch failed", err);
     toast.error("Couldn't save that change.", { description: summary });
@@ -265,6 +277,7 @@ export const syncAtom = atom(null, async (_get, set) => {
   // triggers (a tab refocus fires both `visibilitychange` and `focus`) can't both
   // slip past into overlapping cycles.
   syncing = true;
+  let startedAt: number | null = null;
   try {
     const auth = getAuthProvider();
     if (!auth.isConnected()) {
@@ -283,6 +296,8 @@ export const syncAtom = atom(null, async (_get, set) => {
     }
 
     set(syncStatusAtom, "syncing");
+    startedAt = Date.now();
+    log.info("sync started");
     const repo = await getRepo();
     const deviceId = await repo.getDeviceId();
     const fs = getDriveFS();
@@ -323,11 +338,23 @@ export const syncAtom = atom(null, async (_get, set) => {
     set(lastSyncedAtAtom, Date.now());
     set(lastSyncErrorAtom, null);
     set(syncStatusAtom, "synced");
+    log.info("sync succeeded", {
+      durationMs: Date.now() - startedAt,
+      pushed: result.pushed,
+      collapsed: result.collapsed,
+      rebuilt: result.rebuilt,
+      adopted: Boolean(result.adopted),
+    });
   } catch (err) {
     // DriveError / offline — stay usable, surface honestly (§8.6). The sync seam
     // knows drivestore's error shape, so it writes the user-facing line; the log
     // keeps the full stack for whoever has to diagnose it.
-    log.capture("Drive sync failed", err);
+    log.capture(
+      startedAt === null
+        ? "Drive sync failed"
+        : `Drive sync failed after ${Date.now() - startedAt}ms`,
+      err,
+    );
     set(lastSyncErrorAtom, describeSyncError(err));
     set(syncStatusAtom, "error");
   } finally {
@@ -398,10 +425,13 @@ export const exportDataAtom = atom(null, async (): Promise<DataFile> => {
  * long-standing "work offline, then connect" flow.
  */
 async function installWorld(set: Setter, ops: Op[], kind: ResetKind): Promise<void> {
+  const startedAt = Date.now();
   const repo = await getRepo();
   const world = withGeneralWallet(ops);
   const auth = getAuthProvider();
   const connected = auth.isConnected();
+  const facts = { kind, ...operationLogFacts(world), drive: connected };
+  log.info("data replacement started", facts);
 
   const meta: { key: string; value: unknown }[] = [];
   if (connected) {
@@ -427,6 +457,10 @@ async function installWorld(set: Setter, ops: Op[], kind: ResetKind): Promise<vo
     set(syncStatusAtom, "synced");
   }
   set(backupsAtom, null); // the list just gained an entry — reload it on demand
+  log.info("data replacement succeeded", {
+    ...facts,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 /** Stop using everything. Nothing is destroyed: the previous world is retired to
@@ -533,6 +567,12 @@ export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
  * then backfill due recurring occurrences + settle achieved goals in the
  * background (§8.6 instant-open). */
 export const bootstrapAtom = atom(null, async (_get, set) => {
+  const startedAt = Date.now();
+  log.info("app boot started", {
+    version: BUILD_INFO.version,
+    build: BUILD_INFO.shortSha,
+    schemaVersion: DB_VERSION,
+  });
   // Opening the DB and loading it is the ONLY part that can leave the app
   // unusable, so it is the only part that sets bootError.
   try {
@@ -542,7 +582,7 @@ export const bootstrapAtom = atom(null, async (_get, set) => {
     // A set-aside from a previous session must survive a reload — the notice is
     // the only route back to that data, so it persists until acknowledged.
     set(orphanNoteAtom, (await repo.getMeta<OrphanNote>(ORPHAN_META_KEY)) ?? null);
-    log.info("repo ready");
+    log.info("app boot succeeded", { durationMs: Date.now() - startedAt });
   } catch (err) {
     set(bootErrorAtom, log.capture("could not open the local database", err));
     return;

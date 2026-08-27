@@ -5,10 +5,20 @@ import {
   ErrorBoundary as ReactErrorBoundary,
   type FallbackProps,
 } from "react-error-boundary";
-import { AlertTriangleIcon, CheckIcon, CopyIcon, RotateCcwIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  CopyIcon,
+  DownloadIcon,
+  RotateCcwIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { describeError, errorDetail } from "@/lib/errors";
+import { errorDetail } from "@/lib/errors";
 import { createLogger } from "@/lib/logger";
+import {
+  createDiagnosticsFile,
+  triggerDiagnosticsDownload,
+} from "@/lib/diagnostics-export";
 
 const log = createLogger("ui");
 
@@ -65,9 +75,12 @@ export function ErrorCard({
             Nothing was lost — your data is stored on this device. Try again, or copy the
             details if it keeps happening.
           </p>
-          <p className="text-muted-foreground/80 mt-2 font-mono text-xs break-words">
-            {describeError(error)}
-          </p>
+          <details className="text-muted-foreground mt-2 text-xs">
+            <summary className="w-fit cursor-pointer select-none">Details</summary>
+            <pre className="text-muted-foreground/80 mt-2 max-h-24 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap">
+              {errorDetail(error)}
+            </pre>
+          </details>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button
               size="sm"
@@ -93,7 +106,7 @@ export function CopyButton({
   label = "Copy details",
   className,
 }: {
-  text: string | (() => string);
+  text: string | (() => string | Promise<string>);
   label?: string;
   className?: string;
 }) {
@@ -105,7 +118,9 @@ export function CopyButton({
       className={className ?? "rounded-full"}
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(typeof text === "function" ? text() : text);
+          await navigator.clipboard.writeText(
+            typeof text === "function" ? await text() : text,
+          );
           setState("copied");
         } catch (err) {
           // Clipboard needs a secure context and permission; say so rather than
@@ -122,6 +137,37 @@ export function CopyButton({
         <CopyIcon className="size-3.5" />
       )}
       {state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : label}
+    </Button>
+  );
+}
+
+/** Explicit local file export; no network request or automatic reporting. */
+export function DownloadDiagnosticsButton({
+  text,
+  className,
+}: {
+  text: string | (() => string | Promise<string>);
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className={className ?? "rounded-full"}
+      onClick={async () => {
+        try {
+          const value = typeof text === "function" ? await text() : text;
+          triggerDiagnosticsDownload(createDiagnosticsFile(value));
+        } catch (err) {
+          log.capture("diagnostics download failed", err);
+          setFailed(true);
+          setTimeout(() => setFailed(false), 2000);
+        }
+      }}
+    >
+      <DownloadIcon className="size-3.5" />
+      {failed ? "Couldn't download" : "Download diagnostics"}
     </Button>
   );
 }

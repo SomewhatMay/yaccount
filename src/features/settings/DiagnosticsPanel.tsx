@@ -11,35 +11,21 @@ import {
   syncStatusAtom,
   transactionsAtom,
 } from "@/features/store";
-import { CopyButton } from "@/features/ErrorBoundary";
+import { CopyButton, DownloadDiagnosticsButton } from "@/features/ErrorBoundary";
+import { createLogger, withoutBrowserFacts, type LogRecord } from "@/lib/logger";
+import { BUILD_INFO, buildInfoFacts } from "@/lib/build-info";
 import {
-  buildDiagnostics,
-  createLogger,
-  getLogLevel,
-  logBuffer,
-  setLogLevel,
-  SSR_LOG_LEVEL,
-  subscribeLogLevel,
-  withoutBrowserFacts,
-  type LogLevel,
-  type LogRecord,
-} from "@/lib/logger";
+  clearDiagnostics,
+  collectDiagnostics,
+  readDiagnosticsRecords,
+} from "@/lib/diagnostics-export";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/features/ui";
 
 const log = createLogger("ui");
 
-const LEVELS: LogLevel[] = ["trace", "debug", "info", "warn", "error"];
-
-const LEVEL_TONE: Record<LogLevel, string> = {
+const LEVEL_TONE: Record<LogRecord["level"], string> = {
   trace: "text-muted-foreground/70",
   debug: "text-muted-foreground/70",
   info: "text-muted-foreground",
@@ -68,14 +54,11 @@ export function DiagnosticsPanel() {
   const [opCount, setOpCount] = useState<number | null>(null);
   const [outboxCount, setOutboxCount] = useState<number | null>(null);
   const [records, setRecords] = useState<LogRecord[]>([]);
-  // loglevel owns the level and persists it; read it as the external store it is,
-  // so the pre-hydration render uses the documented default instead of guessing.
-  const level = useSyncExternalStore(subscribeLogLevel, getLogLevel, () => SSR_LOG_LEVEL);
   // `navigator` and the time zone exist on the first client render but NOT in
   // the prerendered HTML, so rendering them straight away disagrees with the
   // markup React is hydrating. Read "has this hydrated yet" as the external
-  // fact it is — the same shape as `level` above, and unlike a setState in an
-  // effect it neither cascades renders nor trips `react-hooks/set-state-in-effect`.
+  // fact it is. Unlike a setState in an effect, this neither cascades renders nor
+  // trips `react-hooks/set-state-in-effect`.
   const mounted = useSyncExternalStore(
     subscribeNothing,
     () => true,
@@ -112,10 +95,19 @@ export function DiagnosticsPanel() {
   // with the pre-hydration HTML, and writing state synchronously inside an effect
   // cascades renders.
   useEffect(() => {
-    const tick = () => setRecords(logBuffer.records());
-    const first = setTimeout(tick, 0);
-    const id = setInterval(tick, 1500);
+    let cancelled = false;
+    let reading = false;
+    const tick = async () => {
+      if (reading) return;
+      reading = true;
+      const next = await readDiagnosticsRecords();
+      reading = false;
+      if (!cancelled) setRecords(next);
+    };
+    const first = setTimeout(() => void tick(), 0);
+    const id = setInterval(() => void tick(), 1500);
     return () => {
+      cancelled = true;
       clearTimeout(first);
       clearInterval(id);
     };
@@ -123,7 +115,7 @@ export function DiagnosticsPanel() {
 
   const facts = useCallback(
     () => ({
-      "app version": process.env.NODE_ENV ?? "unknown",
+      ...buildInfoFacts(BUILD_INFO),
       "user agent": typeof navigator === "undefined" ? null : navigator.userAgent,
       language: typeof navigator === "undefined" ? null : navigator.language,
       "time zone": Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -157,11 +149,17 @@ export function DiagnosticsPanel() {
             addresses are stripped out.
           </p>
         </div>
-        <CopyButton
-          text={() => buildDiagnostics(facts())}
-          label="Copy diagnostics"
-          className="rounded-full border"
-        />
+        <div className="flex flex-wrap gap-2">
+          <CopyButton
+            text={() => collectDiagnostics(facts())}
+            label="Copy diagnostics"
+            className="rounded-full border"
+          />
+          <DownloadDiagnosticsButton
+            text={() => collectDiagnostics(facts())}
+            className="rounded-full border"
+          />
+        </div>
       </div>
 
       <dl className="bg-card grid gap-x-6 gap-y-2 rounded-2xl border p-5 text-sm sm:grid-cols-2">
@@ -173,7 +171,20 @@ export function DiagnosticsPanel() {
             <div key={k} className="flex min-w-0 items-baseline justify-between gap-3">
               <dt className="text-muted-foreground shrink-0">{k}</dt>
               <dd className="tnum min-w-0 truncate text-right font-mono text-xs">
-                {v === null || v === "" ? "—" : String(v)}
+                {k === "commit SHA" && BUILD_INFO.commitUrl ? (
+                  <a
+                    href={BUILD_INFO.commitUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    {BUILD_INFO.shortSha}
+                  </a>
+                ) : v === null || v === "" ? (
+                  "—"
+                ) : (
+                  String(v)
+                )}
               </dd>
             </div>
           ),
@@ -189,24 +200,12 @@ export function DiagnosticsPanel() {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Select value={level} onValueChange={(v) => setLogLevel(v as LogLevel)}>
-              <SelectTrigger size="sm" className="rounded-full" aria-label="Log level">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LEVELS.map((l) => (
-                  <SelectItem key={l} value={l}>
-                    {l}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button
               size="sm"
               variant="ghost"
               className="text-muted-foreground rounded-full"
               onClick={() => {
-                logBuffer.clear();
+                void clearDiagnostics();
                 setRecords([]);
               }}
             >

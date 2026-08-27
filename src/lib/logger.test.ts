@@ -3,9 +3,7 @@ import {
   BROWSER_ONLY_FACTS,
   buildDiagnostics,
   createLogger,
-  getLogLevel,
   logBuffer,
-  setLogLevel,
   withoutBrowserFacts,
 } from "./logger";
 
@@ -20,10 +18,32 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  setLogLevel("info");
 });
 
 describe("createLogger — everything logged reaches Diagnostics", () => {
+  it("queues only the redacted record for persistent storage", () => {
+    const enqueue = vi.fn();
+    createLogger("auth", { enqueue }).info(
+      "signed in as private@example.com with ya29.secret-value",
+    );
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    const saved = enqueue.mock.calls[0][0];
+    expect(saved.message).not.toContain("private@example.com");
+    expect(saved.message).not.toContain("ya29.secret-value");
+  });
+
+  it("never lets a synchronous persistence failure escape the logger", () => {
+    const sink = {
+      enqueue: () => {
+        throw new Error("diagnostics queue failed");
+      },
+    };
+    expect(() =>
+      createLogger("store", sink).info("financial write started"),
+    ).not.toThrow();
+    expect(logBuffer.records().at(-1)?.message).toBe("financial write started");
+  });
+
   it("records the message, its level and its scope", () => {
     createLogger("repo").info("opened the database");
     const [rec] = logBuffer.records();
@@ -35,7 +55,6 @@ describe("createLogger — everything logged reaches Diagnostics", () => {
   it("captures debug records even when the console is quiet", () => {
     // loglevel replaces a below-level method with a no-op, so tapping IT would
     // capture nothing here. Diagnostics needs the trail regardless of verbosity.
-    setLogLevel("error");
     createLogger("sync").debug("pulling ledgers");
     expect(logBuffer.records().map((r) => r.message)).toContain("pulling ledgers");
   });
@@ -145,14 +164,5 @@ describe("withoutBrowserFacts — the first render has to match the prerendered 
       "time zone",
       "user agent",
     ]);
-  });
-});
-
-describe("the log level is a real, readable setting", () => {
-  it("round-trips", () => {
-    setLogLevel("warn");
-    expect(getLogLevel()).toBe("warn");
-    setLogLevel("debug");
-    expect(getLogLevel()).toBe("debug");
   });
 });

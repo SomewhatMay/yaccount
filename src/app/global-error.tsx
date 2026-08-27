@@ -1,5 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
+import { BUILD_INFO, buildInfoFacts } from "@/lib/build-info";
+import {
+  collectDiagnostics,
+  createDiagnosticsFile,
+  triggerDiagnosticsDownload,
+} from "@/lib/diagnostics-export";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("app");
+
 /**
  * The last boundary: something failed in the root layout itself, so there is no
  * shell, no theme and no fonts left to rely on. Everything here is deliberately
@@ -24,6 +35,14 @@ export default function GlobalError({
   ]
     .filter(Boolean)
     .join("\n");
+  const facts = () => ({
+    ...buildInfoFacts(BUILD_INFO),
+    "current error": detail,
+  });
+
+  useEffect(() => {
+    log.capture("root failed to render", error);
+  }, [error]);
 
   return (
     <html lang="en">
@@ -58,6 +77,16 @@ export default function GlobalError({
             Your ledger is stored on this device and has not been touched. Reloading
             usually clears this.
           </p>
+          <p style={{ margin: "0.65rem 0 0", fontSize: "0.75rem", color: "#9a95ad" }}>
+            Build {BUILD_INFO.version} ·{" "}
+            {BUILD_INFO.commitUrl ? (
+              <a href={BUILD_INFO.commitUrl} style={{ color: "inherit" }}>
+                {BUILD_INFO.shortSha}
+              </a>
+            ) : (
+              BUILD_INFO.shortSha
+            )}
+          </p>
           <div
             style={{
               display: "flex",
@@ -82,7 +111,11 @@ export default function GlobalError({
               Reload the app
             </button>
             <button
-              onClick={() => void navigator.clipboard?.writeText(detail)}
+              onClick={() =>
+                void collectDiagnostics(facts()).then((text) =>
+                  navigator.clipboard?.writeText(text),
+                )
+              }
               style={{
                 cursor: "pointer",
                 borderRadius: "999px",
@@ -93,26 +126,51 @@ export default function GlobalError({
                 color: "#c3bed3",
               }}
             >
-              Copy details
+              Copy diagnostics
+            </button>
+            <button
+              onClick={() =>
+                void collectDiagnostics(facts()).then((text) =>
+                  triggerDiagnosticsDownload(createDiagnosticsFile(text)),
+                )
+              }
+              style={{
+                cursor: "pointer",
+                borderRadius: "999px",
+                border: "1px solid #37334a",
+                padding: "0.55rem 1.1rem",
+                fontSize: "0.875rem",
+                background: "transparent",
+                color: "#c3bed3",
+              }}
+            >
+              Download diagnostics
             </button>
           </div>
-          <pre
+          <details
             style={{
               marginTop: "1.5rem",
-              maxHeight: "12rem",
-              overflow: "auto",
               padding: "0.9rem",
               borderRadius: "0.75rem",
               background: "#17161f",
               color: "#9a95ad",
               fontSize: "0.72rem",
               lineHeight: 1.5,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
             }}
           >
-            {detail}
-          </pre>
+            <summary style={{ cursor: "pointer" }}>Details</summary>
+            <pre
+              style={{
+                margin: "0.75rem 0 0",
+                maxHeight: "12rem",
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {detail}
+            </pre>
+          </details>
         </main>
       </body>
     </html>
