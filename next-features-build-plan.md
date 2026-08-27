@@ -154,6 +154,9 @@ Status: approved 2026-08-27. Implementation authorized through the overnight loo
 ### Decisions
 
 - Implement true repository paging: unloaded ledger rows are not all read into app memory at boot.
+- Architecture gate accepted in [`ledger-paging-architecture.md`](ledger-paging-architecture.md):
+  additive same-database entry read model, exact compact balance/usage facts, revision-tagged keyset
+  cursors, and progressive exhaustive scans. Canonical ops/materialized rows remain unchanged.
 - UI-only batching over a full `transactionsAtom` is insufficient.
 - Ledger search and filters are exhaustive across the full ledger, never limited to already loaded pages.
 - Exhaustive does not mean blocking on loading/scanning everything before showing results.
@@ -297,9 +300,7 @@ Status: approved 2026-08-27. Implementation authorized through the overnight loo
 
 ## Unresolved questions
 
-- iOS keyboard architecture after fresh research/repro?
-- Paging architecture after 10+ approach ADR?
-- Persistent logging: separate IndexedDB, short timer batches, age/count pruning, memory fallback.
+- Real iOS Safari/Home Screen PWA validation ([#44](https://github.com/SomewhatMay/yaccount/issues/44)).
 - Final density values after hand test?
 
 ## Implementation sequence
@@ -350,12 +351,9 @@ Each behavior PR follows strict TDD: add the failing test, run it and confirm th
 
 ### PR 4 — True-paging architecture decision record; no implementation
 
-1. Spend substantial design time on at least 10 materially distinct architectures.
-2. Write the mandatory comparison and rejection rationale against every concern listed in the architecture gate.
-3. Write canonical-data/read-model invariants, failure analysis, migration/recovery design, and rollout phases.
-4. Include all four sorts, exhaustive progressive filters/search, exact carried balances/reports, usage/recall, void chains, pending/templates, deep links, sync/reset/replay/import/rollback, interrupted migrations, and stale tabs.
-5. Design correctness/performance fixtures and benchmarks, but do not select an implementation hastily.
-6. Review the ADR before behavior tests or production code. Stop if correctness is not demonstrable.
+Accepted in [`ledger-paging-architecture.md`](ledger-paging-architecture.md). It compares fourteen
+architectures and records the selected design, rejected alternatives, invariants, failure analysis,
+migration/recovery, fixtures, benchmarks, and phased gate. No paging code belongs in this PR.
 
 ### PR 5 — True Ledger paging implementation
 

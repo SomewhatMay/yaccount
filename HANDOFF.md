@@ -50,7 +50,9 @@ repeat them — it says where things stand and what will bite you.
 ## Next
 
 Continue the approved sequence in [`next-features-build-plan.md`](next-features-build-plan.md).
-Next: true-paging architecture ADR only, on fresh pulled `main`; no paging code before review.
+Next: true Ledger paging from the accepted
+[`ledger-paging-architecture.md`](ledger-paging-architecture.md), on fresh pulled `main` with strict
+parity/atomicity/performance gates.
 
 **Deferred — do not start without an explicit go-ahead:**
 
