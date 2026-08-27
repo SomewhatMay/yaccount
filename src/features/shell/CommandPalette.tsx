@@ -19,8 +19,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  buildEntrySearchDocs,
   buildSearchIndex,
-  createSession,
+  createProgressiveSearch,
   matchRanges,
   parseQuery,
   type DocKind,
@@ -32,13 +33,14 @@ import {
   commandPaletteAtom,
   containersAtom,
   cravingWinSheetAtom,
-  flashRowAtom,
   goalsAtom,
+  ledgerRevisionAtom,
   quickAddAtom,
   reportedBalanceContainerIdAtom,
   recurringRulesAtom,
+  scanSearchEntries,
   syncAtom,
-  transactionsAtom,
+  templatesAtom,
 } from "@/features/store";
 import { focusHref } from "@/features/focus-link";
 import { buildInvestmentValueActions } from "@/features/shell/command-actions";
@@ -66,10 +68,9 @@ import {
  * everything the app holds.
  *
  * Filtering and ranking are the engine's (`core/engine/search.ts`), not cmdk's
- * (`shouldFilter={false}`): the index is built once per data change, so a
- * keystroke costs a scan of pre-lowercased strings rather than a fresh
- * `toLowerCase` per row — and a `createSession` rescans only what still matched,
- * so the ledger is paid for on the first character and never again.
+ * (`shouldFilter={false}`). Small entities rank immediately; entry projections
+ * join through bounded repository chunks so the palette never retains the full
+ * ledger and never calls an unfinished scan empty.
  */
 
 /** What each kind is called on screen, in the order the groups fall back to. */
@@ -145,15 +146,15 @@ export function CommandPalette() {
   const [open, setOpen] = useAtom(commandPaletteAtom);
   const [query, setQuery] = useState("");
   const router = useRouter();
-  const transactions = useAtomValue(transactionsAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const goals = useAtomValue(goalsAtom);
   const rules = useAtomValue(recurringRulesAtom);
+  const templates = useAtomValue(templatesAtom);
+  const revision = useAtomValue(ledgerRevisionAtom);
   const openQuickAdd = useSetAtom(quickAddAtom);
   const openCravingWin = useSetAtom(cravingWinSheetAtom);
   const reportBalance = useSetAtom(reportedBalanceContainerIdAtom);
-  const flashRow = useSetAtom(flashRowAtom);
   const sync = useSetAtom(syncAtom);
   const [history, setHistory] = useCommandHistory();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -268,25 +269,94 @@ export function CommandPalette() {
   const index = useMemo(
     () =>
       needsIndex
-        ? buildSearchIndex({ transactions, categories, containers, goals, rules, extras })
+        ? buildSearchIndex({
+            transactions: [],
+            categories,
+            containers,
+            goals,
+            rules,
+            extras,
+          })
         : null,
-    [needsIndex, transactions, categories, containers, goals, rules, extras],
+    [needsIndex, categories, containers, goals, rules, extras],
   );
-  const session = useMemo(() => (index ? createSession(index) : null), [index]);
 
-  // Typing stays responsive even when the ledger is large: React renders the
-  // keystroke first and the results a beat later, rather than blocking on them.
   const deferred = useDeferredValue(query);
   const blank = deferred.trim() === "";
   const words = useMemo(() => parseQuery(deferred).words, [deferred]);
-
-  const results = useMemo(() => {
-    if (!session) return [];
-    // Blank is a curated action page below. Engine ranking begins once there is
-    // a query, where destinations and every recorded entity remain searchable.
-    if (blank) return [];
-    return session.search(deferred, { limit: 24, perKind: 5 });
-  }, [session, deferred, blank]);
+  const baseResults = useMemo(
+    () =>
+      index && !blank
+        ? createProgressiveSearch(index, deferred, { limit: 24, perKind: 5 }).results
+        : [],
+    [blank, deferred, index],
+  );
+  const [progress, setProgress] = useState<{
+    query: string;
+    results: SearchResult[];
+    complete: boolean;
+    error: boolean;
+  }>({ query: "", results: [], complete: true, error: false });
+  useEffect(() => {
+    if (!index || blank) return;
+    let active = true;
+    let accumulator = createProgressiveSearch(index, deferred, {
+      limit: 24,
+      perKind: 5,
+    });
+    void (async () => {
+      let cursor: string | null = null;
+      try {
+        while (active) {
+          const chunk = await scanSearchEntries({ candidateLimit: 250, cursor });
+          if (!active) return;
+          if (chunk.staleCursor) {
+            cursor = null;
+            accumulator = createProgressiveSearch(index, deferred, {
+              limit: 24,
+              perKind: 5,
+            });
+            setProgress({
+              query: deferred,
+              results: accumulator.results,
+              complete: false,
+              error: false,
+            });
+            continue;
+          }
+          const results = accumulator.add(
+            buildEntrySearchDocs(chunk.rows, categories, containers),
+          );
+          if (chunk.complete) accumulator.finish();
+          setProgress({
+            query: deferred,
+            results,
+            complete: chunk.complete,
+            error: false,
+          });
+          if (chunk.complete) return;
+          cursor = chunk.cursor;
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        }
+      } catch {
+        if (active) {
+          setProgress((current) =>
+            current.query === deferred
+              ? { ...current, complete: false, error: true }
+              : current,
+          );
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [blank, categories, containers, deferred, index, revision]);
+  const current =
+    progress.query === deferred
+      ? progress
+      : { query: deferred, results: baseResults, complete: false, error: false };
+  const results = current.results;
 
   // Grouped, but ordered by the best hit in each group — so whatever ⏎ would
   // select is always in the first group, wherever it came from.
@@ -312,13 +382,12 @@ export function CommandPalette() {
       if (kind === "transaction") {
         // Land on the register with the row marked and brought into view — a
         // result you can't find is not a result.
-        router.push("/ledger");
-        return flashRow({ id, scroll: true });
+        return router.push(focusHref("/ledger", id));
       }
       if (kind === "template") {
         // A shortcut is not a register row; it lives in Quick Add, so that is
         // where choosing one goes.
-        const t = transactions.find((row) => row.id === id);
+        const t = templates.find((row) => row.id === id);
         return openQuickAdd(
           t?.to_container_id ? "transfer" : (t?.amount ?? 0) >= 0 ? "income" : "expense",
         );
@@ -388,7 +457,7 @@ export function CommandPalette() {
             </>
           ) : (
             <>
-              <CommandEmpty>Nothing matched that.</CommandEmpty>
+              {current.complete && <CommandEmpty>Nothing matched that.</CommandEmpty>}
 
               {groups.map(([kind, rows]) => (
                 <CommandGroup key={kind} heading={HEADING[kind]}>
@@ -419,6 +488,14 @@ export function CommandPalette() {
                   })}
                 </CommandGroup>
               ))}
+              {!current.complete && (
+                <div
+                  role="status"
+                  className="text-muted-foreground px-3 py-2 text-xs"
+                >
+                  {current.error ? "Search incomplete. Edit query to retry." : "Searching…"}
+                </div>
+              )}
             </>
           )}
         </CommandList>

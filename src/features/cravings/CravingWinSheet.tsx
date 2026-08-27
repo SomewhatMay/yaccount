@@ -29,8 +29,8 @@ import {
   flashRowAtom,
   goalsAtom,
   runGoalMaintenanceAtom,
-  transactionsAtom,
 } from "@/features/store";
+import { useLedgerEntriesById } from "@/features/useLedgerEntries";
 import { ResponsiveSheet } from "@/features/ui";
 import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,6 @@ export function CravingWinSheet() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const goals = useAtomValue(goalsAtom);
-  const transactions = useAtomValue(transactionsAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const setSelected = useSetAtom(cravingWinSheetAtom);
   const dispatchMany = useSetAtom(dispatchManyAtom);
@@ -76,6 +75,10 @@ export function CravingWinSheet() {
       ? (wins.find((win) => win.id === selected) ?? null)
       : null;
   const open = selected === "new" || existing !== null;
+  const transferIds = existing?.transfer_transaction_id
+    ? [existing.transfer_transaction_id]
+    : [];
+  const transactions = useLedgerEntriesById(transferIds);
 
   async function save(result: Extract<CravingWinComposeOutcome, { status: "ready" }>) {
     await dispatchMany(result.ops);
@@ -94,7 +97,7 @@ export function CravingWinSheet() {
       categories={categories}
       containers={containers}
       goals={goals}
-      transactions={transactions}
+      transactions={transactions ?? []}
       defaultContainerId={defaultContainerId}
       onOpenChange={(next) => !next && setSelected(null)}
       onSave={save}
@@ -132,7 +135,7 @@ export function CravingWinFormSheet({
       title={existing ? "Edit craving win" : "Log a craving win"}
       description="Record what you chose not to spend. Only an optional goal transfer changes your balances."
     >
-      {open && (
+      {open && transactions !== null && (
         <CravingWinForm
           key={existing?.id ?? "new"}
           existing={existing}

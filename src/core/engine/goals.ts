@@ -17,6 +17,13 @@ import { containerBalance, isLiveLedgerRow, isTransfer } from "./balances";
 
 type ISO = string;
 
+export interface GoalLedgerFacts {
+  balance: number;
+  netContribution: number;
+}
+
+export type GoalLedgerInput = Transaction[] | GoalLedgerFacts;
+
 function ym(iso: ISO): { y: number; m: number } {
   const [y, m] = iso.split("-").map(Number);
   return { y, m };
@@ -39,7 +46,10 @@ export function wholeMonthsUntil(from: ISO, deadline: ISO): number {
  * container is spending on purpose, not an un-contribution (§5.9.3). Approved-only:
  * a pending contribution moves money only on approval (§10 #3).
  */
-export function goalContributed(goal: Goal, txns: Transaction[]): number {
+export function goalContributed(goal: Goal, txns: GoalLedgerInput): number {
+  if (!Array.isArray(txns)) {
+    return goal.opening_contributed + txns.netContribution;
+  }
   let total = goal.opening_contributed;
   for (const t of txns) {
     if (!isLiveLedgerRow(t) || !isTransfer(t)) continue;
@@ -54,9 +64,11 @@ export function goalContributed(goal: Goal, txns: Transaction[]): number {
  * The quantity a goal's ask + progress measure against (§5.9.7): `contributed`
  * for `spend_down`, live `balance` for `reserve` (so a withdrawal re-opens it).
  */
-export function goalBasis(goal: Goal, txns: Transaction[]): number {
+export function goalBasis(goal: Goal, txns: GoalLedgerInput): number {
   return goal.kind === "reserve"
-    ? containerBalance(txns, goal.container_id)
+    ? Array.isArray(txns)
+      ? containerBalance(txns, goal.container_id)
+      : txns.balance
     : goalContributed(goal, txns);
 }
 
@@ -66,7 +78,7 @@ export function goalBasis(goal: Goal, txns: Transaction[]): number {
  * exceed 1 for an over-contributed spend_down goal; callers cap the *display* at
  * 100%, not the value.
  */
-export function goalProgress(goal: Goal, txns: Transaction[]): number | null {
+export function goalProgress(goal: Goal, txns: GoalLedgerInput): number | null {
   if (goal.target_amount === null || goal.target_amount === 0) return null;
   return goalBasis(goal, txns) / goal.target_amount;
 }
@@ -75,11 +87,14 @@ export function goalProgress(goal: Goal, txns: Transaction[]): number | null {
  * Portion of contributed money still available to spend. Only spend-down goals
  * deplete; reserve goals already use their live balance as ordinary progress.
  */
-export function goalRemainingProgress(goal: Goal, txns: Transaction[]): number | null {
+export function goalRemainingProgress(goal: Goal, txns: GoalLedgerInput): number | null {
   if (goal.kind !== "spend_down") return null;
   const contributed = goalContributed(goal, txns);
   if (contributed <= 0) return null;
-  return containerBalance(txns, goal.container_id) / contributed;
+  const balance = Array.isArray(txns)
+    ? containerBalance(txns, goal.container_id)
+    : txns.balance;
+  return balance / contributed;
 }
 
 /**
@@ -93,7 +108,7 @@ export function goalRemainingProgress(goal: Goal, txns: Transaction[]): number |
  * Rounded UP so the target is actually reached by the deadline (under-asking would
  * leave a cent short).
  */
-export function requiredMonthly(goal: Goal, txns: Transaction[], today: ISO): number {
+export function requiredMonthly(goal: Goal, txns: GoalLedgerInput, today: ISO): number {
   if (goal.mode === "passive") return 0;
   const basis = goalBasis(goal, txns);
   const target = goal.target_amount;
@@ -117,7 +132,7 @@ export function requiredMonthly(goal: Goal, txns: Transaction[], today: ISO): nu
  * the app surfaces a re-plan prompt (push the date or lower the target) rather
  * than silently smoothing the number.
  */
-export function requiresReplan(goal: Goal, txns: Transaction[], today: ISO): boolean {
+export function requiresReplan(goal: Goal, txns: GoalLedgerInput, today: ISO): boolean {
   if (goal.mode !== "deadline" || goal.deadline === null || goal.target_amount === null) {
     return false;
   }
@@ -132,7 +147,7 @@ export function requiresReplan(goal: Goal, txns: Transaction[], today: ISO): boo
  * and closes once `contributed ≥ target`. A `reserve` goal never latches — it
  * oscillates around its set-point — so this is always false for reserves.
  */
-export function isAchieved(goal: Goal, txns: Transaction[]): boolean {
+export function isAchieved(goal: Goal, txns: GoalLedgerInput): boolean {
   if (goal.kind === "reserve" || goal.target_amount === null) return false;
   return goalContributed(goal, txns) >= goal.target_amount;
 }
@@ -144,7 +159,7 @@ export function isAchieved(goal: Goal, txns: Transaction[]): boolean {
  */
 export function projectedCompletion(
   goal: Goal,
-  txns: Transaction[],
+  txns: GoalLedgerInput,
   today: ISO,
 ): ISO | null {
   if (goal.mode !== "fixed" || goal.target_amount === null) return null;

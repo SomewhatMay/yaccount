@@ -1,5 +1,12 @@
 import { atom, type Setter } from "jotai";
-import { Repo, withGeneralWallet } from "@/core/repo";
+import {
+  Repo,
+  withGeneralWallet,
+  type LedgerFocusQuery,
+  type LedgerPageQuery,
+  type LedgerScanQuery,
+  type SearchEntryScanQuery,
+} from "@/core/repo";
 import { DB_VERSION, STORE } from "@/core/repo/db";
 import {
   GENERAL_CONTAINER_ID,
@@ -36,12 +43,17 @@ import { buildExport, exportFileName, serializeExport } from "@/core/data";
 import { getAuthProvider } from "@/auth/web";
 import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
-import { requiredMonthly } from "@/core/engine/goals";
-import { pendingRows } from "@/core/engine/ledger";
+import { requiredMonthly, type GoalLedgerFacts } from "@/core/engine/goals";
 import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands";
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
 import { operationLogFacts } from "@/lib/strategic-logging";
+import { nextLedgerChangeNonce } from "@/features/ledger/change-nonce";
+import type {
+  EntryRead,
+  LedgerContainerFact,
+  LedgerUsageFact,
+} from "@/core/repo/ledger-read";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -67,12 +79,21 @@ export const readyAtom = atom(false);
 export const bootErrorAtom = atom<string | null>(null);
 export const categoriesAtom = atom<Category[]>([]);
 export const containersAtom = atom<Container[]>([]);
-export const transactionsAtom = atom<Transaction[]>([]);
+export const pendingEntriesAtom = atom<EntryRead[]>([]);
+export const containerFactsAtom = atom<Map<string, LedgerContainerFact>>(new Map());
+export const usageFactsAtom = atom<LedgerUsageFact[]>([]);
+export const ledgerCountAtom = atom(0);
+export const ledgerRevisionAtom = atom(0);
+export const ledgerLocalAddAtom = atom<{ id: string; nonce: number } | null>(null);
+export const ledgerRemoteChangeAtom = atom<{ revision: number; nonce: number } | null>(
+  null,
+);
 export const snapshotsAtom = atom<ContainerSnapshot[]>([]);
 export const settingsAtom = atom<Setting[]>([]);
 export const budgetTargetsAtom = atom<BudgetTarget[]>([]);
 export const recurringRulesAtom = atom<RecurringRule[]>([]);
 export const goalsAtom = atom<Goal[]>([]);
+export const goalFactsAtom = atom<Map<string, GoalLedgerFacts>>(new Map());
 export const cravingWinsAtom = atom<CravingWin[]>([]);
 
 /** The synced-setting key holding a month's manually-entered expected income
@@ -81,11 +102,9 @@ export const expectedIncomeKey = (yearMonth: string): string =>
   `expected_income:${yearMonth}`;
 
 /** Live shortcuts (§5.8) — the is_template rows, for the ledger's quick-log strip. */
-export const templatesAtom = atom((get) =>
-  get(transactionsAtom).filter((t) => t.is_template),
-);
+export const templatesAtom = atom<Transaction[]>([]);
 /** The Inbox queue count (§5.8) — drives the nav badge. */
-export const pendingCountAtom = atom((get) => pendingRows(get(transactionsAtom)).length);
+export const pendingCountAtom = atom((get) => get(pendingEntriesAtom).length);
 
 /** Default Spending Container (§5.2) — the compose bar's preselected wallet.
  * A synced setting; falls back to the seeded 'general' wallet. */
@@ -157,14 +176,56 @@ function getRepo(): Promise<Repo> {
   return repoPromise;
 }
 
+export async function readLedgerPage(query: LedgerPageQuery) {
+  return (await getRepo()).getLedgerPage(query);
+}
+
+export async function scanLedgerEntries(query: LedgerScanQuery) {
+  return (await getRepo()).scanLedgerEntries(query);
+}
+
+export async function scanSearchEntries(query: SearchEntryScanQuery) {
+  return (await getRepo()).scanSearchEntries(query);
+}
+
+export async function readLedgerFocus(query: LedgerFocusQuery) {
+  return (await getRepo()).getLedgerFocus(query);
+}
+
+export async function readLedgerRange(start: string, end: string) {
+  return (await getRepo()).getLedgerRange(start, end);
+}
+
+export async function readApprovedTransactionRange(start: string, end: string) {
+  return (await getRepo()).getApprovedTransactionRange(start, end);
+}
+
+export async function readLedgerEntriesById(ids: readonly string[]) {
+  return (await getRepo()).getLedgerEntriesById(ids);
+}
+
+export async function readOverallBalanceSeries(
+  containerIds: readonly string[],
+  days: readonly string[],
+) {
+  return (await getRepo()).getOverallBalanceSeries(containerIds, days);
+}
+
+export async function readPeriodCashFlow(
+  containerIds: readonly string[],
+  yearMonth: string,
+) {
+  return (await getRepo()).getPeriodCashFlow(containerIds, yearMonth);
+}
+
 /** Re-read the materialized tables into the atoms (local-first read path). */
 export const refreshAtom = atom(null, async (_get, set) => {
   const repo = await getRepo();
-  const [cats, conts, txns, snaps, settings, budgetTargets, rules, goals, cravingWins] =
+  const [cats, conts, ledgerRead, snaps, settings, budgetTargets, rules, goals, cravingWins] =
     await Promise.all([
       repo.getAll<Category>(STORE.categories),
       repo.getAll<Container>(STORE.containers),
-      repo.getAll<Transaction>(STORE.transactions),
+      repo.getLedgerReadSnapshot(),
       repo.getAll<ContainerSnapshot>(STORE.containerSnapshots),
       repo.getAll<Setting>(STORE.settings),
       repo.getAll<BudgetTarget>(STORE.budgetTargets),
@@ -172,14 +233,37 @@ export const refreshAtom = atom(null, async (_get, set) => {
       repo.getAll<Goal>(STORE.goals),
       repo.getAll<CravingWin>(STORE.cravingWins),
     ]);
+  const containerFacts = new Map(
+    ledgerRead.containerFacts.map((fact) => [fact.containerId, fact]),
+  );
+  const goalFacts = new Map(
+    await Promise.all(
+      goals.map(async (goal) => [
+        goal.id,
+        {
+          balance: containerFacts.get(goal.container_id)?.balance ?? 0,
+          netContribution: await repo.getContainerTransferContribution(
+            goal.container_id,
+            goal.created_date,
+          ),
+        } satisfies GoalLedgerFacts,
+      ] as const),
+    ),
+  );
   set(categoriesAtom, cats);
   set(containersAtom, conts);
-  set(transactionsAtom, txns);
+  set(pendingEntriesAtom, ledgerRead.pending);
+  set(templatesAtom, ledgerRead.templates);
+  set(containerFactsAtom, containerFacts);
+  set(usageFactsAtom, ledgerRead.usageFacts);
+  set(ledgerCountAtom, ledgerRead.ledgerCount);
+  set(ledgerRevisionAtom, ledgerRead.revision);
   set(snapshotsAtom, snaps);
   set(settingsAtom, settings);
   set(budgetTargetsAtom, budgetTargets);
   set(recurringRulesAtom, rules);
   set(goalsAtom, goals);
+  set(goalFactsAtom, goalFacts);
   set(cravingWinsAtom, cravingWins);
 });
 
@@ -205,6 +289,16 @@ export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
     const repo = await getRepo();
     await repo.dispatch(op);
     await set(refreshAtom);
+    if (
+      op.type === "transaction.create" &&
+      op.payload.row.inbox_status === "approved" &&
+      !op.payload.row.is_template
+    ) {
+      set(ledgerLocalAddAtom, {
+        id: op.payload.row.id,
+        nonce: nextLedgerChangeNonce(),
+      });
+    }
     scheduleSync(set);
     log.info("write succeeded", { ...facts, durationMs: Date.now() - startedAt });
   } catch (err) {
@@ -318,6 +412,13 @@ export const syncAtom = atom(null, async (_get, set) => {
       }),
     });
     await set(refreshAtom); // re-derive the UI from the merged state (§8.6)
+    if (result.rebuilt) {
+      const repoSnapshot = await repo.getLedgerReadSnapshot();
+      set(ledgerRemoteChangeAtom, {
+        revision: repoSnapshot.revision,
+        nonce: nextLedgerChangeNonce(),
+      });
+    }
 
     // This device just discovered the account was cleared or replaced somewhere
     // else. Its own data was set aside rather than dropped, and saying so is not
@@ -522,7 +623,7 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
   const today = todayIso();
   const rules = get(recurringRulesAtom).filter((r) => r.status === "active");
   const goals = get(goalsAtom);
-  const txns = get(transactionsAtom);
+  const goalFacts = get(goalFactsAtom);
   for (const rule of rules) {
     // A goal_derived rule logs the linked goal's CURRENT required_monthly (§5.9.5),
     // recomputed here at generation time so a deadline goal's drifting ask never
@@ -530,7 +631,15 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
     let opts: { goalDerivedAmount?: number } | undefined;
     if (rule.amount_mode === "goal_derived" && rule.linked_goal_id) {
       const goal = goals.find((g) => g.id === rule.linked_goal_id);
-      opts = goal ? { goalDerivedAmount: requiredMonthly(goal, txns, today) } : undefined;
+      opts = goal
+        ? {
+            goalDerivedAmount: requiredMonthly(
+              goal,
+              goalFacts.get(goal.id) ?? { balance: 0, netContribution: 0 },
+              today,
+            ),
+          }
+        : undefined;
     }
     const { rows, rule: advanced } = generateDueOccurrences(rule, today, opts);
     // Advance the cursor even when nothing was logged (a goal_derived $0), so the
@@ -553,11 +662,11 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
  */
 export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
   const today = todayIso();
-  const txns = get(transactionsAtom);
+  const goalFacts = get(goalFactsAtom);
   const rules = get(recurringRulesAtom);
   const goals = get(goalsAtom);
   const repo = await getRepo();
-  const ops = goalMaintenanceOps(goals, txns, rules, today);
+  const ops = goalMaintenanceOps(goals, goalFacts, rules, today);
   if (ops.length === 0) return;
   await repo.dispatchMany(ops);
   await set(refreshAtom);

@@ -2,7 +2,7 @@ import { addDays, differenceInCalendarDays, format } from "date-fns";
 import type { BudgetTarget, Category, Goal, RecurringRule, Transaction } from "../model";
 import { isTransferRule } from "../model";
 import { budgetOnDate } from "./budgets";
-import { requiredMonthly } from "./goals";
+import { requiredMonthly, type GoalLedgerFacts } from "./goals";
 import { activeRows } from "./ledger";
 import { monthlyPlan, type PlanAllowance, type PlanAsk } from "./plan";
 import {
@@ -56,6 +56,7 @@ interface AllocationInputs {
   goals: Goal[];
   budgetTargets: BudgetTarget[];
   rules: RecurringRule[];
+  goalFacts?: ReadonlyMap<string, GoalLedgerFacts>;
 }
 
 /** Current-month allocation, delegating the locked plan identity to monthlyPlan. */
@@ -72,6 +73,7 @@ export function allocationPlanMonth(
     budgetTargets: input.budgetTargets,
     rules: input.rules,
     manualIncome: input.manualIncome,
+    goalFacts: input.goalFacts,
   });
   const incomeIds = new Set(
     input.categories
@@ -272,7 +274,16 @@ export function allocationPlanPayCycle(
   );
   const monthlyGoalAsk = input.goals
     .filter((goal) => goal.status === "active" && !goal.is_archived)
-    .reduce((sum, goal) => sum + requiredMonthly(goal, input.txns, input.today), 0);
+    .reduce(
+      (sum, goal) =>
+        sum +
+        requiredMonthly(
+          goal,
+          input.goalFacts?.get(goal.id) ?? input.txns,
+          input.today,
+        ),
+      0,
+    );
   let allowanceShare = 0;
   let goalAskShare = 0;
   for (const segment of coveredSegments(input.today, end)) {

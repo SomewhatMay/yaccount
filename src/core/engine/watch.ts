@@ -55,13 +55,17 @@ export function containerWatch(input: {
   categories: Category[];
   containers: Container[];
   recurringRules: RecurringRule[];
+  currentBalances?: ReadonlyMap<string, number>;
+  balancesAsOfToday?: ReadonlyMap<string, number>;
 }): ContainerWatch {
   const rows = activeRows(input.transactions);
-  const currentBalance = rows.reduce(
-    (sum, row) =>
-      row.date <= input.today ? sum + transactionDelta(row, input.containerId) : sum,
-    0,
-  );
+  const currentBalance =
+    input.currentBalances?.get(input.containerId) ??
+    rows.reduce(
+      (sum, row) =>
+        row.date <= input.today ? sum + transactionDelta(row, input.containerId) : sum,
+      0,
+    );
   const flowStart = format(
     subDays(new Date(`${input.today}T00:00:00`), 29),
     "yyyy-MM-dd",
@@ -81,6 +85,7 @@ export function containerWatch(input: {
     input.today,
     30,
     [input.containerId],
+    input.balancesAsOfToday,
   );
   const distanceAboveFloor =
     input.floor === null ? null : forecast.low.balance - input.floor;

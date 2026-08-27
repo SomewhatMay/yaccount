@@ -36,7 +36,7 @@ import {
   readyAtom,
   recurringRulesAtom,
   runRecurringGenerationAtom,
-  transactionsAtom,
+  usageFactsAtom,
 } from "@/features/store";
 import { useFocusParam } from "@/features/useFocusParam";
 import { describeRule } from "@/features/recurring/describe";
@@ -112,7 +112,7 @@ export function RecurringView() {
   const rules = useAtomValue(recurringRulesAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
-  const transactions = useAtomValue(transactionsAtom);
+  const transactions = useAtomValue(usageFactsAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const generate = useSetAtom(runRecurringGenerationAtom);

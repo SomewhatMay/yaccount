@@ -1,29 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import { addDays, format, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   budgetTargetsAtom,
   categoriesAtom,
+  containerFactsAtom,
   containersAtom,
   cravingWinsAtom,
   dispatchManyAtom,
   flashRowAtom,
   goalsAtom,
+  goalFactsAtom,
+  ledgerCountAtom,
+  ledgerRevisionAtom,
+  pendingEntriesAtom,
+  readApprovedTransactionRange,
+  readLedgerEntriesById,
+  readLedgerPage,
+  readLedgerRange,
+  readOverallBalanceSeries,
   readyAtom,
   recurringRulesAtom,
   snapshotsAtom,
   settingsAtom,
-  transactionsAtom,
 } from "@/features/store";
 import {
   resolvePeriod,
+  precedingRange,
   statsTransactions,
+  trailingDays,
   type DateRange,
   type ReportingPeriod,
 } from "@/core/engine";
-import { newId } from "@/core/model";
+import { newId, type Transaction } from "@/core/model";
 import { todayIso } from "@/features/clock";
 import { FigureSkeleton, ListSkeleton, PageHeader } from "@/features/ui";
 import { PeriodPicker } from "./PeriodPicker";
@@ -65,60 +77,26 @@ export function DashboardView() {
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
+  const containerFacts = useAtomValue(containerFactsAtom);
   const cravingWins = useAtomValue(cravingWinsAtom);
-  const transactions = useAtomValue(transactionsAtom);
   const budgetTargets = useAtomValue(budgetTargetsAtom);
   const snapshots = useAtomValue(snapshotsAtom);
   const recurringRules = useAtomValue(recurringRulesAtom);
   const goals = useAtomValue(goalsAtom);
+  const goalFacts = useAtomValue(goalFactsAtom);
+  const ledgerCount = useAtomValue(ledgerCountAtom);
+  const revision = useAtomValue(ledgerRevisionAtom);
+  const pendingEntries = useAtomValue(pendingEntriesAtom);
   const settings = useAtomValue(settingsAtom);
   const dispatchOps = useSetAtom(dispatchManyAtom);
   const flashRow = useSetAtom(flashRowAtom);
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
-  const data = useMemo(() => {
-    const reportTransactions = statsTransactions(transactions, categories);
-    return {
-      today,
-      categories,
-      containers,
-      cravingWins,
-      ledgerTransactions: transactions,
-      reportTransactions,
-      budgetTargets,
-      snapshots,
-      recurringRules,
-      goals,
-      syncedSettings: settings,
-      dispatchOps,
-      aggregates: createDashboardAggregates({
-        budgetTargets,
-        categories,
-        containers,
-        ledgerTransactions: transactions,
-        reportTransactions,
-        recurringRules,
-        snapshots,
-        goals,
-      }),
-    };
-  }, [
-    today,
-    categories,
-    containers,
-    cravingWins,
-    transactions,
-    budgetTargets,
-    snapshots,
-    recurringRules,
-    goals,
-    settings,
-    dispatchOps,
-  ]);
   const overviewCuration = useMemo(() => {
-    const hasExpenseBudget = data.aggregates.budgetTriage(today).rows.length > 0;
-    const hasActiveGoal = data.aggregates.goalOutlook(today).rows.length > 0;
-    const landing = data.aggregates.monthLanding(today);
+    const hasExpenseBudget = budgetTargets.length > 0;
+    const hasActiveGoal = goals.some(
+      (goal) => goal.status === "active" && !goal.is_archived,
+    );
     const incomeCategoryIds = new Set(
       categories
         .filter((category) => category.type === "income" && !category.is_archived)
@@ -135,14 +113,12 @@ export function DashboardView() {
           (rule.template_amount ?? 0) > 0,
       ),
       hasActiveGoal,
-      hasLandingHistory: landing.history.length >= 2,
+      hasLandingHistory: false,
       hasLandingSignal:
-        landing.scheduledItems.length > 0 ||
-        landing.unknownItems.length > 0 ||
-        landing.history.some((item) => item.flexibleSpending !== 0),
+        ledgerCount > 0 || recurringRules.some((rule) => rule.status === "active"),
       hasCravingWins: cravingWins.length > 0,
     });
-  }, [categories, cravingWins.length, data.aggregates, recurringRules, today]);
+  }, [budgetTargets.length, categories, cravingWins.length, goals, ledgerCount, recurringRules]);
 
   const dashboardSets = useDashboardSets(overviewCuration);
   const activeDashboardId = dashboardSets.activeDashboard.id;
@@ -174,6 +150,139 @@ export function DashboardView() {
     () => (comparePeriod ? resolvePeriod(comparePeriod, today) : null),
     [comparePeriod, today],
   );
+  const queryBounds = useMemo(() => {
+    const fixedStart = format(subMonths(new Date(`${today}T00:00:00`), 6), "yyyy-MM-01");
+    const priorPrimary = precedingRange(primaryRange);
+    const priorCompare = compareRange ? precedingRange(compareRange) : null;
+    const ranges = [primaryRange, compareRange, priorPrimary, priorCompare].filter(
+      (range): range is DateRange => range !== null,
+    );
+    const allTime = ranges.some((range) => range.start === null);
+    const starts = ranges.flatMap((range) => (range.start ? [range.start] : []));
+    const ends = ranges.flatMap((range) => (range.end ? [range.end] : []));
+    const futureEnd = format(addDays(new Date(`${today}T00:00:00`), 60), "yyyy-MM-dd");
+    return {
+      start: allTime ? "0000-01-01" : [fixedStart, ...starts].sort()[0],
+      end: [futureEnd, ...ends].sort().at(-1)!,
+      futureEnd,
+    };
+  }, [compareRange, primaryRange, today]);
+  const cravingTransferIds = useMemo(
+    () =>
+      cravingWins.flatMap((win) =>
+        win.transfer_transaction_id ? [win.transfer_transaction_id] : [],
+      ),
+    [cravingWins],
+  );
+  const reportKey = `${revision}:${queryBounds.start}:${queryBounds.end}`;
+  const [reportRead, setReportRead] = useState<{
+    key: string;
+    transactions: Transaction[];
+    balancesAsOfToday: Map<string, number>;
+    curve: number[];
+  } | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    let active = true;
+    const countedIds = containers
+      .filter(
+        (container) => container.include_in_overall_balance && !container.is_archived,
+      )
+      .map((container) => container.id);
+    void Promise.all([
+      readLedgerRange(queryBounds.start, queryBounds.end),
+      readApprovedTransactionRange(today, queryBounds.futureEnd),
+      readLedgerPage({ sort: "newest", limit: 8, cursor: null }),
+      readLedgerEntriesById(cravingTransferIds),
+      readOverallBalanceSeries(countedIds, trailingDays(today, 90)),
+      Promise.all(
+        containers.map(async (container) => [
+          container.id,
+          (await readOverallBalanceSeries([container.id], [today]))[0] ?? 0,
+        ] as const),
+      ),
+    ]).then(([rangeRows, futureRows, recent, cravingRows, curve, balances]) => {
+      if (!active) return;
+      const byId = new Map(
+        [...rangeRows, ...futureRows, ...recent.rows, ...cravingRows, ...pendingEntries].map(
+          (row) => [row.id, row],
+        ),
+      );
+      setReportRead({
+        key: reportKey,
+        transactions: [...byId.values()],
+        balancesAsOfToday: new Map(balances),
+        curve,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [
+    containers,
+    cravingTransferIds,
+    pendingEntries,
+    queryBounds,
+    ready,
+    reportKey,
+    revision,
+    today,
+  ]);
+  const currentReportRead = reportRead?.key === reportKey ? reportRead : null;
+  const data = useMemo(() => {
+    if (!currentReportRead) return null;
+    const reportTransactions = statsTransactions(
+      currentReportRead.transactions,
+      categories,
+    );
+    const currentBalances = new Map(
+      [...containerFacts].map(([id, fact]) => [id, fact.balance]),
+    );
+    return {
+      today,
+      categories,
+      containers,
+      cravingWins,
+      ledgerTransactions: currentReportRead.transactions,
+      reportTransactions,
+      budgetTargets,
+      snapshots,
+      recurringRules,
+      goals,
+      currentBalances,
+      goalFacts,
+      overallBalanceCurve: currentReportRead.curve,
+      syncedSettings: settings,
+      dispatchOps,
+      aggregates: createDashboardAggregates({
+        budgetTargets,
+        categories,
+        containers,
+        ledgerTransactions: currentReportRead.transactions,
+        reportTransactions,
+        recurringRules,
+        snapshots,
+        goals,
+        currentBalances,
+        balancesAsOfToday: currentReportRead.balancesAsOfToday,
+        goalFacts,
+      }),
+    };
+  }, [
+    budgetTargets,
+    categories,
+    containerFacts,
+    containers,
+    cravingWins,
+    dispatchOps,
+    goalFacts,
+    goals,
+    recurringRules,
+    currentReportRead,
+    settings,
+    snapshots,
+    today,
+  ]);
 
   function beginEditing() {
     setDraftDashboard({
@@ -308,7 +417,7 @@ export function DashboardView() {
         )}
       </div>
 
-      {!ready ? (
+      {!ready || !data ? (
         <>
           <FigureSkeleton />
           <ListSkeleton rows={4} />
@@ -352,40 +461,42 @@ export function DashboardView() {
           onHideInstance={hideInstance}
         />
       )}
-      <WidgetGallerySheet
-        open={galleryOpen}
-        onOpenChange={setGalleryOpen}
-        definitions={DASHBOARD_WIDGETS}
-        entries={widgetEntries}
-        hiddenInstanceIds={activeLayout.hidden}
-        context={{ ...data, range: primaryRange }}
-        onRestore={(instanceId) => {
-          if (!draftDashboard) return;
-          const layout = layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS);
-          setDraftDashboard(
-            applyDashboardLayout(
+      {data && (
+        <WidgetGallerySheet
+          open={galleryOpen}
+          onOpenChange={setGalleryOpen}
+          definitions={DASHBOARD_WIDGETS}
+          entries={widgetEntries}
+          hiddenInstanceIds={activeLayout.hidden}
+          context={{ ...data, range: primaryRange }}
+          onRestore={(instanceId) => {
+            if (!draftDashboard) return;
+            const layout = layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS);
+            setDraftDashboard(
+              applyDashboardLayout(
+                draftDashboard,
+                setWidgetVisible(layout, instanceId, true),
+                DASHBOARD_WIDGETS,
+              ),
+            );
+            setGalleryOpen(false);
+            flashRow({ id: instanceId, scroll: true });
+          }}
+          onCreate={(widgetType, configuration) => {
+            if (!draftDashboard) return;
+            const next = addDashboardWidgetInstance(
               draftDashboard,
-              setWidgetVisible(layout, instanceId, true),
-              DASHBOARD_WIDGETS,
-            ),
-          );
-          setGalleryOpen(false);
-          flashRow({ id: instanceId, scroll: true });
-        }}
-        onCreate={(widgetType, configuration) => {
-          if (!draftDashboard) return;
-          const next = addDashboardWidgetInstance(
-            draftDashboard,
-            widgetType,
-            configuration,
-            newId,
-          );
-          const instanceId = next.instances.at(-1)!.instanceId;
-          setDraftDashboard(next);
-          setGalleryOpen(false);
-          flashRow({ id: instanceId, scroll: true });
-        }}
-      />
+              widgetType,
+              configuration,
+              newId,
+            );
+            const instanceId = next.instances.at(-1)!.instanceId;
+            setDraftDashboard(next);
+            setGalleryOpen(false);
+            flashRow({ id: instanceId, scroll: true });
+          }}
+        />
+      )}
     </div>
   );
 }

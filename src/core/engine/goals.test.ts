@@ -71,6 +71,22 @@ describe("spend_down goal — progress is contributions, never balance (§5.9.3)
     expect(goalRemainingProgress(goal, txns)).toBe(0.9);
   });
 
+  it("accepts exact compact balance/contribution facts with array parity", () => {
+    const txns = [
+      contribute(20000, "2026-03-01", "c1"),
+      spend(2000, "2026-07-10", "e1"),
+    ];
+    const facts = { balance: 18000, netContribution: 20000 };
+
+    expect(goalContributed(goal, facts)).toBe(goalContributed(goal, txns));
+    expect(goalBasis(goal, facts)).toBe(goalBasis(goal, txns));
+    expect(goalProgress(goal, facts)).toBe(goalProgress(goal, txns));
+    expect(goalRemainingProgress(goal, facts)).toBe(goalRemainingProgress(goal, txns));
+    expect(requiredMonthly(goal, facts, "2026-08-01")).toBe(
+      requiredMonthly(goal, txns, "2026-08-01"),
+    );
+  });
+
   it("half-saved then a spend: remaining = target − contributed (schedule untouched)", () => {
     const txns = [contribute(10000, "2026-06-01", "c1"), spend(2000, "2026-07-10", "e1")];
     expect(goalContributed(goal, txns)).toBe(10000);

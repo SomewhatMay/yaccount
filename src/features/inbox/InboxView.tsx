@@ -18,7 +18,8 @@ import {
   flashedRowAtom,
   readyAtom,
   recurringRulesAtom,
-  transactionsAtom,
+  pendingEntriesAtom,
+  usageFactsAtom,
 } from "@/features/store";
 import { approveTransaction, unvoidTransaction, voidTransaction } from "@/core/commands";
 import { isTransfer } from "@/core/engine/balances";
@@ -81,7 +82,8 @@ const SORT_OPTIONS = [
  */
 export function InboxView() {
   const ready = useAtomValue(readyAtom);
-  const transactions = useAtomValue(transactionsAtom);
+  const transactions = useAtomValue(usageFactsAtom);
+  const pendingEntries = useAtomValue(pendingEntriesAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const rules = useAtomValue(recurringRulesAtom);
@@ -97,7 +99,7 @@ export function InboxView() {
   const filter = useMemo(() => toFilter(draft), [draft]);
   const filtering = isFilterActive(filter);
 
-  const pending = useMemo(() => pendingRows(transactions), [transactions]);
+  const pending = pendingEntries;
   const rankedCategories = useMemo(
     () =>
       rankCategoriesByUsage(

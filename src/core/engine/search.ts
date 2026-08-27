@@ -294,6 +294,52 @@ function lower(parts: (string | null | undefined)[]): string {
   return parts.filter((p) => p != null && p !== "").join(" ").toLowerCase();
 }
 
+/** Build docs for rows already proven findable by the repository read model. */
+export function buildEntrySearchDocs(
+  entries: readonly Transaction[],
+  categories: readonly Category[],
+  containers: readonly Container[],
+): SearchDoc[] {
+  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const contName = new Map(containers.map((c) => [c.id, c.name]));
+  return entries.map((t) => {
+    const category = t.category_id ? (catName.get(t.category_id) ?? "") : "";
+    const from = contName.get(t.container_id) ?? "";
+    const to = t.to_container_id ? (contName.get(t.to_container_id) ?? "") : "";
+    const title = t.is_template ? (t.template_name ?? t.vendor_source) : t.vendor_source;
+    const containerNames = lower([from, to]);
+    return {
+      id: t.id,
+      kind: t.is_template ? "template" : "transaction",
+      title,
+      subtitle: t.is_template
+        ? t.vendor_source
+        : `${category || (t.to_container_id ? "Transfer" : "")} · ${t.date}`,
+      meta: formatCents(t.amount),
+      key: title.toLowerCase(),
+      hay: lower([
+        title,
+        t.vendor_source,
+        t.notes,
+        category,
+        from,
+        to,
+        formatCents(t.amount),
+        t.is_template ? "" : t.date,
+      ]),
+      amount: Math.abs(t.amount),
+      date: t.is_template ? null : t.date,
+      recency: t.entered_at ?? `${t.date}T00:00:00.000Z`,
+      txKind: t.is_template ? null : transactionKind(t),
+      pending: t.inbox_status === "pending",
+      template: t.is_template,
+      archived: false,
+      categoryHay: category.toLowerCase(),
+      containerHay: containerNames,
+    } satisfies SearchDoc;
+  });
+}
+
 /**
  * Build the index. Linear in the data, run once per data change — never per
  * keystroke.
@@ -330,46 +376,7 @@ export function buildSearchIndex(input: SearchInput): SearchIndex {
     ...templateRows(input.transactions),
   ];
 
-  for (const t of entries) {
-    const category = t.category_id ? (catName.get(t.category_id) ?? "") : "";
-    const from = contName.get(t.container_id) ?? "";
-    const to = t.to_container_id ? (contName.get(t.to_container_id) ?? "") : "";
-    const title = t.is_template ? (t.template_name ?? t.vendor_source) : t.vendor_source;
-    const containers = lower([from, to]);
-    docs.push({
-      id: t.id,
-      kind: t.is_template ? "template" : "transaction",
-      title,
-      subtitle: t.is_template
-        ? t.vendor_source
-        : `${category || (t.to_container_id ? "Transfer" : "")} · ${t.date}`,
-      meta: formatCents(t.amount),
-      key: title.toLowerCase(),
-      hay: lower([
-        title,
-        t.vendor_source,
-        t.notes,
-        category,
-        from,
-        to,
-        formatCents(t.amount),
-        t.is_template ? "" : t.date,
-      ]),
-      amount: Math.abs(t.amount),
-      // A template has no place on the calendar (§5.8) — its `date` is an
-      // anchor, so a date window must not appear to answer for it.
-      date: t.is_template ? null : t.date,
-      recency: t.entered_at ?? `${t.date}T00:00:00.000Z`,
-      // `is:expense|income|transfer` asks about ENTRIES. A shortcut is not one;
-      // `is:template` is how you ask for those.
-      txKind: t.is_template ? null : transactionKind(t),
-      pending: t.inbox_status === "pending",
-      template: t.is_template,
-      archived: false,
-      categoryHay: category.toLowerCase(),
-      containerHay: containers,
-    });
-  }
+  docs.push(...buildEntrySearchDocs(entries, input.categories, input.containers));
 
   for (const c of input.categories) {
     docs.push({
@@ -606,6 +613,40 @@ export function search(
   opts: SearchOptions = {},
 ): SearchResult[] {
   return run(index.docs, parseQuery(raw), opts);
+}
+
+export interface ProgressiveSearch {
+  add(docs: readonly SearchDoc[]): SearchResult[];
+  finish(): SearchResult[];
+  readonly results: SearchResult[];
+  readonly complete: boolean;
+}
+
+/** Bounded top-k merge: prior survivors plus each repository scan chunk. */
+export function createProgressiveSearch(
+  base: SearchIndex,
+  raw: string,
+  opts: SearchOptions = {},
+): ProgressiveSearch {
+  const query = parseQuery(raw);
+  let results = run(base.docs, query, opts);
+  let complete = false;
+  return {
+    get results() {
+      return results;
+    },
+    get complete() {
+      return complete;
+    },
+    add(docs) {
+      results = run([...results.map((result) => result.doc), ...docs], query, opts);
+      return results;
+    },
+    finish() {
+      complete = true;
+      return results;
+    },
+  };
 }
 
 /**

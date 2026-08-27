@@ -6,6 +6,7 @@ import type { Category, Container, Transaction } from "@/core/model";
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
+  type UsageSource,
 } from "@/core/engine/usage-ranking";
 import {
   rankVendorSourcesForKind,
@@ -38,7 +39,7 @@ export function useComposeFields({
 }: {
   categories: Category[];
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   defaultContainerId: string;
   /** What the surface opens on. The bar starts on an expense; the sheet starts
    * on whatever asked it to open. */

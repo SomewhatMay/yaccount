@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { addDays, format } from "date-fns";
 import {
   makeCategory,
   makeCravingWin,
@@ -7,6 +8,7 @@ import {
   makeTransaction,
 } from "@/core/model";
 import { DashboardView } from "./DashboardView";
+import { todayIso } from "@/features/clock";
 import type { WidgetContext, WidgetDef } from "./registry";
 
 const fixture = vi.hoisted(() => ({
@@ -17,6 +19,7 @@ const fixture = vi.hoisted(() => ({
   dispatchMany: vi.fn(async () => {}),
   flashRow: vi.fn(),
   draftDashboard: undefined as unknown,
+  reportRead: null as unknown,
   stateSetters: [] as ReturnType<typeof vi.fn>[],
 }));
 const dashboardSets = vi.hoisted(() => ({
@@ -90,6 +93,7 @@ vi.mock("react", async (importOriginal) => {
   return {
     ...actual,
     useMemo: <T,>(factory: () => T) => factory(),
+    useEffect: () => undefined,
     useState: <T,>(initialValue: T) => {
       const index = fixture.stateSetters.length;
       const setter = vi.fn();
@@ -97,6 +101,8 @@ vi.mock("react", async (importOriginal) => {
       return [
         index === 0 && fixture.draftDashboard !== undefined
           ? (fixture.draftDashboard as T)
+          : index === 4 && fixture.reportRead !== undefined
+            ? (fixture.reportRead as T)
           : initialValue,
         setter,
       ];
@@ -113,9 +119,18 @@ vi.mock("jotai", () => ({
 vi.mock("@/features/store", () => ({
   readyAtom: "ready",
   categoriesAtom: "categories",
+  containerFactsAtom: "containerFacts",
   containersAtom: "containers",
   cravingWinsAtom: "cravingWins",
-  transactionsAtom: "transactions",
+  goalFactsAtom: "goalFacts",
+  ledgerCountAtom: "ledgerCount",
+  ledgerRevisionAtom: "ledgerRevision",
+  pendingEntriesAtom: "pendingEntries",
+  readApprovedTransactionRange: vi.fn(),
+  readLedgerEntriesById: vi.fn(),
+  readLedgerPage: vi.fn(),
+  readLedgerRange: vi.fn(),
+  readOverallBalanceSeries: vi.fn(),
   budgetTargetsAtom: "budgetTargets",
   snapshotsAtom: "snapshots",
   recurringRulesAtom: "recurringRules",
@@ -192,7 +207,7 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.values.set("ready", true);
   fixture.values.set("categories", [included, excluded]);
   fixture.values.set("containers", [makeGeneralContainer()]);
-  fixture.values.set("transactions", [
+  const transactions = [
     makeTransaction({
       id: "included-row",
       date: "2026-08-01",
@@ -207,7 +222,26 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
       vendor_source: "Excluded expense",
       category_id: excluded.id,
     }),
-  ]);
+  ];
+  fixture.values.set(
+    "containerFacts",
+    new Map([
+      [
+        "general",
+        { id: "container:general", containerId: "general", balance: -3000, netContribution: 0 },
+      ],
+    ]),
+  );
+  fixture.values.set("goalFacts", new Map());
+  fixture.values.set("ledgerCount", 2);
+  fixture.values.set("ledgerRevision", 1);
+  fixture.values.set("pendingEntries", []);
+  fixture.reportRead = {
+    key: `1:0000-01-01:${format(addDays(new Date(`${todayIso()}T00:00:00`), 60), "yyyy-MM-dd")}`,
+    transactions,
+    balancesAsOfToday: new Map([["general", -3000]]),
+    curve: [-3000],
+  };
   fixture.values.set("budgetTargets", []);
   fixture.values.set("snapshots", []);
   fixture.values.set("recurringRules", []);
@@ -317,7 +351,17 @@ it("closes the gallery and targets an added widget for scroll feedback", () => {
   fixture.values.set("ready", true);
   fixture.values.set("categories", []);
   fixture.values.set("containers", []);
-  fixture.values.set("transactions", []);
+  fixture.values.set("containerFacts", new Map());
+  fixture.values.set("goalFacts", new Map());
+  fixture.values.set("ledgerCount", 0);
+  fixture.values.set("ledgerRevision", 1);
+  fixture.values.set("pendingEntries", []);
+  fixture.reportRead = {
+    key: `1:0000-01-01:${format(addDays(new Date(`${todayIso()}T00:00:00`), 60), "yyyy-MM-dd")}`,
+    transactions: [],
+    balancesAsOfToday: new Map(),
+    curve: [],
+  };
   fixture.values.set("budgetTargets", []);
   fixture.values.set("snapshots", []);
   fixture.values.set("recurringRules", []);

@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { createCravingWin, unvoidTransaction } from "@/core/commands";
 import {
-  activeRows,
   cravingWinCumulativeSeries,
   cravingWinSummary,
   groupCravingWinsByYear,
@@ -36,8 +35,8 @@ import {
   goalsAtom,
   readyAtom,
   runGoalMaintenanceAtom,
-  transactionsAtom,
 } from "@/features/store";
+import { useLedgerEntriesById } from "@/features/useLedgerEntries";
 import {
   EmptyState,
   Eyebrow,
@@ -74,7 +73,6 @@ function dayLabel(date: string): string {
 export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
   const ready = useAtomValue(readyAtom);
   const wins = useAtomValue(cravingWinsAtom);
-  const transactions = useAtomValue(transactionsAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const goals = useAtomValue(goalsAtom);
@@ -83,9 +81,17 @@ export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
   const maintainGoals = useSetAtom(runGoalMaintenanceAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const [deleting, setDeleting] = useState<CravingWin | null>(null);
+  const transferIds = useMemo(
+    () =>
+      wins.flatMap((win) =>
+        win.transfer_transaction_id ? [win.transfer_transaction_id] : [],
+      ),
+    [wins],
+  );
+  const transactions = useLedgerEntriesById(transferIds);
 
   const summary = useMemo(
-    () => cravingWinSummary(wins, transactions, today),
+    () => (transactions ? cravingWinSummary(wins, transactions, today) : null),
     [today, transactions, wins],
   );
   const series = useMemo(() => cravingWinCumulativeSeries(wins), [wins]);
@@ -93,9 +99,7 @@ export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
   const liveTransferIds = useMemo(
     () =>
       new Set(
-        activeRows(transactions)
-          .filter(isTransfer)
-          .map((transaction) => transaction.id),
+        (transactions ?? []).filter(isTransfer).map((transaction) => transaction.id),
       ),
     [transactions],
   );
@@ -116,7 +120,7 @@ export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
   }, [containerById, goals]);
 
   async function remove(win: CravingWin, reverseTransfer: boolean) {
-    const result = composeCravingWinRemoval(win, transactions, reverseTransfer);
+    const result = composeCravingWinRemoval(win, transactions ?? [], reverseTransfer);
     await dispatchMany(result.ops);
     await maintainGoals();
     setDeleting(null);
@@ -139,7 +143,7 @@ export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
     });
   }
 
-  if (!ready) {
+  if (!ready || summary === null) {
     return (
       <div className="space-y-6">
         <FigureSkeleton />

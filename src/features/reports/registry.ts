@@ -25,6 +25,7 @@ import type {
 import type { Op } from "@/core/oplog";
 import { formatCents } from "@/core/money";
 import type { DashboardAggregates } from "./dashboard-aggregates";
+import type { GoalLedgerFacts } from "@/core/engine";
 import { isMonthCloseAcknowledged } from "./month-close-state";
 
 export interface WidgetContext {
@@ -39,6 +40,9 @@ export interface WidgetContext {
   snapshots: ContainerSnapshot[];
   recurringRules: RecurringRule[];
   goals: Goal[];
+  currentBalances?: ReadonlyMap<string, number>;
+  goalFacts?: ReadonlyMap<string, GoalLedgerFacts>;
+  overallBalanceCurve?: number[];
   aggregates: DashboardAggregates;
   instanceSubject?: { type: string; id: string };
   instanceSettings?: Record<string, unknown>;

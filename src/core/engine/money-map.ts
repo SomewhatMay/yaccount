@@ -52,6 +52,7 @@ export function moneyMap(
   snapshots: readonly ContainerSnapshot[],
   ledgerTransactions: Transaction[],
   goals: readonly Goal[],
+  balances?: ReadonlyMap<string, number>,
 ): MoneyMap {
   const activeGoals = new Map<string, Goal[]>();
   for (const goal of goals) {
@@ -88,7 +89,8 @@ export function moneyMap(
       value:
         container.is_investment && kind !== "counted"
           ? (snapshot?.reported_balance ?? null)
-          : containerBalance(ledgerTransactions, container.id),
+          : (balances?.get(container.id) ??
+            containerBalance(ledgerTransactions, container.id)),
       valuation:
         container.is_investment && kind !== "counted"
           ? snapshot

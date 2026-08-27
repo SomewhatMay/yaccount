@@ -153,6 +153,7 @@ export function cashHorizon(
   today: string,
   days: CashHorizonDays,
   requestedContainerIds?: readonly string[],
+  balancesAsOfToday?: ReadonlyMap<string, number>,
 ): CashHorizon {
   const cashContainers = selectedCashContainers(containers, requestedContainerIds);
   const containerIds = cashContainers.map((container) => container.id).sort();
@@ -161,7 +162,12 @@ export function cashHorizon(
     categories.map((category) => [category.id, category.type]),
   );
   const end = format(addDays(new Date(`${today}T00:00:00`), days), "yyyy-MM-dd");
-  const startingBalance = selectedBalanceAsOf(transactions, included, today);
+  const startingBalance = balancesAsOfToday
+    ? containerIds.reduce(
+        (sum, containerId) => sum + (balancesAsOfToday.get(containerId) ?? 0),
+        0,
+      )
+    : selectedBalanceAsOf(transactions, included, today);
   const drafts: EventDraft[] = [];
 
   const approvedActive = activeRows(transactions).filter(

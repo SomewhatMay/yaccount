@@ -28,9 +28,7 @@ import {
   newId,
   type Goal,
   type GoalKind,
-  type Transaction,
 } from "@/core/model";
-import { containerBalance } from "@/core/engine/balances";
 import {
   goalBasis,
   goalContributed,
@@ -40,6 +38,7 @@ import {
   projectedCompletion,
   requiredMonthly,
   requiresReplan,
+  type GoalLedgerFacts,
 } from "@/core/engine/goals";
 import {
   activeGoalFilterCount,
@@ -54,14 +53,16 @@ import { useLocalPref } from "@/features/prefs";
 import { FilterBar } from "@/features/FilterBar";
 import {
   containersAtom,
+  containerFactsAtom,
   defaultContainerIdAtom,
   dispatchAtom,
   flashRowAtom,
   goalsAtom,
+  goalFactsAtom,
   readyAtom,
   runGoalMaintenanceAtom,
   runRecurringGenerationAtom,
-  transactionsAtom,
+  usageFactsAtom,
 } from "@/features/store";
 import { useFocusParam } from "@/features/useFocusParam";
 import { describeGoal } from "@/features/goals/describe";
@@ -118,7 +119,9 @@ export function GoalsView() {
   const ready = useAtomValue(readyAtom);
   const goals = useAtomValue(goalsAtom);
   const containers = useAtomValue(containersAtom);
-  const txns = useAtomValue(transactionsAtom);
+  const goalFacts = useAtomValue(goalFactsAtom);
+  const containerFacts = useAtomValue(containerFactsAtom);
+  const usageFacts = useAtomValue(usageFactsAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
@@ -156,9 +159,13 @@ export function GoalsView() {
     () =>
       sortGoals(applyGoalFilter(goals, filter, { label: labelOf }), sort, {
         label: labelOf,
-        progress: (g) => goalProgress(g, txns),
+        progress: (g) =>
+          goalProgress(
+            g,
+            goalFacts.get(g.id) ?? { balance: 0, netContribution: 0 },
+          ),
       }),
-    [goals, filter, labelOf, sort, txns],
+    [goals, filter, goalFacts, labelOf, sort],
   );
 
   // The sections stay — a filter narrows what is in them, it does not flatten
@@ -199,7 +206,7 @@ export function GoalsView() {
           created_date: editing.created_date,
           completed_date: editing.completed_date,
         }),
-        txns,
+        goalFacts.get(editing.id) ?? { balance: 0, netContribution: 0 },
       );
       if (renamedContainer) {
         await dispatch(updateContainer(renamedContainer));
@@ -231,7 +238,9 @@ export function GoalsView() {
     }
 
     const opening =
-      input.absorbLeftover && existing ? containerBalance(txns, existing.id) : 0;
+      input.absorbLeftover && existing
+        ? (containerFacts.get(existing.id)?.balance ?? 0)
+        : 0;
 
     const goalId = newId();
     await dispatch(
@@ -372,7 +381,7 @@ export function GoalsView() {
             <GoalCard
               key={g.id}
               goal={g}
-              txns={txns}
+              facts={goalFacts.get(g.id) ?? { balance: 0, netContribution: 0 }}
               containerName={containerName(g.container_id)}
               onEdit={() => setSheet(g)}
               onCancel={async () => {
@@ -400,7 +409,7 @@ export function GoalsView() {
               <GoalCard
                 key={g.id}
                 goal={g}
-                txns={txns}
+                facts={goalFacts.get(g.id) ?? { balance: 0, netContribution: 0 }}
                 containerName={containerName(g.container_id)}
                 onEdit={() => setSheet(g)}
                 onArchive={async () => {
@@ -463,7 +472,7 @@ export function GoalsView() {
         open={sheet !== null}
         goal={sheet === "new" ? null : sheet}
         containers={containers}
-        transactions={txns}
+        transactions={usageFacts}
         defaultFundingId={defaultContainerId}
         onOpenChange={(open) => !open && setSheet(null)}
         onSubmit={handleSubmit}
@@ -474,7 +483,7 @@ export function GoalsView() {
 
 function GoalCard({
   goal,
-  txns,
+  facts,
   containerName,
   onEdit,
   onCancel,
@@ -482,7 +491,7 @@ function GoalCard({
   onResume,
 }: {
   goal: Goal;
-  txns: Transaction[];
+  facts: GoalLedgerFacts;
   containerName: string;
   onEdit: () => void;
   onCancel?: () => void;
@@ -491,15 +500,15 @@ function GoalCard({
 }) {
   const { ref, flashed } = useFlashRow(goal.id);
   const now = todayIso();
-  const contributed = goalContributed(goal, txns);
-  const basis = goalBasis(goal, txns);
-  const balance = containerBalance(txns, goal.container_id);
-  const progress = goalProgress(goal, txns);
-  const remainingProgress = goalRemainingProgress(goal, txns);
-  const ask = requiredMonthly(goal, txns, now);
-  const achieved = isAchieved(goal, txns);
-  const replan = requiresReplan(goal, txns, now);
-  const projected = projectedCompletion(goal, txns, now);
+  const contributed = goalContributed(goal, facts);
+  const basis = goalBasis(goal, facts);
+  const balance = facts.balance;
+  const progress = goalProgress(goal, facts);
+  const remainingProgress = goalRemainingProgress(goal, facts);
+  const ask = requiredMonthly(goal, facts, now);
+  const achieved = isAchieved(goal, facts);
+  const replan = requiresReplan(goal, facts, now);
+  const projected = projectedCompletion(goal, facts, now);
   const openEnded = goal.mode === "fixed" && goal.target_amount === null;
   const pct = progress === null ? null : Math.min(100, Math.round(progress * 100));
   const remainingPct =

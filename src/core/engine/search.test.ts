@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSearchIndex,
+  buildEntrySearchDocs,
+  createProgressiveSearch,
   createSession,
   matchRanges,
   NO_QUERY,
@@ -290,6 +292,33 @@ describe("buildSearchIndex — every field of every entity is reachable", () => 
       transactions: [...WORLD.transactions, makeVoidRow(tx.groceries, { id: "v1" })],
     });
     expect(ids(search(voided, "whole foods"))).toEqual([]);
+  });
+});
+
+describe("progressive Search", () => {
+  it("publishes improving bounded results and ends with full-index parity", () => {
+    const base = buildSearchIndex({ ...WORLD, transactions: [] });
+    const entries = buildEntrySearchDocs(Object.values(tx), cats, conts);
+    const progressive = createProgressiveSearch(base, "blue bottle", {
+      limit: 24,
+      perKind: 5,
+    });
+
+    expect(progressive.complete).toBe(false);
+    expect(progressive.add(entries.slice(1))).toEqual(
+      search(
+        { docs: [...base.docs, ...entries.slice(1)] },
+        "blue bottle",
+        { limit: 24, perKind: 5 },
+      ),
+    );
+    expect(progressive.add(entries.slice(0, 1)).map((result) => result.doc.id)).toContain(
+      "t_coffee",
+    );
+    expect(progressive.finish()).toEqual(
+      search(index, "blue bottle", { limit: 24, perKind: 5 }),
+    );
+    expect(progressive.complete).toBe(true);
   });
 });
 

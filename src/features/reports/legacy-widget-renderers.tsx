@@ -77,16 +77,18 @@ function BalanceFigure({
   containers,
   ledgerTransactions,
   aggregates,
+  overallBalanceCurve,
 }: WidgetContext) {
   const balance = aggregates.balance();
   const curve = useMemo(
     () =>
+      overallBalanceCurve ??
       overallBalanceSeries(
         ledgerTransactions,
         containers,
         trailingDays(today, BALANCE_CURVE_DAYS),
       ),
-    [ledgerTransactions, containers, today],
+    [ledgerTransactions, containers, overallBalanceCurve, today],
   );
   return (
     <Figure
@@ -373,21 +375,24 @@ function Upcoming({ today, aggregates }: WidgetContext) {
   return <UpcomingList rows={rows} />;
 }
 
-function Goals({ today, ledgerTransactions, goals }: WidgetContext) {
+function Goals({ today, ledgerTransactions, goals, goalFacts }: WidgetContext) {
   const rows = useMemo(
     () =>
       goals
         .filter((g) => g.status === "active" && !g.is_archived)
-        .map((g) => ({
-          id: g.id,
-          name: g.name ?? "Goal",
-          basis: goalBasis(g, ledgerTransactions),
-          target: g.target_amount,
-          progress: goalProgress(g, ledgerTransactions),
-          monthly: requiredMonthly(g, ledgerTransactions, today),
-        }))
+        .map((g) => {
+          const ledger = goalFacts?.get(g.id) ?? ledgerTransactions;
+          return {
+            id: g.id,
+            name: g.name ?? "Goal",
+            basis: goalBasis(g, ledger),
+            target: g.target_amount,
+            progress: goalProgress(g, ledger),
+            monthly: requiredMonthly(g, ledger, today),
+          };
+        })
         .sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1)),
-    [goals, ledgerTransactions, today],
+    [goalFacts, goals, ledgerTransactions, today],
   );
   return <GoalsRail goals={rows} />;
 }

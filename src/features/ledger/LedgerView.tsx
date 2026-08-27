@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAtomValue, useSetAtom } from "jotai";
@@ -17,20 +24,26 @@ import {
 import {
   categoriesAtom,
   containersAtom,
+  containerFactsAtom,
   dispatchAtom,
   flashRowAtom,
   flashedRowAtom,
+  ledgerCountAtom,
+  ledgerLocalAddAtom,
+  ledgerRemoteChangeAtom,
+  ledgerRevisionAtom,
+  readLedgerEntriesById,
+  readLedgerFocus,
+  readLedgerPage,
+  readOverallBalanceSeries,
+  readPeriodCashFlow,
   readyAtom,
-  transactionsAtom,
+  scanLedgerEntries,
+  usageFactsAtom,
   type FlashedRow,
 } from "@/features/store";
 import { createTemplate, unvoidTransaction, voidTransaction } from "@/core/commands";
-import {
-  isLiveLedgerRow,
-  isTransfer,
-  overallBalance,
-  overallBalanceSeries,
-} from "@/core/engine/balances";
+import { isTransfer } from "@/core/engine/balances";
 import {
   activeFilterCount,
   applyFilter,
@@ -39,7 +52,7 @@ import {
 } from "@/core/engine/filter";
 import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
 import { parseLedgerQuery } from "@/features/ledger/deep-link";
-import { activeRows, isRegisterSort, sortRegister } from "@/core/engine/ledger";
+import { isRegisterSort, sortRegister } from "@/core/engine/ledger";
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
@@ -74,6 +87,14 @@ import { FilterBar } from "@/features/FilterBar";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  initialLedgerPagingState,
+  createLedgerSessionCache,
+  needsImmediateLocalAddReload,
+  ledgerPagingReducer,
+  pageSizeForWidth,
+  type LedgerPagingState,
+} from "@/features/ledger/paging-state";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -110,23 +131,39 @@ const SORT_OPTIONS = [
   { value: "smallest", label: "Smallest" },
 ] as const;
 
+const SCAN_CANDIDATES = 100;
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
 const KINDS: { value: TransactionKind; label: string }[] = [
   { value: "expense", label: "Expense" },
   { value: "income", label: "Income" },
   { value: "transfer", label: "Transfer" },
 ];
 
+let savedPaging: LedgerPagingState | null = null;
+let savedPagingQuery = "";
+let savedFilter: FilterDraft | null = null;
+const ledgerSession = createLedgerSessionCache<FilterDraft>();
+
 export function LedgerView() {
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
-  const transactions = useAtomValue(transactionsAtom);
+  const containerFacts = useAtomValue(containerFactsAtom);
+  const usageFacts = useAtomValue(usageFactsAtom);
+  const ledgerCount = useAtomValue(ledgerCountAtom);
+  const revision = useAtomValue(ledgerRevisionAtom);
+  const localAdd = useAtomValue(ledgerLocalAddAtom);
+  const remoteChange = useAtomValue(ledgerRemoteChangeAtom);
   const flashed = useAtomValue(flashedRowAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const searchParams = useSearchParams();
   const router = useRouter();
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [initialQuery] = useState(() => parseLedgerQuery(searchParams.toString()));
+  const focusId = useRef(initialQuery.focus);
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11 — a filter
   // still on from yesterday is a hidden reason the list looks wrong). The one
@@ -140,24 +177,13 @@ export function LedgerView() {
   // one. The hook is synced to the router and correct on that first render.
   const [sort, setSort] = useLocalPref(SORT_KEY, "newest", isRegisterSort);
   const [draft, setDraft] = useState<FilterDraft>(
-    () => parseLedgerQuery(searchParams.toString()).draft,
+    () =>
+      searchParams.toString()
+        ? initialQuery.draft
+        : (savedFilter ?? initialQuery.draft),
   );
   const filter = useMemo(() => toFilter(draft), [draft]);
   const filtering = isFilterActive(filter);
-
-  // A `focus=` link scrolls to and flashes one row (the same landing the ⌘K
-  // palette gives a search hit). Then the query is stripped so the drill-down is
-  // clearable and a refresh returns the plain ledger — the seeded draft survives
-  // the strip, since its initializer only runs once. `flashRow`/`router.replace`
-  // are side effects, not React state, so this is not the `setState`-in-an-effect
-  // the repo's ESLint forbids.
-  useEffect(() => {
-    const query = searchParams.toString();
-    if (!query) return;
-    const { focus } = parseLedgerQuery(query);
-    if (focus) flashRow({ id: focus, scroll: true });
-    router.replace("/ledger", { scroll: false });
-  }, [searchParams, flashRow, router]);
 
   // Stable for the session's render; `core` stays clock-free (§ engine).
   const today = useMemo(() => todayIso(), []);
@@ -168,8 +194,15 @@ export function LedgerView() {
   // the list on screen. That is exactly why the CARRIED figure has to hide when
   // the register is filtered: those rows no longer explain it.
   const balance = useMemo(
-    () => overallBalance(transactions, containers),
-    [transactions, containers],
+    () =>
+      containers.reduce(
+        (total, container) =>
+          !container.include_in_overall_balance || container.is_archived
+            ? total
+            : total + (containerFacts.get(container.id)?.balance ?? 0),
+        0,
+      ),
+    [containerFacts, containers],
   );
 
   const counted = useMemo(
@@ -177,43 +210,42 @@ export function LedgerView() {
     [containers],
   );
 
-  // The ground the figure stands on (§12.7 signature #1): the trailing quarter of
-  // this same balance. A balance is the end of a story, and this is the story.
-  const curve = useMemo(
-    () => overallBalanceSeries(transactions, containers, trailingDays(today, CURVE_DAYS)),
-    [transactions, containers, today],
+  const summaryKey = useMemo(
+    () => JSON.stringify([revision, today, counted.map((container) => container.id)]),
+    [counted, revision, today],
   );
-
-  // This-month in/out across the counted containers, and the same for last month
-  // so the figure can be told what it can't say about itself. Transfers are
-  // excluded — moving your own money between containers is neither income nor
-  // expense.
-  const { monthIn, monthOut, lastMonthNet, hadLastMonth } = useMemo(() => {
-    const ym = thisMonthIso();
-    const prev = lastMonthIso();
-    const ids = new Set(counted.map((c) => c.id));
-    let inSum = 0;
-    let outSum = 0;
-    let prevNet = 0;
-    let prevRows = 0;
-    for (const t of transactions) {
-      if (!isLiveLedgerRow(t) || isTransfer(t)) continue;
-      if (!ids.has(t.container_id)) continue;
-      if (t.yearMonth === ym) {
-        if (t.amount >= 0) inSum += t.amount;
-        else outSum += -t.amount;
-      } else if (t.yearMonth === prev) {
-        prevNet += t.amount;
-        prevRows += 1;
-      }
-    }
-    return {
-      monthIn: inSum,
-      monthOut: outSum,
-      lastMonthNet: prevNet,
-      hadLastMonth: prevRows > 0,
+  const [summary, setSummary] = useState<{
+    key: string;
+    curve: number[];
+    monthIn: number;
+    monthOut: number;
+    lastMonthNet: number;
+    hadLastMonth: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    let active = true;
+    const ids = counted.map((container) => container.id);
+    void Promise.all([
+      readOverallBalanceSeries(ids, trailingDays(today, CURVE_DAYS)),
+      readPeriodCashFlow(ids, thisMonthIso()),
+      readPeriodCashFlow(ids, lastMonthIso()),
+    ]).then(([curve, current, previous]) => {
+      if (!active) return;
+      setSummary({
+        key: summaryKey,
+        curve,
+        monthIn: current.incoming,
+        monthOut: current.outgoing,
+        lastMonthNet: previous.net,
+        hadLastMonth: previous.count > 0,
+      });
+    });
+    return () => {
+      active = false;
     };
-  }, [transactions, counted]);
+  }, [counted, ready, revision, summaryKey, today]);
+  const currentSummary = summary?.key === summaryKey ? summary : null;
 
   const nameOf = useMemo(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
@@ -249,31 +281,218 @@ export function LedgerView() {
     [nameOf, containerNameOf],
   );
 
-  // Deleting appends a reversing row and undoing appends one that reverses THAT,
-  // so what is live is a chain walk (§0.3) — `activeRows` owns the rule. What is
-  // shown is then the shared predicate (`applyFilter`), so the rail, the ⌘K
-  // palette and every M11 list view narrow rows by one rule.
-  const live = useMemo(() => activeRows(transactions), [transactions]);
   const rankedCategories = useMemo(
     () =>
       rankCategoriesByUsage(
         categories.filter((c) => !c.is_archived),
-        transactions,
+        usageFacts,
       ),
-    [categories, transactions],
+    [categories, usageFacts],
   );
   const rankedContainers = useMemo(
     () =>
       rankContainersByUsage(
         containers.filter((c) => !c.is_archived),
-        transactions,
+        usageFacts,
       ),
-    [containers, transactions],
+    [containers, usageFacts],
   );
-  const rows = useMemo(
-    () => sortRegister(applyFilter(live, filter, { label: labelOf }), sort),
-    [live, filter, labelOf, sort],
+  const pageSize = useMemo(
+    () => pageSizeForWidth(typeof window === "undefined" ? 1024 : window.innerWidth),
+    [],
   );
+  const queryKey = useMemo(() => JSON.stringify([sort, filter]), [filter, sort]);
+  const [paging, pageDispatch] = useReducer(
+    ledgerPagingReducer,
+    pageSize,
+    (size) => savedPaging ?? initialLedgerPagingState(size),
+  );
+  const request = useRef(0);
+  const loadPage = useCallback(
+    async (cursor: string | null, append: boolean) => {
+      const id = ++request.current;
+      pageDispatch({ type: "loading" });
+      try {
+        savedPagingQuery = queryKey;
+        if (!filtering) {
+          const page = await readLedgerPage({ sort, limit: pageSize, cursor });
+          if (request.current !== id) return;
+          pageDispatch({ type: "page", ...page, append });
+          return;
+        }
+
+        let scanCursor = cursor;
+        let matched = 0;
+        let appendChunk = append;
+        while (true) {
+          const chunk = await scanLedgerEntries({
+            sort,
+            candidateLimit: SCAN_CANDIDATES,
+            matchLimit: pageSize - matched,
+            cursor: scanCursor,
+            filter,
+          });
+          if (request.current !== id) return;
+          matched += chunk.rows.length;
+          const pageReady = chunk.complete || matched >= pageSize;
+          if (pageReady) {
+            pageDispatch({ type: "page", ...chunk, append: appendChunk });
+            return;
+          }
+          pageDispatch({
+            type: "provisional",
+            rows: chunk.rows,
+            cursor: chunk.cursor!,
+            revision: chunk.revision,
+            append: appendChunk,
+          });
+          appendChunk = true;
+          scanCursor = chunk.cursor;
+          await yieldToBrowser();
+        }
+      } catch (error) {
+        if (request.current !== id) return;
+        pageDispatch({
+          type: "error",
+          message: error instanceof Error ? error.message : "Could not load entries.",
+        });
+      }
+    },
+    [filter, filtering, pageSize, queryKey, sort],
+  );
+
+  useEffect(() => {
+    savedFilter = draft;
+  }, [draft]);
+  useEffect(() => {
+    savedPaging = paging;
+  }, [paging]);
+  const latestSession = useRef({ queryKey, paging, draft });
+  useEffect(() => {
+    latestSession.current = { queryKey, paging, draft };
+  }, [draft, paging, queryKey]);
+  useEffect(
+    () => () => {
+      const latest = latestSession.current;
+      ledgerSession.save(latest.queryKey, latest.paging, latest.draft, window.scrollY);
+    },
+    [],
+  );
+  const restoredScroll = useRef(false);
+  useEffect(() => {
+    if (!ready || restoredScroll.current) return;
+    restoredScroll.current = true;
+    const saved = ledgerSession.restore(queryKey);
+    if (!saved) return;
+    window.requestAnimationFrame(() => window.scrollTo({ top: saved.scrollY }));
+  }, [queryKey, ready]);
+  const previousQuery = useRef(queryKey);
+  useEffect(() => {
+    if (previousQuery.current === queryKey) return;
+    previousQuery.current = queryKey;
+    window.scrollTo({ top: 0 });
+  }, [queryKey]);
+  useEffect(() => {
+    if (!ready) return;
+    const focus = focusId.current;
+    if (focus) {
+      focusId.current = null;
+      const id = ++request.current;
+      pageDispatch({ type: "query-change" });
+      void readLedgerFocus({ id: focus, sort, limit: pageSize })
+        .then((window) => {
+          if (request.current !== id) return;
+          savedPagingQuery = queryKey;
+          pageDispatch({
+            type: "page",
+            rows: window.rows,
+            cursor: window.cursor,
+            revision: window.revision,
+            complete: window.completeAfter,
+            append: false,
+          });
+          flashRow({ id: focus, scroll: true });
+          router.replace("/ledger", { scroll: false });
+        })
+        .catch((error: unknown) => {
+          if (request.current !== id) return;
+          pageDispatch({
+            type: "error",
+            message: error instanceof Error ? error.message : "Could not find entry.",
+          });
+        });
+      return;
+    }
+    if (
+      savedPagingQuery === queryKey &&
+      savedPaging?.status === "ready"
+    ) {
+      return;
+    }
+    pageDispatch({ type: "query-change" });
+    void loadPage(null, false);
+  }, [flashRow, loadPage, pageSize, queryKey, ready, router, sort]);
+
+  const lastLocalAdd = useRef<number | null>(null);
+  useEffect(() => {
+    if (!localAdd || lastLocalAdd.current === localAdd.nonce) return;
+    lastLocalAdd.current = localAdd.nonce;
+    request.current += 1;
+    pageDispatch({ type: "local-add", id: localAdd.id });
+    flashRow({ id: localAdd.id });
+    setDraft(NO_FILTER);
+    setSort("newest");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (needsImmediateLocalAddReload(sort, filtering)) {
+      void loadPage(null, false);
+    }
+  }, [filtering, flashRow, loadPage, localAdd, setSort, sort]);
+
+  useEffect(() => {
+    if (!ready || paging.rows.length === 0 || paging.revision === revision) return;
+    let active = true;
+    void readLedgerEntriesById(paging.rows.map((row) => row.id)).then((current) => {
+      if (!active) return;
+      pageDispatch({
+        type: "revalidate",
+        rows: sortRegister(applyFilter(current, filter, { label: labelOf }), sort),
+        revision,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [filter, labelOf, paging.revision, paging.rows, ready, revision, sort]);
+
+  const lastRemoteChange = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      !remoteChange ||
+      lastRemoteChange.current === remoteChange.nonce ||
+      paging.rows.length === 0
+    ) {
+      return;
+    }
+    lastRemoteChange.current = remoteChange.nonce;
+    let active = true;
+    void readLedgerPage({ sort, limit: 1, cursor: null, filter }).then((page) => {
+      if (!active) return;
+      pageDispatch({
+        type: "remote-change",
+        revision: page.revision,
+        hasNewEntries:
+          sort === "newest" &&
+          !filtering &&
+          page.rows[0]?.id !== undefined &&
+          page.rows[0]?.id !== paging.rows[0]?.id,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [filter, filtering, paging.rows, remoteChange, sort]);
+
+  const rows = paging.rows;
 
   // A size sort ranks entries ACROSS days, so day headers would be lying about
   // what orders the page — the date moves onto the row instead.
@@ -293,12 +512,57 @@ export function LedgerView() {
   // The carried balance, one ordered pass over the days on screen rather than a
   // full scan per header. Computed from the WHOLE ledger, not the filtered rows —
   // it is the running overall balance, which is why it hides when filtered.
-  const carried = useMemo(() => {
-    if (!grouped || filtering) return null;
-    const days = groups.map((g) => g.day);
-    const values = overallBalanceSeries(transactions, containers, days);
-    return new Map(days.map((d, i) => [d, values[i]]));
-  }, [grouped, filtering, groups, transactions, containers]);
+  const carriedKey = useMemo(
+    () => JSON.stringify([revision, groups.map((group) => group.day)]),
+    [groups, revision],
+  );
+  const [carried, setCarried] = useState<{
+    key: string;
+    values: Map<string, number>;
+  } | null>(null);
+  useEffect(() => {
+    if (!grouped || filtering || groups.length === 0) {
+      return;
+    }
+    let active = true;
+    const days = groups.map((group) => group.day);
+    const ids = containers
+      .filter(
+        (container) => container.include_in_overall_balance && !container.is_archived,
+      )
+      .map((container) => container.id);
+    void readOverallBalanceSeries(ids, days).then((values) => {
+      if (active) {
+        setCarried({
+          key: carriedKey,
+          values: new Map(days.map((day, index) => [day, values[index]])),
+        });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [carriedKey, containers, filtering, grouped, groups, revision]);
+  const currentCarried =
+    grouped && !filtering && carried?.key === carriedKey ? carried.values : null;
+
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadMore = useCallback(() => {
+    if (paging.status === "loading" || paging.complete || paging.cursor === null) return;
+    void loadPage(paging.cursor, true);
+  }, [loadPage, paging.complete, paging.cursor, paging.status]);
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   // Save a row as a 1-tap shortcut (§5.8). The template keeps the shape (transfer
   // vs. expense/income) so quick-logging it later reproduces the same kind of row.
@@ -351,8 +615,10 @@ export function LedgerView() {
       </div>
     );
 
+  const monthIn = currentSummary?.monthIn ?? 0;
+  const monthOut = currentSummary?.monthOut ?? 0;
   const monthNet = monthIn - monthOut;
-  const versusLastMonth = monthNet - lastMonthNet;
+  const versusLastMonth = monthNet - (currentSummary?.lastMonthNet ?? 0);
 
   return (
     <div className="space-y-6">
@@ -363,34 +629,36 @@ export function LedgerView() {
           Every approved entry, with the running balance it creates.
         </p>
       </section>
-      <Figure
-        label="Overall balance"
-        cents={balance}
-        series={live.length > 0 ? curve : undefined}
-      >
-        <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
-          <span className="text-foreground/70 font-medium">This month</span>
-          <span className="inline-flex items-center gap-1.5">
-            <ArrowDownLeftIcon className="text-positive size-4" />
-            <Money cents={monthIn} className="text-foreground" />
-            in
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <ArrowUpRightIcon className="size-4" />
-            <Money cents={monthOut} className="text-foreground" />
-            out
-          </span>
-        </div>
-        {/* The accountant's note: what the figure cannot say about itself
-            (§12.3). Only once there is a month to compare against. */}
-        {hadLastMonth && (
-          <Marginalia className="mt-2">
-            {versusLastMonth === 0
-              ? "level with last month"
-              : `${versusLastMonth > 0 ? "up" : "down"} ${formatCents(Math.abs(versusLastMonth))} on last month`}
-          </Marginalia>
-        )}
-      </Figure>
+      {currentSummary ? (
+        <Figure
+          label="Overall balance"
+          cents={balance}
+          series={ledgerCount > 0 ? currentSummary.curve : undefined}
+        >
+          <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+            <span className="text-foreground/70 font-medium">This month</span>
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowDownLeftIcon className="text-positive size-4" />
+              <Money cents={monthIn} className="text-foreground" />
+              in
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowUpRightIcon className="size-4" />
+              <Money cents={monthOut} className="text-foreground" />
+              out
+            </span>
+          </div>
+          {currentSummary.hadLastMonth && (
+            <Marginalia className="mt-2">
+              {versusLastMonth === 0
+                ? "level with last month"
+                : `${versusLastMonth > 0 ? "up" : "down"} ${formatCents(Math.abs(versusLastMonth))} on last month`}
+            </Marginalia>
+          )}
+        </Figure>
+      ) : (
+        <FigureSkeleton />
+      )}
 
       {/* No compose bar here any more (M11 phase 5). Writing an entry is the
           FAB and the quick-add sheet, from every screen — a second, permanently
@@ -398,7 +666,7 @@ export function LedgerView() {
           costing a third of the page. The compose-bar pattern (§12.4) is
           unchanged and still how Categories and Containers create. */}
 
-      {live.length > 0 && (
+      {ledgerCount > 0 && (
         <FilterBar
           search={draft.text}
           onSearch={(text) => setDraft((d) => ({ ...d, text }))}
@@ -459,11 +727,40 @@ export function LedgerView() {
           container, which would make the sticky day header stick to this card
           (it never scrolls) instead of to the viewport. Clip rounds the corners
           without creating one. */}
+      {paging.newEntries && (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-full"
+            onClick={() => {
+              pageDispatch({ type: "jump-new" });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              void loadPage(null, false);
+            }}
+          >
+            New entries
+          </Button>
+        </div>
+      )}
       <div className="bg-card overflow-clip rounded-2xl border">
-        {rows.length === 0 ? (
+        {paging.status === "loading" && rows.length === 0 ? (
+          <ListSkeleton rows={pageSize === 25 ? 5 : 8} />
+        ) : paging.status === "error" && rows.length === 0 ? (
+          <EmptyState
+            title="Entries could not be loaded"
+            action={
+              <Button variant="outline" size="sm" onClick={() => void loadPage(null, false)}>
+                Retry
+              </Button>
+            }
+          >
+            Nothing was treated as missing. Try the read again.
+          </EmptyState>
+        ) : rows.length === 0 ? (
           // Filtering the last row away is still "nothing logged yet", not a
           // filter you can widen.
-          filtering && live.length > 0 ? (
+          filtering && ledgerCount > 0 ? (
             <EmptyState
               title="Nothing matches those filters"
               action={
@@ -477,7 +774,7 @@ export function LedgerView() {
                 </Button>
               }
             >
-              {live.length} entr{live.length === 1 ? "y is" : "ies are"} in the register —
+              {ledgerCount} entr{ledgerCount === 1 ? "y is" : "ies are"} in the register —
               widen the filters to see them.
             </EmptyState>
           ) : categories.length === 0 ? (
@@ -505,7 +802,7 @@ export function LedgerView() {
         ) : grouped ? (
           groups.map((g, gi) => (
             <div key={g.day} className={cn(gi > 0 && "border-t")}>
-              <DayHeader day={g.day} carried={carried?.get(g.day) ?? null} />
+              <DayHeader day={g.day} carried={currentCarried?.get(g.day) ?? null} />
               {g.items.map((t) => (
                 <LedgerRow
                   key={t.id}
@@ -545,13 +842,34 @@ export function LedgerView() {
             ))}
           </div>
         )}
+        {rows.length > 0 && !paging.complete && (
+          <div ref={loadMoreRef} className="flex justify-center border-t px-4 py-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={paging.status === "loading"}
+              onClick={loadMore}
+            >
+              {paging.status === "loading" ? "Loading…" : "Load more"}
+            </Button>
+          </div>
+        )}
+        {paging.status === "error" && rows.length > 0 && (
+          <div className="flex items-center justify-center gap-3 border-t px-4 py-3 text-sm">
+            <span className="text-muted-foreground">More entries unknown.</span>
+            <Button variant="ghost" size="sm" onClick={loadMore}>
+              Retry
+            </Button>
+          </div>
+        )}
       </div>
 
       <EditTransactionSheet
         editing={editing}
         categories={categories}
         containers={containers}
-        transactions={transactions}
+        transactions={usageFacts}
         onOpenChange={(open) => !open && setEditing(null)}
         onSave={async (op) => {
           await dispatch(op);

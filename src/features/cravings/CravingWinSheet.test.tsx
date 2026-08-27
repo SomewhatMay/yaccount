@@ -22,7 +22,10 @@ vi.mock("@/features/store", () => ({
   flashRowAtom: "flashRow",
   goalsAtom: "goals",
   runGoalMaintenanceAtom: "maintainGoals",
-  transactionsAtom: "transactions",
+}));
+
+vi.mock("@/features/useLedgerEntries", () => ({
+  useLedgerEntriesById: () => fixture.values.get("transactions"),
 }));
 
 it("adapts the globally selected win to the shared form sheet", () => {

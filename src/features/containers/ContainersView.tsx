@@ -13,13 +13,13 @@ import {
 } from "lucide-react";
 import {
   containersAtom,
+  containerFactsAtom,
   defaultContainerIdAtom,
   dispatchAtom,
   flashRowAtom,
   readyAtom,
   reportedBalanceContainerIdAtom,
   snapshotsAtom,
-  transactionsAtom,
 } from "@/features/store";
 import { useFocusParam } from "@/features/useFocusParam";
 import {
@@ -29,7 +29,6 @@ import {
   unarchiveContainer,
   updateContainer,
 } from "@/core/commands";
-import { containerBalance, netContributions } from "@/core/engine/balances";
 import { formatCents } from "@/core/money";
 import {
   GENERAL_CONTAINER_ID,
@@ -118,7 +117,7 @@ const NO_FILTER: ContainerDraft = { text: "", kinds: [], counted: [], states: []
 export function ContainersView() {
   const ready = useAtomValue(readyAtom);
   const containers = useAtomValue(containersAtom);
-  const transactions = useAtomValue(transactionsAtom);
+  const containerFacts = useAtomValue(containerFactsAtom);
   const snapshots = useAtomValue(snapshotsAtom);
   const defaultId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
@@ -130,7 +129,9 @@ export function ContainersView() {
   // A ⌘K result reveals the row; it does not open the rename field.
   useFocusParam("/containers");
   const [archiving, setArchiving] = useState<Container | null>(null);
-  const archivingBalance = archiving ? containerBalance(transactions, archiving.id) : 0;
+  const archivingBalance = archiving
+    ? (containerFacts.get(archiving.id)?.balance ?? 0)
+    : 0;
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11).
   const [sort, setSort] = useLocalPref(SORT_KEY, "name", isContainerSort);
@@ -139,8 +140,8 @@ export function ContainersView() {
   const filtering = activeContainerFilterCount(filter) > 0;
 
   const balanceOf = useMemo(
-    () => (c: Container) => containerBalance(transactions, c.id),
-    [transactions],
+    () => (c: Container) => containerFacts.get(c.id)?.balance ?? 0,
+    [containerFacts],
   );
 
   const shown = useMemo(
@@ -297,7 +298,7 @@ export function ContainersView() {
               divider={i > 0}
               balance={balanceOf(c)}
               siblings={containers}
-              contributed={netContributions(transactions, c.id)}
+              contributed={containerFacts.get(c.id)?.netContribution ?? 0}
               snapshot={latestSnapshot.get(c.id)}
               isDefault={c.id === defaultId}
               onDispatch={dispatch}

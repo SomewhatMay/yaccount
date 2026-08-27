@@ -16,7 +16,7 @@ import {
   readyAtom,
   recurringRulesAtom,
   settingsAtom,
-  transactionsAtom,
+  goalFactsAtom,
 } from "@/features/store";
 import { cn } from "@/lib/utils";
 import {
@@ -53,7 +53,7 @@ function monthLabel(ym: string): string {
 export function PlanView() {
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
-  const txns = useAtomValue(transactionsAtom);
+  const goalFacts = useAtomValue(goalFactsAtom);
   const goals = useAtomValue(goalsAtom);
   const budgetTargets = useAtomValue(budgetTargetsAtom);
   const rules = useAtomValue(recurringRulesAtom);
@@ -76,14 +76,15 @@ export function PlanView() {
       monthlyPlan({
         yearMonth,
         today,
-        txns,
+        txns: [],
+        goalFacts,
         categories,
         goals,
         budgetTargets,
         rules,
         manualIncome,
       }),
-    [yearMonth, today, txns, categories, goals, budgetTargets, rules, manualIncome],
+    [yearMonth, today, goalFacts, categories, goals, budgetTargets, rules, manualIncome],
   );
 
   async function saveIncome() {

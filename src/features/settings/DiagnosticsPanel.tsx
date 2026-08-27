@@ -9,7 +9,6 @@ import {
   lastSyncErrorAtom,
   lastSyncedAtAtom,
   syncStatusAtom,
-  transactionsAtom,
 } from "@/features/store";
 import { CopyButton, DownloadDiagnosticsButton } from "@/features/ErrorBoundary";
 import { createLogger, withoutBrowserFacts, type LogRecord } from "@/lib/logger";
@@ -45,7 +44,6 @@ const LEVEL_TONE: Record<LogRecord["level"], string> = {
 const subscribeNothing = () => () => {};
 
 export function DiagnosticsPanel() {
-  const transactions = useAtomValue(transactionsAtom);
   const syncStatus = useAtomValue(syncStatusAtom);
   const lastSyncedAt = useAtomValue(lastSyncedAtAtom);
   const lastSyncError = useAtomValue(lastSyncErrorAtom);
@@ -53,6 +51,7 @@ export function DiagnosticsPanel() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [opCount, setOpCount] = useState<number | null>(null);
   const [outboxCount, setOutboxCount] = useState<number | null>(null);
+  const [transactionCount, setTransactionCount] = useState<number | null>(null);
   const [records, setRecords] = useState<LogRecord[]>([]);
   // `navigator` and the time zone exist on the first client render but NOT in
   // the prerendered HTML, so rendering them straight away disagrees with the
@@ -70,15 +69,17 @@ export function DiagnosticsPanel() {
     void (async () => {
       try {
         const repo = await Repo.open();
-        const [id, ops, outbox] = await Promise.all([
+        const [id, ops, outbox, transactions] = await Promise.all([
           repo.getDeviceId(),
           repo.listOps(),
           repo.getAll(STORE.outbox),
+          repo.count(STORE.transactions),
         ]);
         if (cancelled) return;
         setDeviceId(id);
         setOpCount(ops.length);
         setOutboxCount(outbox.length);
+        setTransactionCount(transactions);
       } catch (err) {
         // The panel is the place you land WHEN things are broken, so it has to
         // survive the repo being the broken thing.
@@ -121,7 +122,7 @@ export function DiagnosticsPanel() {
       "time zone": Intl.DateTimeFormat().resolvedOptions().timeZone,
       database: `${DB_NAME} v${DB_VERSION}`,
       "device id": deviceId,
-      transactions: transactions.length,
+      transactions: transactionCount,
       "ops in journal": opCount,
       "queued to sync": outboxCount,
       "sync status": syncStatus,
@@ -130,7 +131,7 @@ export function DiagnosticsPanel() {
     }),
     [
       deviceId,
-      transactions.length,
+      transactionCount,
       opCount,
       outboxCount,
       syncStatus,

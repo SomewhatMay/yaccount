@@ -15,6 +15,7 @@ import {
   rankShortcutsByUsage,
   rankVendorSourcesByUsage,
 } from "./usage-ranking";
+import { deriveLedgerReadModel } from "@/core/repo/ledger-read";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -328,6 +329,47 @@ describe("usage-ranked selectors", () => {
     expect(rankContainersByUsage(candidates, []).map((c) => c.id)).toEqual(["a", "b"]);
     expect(candidates).toEqual(original);
     expect(rankContainersByUsage(candidates, []).map((c) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps exact ranking from compact read facts without transaction rows", () => {
+    const categories = [
+      makeCategory({ id: "once", name: "Once", type: "expense" }),
+      makeCategory({ id: "twice", name: "Twice", type: "expense" }),
+    ];
+    const templates = [
+      makeTemplate({
+        id: "once-template",
+        template_name: "Once",
+        amount: -100,
+        vendor_source: "Once",
+        container_id: "wallet",
+        category_id: "once",
+      }),
+      makeTemplate({
+        id: "twice-template",
+        template_name: "Twice",
+        amount: -200,
+        vendor_source: "Twice",
+        container_id: "wallet",
+        category_id: "twice",
+      }),
+    ];
+    const rows = [
+      entry("once-use", "once", "wallet", "2026-07-03T00:00:00.000Z"),
+      { ...entry("twice-1", "twice", "wallet", "2026-07-01T00:00:00.000Z"), amount: -200, vendor_source: "Twice" },
+      { ...entry("twice-2", "twice", "wallet", "2026-07-02T00:00:00.000Z"), amount: -200, vendor_source: "Twice" },
+    ];
+    rows[0].vendor_source = "Once";
+    const facts = deriveLedgerReadModel(rows).usage;
+
+    expect(rankCategoriesByUsage(categories, facts).map((row) => row.id)).toEqual([
+      "twice",
+      "once",
+    ]);
+    expect(rankShortcutsByUsage(templates, facts).map((row) => row.id)).toEqual([
+      "twice-template",
+      "once-template",
+    ]);
   });
 
   it.each([
