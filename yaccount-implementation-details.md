@@ -23,7 +23,7 @@
 | Dates | ISO `YYYY-MM-DD` strings, `date-fns` for math |
 | Money | integer cents everywhere; decimal only at the input-parse and display-format edges |
 | Backend | `drivestore` over Google Drive `appDataFolder` |
-| Logging | `loglevel` + a ring buffer surfaced in Settings diagnostics |
+| Logging | `loglevel` + redacted memory/persistent local diagnostics surfaced in Settings |
 | Tests | Vitest + `fake-indexeddb`; Playwright for e2e |
 | Native shell | Capacitor — deferred (M10) |
 
@@ -137,7 +137,7 @@ instead of minting duplicates. The `deviceId` is minted into `app_meta` and is *
 
 ## 4. Persistence
 
-`src/core/repo/db.ts` owns the schema: **`DB_VERSION = 3`**, eleven stores (the seven tables,
+`src/core/repo/db.ts` owns the schema: **`DB_VERSION = 4`**, twelve stores (the eight tables,
 synced `settings`, and infra `oplog` / `app_meta` / `outbox`) and three indexes. See spec §7.1 for
 what each store and index is for.
 
