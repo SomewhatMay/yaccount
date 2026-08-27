@@ -1,8 +1,8 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 export const DB_NAME = "yaccount";
-// v4: adds Cravings Savings. Guarded upgrade keeps every populated older cache.
-export const DB_VERSION = 4;
+// v5: adds reconstructable Ledger read stores/indexes. Canonical stores stay untouched.
+export const DB_VERSION = 5;
 
 /** Object-store registry. Materialized tables (§7) + infra stores. */
 export const STORE = {
@@ -14,6 +14,9 @@ export const STORE = {
   recurringRules: "recurring_rules",
   goals: "goals",
   cravingWins: "craving_wins",
+  entryRead: "entry_read",
+  ledgerBalanceBucket: "ledger_balance_bucket",
+  ledgerReadFact: "ledger_read_fact",
   settings: "settings", // synced user preferences (M3) — key/value, keyPath 'key'
   oplog: "oplog", // append-only journal (§8.2)
   appMeta: "app_meta", // device-local metadata (deviceId, …) — never synced (§8.4)
@@ -35,11 +38,19 @@ export const STATE_STORES: StoreName[] = [
   STORE.settings,
 ];
 
+/** Disposable, local read models. Never synced or exported. */
+export const READ_STORES: StoreName[] = [
+  STORE.entryRead,
+  STORE.ledgerBalanceBucket,
+  STORE.ledgerReadFact,
+];
+
 /** Every store — the transaction scope for a dispatch (append + apply, §3).
  * Includes `outbox` so a local dispatch enqueues its op for push in the SAME
  * atomic transaction (§8.4 — a crash can't leave an authored op un-queued). */
 export const ALL_STORES: StoreName[] = [
   ...STATE_STORES,
+  ...READ_STORES,
   STORE.oplog,
   STORE.appMeta,
   STORE.outbox,
@@ -52,18 +63,47 @@ export const INDEX = {
   byContainerMonth: "by_container_month",
   // Total-order iteration of the op-log (ts, then id) — §8.2.
   oplogByTs: "by_ts",
+  transactionsByDate: "by_date",
+  transactionsByReversesId: "by_reverses_id",
+  transactionsByCategoryDate: "by_category_date",
+  transactionsBySourceDate: "by_source_date",
+  transactionsByDestinationDate: "by_destination_date",
+  transactionsByRuleDate: "by_rule_date",
+  transactionsByOccurrenceDate: "by_occurrence_date",
+  entryChronology: "by_chronology",
+  entryLargest: "by_largest",
+  entrySmallest: "by_smallest",
+  entryCategoryChronology: "by_category_chronology",
+  entrySourceChronology: "by_source_chronology",
+  entryDestinationChronology: "by_destination_chronology",
+  entryRuleChronology: "by_rule_chronology",
+  entryOccurrenceChronology: "by_occurrence_chronology",
+  entryCravingChronology: "by_craving_chronology",
+  entryVendorUsage: "by_vendor_usage",
+  entryShortcutUsage: "by_shortcut_usage",
+  balanceBucketByPeriodContainer: "by_period_container_key",
 } as const;
 
 export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
-  return openDB(name, DB_VERSION, {
+  let opened: IDBPDatabase | undefined;
+  const pending = openDB(name, DB_VERSION, {
     // Guarded per-store creation so an existing device upgrades in place — an
     // already-populated IndexedDB is the local-first source of truth (§8.6) and
     // must never be dropped to add a store.
-    upgrade(db) {
+    upgrade(db, _oldVersion, _newVersion, upgradeTx) {
       const store = (name: StoreName, keyPath = "id") =>
         db.objectStoreNames.contains(name)
           ? null
           : db.createObjectStore(name, { keyPath });
+
+      const ensureIndex = (
+        storeName: StoreName,
+        name: string,
+        keyPath: string | string[],
+      ) => {
+        const objectStore = upgradeTx.objectStore(storeName);
+        if (!objectStore.indexNames.contains(name)) objectStore.createIndex(name, keyPath);
+      };
 
       store(STORE.categories);
       store(STORE.containers);
@@ -78,11 +118,73 @@ export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
         ]);
         transactions.createIndex(INDEX.byContainerMonth, ["container_id", "yearMonth"]);
       }
+      ensureIndex(STORE.transactions, INDEX.transactionsByDate, "date");
+      ensureIndex(STORE.transactions, INDEX.transactionsByReversesId, "reverses_id");
+      ensureIndex(STORE.transactions, INDEX.transactionsByCategoryDate, [
+        "category_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.transactions, INDEX.transactionsBySourceDate, [
+        "container_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.transactions, INDEX.transactionsByDestinationDate, [
+        "to_container_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.transactions, INDEX.transactionsByRuleDate, [
+        "recurring_rule_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(
+        STORE.transactions,
+        INDEX.transactionsByOccurrenceDate,
+        "recurring_occurrence_date",
+      );
 
       store(STORE.containerSnapshots);
       store(STORE.recurringRules);
       store(STORE.goals);
       store(STORE.cravingWins);
+      store(STORE.entryRead);
+      ensureIndex(STORE.entryRead, INDEX.entryChronology, "chronologyKey");
+      ensureIndex(STORE.entryRead, INDEX.entryLargest, "largestKey");
+      ensureIndex(STORE.entryRead, INDEX.entrySmallest, "smallestKey");
+      ensureIndex(
+        STORE.entryRead,
+        INDEX.entryCategoryChronology,
+        "categoryChronologyKey",
+      );
+      ensureIndex(STORE.entryRead, INDEX.entrySourceChronology, "sourceChronologyKey");
+      ensureIndex(
+        STORE.entryRead,
+        INDEX.entryDestinationChronology,
+        "destinationChronologyKey",
+      );
+      ensureIndex(STORE.entryRead, INDEX.entryRuleChronology, "ruleChronologyKey");
+      ensureIndex(
+        STORE.entryRead,
+        INDEX.entryOccurrenceChronology,
+        "occurrenceChronologyKey",
+      );
+      ensureIndex(STORE.entryRead, INDEX.entryCravingChronology, "cravingChronologyKey");
+      ensureIndex(STORE.entryRead, INDEX.entryVendorUsage, "vendorUsageKey");
+      ensureIndex(STORE.entryRead, INDEX.entryShortcutUsage, "shortcutUsageKey");
+      store(STORE.ledgerBalanceBucket);
+      ensureIndex(
+        STORE.ledgerBalanceBucket,
+        INDEX.balanceBucketByPeriodContainer,
+        ["period", "containerId", "key"],
+      );
+      store(STORE.ledgerReadFact);
       store(STORE.settings, "key"); // added in DB v2 (M3)
 
       const oplog = store(STORE.oplog);
@@ -95,7 +197,14 @@ export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
     // hazard, but the browser blocks the downgrade-open. Nothing to do here; the
     // guarded upgrade above only ever *adds* stores.
     blocked() {
-      /* another tab holds an older connection — it will close and retry */
+      /* another tab holds an older connection; the caller remains safely blocked */
     },
+    blocking() {
+      opened?.close();
+    },
+  });
+  return pending.then((db) => {
+    opened = db;
+    return db;
   });
 }

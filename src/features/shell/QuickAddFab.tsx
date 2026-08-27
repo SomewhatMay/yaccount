@@ -19,7 +19,7 @@ import {
   flashRowAtom,
   quickAddAtom,
   templatesAtom,
-  transactionsAtom,
+  usageFactsAtom,
 } from "@/features/store";
 import {
   FAB_HOLD_MS,
@@ -52,7 +52,7 @@ export function QuickAddFab() {
   const openQuickAdd = useSetAtom(quickAddAtom);
   const openCravingWin = useSetAtom(cravingWinSheetAtom);
   const templates = useAtomValue(templatesAtom);
-  const transactions = useAtomValue(transactionsAtom);
+  const transactions = useAtomValue(usageFactsAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const rankedTemplates = useMemo(

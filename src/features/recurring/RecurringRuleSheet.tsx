@@ -19,6 +19,7 @@ import {
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
+  type UsageSource,
 } from "@/core/engine/usage-ranking";
 import {
   rankVendorSourcesForKind,
@@ -73,7 +74,7 @@ export function RecurringRuleSheet({
   rule: RecurringRule | null;
   categories: Category[];
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
@@ -108,7 +109,7 @@ function RuleForm({
   rule: RecurringRule | null;
   categories: Category[];
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
   const activeCategories = useMemo(

@@ -11,6 +11,7 @@ import {
   rankVendorSourcesForKind,
   recallVendorSelection,
 } from "./autocomplete";
+import { deriveLedgerReadModel } from "@/core/repo/ledger-read";
 
 const categories = [
   makeCategory({ id: "food", name: "Food", type: "expense" }),
@@ -139,5 +140,27 @@ describe("creation autocomplete", () => {
       "common",
     ]);
     expect(rankAutocompleteOptions(options, "")).toEqual(options);
+  });
+
+  it("ranks and recalls vendors from compact usage facts", () => {
+    const rows = [
+      entry("old", "Cafe", "food", "cash", "2026-08-01T10:00:00.000Z"),
+      entry("new", "Cafe", "fun", "card", "2026-08-03T10:00:00.000Z"),
+      entry("repeat", "Cafe", "food", "cash", "2026-08-02T10:00:00.000Z"),
+      entry("income", "Cafe", "salary", "bank", "2026-08-04T10:00:00.000Z"),
+    ];
+    const facts = deriveLedgerReadModel(rows).usage;
+
+    expect(rankVendorSourcesForKind(facts, categories, "expense", "ca")).toEqual([
+      "Cafe",
+    ]);
+    expect(recallVendorSelection(facts, categories, "expense", "cafe")).toEqual({
+      categoryId: "fun",
+      containerId: "card",
+    });
+    expect(recallVendorSelection(facts, categories, "income", "cafe")).toEqual({
+      categoryId: "salary",
+      containerId: "bank",
+    });
   });
 });

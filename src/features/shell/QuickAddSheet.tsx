@@ -17,7 +17,7 @@ import {
   flashRowAtom,
   quickAddAtom,
   templatesAtom,
-  transactionsAtom,
+  usageFactsAtom,
 } from "@/features/store";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
@@ -81,7 +81,7 @@ function QuickAddForm({
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const templates = useAtomValue(templatesAtom);
-  const transactions = useAtomValue(transactionsAtom);
+  const transactions = useAtomValue(usageFactsAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);

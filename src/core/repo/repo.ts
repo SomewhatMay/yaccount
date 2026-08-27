@@ -5,7 +5,9 @@ import {
   DB_VERSION,
   STORE,
   ALL_STORES,
+  READ_STORES,
   STATE_STORES,
+  INDEX,
   type StoreName,
 } from "./db";
 import {
@@ -17,7 +19,30 @@ import {
   type Op,
   type Tx,
 } from "../oplog";
-import { makeGeneralContainer, GENERAL_CONTAINER_ID, type Transaction } from "../model";
+import {
+  makeGeneralContainer,
+  GENERAL_CONTAINER_ID,
+  type Category,
+  type Container,
+  type Transaction,
+} from "../model";
+import { matchesFilter, type TransactionFilter } from "../engine/filter";
+import {
+  deriveLedgerReadModel,
+  entryIndexKey,
+  ledgerUsageContributions,
+  ledgerUsageRecent,
+  LEDGER_READ_MODEL_VERSION,
+  LEDGER_READ_REVISION_KEY,
+  LEDGER_READ_VERSION_KEY,
+  type EntryRead,
+  type LedgerBalanceBucket,
+  type LedgerContainerFact,
+  type LedgerReadState,
+  type LedgerReadSort,
+  type LedgerUsageContribution,
+  type LedgerUsageFact,
+} from "./ledger-read";
 
 const DEVICE_ID_KEY = "deviceId";
 // One-shot data passes, marked done in `app_meta` so they never re-run. NOT a
@@ -70,6 +95,88 @@ export interface RepoDiagnosticEvent {
 type RepoDiagnosticSink = (event: RepoDiagnosticEvent) => void;
 const ignoreDiagnostics: RepoDiagnosticSink = () => {};
 const elapsed = (startedAt: number): number => Math.max(0, Date.now() - startedAt);
+
+export interface LedgerPageQuery {
+  sort: LedgerReadSort;
+  limit: number;
+  cursor: string | null;
+  filter?: TransactionFilter;
+}
+
+export interface LedgerPageResult {
+  rows: EntryRead[];
+  cursor: string | null;
+  revision: number;
+  complete: boolean;
+  staleCursor: boolean;
+}
+
+export interface LedgerFocusQuery {
+  id: string;
+  sort: LedgerReadSort;
+  limit: number;
+}
+
+export interface LedgerFocusResult {
+  rows: EntryRead[];
+  revision: number;
+  completeBefore: boolean;
+  completeAfter: boolean;
+}
+
+export interface LedgerReadSnapshot {
+  revision: number;
+  ledgerCount: number;
+  pending: EntryRead[];
+  templates: EntryRead[];
+  containerFacts: LedgerContainerFact[];
+  usageFacts: LedgerUsageFact[];
+}
+
+interface LedgerCursorToken {
+  version: number;
+  revision: number;
+  sort: LedgerReadSort;
+  filter: string;
+  key: IDBValidKey;
+}
+
+function isTransactionOp(op: Op): boolean {
+  return op.type.startsWith("transaction.") || op.type.startsWith("template.");
+}
+
+function transactionOpRowId(op: Op): string | null {
+  switch (op.type) {
+    case "transaction.create":
+    case "transaction.update":
+    case "transaction.void":
+    case "template.create":
+      return op.payload.row.id;
+    case "transaction.approve":
+    case "template.remove":
+      return op.payload.id;
+    default:
+      return null;
+  }
+}
+
+function filterSignature(filter: TransactionFilter | undefined): string {
+  return JSON.stringify(filter ?? {});
+}
+
+function parseCursor(value: string): LedgerCursorToken {
+  const parsed = JSON.parse(value) as Partial<LedgerCursorToken>;
+  if (
+    parsed.version !== LEDGER_READ_MODEL_VERSION ||
+    typeof parsed.revision !== "number" ||
+    typeof parsed.sort !== "string" ||
+    typeof parsed.filter !== "string" ||
+    parsed.key === undefined
+  ) {
+    throw new Error("invalid Ledger cursor");
+  }
+  return parsed as LedgerCursorToken;
+}
 
 /** `Tx` backed by a live IndexedDB transaction — the same reducer runs here. */
 class IdbTx implements Tx {
@@ -150,6 +257,317 @@ export class Repo {
     const general = await this.db.get(STORE.containers, GENERAL_CONTAINER_ID);
     if (!general) await this.dispatch(seedGeneralOp());
     await this.backfillEnteredAt();
+    await this.ensureLedgerReadModel();
+  }
+
+  private async bumpLedgerRevision(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+  ): Promise<number> {
+    const meta = tx.objectStore(STORE.appMeta);
+    const current = (await meta.get(LEDGER_READ_REVISION_KEY)) as
+      | { value: number }
+      | undefined;
+    const revision = (current?.value ?? 0) + 1;
+    await meta.put({ key: LEDGER_READ_REVISION_KEY, value: revision });
+    return revision;
+  }
+
+  private async rebuildLedgerReadModel(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+  ): Promise<number> {
+    const transactions = (await tx.objectStore(STORE.transactions).getAll()) as Transaction[];
+    const model = deriveLedgerReadModel(transactions);
+    for (const store of READ_STORES) await tx.objectStore(store).clear();
+    const entries = tx.objectStore(STORE.entryRead);
+    for (const entry of model.entries) await entries.put(entry);
+    const buckets = tx.objectStore(STORE.ledgerBalanceBucket);
+    for (const bucket of model.buckets) await buckets.put(bucket);
+    const facts = tx.objectStore(STORE.ledgerReadFact);
+    for (const fact of model.facts.values()) await facts.put(fact);
+    for (const fact of model.usage) await facts.put(fact);
+    for (const [state, count] of Object.entries(model.counts)) {
+      await facts.put({ id: `count:${state}`, state, count });
+    }
+    await tx.objectStore(STORE.appMeta).put({
+      key: LEDGER_READ_VERSION_KEY,
+      value: LEDGER_READ_MODEL_VERSION,
+    });
+    return this.bumpLedgerRevision(tx);
+  }
+
+  private async ensureLedgerReadModel(): Promise<void> {
+    const marker = (await this.db.get(STORE.appMeta, LEDGER_READ_VERSION_KEY)) as
+      | { value: number }
+      | undefined;
+    if (marker?.value === LEDGER_READ_MODEL_VERSION) return;
+    const tx = this.db.transaction(
+      [STORE.transactions, ...READ_STORES, STORE.appMeta],
+      "readwrite",
+    );
+    try {
+      await this.rebuildLedgerReadModel(
+        tx as IDBPTransaction<unknown, StoreName[], "readwrite">,
+      );
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        // already settled
+      }
+      await tx.done.catch(() => {});
+      throw error;
+    }
+  }
+
+  private async adjustFinancialRow(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+    row: Transaction,
+    sign: 1 | -1,
+  ): Promise<void> {
+    const model = deriveLedgerReadModel([row]);
+    const buckets = tx.objectStore(STORE.ledgerBalanceBucket);
+    for (const delta of model.buckets) {
+      const current = (await buckets.get(delta.id)) as LedgerBalanceBucket | undefined;
+      const next: LedgerBalanceBucket = {
+        ...(current ?? {
+          id: delta.id,
+          period: delta.period,
+          containerId: delta.containerId,
+          key: delta.key,
+          balanceDelta: 0,
+          transferInflow: 0,
+          transferOutflow: 0,
+          netContribution: 0,
+          ordinaryIn: 0,
+          ordinaryOut: 0,
+          ordinaryCount: 0,
+        }),
+        balanceDelta: (current?.balanceDelta ?? 0) + sign * delta.balanceDelta,
+        transferInflow: (current?.transferInflow ?? 0) + sign * delta.transferInflow,
+        transferOutflow: (current?.transferOutflow ?? 0) + sign * delta.transferOutflow,
+        netContribution:
+          (current?.netContribution ?? 0) + sign * delta.netContribution,
+        ordinaryIn: (current?.ordinaryIn ?? 0) + sign * delta.ordinaryIn,
+        ordinaryOut: (current?.ordinaryOut ?? 0) + sign * delta.ordinaryOut,
+        ordinaryCount: (current?.ordinaryCount ?? 0) + sign * delta.ordinaryCount,
+      };
+      if (
+        next.balanceDelta === 0 &&
+        next.transferInflow === 0 &&
+        next.transferOutflow === 0 &&
+        next.netContribution === 0
+        && next.ordinaryIn === 0
+        && next.ordinaryOut === 0
+        && next.ordinaryCount === 0
+      ) {
+        await buckets.delete(next.id);
+      } else {
+        await buckets.put(next);
+      }
+    }
+    const facts = tx.objectStore(STORE.ledgerReadFact);
+    for (const delta of model.facts.values()) {
+      const current = (await facts.get(delta.id)) as LedgerContainerFact | undefined;
+      const next: LedgerContainerFact = {
+        id: delta.id,
+        containerId: delta.containerId,
+        balance: (current?.balance ?? 0) + sign * delta.balance,
+        netContribution:
+          (current?.netContribution ?? 0) + sign * delta.netContribution,
+      };
+      await facts.put(next);
+    }
+  }
+
+  private async collectTransactionComponent(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+    seedIds: Iterable<string>,
+  ): Promise<{ ids: Set<string>; rows: Transaction[] }> {
+    const transactions = tx.objectStore(STORE.transactions);
+    const children = transactions.index(INDEX.transactionsByReversesId);
+    const queued = [...seedIds];
+    const ids = new Set<string>();
+    const rows = new Map<string, Transaction>();
+    while (queued.length > 0) {
+      const id = queued.pop()!;
+      if (ids.has(id)) continue;
+      ids.add(id);
+      const row = (await transactions.get(id)) as Transaction | undefined;
+      if (!row) continue;
+      rows.set(id, row);
+      if (row.reverses_id) queued.push(row.reverses_id);
+      for (const child of (await children.getAll(id)) as Transaction[]) {
+        queued.push(child.id);
+      }
+    }
+    return { ids, rows: [...rows.values()] };
+  }
+
+  private async updateLedgerReadModel(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+    oldRows: Map<string, Transaction | undefined>,
+  ): Promise<void> {
+    const transactions = tx.objectStore(STORE.transactions);
+    const seeds = new Set(oldRows.keys());
+    for (const old of oldRows.values()) if (old?.reverses_id) seeds.add(old.reverses_id);
+    for (const [id, old] of oldRows) {
+      const current = (await transactions.get(id)) as Transaction | undefined;
+      if (current?.reverses_id) seeds.add(current.reverses_id);
+      if (old) await this.adjustFinancialRow(tx, old, -1);
+      if (current) await this.adjustFinancialRow(tx, current, 1);
+    }
+
+    const component = await this.collectTransactionComponent(tx, seeds);
+    const entries = tx.objectStore(STORE.entryRead);
+    const countDelta: Record<LedgerReadState, number> = {
+      ledger: 0,
+      pending: 0,
+      template: 0,
+    };
+    const previousEntries: EntryRead[] = [];
+    for (const id of component.ids) {
+      const existing = (await entries.get(id)) as EntryRead | undefined;
+      if (existing) {
+        previousEntries.push(existing);
+        countDelta[existing.state] -= 1;
+      }
+      await entries.delete(id);
+    }
+    const projected = deriveLedgerReadModel(component.rows).entries;
+    for (const entry of projected) {
+      await entries.put(entry);
+      countDelta[entry.state] += 1;
+    }
+    await this.updateUsageFacts(tx, previousEntries, projected);
+    const facts = tx.objectStore(STORE.ledgerReadFact);
+    for (const state of ["ledger", "pending", "template"] as const) {
+      if (countDelta[state] === 0) continue;
+      const id = `count:${state}`;
+      const current = (await facts.get(id)) as { id: string; state: string; count: number };
+      await facts.put({ id, state, count: (current?.count ?? 0) + countDelta[state] });
+    }
+    await this.bumpLedgerRevision(tx);
+  }
+
+  private async latestUsageEntry(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+    contribution: LedgerUsageContribution,
+  ): Promise<EntryRead | undefined> {
+    const store = tx.objectStore(STORE.entryRead);
+    const latestFrom = async (
+      indexName: string,
+      prefix: IDBValidKey[],
+    ): Promise<EntryRead | undefined> => {
+      const cursor = await store
+        .index(indexName)
+        .openCursor(IDBKeyRange.bound(prefix, [...prefix, []]), "prev");
+      return cursor?.value as EntryRead | undefined;
+    };
+    if (contribution.selector === "category") {
+      return latestFrom(INDEX.entryCategoryChronology, [
+        "ledger",
+        contribution.categoryId!,
+      ]);
+    }
+    if (contribution.selector === "vendor") {
+      return latestFrom(INDEX.entryVendorUsage, [
+        "ledger",
+        contribution.subject,
+        contribution.categoryId!,
+        contribution.containerId!,
+      ]);
+    }
+    if (contribution.selector === "shortcut") {
+      return latestFrom(INDEX.entryShortcutUsage, ["ledger", contribution.shape!]);
+    }
+    const source = await latestFrom(INDEX.entrySourceChronology, [
+      "ledger",
+      contribution.containerId!,
+    ]);
+    const destination = await latestFrom(INDEX.entryDestinationChronology, [
+      "ledger",
+      contribution.containerId!,
+    ]);
+    if (!source) return destination;
+    if (!destination) return source;
+    const sourceRecent = ledgerUsageRecent(source);
+    const destinationRecent = ledgerUsageRecent(destination);
+    return sourceRecent > destinationRecent ||
+      (sourceRecent === destinationRecent && source.id > destination.id)
+      ? source
+      : destination;
+  }
+
+  private usageFact(
+    contribution: LedgerUsageContribution,
+    row: EntryRead,
+    count: number,
+  ): LedgerUsageFact {
+    return {
+      id: contribution.id,
+      kind: contribution.kind,
+      subject: contribution.subject,
+      count,
+      recent: ledgerUsageRecent(row),
+      recentId: row.id,
+      ...(contribution.value === undefined ? {} : { value: contribution.value }),
+      ...(contribution.categoryId === undefined
+        ? {}
+        : { categoryId: contribution.categoryId }),
+      ...(contribution.containerId === undefined
+        ? {}
+        : { containerId: contribution.containerId }),
+      ...(contribution.shape === undefined ? {} : { shape: contribution.shape }),
+    };
+  }
+
+  private async updateUsageFacts(
+    tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
+    removed: EntryRead[],
+    added: EntryRead[],
+  ): Promise<void> {
+    const facts = tx.objectStore(STORE.ledgerReadFact);
+    for (const row of removed.filter((entry) => entry.state === "ledger")) {
+      for (const contribution of ledgerUsageContributions(row)) {
+        const current = (await facts.get(contribution.id)) as LedgerUsageFact | undefined;
+        if (!current) continue;
+        const count = current.count - 1;
+        if (count <= 0) {
+          await facts.delete(contribution.id);
+          continue;
+        }
+        if (current.recentId === row.id) {
+          const latest = await this.latestUsageEntry(tx, contribution);
+          if (!latest) {
+            await facts.delete(contribution.id);
+            continue;
+          }
+          const latestContribution = ledgerUsageContributions(latest).find(
+            (candidate) => candidate.id === contribution.id,
+          );
+          if (!latestContribution) throw new Error("usage selector mismatch");
+          await facts.put(this.usageFact(latestContribution, latest, count));
+        } else {
+          await facts.put({ ...current, count });
+        }
+      }
+    }
+    for (const row of added.filter((entry) => entry.state === "ledger")) {
+      for (const contribution of ledgerUsageContributions(row)) {
+        const current = (await facts.get(contribution.id)) as LedgerUsageFact | undefined;
+        const recent = ledgerUsageRecent(row);
+        const newest =
+          !current ||
+          recent > current.recent ||
+          (recent === current.recent && row.id > current.recentId);
+        await facts.put(
+          newest
+            ? this.usageFact(contribution, row, (current?.count ?? 0) + 1)
+            : { ...current, count: current.count + 1 },
+        );
+      }
+    }
   }
 
   /**
@@ -237,14 +655,40 @@ export class Repo {
     const tx = this.db.transaction(ALL_STORES, "readwrite");
     try {
       const oplog = tx.objectStore(STORE.oplog);
+      let wrote = false;
+      let rebuildReadModel = false;
+      const oldTransactions = new Map<string, Transaction | undefined>();
       for (const op of ops) {
         if (await oplog.get(op.id)) continue;
+        wrote = true;
+        rebuildReadModel ||= isTransactionOp(op);
+        const transactionId = transactionOpRowId(op);
+        if (transactionId !== null && !oldTransactions.has(transactionId)) {
+          oldTransactions.set(
+            transactionId,
+            (await tx.objectStore(STORE.transactions).get(transactionId)) as
+              | Transaction
+              | undefined,
+          );
+        }
         await oplog.put(op);
         await tx.objectStore(STORE.outbox).put({ id: op.id });
         await applyOp(
           new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),
           op,
         );
+      }
+      if (wrote) {
+        if (rebuildReadModel) {
+          await this.updateLedgerReadModel(
+            tx as IDBPTransaction<unknown, StoreName[], "readwrite">,
+            oldTransactions,
+          );
+        } else {
+          await this.bumpLedgerRevision(
+            tx as IDBPTransaction<unknown, StoreName[], "readwrite">,
+          );
+        }
       }
       await tx.done;
     } catch (err) {
@@ -264,6 +708,320 @@ export class Repo {
 
   async getAll<T>(store: StoreName): Promise<T[]> {
     return (await this.db.getAll(store)) as T[];
+  }
+
+  async getContainerFact(containerId: string): Promise<LedgerContainerFact | undefined> {
+    return (await this.db.get(
+      STORE.ledgerReadFact,
+      `container:${containerId}`,
+    )) as LedgerContainerFact | undefined;
+  }
+
+  async getUsageFacts(): Promise<LedgerUsageFact[]> {
+    const facts = (await this.db.getAll(STORE.ledgerReadFact)) as Array<
+      LedgerUsageFact | LedgerContainerFact | { id: string }
+    >;
+    return facts.filter(
+      (fact): fact is LedgerUsageFact =>
+        "kind" in fact &&
+        ["category", "container", "vendor", "shortcut"].includes(fact.kind),
+    );
+  }
+
+  async getLedgerReadSnapshot(): Promise<LedgerReadSnapshot> {
+    const tx = this.db.transaction(
+      [STORE.entryRead, STORE.ledgerReadFact, STORE.appMeta],
+      "readonly",
+    );
+    const entries = tx.objectStore(STORE.entryRead).index(INDEX.entryChronology);
+    const collection = async (state: "pending" | "template") => {
+      const rows: EntryRead[] = [];
+      let cursor = await entries.openCursor(
+        IDBKeyRange.bound([state], [state, []]),
+        "next",
+      );
+      while (cursor) {
+        rows.push(cursor.value as EntryRead);
+        cursor = await cursor.continue();
+      }
+      return rows;
+    };
+    const pending = await collection("pending");
+    const templates = await collection("template");
+    const facts = (await tx.objectStore(STORE.ledgerReadFact).getAll()) as Array<
+      LedgerUsageFact | LedgerContainerFact | { id: string; state?: string; count?: number }
+    >;
+    const revisionRecord = (await tx
+      .objectStore(STORE.appMeta)
+      .get(LEDGER_READ_REVISION_KEY)) as { value: number } | undefined;
+    await tx.done;
+    const ledgerCount = facts.find((fact) => fact.id === "count:ledger");
+    return {
+      revision: revisionRecord?.value ?? 0,
+      ledgerCount: ledgerCount && "count" in ledgerCount ? ledgerCount.count ?? 0 : 0,
+      pending,
+      templates,
+      containerFacts: facts.filter(
+        (fact): fact is LedgerContainerFact => "containerId" in fact && "balance" in fact,
+      ),
+      usageFacts: facts.filter(
+        (fact): fact is LedgerUsageFact =>
+          "kind" in fact &&
+          ["category", "container", "vendor", "shortcut"].includes(fact.kind),
+      ),
+    };
+  }
+
+  async getLedgerPage(query: LedgerPageQuery): Promise<LedgerPageResult> {
+    if (!Number.isInteger(query.limit) || query.limit <= 0) {
+      throw new Error("Ledger page limit must be a positive integer");
+    }
+    const signature = filterSignature(query.filter);
+    const token = query.cursor === null ? null : parseCursor(query.cursor);
+    if (token && (token.sort !== query.sort || token.filter !== signature)) {
+      throw new Error("Ledger cursor does not match the query");
+    }
+    const tx = this.db.transaction(
+      [STORE.entryRead, STORE.appMeta, STORE.categories, STORE.containers],
+      "readonly",
+    );
+    const meta = (await tx.objectStore(STORE.appMeta).get(LEDGER_READ_REVISION_KEY)) as
+      | { value: number }
+      | undefined;
+    const revision = meta?.value ?? 0;
+    const staleCursor = token !== null && token.revision !== revision;
+    const categories = (await tx.objectStore(STORE.categories).getAll()) as Category[];
+    const containers = (await tx.objectStore(STORE.containers).getAll()) as Container[];
+    const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+    const containerNames = new Map(
+      containers.map((container) => [container.id, container.name]),
+    );
+    const label = (row: Transaction): string =>
+      [
+        row.category_id ? categoryNames.get(row.category_id) : "Transfer",
+        containerNames.get(row.container_id),
+        row.to_container_id ? containerNames.get(row.to_container_id) : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    const direction: IDBCursorDirection =
+      query.sort === "newest" || query.sort === "largest" ? "prev" : "next";
+    const indexName =
+      query.sort === "largest"
+        ? INDEX.entryLargest
+        : query.sort === "smallest"
+          ? INDEX.entrySmallest
+          : INDEX.entryChronology;
+    const lower: IDBValidKey = ["ledger"];
+    const upper: IDBValidKey = ["ledger", []];
+    const range = token
+      ? direction === "next"
+        ? IDBKeyRange.bound(token.key, upper, true, false)
+        : IDBKeyRange.bound(lower, token.key, false, true)
+      : IDBKeyRange.bound(lower, upper);
+    const index = tx.objectStore(STORE.entryRead).index(indexName);
+    let cursor = await index.openCursor(range, direction);
+    const rows: EntryRead[] = [];
+    let lastKey: IDBValidKey | null = null;
+    let hasMore = false;
+    while (cursor) {
+      const entry = cursor.value as EntryRead;
+      if (matchesFilter(entry, query.filter ?? {}, { label })) {
+        if (rows.length === query.limit) {
+          hasMore = true;
+          break;
+        }
+        rows.push(entry);
+        lastKey = entryIndexKey(entry, query.sort);
+      }
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    const nextToken =
+      hasMore && lastKey !== null
+        ? JSON.stringify({
+            version: LEDGER_READ_MODEL_VERSION,
+            revision,
+            sort: query.sort,
+            filter: signature,
+            key: lastKey,
+          } satisfies LedgerCursorToken)
+        : null;
+    return {
+      rows,
+      cursor: nextToken,
+      revision,
+      complete: !hasMore,
+      staleCursor,
+    };
+  }
+
+  async getEntryCollection(state: LedgerReadState): Promise<EntryRead[]> {
+    const tx = this.db.transaction(STORE.entryRead, "readonly");
+    const index = tx.objectStore(STORE.entryRead).index(INDEX.entryChronology);
+    const range = IDBKeyRange.bound([state], [state, []]);
+    const rows: EntryRead[] = [];
+    let cursor = await index.openCursor(range, "next");
+    while (cursor) {
+      rows.push(cursor.value as EntryRead);
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    return rows;
+  }
+
+  async getLedgerRange(start: string, end: string): Promise<EntryRead[]> {
+    const tx = this.db.transaction(STORE.entryRead, "readonly");
+    const index = tx.objectStore(STORE.entryRead).index(INDEX.entryChronology);
+    const rows = (await index.getAll(
+      IDBKeyRange.bound(["ledger", start], ["ledger", end, []]),
+    )) as EntryRead[];
+    await tx.done;
+    return rows;
+  }
+
+  async getLedgerEntriesById(ids: readonly string[]): Promise<EntryRead[]> {
+    const tx = this.db.transaction(STORE.entryRead, "readonly");
+    const store = tx.objectStore(STORE.entryRead);
+    const rows: EntryRead[] = [];
+    for (const id of ids) {
+      const row = (await store.get(id)) as EntryRead | undefined;
+      if (row?.state === "ledger") rows.push(row);
+    }
+    await tx.done;
+    return rows;
+  }
+
+  async getLedgerFocus(query: LedgerFocusQuery): Promise<LedgerFocusResult> {
+    if (!Number.isInteger(query.limit) || query.limit <= 0) {
+      throw new Error("Ledger focus limit must be a positive integer");
+    }
+    const tx = this.db.transaction([STORE.entryRead, STORE.appMeta], "readonly");
+    const store = tx.objectStore(STORE.entryRead);
+    const target = (await store.get(query.id)) as EntryRead | undefined;
+    const meta = (await tx.objectStore(STORE.appMeta).get(LEDGER_READ_REVISION_KEY)) as
+      | { value: number }
+      | undefined;
+    if (!target || target.state !== "ledger") {
+      await tx.done;
+      return {
+        rows: [],
+        revision: meta?.value ?? 0,
+        completeBefore: true,
+        completeAfter: true,
+      };
+    }
+    const indexName =
+      query.sort === "largest"
+        ? INDEX.entryLargest
+        : query.sort === "smallest"
+          ? INDEX.entrySmallest
+          : INDEX.entryChronology;
+    const index = store.index(indexName);
+    const key = entryIndexKey(target, query.sort);
+    const displayDirection: IDBCursorDirection =
+      query.sort === "newest" || query.sort === "largest" ? "prev" : "next";
+    const oppositeDirection: IDBCursorDirection =
+      displayDirection === "next" ? "prev" : "next";
+    const scan = async (
+      direction: IDBCursorDirection,
+      limit: number,
+    ): Promise<{ rows: EntryRead[]; complete: boolean }> => {
+      const lower: IDBValidKey = ["ledger"];
+      const upper: IDBValidKey = ["ledger", []];
+      const range =
+        direction === "next"
+          ? IDBKeyRange.bound(key, upper, true, false)
+          : IDBKeyRange.bound(lower, key, false, true);
+      const rows: EntryRead[] = [];
+      let cursor = await index.openCursor(range, direction);
+      while (cursor && rows.length < limit) {
+        rows.push(cursor.value as EntryRead);
+        cursor = await cursor.continue();
+      }
+      return { rows, complete: cursor === null };
+    };
+
+    const preferredBefore = Math.floor((query.limit - 1) / 2);
+    let before = await scan(oppositeDirection, preferredBefore);
+    let after = await scan(displayDirection, query.limit - 1 - before.rows.length);
+    if (after.rows.length < query.limit - 1 - before.rows.length) {
+      before = await scan(oppositeDirection, query.limit - 1 - after.rows.length);
+    }
+    await tx.done;
+    return {
+      rows: [...before.rows.reverse(), target, ...after.rows],
+      revision: meta?.value ?? 0,
+      completeBefore: before.complete,
+      completeAfter: after.complete,
+    };
+  }
+
+  async getOverallBalanceSeries(
+    containerIds: readonly string[],
+    days: readonly string[],
+  ): Promise<number[]> {
+    if (days.length === 0 || containerIds.length === 0) return days.map(() => 0);
+    const tx = this.db.transaction(STORE.ledgerBalanceBucket, "readonly");
+    const index = tx
+      .objectStore(STORE.ledgerBalanceBucket)
+      .index(INDEX.balanceBucketByPeriodContainer);
+    const byContainer = new Map<
+      string,
+      { months: LedgerBalanceBucket[]; days: LedgerBalanceBucket[] }
+    >();
+    for (const containerId of new Set(containerIds)) {
+      const months = (await index.getAll(
+        IDBKeyRange.bound(
+          ["month", containerId],
+          ["month", containerId, []],
+        ),
+      )) as LedgerBalanceBucket[];
+      const daily = (await index.getAll(
+        IDBKeyRange.bound(["day", containerId], ["day", containerId, []]),
+      )) as LedgerBalanceBucket[];
+      byContainer.set(containerId, { months, days: daily });
+    }
+    await tx.done;
+
+    return days.map((day) => {
+      const month = day.slice(0, 7);
+      let balance = 0;
+      for (const containerId of containerIds) {
+        const buckets = byContainer.get(containerId);
+        if (!buckets) continue;
+        for (const bucket of buckets.months) {
+          if (bucket.key < month) balance += bucket.balanceDelta;
+        }
+        for (const bucket of buckets.days) {
+          if (bucket.key.startsWith(month) && bucket.key <= day) {
+            balance += bucket.balanceDelta;
+          }
+        }
+      }
+      return balance;
+    });
+  }
+
+  async getPeriodCashFlow(
+    containerIds: readonly string[],
+    yearMonth: string,
+  ): Promise<{ incoming: number; outgoing: number; net: number; count: number }> {
+    const tx = this.db.transaction(STORE.ledgerBalanceBucket, "readonly");
+    const store = tx.objectStore(STORE.ledgerBalanceBucket);
+    let incoming = 0;
+    let outgoing = 0;
+    let count = 0;
+    for (const containerId of new Set(containerIds)) {
+      const bucket = (await store.get(
+        `month:${yearMonth}:${containerId}`,
+      )) as LedgerBalanceBucket | undefined;
+      incoming += bucket?.ordinaryIn ?? 0;
+      outgoing += bucket?.ordinaryOut ?? 0;
+      count += bucket?.ordinaryCount ?? 0;
+    }
+    await tx.done;
+    return { incoming, outgoing, net: incoming - outgoing, count };
   }
 
   async getDeviceId(): Promise<string> {
@@ -320,6 +1078,10 @@ export class Repo {
       await applyInOrder(
         new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">),
         sorted,
+      );
+
+      await this.rebuildLedgerReadModel(
+        tx as IDBPTransaction<unknown, StoreName[], "readwrite">,
       );
 
       const appMeta = tx.objectStore(STORE.appMeta);
@@ -402,6 +1164,9 @@ export class Repo {
       const itx = new IdbTx(tx as IDBPTransaction<unknown, StoreName[], "readwrite">);
       for (const store of STATE_STORES) await tx.objectStore(store).clear();
       await applyInOrder(itx, all);
+      await this.rebuildLedgerReadModel(
+        tx as IDBPTransaction<unknown, StoreName[], "readwrite">,
+      );
       await tx.done;
       this.diagnostic({
         message: "database rebuild succeeded",

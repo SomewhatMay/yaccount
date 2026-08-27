@@ -1,7 +1,13 @@
 import type { Category, Transaction } from "../model";
 import { activeRows } from "./ledger";
+import type { UsageFactLike } from "./usage-ranking";
 
 export type CreationKind = "expense" | "income" | "transfer";
+type VendorUsageSource = Transaction[] | UsageFactLike[];
+
+function isUsageFacts(source: VendorUsageSource): source is UsageFactLike[] {
+  return source.length > 0 && "kind" in source[0];
+}
 
 function normalize(value: string): string {
   return value.trim().normalize("NFC").toLocaleLowerCase();
@@ -31,7 +37,7 @@ export function rankAutocompleteOptions<T extends { label: string }>(
 }
 
 export function rankVendorSourcesForKind(
-  transactions: Transaction[],
+  transactions: VendorUsageSource,
   categories: Category[],
   kind: CreationKind,
   query: string,
@@ -46,27 +52,50 @@ export function rankVendorSourcesForKind(
   >();
   const normalizedQuery = normalize(query);
 
-  for (const row of activeRows(transactions)) {
-    if (
-      row.to_container_id ||
-      !row.category_id ||
-      categoryKinds.get(row.category_id) !== kind
-    ) {
-      continue;
+  if (isUsageFacts(transactions)) {
+    for (const fact of transactions) {
+      if (
+        fact.kind !== "vendor" ||
+        !fact.value ||
+        !fact.categoryId ||
+        categoryKinds.get(fact.categoryId) !== kind
+      ) {
+        continue;
+      }
+      const score = matchScore(fact.subject, normalizedQuery);
+      if (!score) continue;
+      const current = usage.get(fact.subject);
+      usage.set(fact.subject, {
+        value: !current || fact.recent >= current.recent ? fact.value : current.value,
+        count: (current?.count ?? 0) + fact.count,
+        recent:
+          current && current.recent > fact.recent ? current.recent : fact.recent,
+        score,
+      });
     }
-    const value = row.vendor_source.trim().normalize("NFC");
-    const key = normalize(value);
-    if (!key) continue;
-    const score = matchScore(key, normalizedQuery);
-    if (!score) continue;
-    const recent = row.entered_at ?? `${row.date}T00:00:00.000Z`;
-    const current = usage.get(key);
-    usage.set(key, {
-      value: !current || recent >= current.recent ? value : current.value,
-      count: (current?.count ?? 0) + 1,
-      recent: current && current.recent > recent ? current.recent : recent,
-      score,
-    });
+  } else {
+    for (const row of activeRows(transactions)) {
+      if (
+        row.to_container_id ||
+        !row.category_id ||
+        categoryKinds.get(row.category_id) !== kind
+      ) {
+        continue;
+      }
+      const value = row.vendor_source.trim().normalize("NFC");
+      const key = normalize(value);
+      if (!key) continue;
+      const score = matchScore(key, normalizedQuery);
+      if (!score) continue;
+      const recent = row.entered_at ?? `${row.date}T00:00:00.000Z`;
+      const current = usage.get(key);
+      usage.set(key, {
+        value: !current || recent >= current.recent ? value : current.value,
+        count: (current?.count ?? 0) + 1,
+        recent: current && current.recent > recent ? current.recent : recent,
+        score,
+      });
+    }
   }
 
   return [...usage.values()]
@@ -81,7 +110,7 @@ export function rankVendorSourcesForKind(
 }
 
 export function recallVendorSelection(
-  transactions: Transaction[],
+  transactions: VendorUsageSource,
   categories: Category[],
   kind: CreationKind,
   value: string,
@@ -92,6 +121,25 @@ export function recallVendorSelection(
   const categoryKinds = new Map(
     categories.map((category) => [category.id, category.type]),
   );
+  if (isUsageFacts(transactions)) {
+    const match = transactions
+      .filter(
+        (fact) =>
+          fact.kind === "vendor" &&
+          fact.subject === key &&
+          fact.categoryId !== undefined &&
+          fact.containerId !== undefined &&
+          categoryKinds.get(fact.categoryId) === kind,
+      )
+      .sort(
+        (a, b) =>
+          b.recent.localeCompare(a.recent) ||
+          (b.recentId ?? "").localeCompare(a.recentId ?? ""),
+      )[0];
+    return match?.categoryId && match.containerId
+      ? { categoryId: match.categoryId, containerId: match.containerId }
+      : null;
+  }
   const match = activeRows(transactions)
     .filter(
       (row) =>

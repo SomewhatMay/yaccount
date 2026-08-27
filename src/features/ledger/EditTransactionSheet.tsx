@@ -7,6 +7,7 @@ import { isTransfer } from "@/core/engine/balances";
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
+  type UsageSource,
 } from "@/core/engine/usage-ranking";
 import { formatCents, parseDollars } from "@/core/money";
 import {
@@ -52,7 +53,7 @@ export function EditTransactionSheet({
   editing: Transaction | null;
   categories: Category[];
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   onOpenChange: (open: boolean) => void;
   onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
@@ -172,7 +173,7 @@ function EditForm({
   tx: Transaction;
   categories: Category[];
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {
@@ -357,7 +358,7 @@ function TransferForm({
 }: {
   tx: Transaction;
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {

@@ -3,7 +3,10 @@
 import { useMemo, useState } from "react";
 import { parseDollars } from "@/core/money";
 import type { Container, Goal, GoalKind, GoalMode, Transaction } from "@/core/model";
-import { rankContainersByUsage } from "@/core/engine/usage-ranking";
+import {
+  rankContainersByUsage,
+  type UsageSource,
+} from "@/core/engine/usage-ranking";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,7 +52,7 @@ export function GoalSheet({
   open: boolean;
   goal: Goal | null; // null = create
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   defaultFundingId: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: GoalFormInput, editingGoal: Goal | null) => Promise<void>;
@@ -84,7 +87,7 @@ function GoalForm({
 }: {
   goal: Goal | null;
   containers: Container[];
-  transactions: Transaction[];
+  transactions: UsageSource;
   defaultFundingId: string;
   onSubmit: (input: GoalFormInput, editingGoal: Goal | null) => Promise<void>;
 }) {
