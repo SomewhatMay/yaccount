@@ -451,7 +451,9 @@ export function MoneyBriefExpanded(context: WidgetContext) {
           <p className="mt-4 font-medium">{countLabel(result.totalItems)}</p>
           <div className="divide-rule mt-2 divide-y">
             {result.items.map((item, index) => (
-              <BriefItemRow key={`${item.kind}:${index}`} item={item} />
+              <div key={`${item.kind}:${index}`}>
+                <BriefItemRow item={item} />
+              </div>
             ))}
           </div>
           <Marginalia className="mt-3 text-xs">
@@ -484,7 +486,9 @@ export function MoneyBriefCompact(context: WidgetContext) {
           </div>
           <div className="divide-rule mt-2 divide-y">
             {result.items.map((item, index) => (
-              <BriefItemRow key={`${item.kind}:${index}`} item={item} compact />
+              <div key={`${item.kind}:${index}`}>
+                <BriefItemRow item={item} compact />
+              </div>
             ))}
           </div>
           <p className="text-muted-foreground mt-2 text-xs">

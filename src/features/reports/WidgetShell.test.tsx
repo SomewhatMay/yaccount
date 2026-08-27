@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import type { WidgetContext, WidgetDef } from "./registry";
 import { ShowMathSheet } from "./ShowMathSheet";
 import { DashboardWidget } from "./WidgetShell";
@@ -52,6 +52,24 @@ function textOf(node: ReactNode): string {
   if (Array.isArray(node)) return node.map(textOf).join(" ");
   if (!isValidElement<{ children?: ReactNode }>(node)) return "";
   return textOf(node.props.children);
+}
+
+function findComponent(
+  node: ReactNode,
+  name: string,
+): ReactElement<Record<string, unknown>> | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findComponent(child, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement<{ children?: ReactNode }>(node)) return null;
+  if (typeof node.type === "function" && node.type.name === name) {
+    return node as ReactElement<Record<string, unknown>>;
+  }
+  return findComponent(node.props.children, name);
 }
 
 function render(def: WidgetDef, size: "compact" | "expanded" = "expanded") {
@@ -114,7 +132,54 @@ it("offers the reusable math surface when a widget discloses its inputs", () => 
     }),
   } as WidgetDef;
 
-  expect(textOf(render(def))).toContain("Show the math");
+  const actions = findComponent(render(def), "RowActions");
+
+  expect(actions?.props.label).toBe("Configure Test forecast");
+  expect(textOf(actions?.props.children as ReactNode)).toContain("Show the math");
+});
+
+it("groups size and settings with math in the title menu", () => {
+  const changeSize = vi.fn();
+  const def = {
+    id: "test",
+    title: "Test forecast",
+    description: "Test",
+    defaultVisible: true,
+    fixedWindow: true,
+    render: () => <div>Expanded</div>,
+    renderCompact: () => <div>Compact</div>,
+    renderSettings: () => <div>Settings body</div>,
+    math: () => ({
+      range: "Aug 2026",
+      freshness: "Current",
+      lines: [],
+      exclusions: [],
+      rule: "Test rule",
+    }),
+  } as WidgetDef;
+
+  const tree = DashboardWidget({
+    instanceId: "test-instance",
+    size: "expanded",
+    def,
+    base,
+    onSizeChange: changeSize,
+  });
+  const actions = findComponent(tree, "RowActions");
+  const menuText = textOf(actions?.props.children as ReactNode);
+  const sizeGroup = findComponent(
+    actions?.props.children as ReactNode,
+    "DropdownMenuRadioGroup",
+  );
+
+  expect(actions?.props.label).toBe("Configure Test forecast");
+  expect(menuText).toContain("Size");
+  expect(menuText).toContain("Compact");
+  expect(menuText).toContain("Expanded");
+  expect(menuText).toContain("Settings");
+  expect(menuText).toContain("Show the math");
+  (sizeGroup?.props.onValueChange as ((value: string) => void) | undefined)?.("compact");
+  expect(changeSize).toHaveBeenCalledWith("compact");
 });
 
 it("separates math inputs and always discloses freshness, exclusions, and rule", () => {

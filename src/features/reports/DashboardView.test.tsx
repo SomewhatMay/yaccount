@@ -10,6 +10,9 @@ const fixture = vi.hoisted(() => ({
   compareKeys: [] as string[],
   curations: [] as unknown[],
   dispatchMany: vi.fn(async () => {}),
+  flashRow: vi.fn(),
+  draftDashboard: undefined as unknown,
+  stateSetters: [] as ReturnType<typeof vi.fn>[],
 }));
 const dashboardSets = vi.hoisted(() => ({
   dashboards: [
@@ -82,13 +85,24 @@ vi.mock("react", async (importOriginal) => {
   return {
     ...actual,
     useMemo: <T,>(factory: () => T) => factory(),
-    useState: <T,>(initialValue: T) => [initialValue, vi.fn()],
+    useState: <T,>(initialValue: T) => {
+      const index = fixture.stateSetters.length;
+      const setter = vi.fn();
+      fixture.stateSetters.push(setter);
+      return [
+        index === 0 && fixture.draftDashboard !== undefined
+          ? (fixture.draftDashboard as T)
+          : initialValue,
+        setter,
+      ];
+    },
   };
 });
 
 vi.mock("jotai", () => ({
   useAtomValue: (atom: string) => fixture.values.get(atom),
-  useSetAtom: () => fixture.dispatchMany,
+  useSetAtom: (atom: string) =>
+    atom === "flashRow" ? fixture.flashRow : fixture.dispatchMany,
 }));
 
 vi.mock("@/features/store", () => ({
@@ -102,6 +116,7 @@ vi.mock("@/features/store", () => ({
   goalsAtom: "goals",
   settingsAtom: "settings",
   dispatchManyAtom: "dispatchMany",
+  flashRowAtom: "flashRow",
 }));
 
 vi.mock("./period-pref", () => ({
@@ -195,6 +210,8 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.periodKeys = [];
   fixture.compareKeys = [];
   fixture.curations = [];
+  fixture.draftDashboard = undefined;
+  fixture.stateSetters = [];
 
   const dashboard = DashboardView();
   expect(fixture.curations).toEqual([
@@ -216,6 +233,7 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   ) as ReactElement<{
     def: WidgetDef;
     base: WidgetContext;
+    onSizeChange: (size: "compact" | "expanded") => Promise<void>;
   }>[];
   expect(balanceWidget.props.base.aggregates).toBeDefined();
   expect(balanceWidget.props.base.aggregates).toBe(savedWidget.props.base.aggregates);
@@ -267,4 +285,43 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   expect(savedWidget.props.base.aggregates.period({ start: null, end: null }).saved).toBe(
     -1000,
   );
+  dashboardSets.saveLayout.mockClear();
+  await savedWidget.props.onSizeChange("expanded");
+  expect(dashboardSets.saveLayout).toHaveBeenCalledWith({
+    ...dashboardSets.layout,
+    sizes: {
+      ...dashboardSets.layout.sizes,
+      "saved-instance": "expanded",
+    },
+  });
+});
+
+it("closes the gallery and targets an added widget for scroll feedback", () => {
+  fixture.values.set("ready", true);
+  fixture.values.set("categories", []);
+  fixture.values.set("containers", []);
+  fixture.values.set("transactions", []);
+  fixture.values.set("budgetTargets", []);
+  fixture.values.set("snapshots", []);
+  fixture.values.set("recurringRules", []);
+  fixture.values.set("goals", []);
+  fixture.values.set("settings", []);
+  fixture.draftDashboard = dashboardSets.activeDashboard;
+  fixture.stateSetters = [];
+  fixture.flashRow.mockClear();
+
+  const dashboard = DashboardView();
+  const gallery = findComponent(dashboard, "WidgetGallerySheet")!;
+  const onCreate = gallery.props.onCreate as (
+    widgetType: string,
+    configuration: Record<string, unknown>,
+  ) => void;
+
+  onCreate("commitments", {});
+
+  const next = fixture.stateSetters[0].mock.calls[0][0];
+  const addedId = next.instances.at(-1).instanceId;
+  expect(next.instances.at(-1).widgetType).toBe("commitments");
+  expect(fixture.stateSetters[1]).toHaveBeenCalledWith(false);
+  expect(fixture.flashRow).toHaveBeenCalledWith({ id: addedId, scroll: true });
 });

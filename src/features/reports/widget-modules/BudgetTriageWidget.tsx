@@ -45,7 +45,9 @@ function rowNote(row: BudgetTriageRow): string {
     const planned =
       row.scheduledRemaining > 0 &&
       row.spent + row.scheduledRemaining >= (row.linearProjection ?? row.spent);
-    return `At the current ${planned ? "plan" : "pace"}, about ${formatCents(over)} over by month end.`;
+    return planned
+      ? `With scheduled spending, about ${formatCents(over)} over by month end.`
+      : `At this spending pace, about ${formatCents(over)} over by month end.`;
   }
   if (row.scheduled.length === 1) {
     return `${row.scheduled[0].label} remains scheduled for ${formatCents(row.scheduled[0].amount)}.`;

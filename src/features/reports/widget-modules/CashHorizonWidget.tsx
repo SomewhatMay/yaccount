@@ -234,13 +234,14 @@ export function CashHorizonExpanded(context: WidgetContext) {
           </p>
           <RiskNote horizon={horizon} />
         </div>
-        <HorizonPicker context={context} days={days} />
       </div>
 
       <HorizonChart horizon={horizon} />
       <div className="divide-rule divide-y">
         {horizon.events.slice(0, 6).map((event) => (
-          <EventRow key={event.id} event={event} />
+          <div key={event.id}>
+            <EventRow event={event} />
+          </div>
         ))}
       </div>
       {horizon.events.length > 6 && (
@@ -296,6 +297,21 @@ export function CashHorizonCompact(context: WidgetContext) {
           </span>
         </p>
       )}
+    </div>
+  );
+}
+
+export function CashHorizonSettings(context: WidgetContext) {
+  const days = horizonDays(context);
+  return (
+    <div>
+      <Eyebrow>Forecast window</Eyebrow>
+      <div className="mt-2 flex justify-start">
+        <HorizonPicker context={context} days={days} />
+      </div>
+      <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+        Include known cash events over the next 14, 30, or 60 days.
+      </p>
     </div>
   );
 }

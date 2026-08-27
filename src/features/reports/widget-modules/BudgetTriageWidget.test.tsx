@@ -111,7 +111,7 @@ it("renders attention-first expanded and compact summaries from the same triage"
   expect(compact).toContain(`aria-label="${summary}"`);
   expect(expanded.indexOf("Groceries")).toBeLessThan(expanded.indexOf("Dining out"));
   expect(expanded.indexOf("Dining out")).toBeLessThan(expanded.indexOf("Fuel"));
-  expect(expanded).toContain("At the current plan, about $10.00 over by month end");
+  expect(expanded).toContain("With scheduled spending, about $10.00 over by month end");
   expect(compact).toContain("Household");
 });
 

@@ -29,7 +29,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { RowActions } from "@/features/ui";
+import { RowActions, useFlashRow } from "@/features/ui";
 import { cn } from "@/lib/utils";
 import {
   PINNED_WIDGET_ID,
@@ -151,15 +151,22 @@ function SortableDashboardWidget({
     isDragging,
     isOver,
   } = useSortable({ id: instance.instanceId, disabled: pinned });
+  const { ref: flashRef, flashed } = useFlashRow<HTMLElement>(instance.instanceId);
 
   return (
     <section
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        flashRef.current = node;
+      }}
       data-widget-id={def.id}
       data-widget-instance-id={instance.instanceId}
+      data-highlighted={flashed ? "" : undefined}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "bg-card relative overflow-clip rounded-2xl border",
+        flashed &&
+          "bg-primary/15 ring-primary/40 ring-2 transition-[background-color,box-shadow] duration-[var(--dur-2)]",
         isDragging && "z-20 opacity-80 shadow-xl",
         isOver &&
           !isDragging &&

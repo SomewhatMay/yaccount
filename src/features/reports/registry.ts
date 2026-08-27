@@ -88,10 +88,13 @@ export interface WidgetDef {
   /** Production descriptors use loaders; render functions remain a small test seam. */
   load?: WidgetModuleLoader;
   loadCompact?: WidgetModuleLoader;
+  loadSettings?: WidgetModuleLoader;
   component?: LazyExoticComponent<WidgetRenderer>;
   compactComponent?: LazyExoticComponent<WidgetRenderer>;
+  settingsComponent?: LazyExoticComponent<WidgetRenderer>;
   render?: (ctx: WidgetContext) => ReactNode;
   renderCompact?: (ctx: WidgetContext) => ReactNode;
+  renderSettings?: (ctx: WidgetContext) => ReactNode;
   availability?: (ctx: WidgetContext) => WidgetAvailability;
   math?: (ctx: WidgetContext) => WidgetMathDisclosure;
 }
@@ -201,6 +204,10 @@ const loadCashHorizonCompact: WidgetModuleLoader = () =>
   import("./widget-modules/CashHorizonWidget").then((module) => ({
     default: module.CashHorizonCompact,
   }));
+const loadCashHorizonSettings: WidgetModuleLoader = () =>
+  import("./widget-modules/CashHorizonWidget").then((module) => ({
+    default: module.CashHorizonSettings,
+  }));
 
 const loadCommitments: WidgetModuleLoader = () =>
   import("./widget-modules/CommitmentsWidget").then((module) => ({
@@ -210,6 +217,10 @@ const loadCommitmentsCompact: WidgetModuleLoader = () =>
   import("./widget-modules/CommitmentsWidget").then((module) => ({
     default: module.CommitmentsCompact,
   }));
+const loadCommitmentsSettings: WidgetModuleLoader = () =>
+  import("./widget-modules/CommitmentsWidget").then((module) => ({
+    default: module.CommitmentsSettings,
+  }));
 
 const loadAllocationPlan: WidgetModuleLoader = () =>
   import("./widget-modules/AllocationPlanWidget").then((module) => ({
@@ -218,6 +229,10 @@ const loadAllocationPlan: WidgetModuleLoader = () =>
 const loadAllocationPlanCompact: WidgetModuleLoader = () =>
   import("./widget-modules/AllocationPlanWidget").then((module) => ({
     default: module.AllocationPlanCompact,
+  }));
+const loadAllocationPlanSettings: WidgetModuleLoader = () =>
+  import("./widget-modules/AllocationPlanWidget").then((module) => ({
+    default: module.AllocationPlanSettings,
   }));
 const loadMonthLanding: WidgetModuleLoader = () =>
   import("./widget-modules/MonthLandingWidget").then((module) => ({
@@ -243,6 +258,10 @@ const loadContainerWatchCompact: WidgetModuleLoader = () =>
   import("./widget-modules/WatchWidget").then((module) => ({
     default: module.ContainerWatchCompact,
   }));
+const loadContainerWatchSettings: WidgetModuleLoader = () =>
+  import("./widget-modules/WatchWidget").then((module) => ({
+    default: module.ContainerWatchSettings,
+  }));
 const loadCategoryWatch: WidgetModuleLoader = () =>
   import("./widget-modules/WatchWidget").then((module) => ({
     default: module.CategoryWatchExpanded,
@@ -251,9 +270,17 @@ const loadCategoryWatchCompact: WidgetModuleLoader = () =>
   import("./widget-modules/WatchWidget").then((module) => ({
     default: module.CategoryWatchCompact,
   }));
+const loadCategoryWatchSettings: WidgetModuleLoader = () =>
+  import("./widget-modules/WatchWidget").then((module) => ({
+    default: module.CategoryWatchSettings,
+  }));
 
 function compact(loader: WidgetModuleLoader) {
   return { loadCompact: loader, compactComponent: lazy(loader) };
+}
+
+function configurable(loader: WidgetModuleLoader) {
+  return { loadSettings: loader, settingsComponent: lazy(loader) };
 }
 
 function gallery(
@@ -1298,6 +1325,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     load: loadCommitments,
     component: lazy(loadCommitments),
     ...compact(loadCommitmentsCompact),
+    ...configurable(loadCommitmentsSettings),
     availability: commitmentsAvailability,
     math: commitmentsMath,
   },
@@ -1318,6 +1346,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     load: loadCashHorizon,
     component: lazy(loadCashHorizon),
     ...compact(loadCashHorizonCompact),
+    ...configurable(loadCashHorizonSettings),
     availability: cashHorizonAvailability,
     math: cashHorizonMath,
   },
@@ -1343,6 +1372,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     load: loadAllocationPlan,
     component: lazy(loadAllocationPlan),
     ...compact(loadAllocationPlanCompact),
+    ...configurable(loadAllocationPlanSettings),
     availability: allocationAvailability,
     math: allocationMath,
   },
@@ -1436,6 +1466,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     load: loadContainerWatch,
     component: lazy(loadContainerWatch),
     ...compact(loadContainerWatchCompact),
+    ...configurable(loadContainerWatchSettings),
     math: containerWatchMath,
   },
   {
@@ -1453,6 +1484,7 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     load: loadCategoryWatch,
     component: lazy(loadCategoryWatch),
     ...compact(loadCategoryWatchCompact),
+    ...configurable(loadCategoryWatchSettings),
     math: categoryWatchMath,
   },
   {

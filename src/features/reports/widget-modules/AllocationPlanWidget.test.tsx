@@ -15,7 +15,11 @@ import {
 } from "@/core/model";
 import { createDashboardAggregates } from "../dashboard-aggregates";
 import { DASHBOARD_WIDGETS, type WidgetContext } from "../registry";
-import { AllocationPlanCompact, AllocationPlanExpanded } from "./AllocationPlanWidget";
+import {
+  AllocationPlanCompact,
+  AllocationPlanExpanded,
+  AllocationPlanSettings,
+} from "./AllocationPlanWidget";
 
 const general = makeGeneralContainer();
 const salaryCategory = makeCategory({
@@ -203,7 +207,7 @@ it("names over-planning without making a cash-safety claim", () => {
   expect(expanded.toLowerCase()).not.toContain("cash available");
 });
 
-it("renders a selected pay cycle and editable income anchors", () => {
+it("renders a selected pay cycle and keeps income anchors in settings", () => {
   const salary = makeRecurringRule({
     id: "Salary",
     frequency: "biweekly",
@@ -233,6 +237,7 @@ it("renders a selected pay cycle and editable income anchors", () => {
     },
   });
   const expanded = renderToStaticMarkup(<AllocationPlanExpanded {...ctx} />);
+  const settings = renderToStaticMarkup(<AllocationPlanSettings {...ctx} />);
 
   expect(expanded).toContain("Aug 16 – Aug 29");
   expect(expanded).toContain("Next income in 7 days");
@@ -241,8 +246,10 @@ it("renders a selected pay cycle and editable income anchors", () => {
   expect(expanded).toContain('aria-label="Flexible budget share: -$50.00"');
   expect(expanded).toContain('aria-label="Goal asks: -$70.00"');
   expect(expanded).toContain('aria-label="Unplanned for this cycle: $2,860.00"');
-  expect(expanded).toContain('aria-label="Use Salary as a pay-cycle anchor"');
-  expect(expanded).toContain('aria-label="Use Side work as a pay-cycle anchor"');
+  expect(expanded).not.toContain('aria-label="Allocation mode"');
+  expect(expanded).not.toContain('aria-label="Use Salary as a pay-cycle anchor"');
+  expect(settings).toContain('aria-label="Use Salary as a pay-cycle anchor"');
+  expect(settings).toContain('aria-label="Use Side work as a pay-cycle anchor"');
 });
 
 it("persists mode and anchor choices through instance settings", () => {
@@ -250,13 +257,13 @@ it("persists mode and anchor choices through instance settings", () => {
   const side = rule("Side work", 25, 10_000, sideCategory.id);
   const save = vi.fn(async () => {});
   const ctx = context({ rules: [salary, side], transactions: [], save });
-  const monthTree = AllocationPlanExpanded(ctx);
+  const monthTree = AllocationPlanSettings(ctx);
 
   findByAriaLabel(monthTree, "Plan by pay cycle")?.props.onClick?.();
   expect(save).toHaveBeenCalledWith({ allocationMode: "pay-cycle" });
 
   save.mockClear();
-  const payTree = AllocationPlanExpanded({
+  const payTree = AllocationPlanSettings({
     ...ctx,
     instanceSettings: { allocationMode: "pay-cycle" },
   });
@@ -273,7 +280,7 @@ it("persists mode and anchor choices through instance settings", () => {
 it("keeps the final pay-cycle income anchor selected", () => {
   const salary = rule("Salary", 30, 290_000, salaryCategory.id);
   const save = vi.fn(async () => {});
-  const tree = AllocationPlanExpanded(
+  const tree = AllocationPlanSettings(
     context({
       rules: [salary],
       transactions: [],

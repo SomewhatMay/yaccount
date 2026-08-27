@@ -270,17 +270,7 @@ function AnchorPicker({
   );
 }
 
-function PayCyclePlan({
-  plan,
-  context,
-  rules,
-  selected,
-}: {
-  plan: PayCycleAllocationPlan;
-  context: WidgetContext;
-  rules: RecurringRule[];
-  selected: string[] | undefined;
-}) {
+function PayCyclePlan({ plan }: { plan: PayCycleAllocationPlan }) {
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -340,7 +330,6 @@ function PayCyclePlan({
           : "both calendar months"}
         .
       </Marginalia>
-      <AnchorPicker context={context} rules={rules} selected={selected} />
     </div>
   );
 }
@@ -360,20 +349,8 @@ export function AllocationPlanExpanded(context: WidgetContext) {
   const resolved = plans(context);
   return (
     <div>
-      <div className="mb-4 flex justify-end">
-        <ModePicker
-          context={context}
-          mode={resolved.mode}
-          payCycleAvailable={resolved.payCycle !== null}
-        />
-      </div>
       {resolved.mode === "pay-cycle" && resolved.payCycle ? (
-        <PayCyclePlan
-          plan={resolved.payCycle}
-          context={context}
-          rules={resolved.rules}
-          selected={resolved.selected}
-        />
+        <PayCyclePlan plan={resolved.payCycle} />
       ) : (
         <MonthPlan plan={resolved.month} context={context} />
       )}
@@ -399,14 +376,7 @@ export function AllocationPlanCompact(context: WidgetContext) {
   const over = pay?.overPlanned ?? resolved.month.overPlanned;
   return (
     <div>
-      <div className="flex items-center justify-between gap-3">
-        <Eyebrow>{resolved.mode === "pay-cycle" ? "Pay cycle" : "Month"}</Eyebrow>
-        <ModePicker
-          context={context}
-          mode={resolved.mode}
-          payCycleAvailable={resolved.payCycle !== null}
-        />
-      </div>
+      <Eyebrow>{resolved.mode === "pay-cycle" ? "Pay cycle" : "Month"}</Eyebrow>
       <div className="mt-3">
         <AmountRow label="Expected income" amount={income} />
         <AmountRow label="Planned" amount={planned} displayAmount={-planned} />
@@ -426,6 +396,33 @@ export function AllocationPlanCompact(context: WidgetContext) {
           )}
           .
         </Marginalia>
+      )}
+    </div>
+  );
+}
+
+export function AllocationPlanSettings(context: WidgetContext) {
+  const resolved = plans(context);
+  return (
+    <div>
+      <Eyebrow>Plan window</Eyebrow>
+      <div className="mt-2 flex justify-start">
+        <ModePicker
+          context={context}
+          mode={resolved.mode}
+          payCycleAvailable={resolved.payCycle !== null}
+        />
+      </div>
+      {resolved.payCycle ? (
+        <AnchorPicker
+          context={context}
+          rules={resolved.rules}
+          selected={resolved.selected}
+        />
+      ) : (
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          Pay cycle needs a next scheduled income.
+        </p>
       )}
     </div>
   );

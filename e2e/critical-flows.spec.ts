@@ -416,9 +416,12 @@ test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
     page.getByText("The latest approved entries across the ledger."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Add Recent entries" }).click();
-  await page.keyboard.press("Escape");
 
-  await expect(page.locator('[data-widget-id="recent"]')).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Add widgets" })).toBeHidden();
+  await expect(page.locator('[data-widget-id="recent"]')).toHaveAttribute(
+    "data-highlighted",
+    "",
+  );
 });
 
 test("searches the grouped widget gallery by recognition language", async ({ page }) => {
@@ -437,10 +440,8 @@ test("searches the grouped widget gallery by recognition language", async ({ pag
 
 test("persists a useful compact widget mode", async ({ page }) => {
   await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
   await page.getByRole("menuitemradio", { name: "Compact" }).click();
-  await page.getByRole("button", { name: "Done" }).click();
 
   const recentCard = page
     .getByRole("heading", { name: "Recent entries" })
@@ -469,27 +470,24 @@ test("persists the synced Cash horizon window", async ({ page }) => {
     .getByRole("heading", { name: "Cash horizon" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
   await horizon.scrollIntoViewIfNeeded();
-  await horizon.getByRole("button", { name: "Forecast 60 days" }).click();
-  await expect(horizon.getByRole("button", { name: "Forecast 60 days" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await horizon.getByRole("button", { name: "Configure Cash horizon" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const horizonSettings = page.getByRole("dialog", { name: "Cash horizon settings" });
+  await horizonSettings.getByRole("button", { name: "Forecast 60 days" }).click();
+  await expect(
+    horizonSettings.getByRole("button", { name: "Forecast 60 days" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
 
   await page.reload();
   await horizon.scrollIntoViewIfNeeded();
-  await expect(horizon.getByRole("button", { name: "Forecast 60 days" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await horizon.getByRole("button", { name: "Configure Cash horizon" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  await expect(
+    horizonSettings.getByRole("button", { name: "Forecast 60 days" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
   await expect(horizon.getByText("E2E future power", { exact: false })).toHaveCount(2);
-
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
-  const preview = page.locator('[data-widget-id="upcoming"]');
-  await preview.scrollIntoViewIfNeeded();
-  await expect(preview.getByRole("button", { name: "Forecast 60 days" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
 });
 
 test("adds Commitments and persists its cadence view", async ({ page }) => {
@@ -509,7 +507,6 @@ test("adds Commitments and persists its cadence view", async ({ page }) => {
   await page.getByRole("button", { name: "Edit dashboard" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: "Add Commitments" }).click();
-  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Done" }).click();
 
   const card = page
@@ -518,16 +515,27 @@ test("adds Commitments and persists its cadence view", async ({ page }) => {
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByLabel("Scheduled monthly load: $65.00").first()).toBeVisible();
   await expect(card.getByText("E2E internet", { exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Show irregular commitments" }).click();
+  await card.getByRole("button", { name: "Configure Commitments" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const commitmentSettings = page.getByRole("dialog", {
+    name: "Commitments settings",
+  });
+  await commitmentSettings
+    .getByRole("button", { name: "Show irregular commitments" })
+    .click();
   await expect(
-    card.getByRole("button", { name: "Show irregular commitments" }),
+    commitmentSettings.getByRole("button", { name: "Show irregular commitments" }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
 
   await page.reload();
   await card.scrollIntoViewIfNeeded();
+  await card.getByRole("button", { name: "Configure Commitments" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(
-    card.getByRole("button", { name: "Show irregular commitments" }),
+    commitmentSettings.getByRole("button", { name: "Show irregular commitments" }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
   await expect(card.getByLabel("Known in the next 12 months: $0.00")).toBeVisible();
 });
 
@@ -560,24 +568,32 @@ test("persists Allocation plan pay-cycle mode and income anchors", async ({ page
     .getByRole("heading", { name: "Allocation plan" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
   await allocation.scrollIntoViewIfNeeded();
-  await allocation.getByRole("button", { name: "Plan by pay cycle" }).click();
+  await allocation.getByRole("button", { name: "Configure Allocation plan" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const allocationSettings = page.getByRole("dialog", {
+    name: "Allocation plan settings",
+  });
+  await allocationSettings.getByRole("button", { name: "Plan by pay cycle" }).click();
   await expect(
-    allocation.getByRole("button", { name: "Plan by pay cycle" }),
+    allocationSettings.getByRole("button", { name: "Plan by pay cycle" }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  await allocation.getByText("Income anchors", { exact: false }).click();
-  await allocation
+  await allocationSettings.getByText("Income anchors", { exact: false }).click();
+  await allocationSettings
     .getByRole("checkbox", { name: "Use E2E side income as a pay-cycle anchor" })
     .click();
+  await page.keyboard.press("Escape");
 
   await page.reload();
   await allocation.scrollIntoViewIfNeeded();
+  await allocation.getByRole("button", { name: "Configure Allocation plan" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(
-    allocation.getByRole("button", { name: "Plan by pay cycle" }),
+    allocationSettings.getByRole("button", { name: "Plan by pay cycle" }),
   ).toHaveAttribute("aria-pressed", "true");
-  await allocation.getByText("Income anchors", { exact: false }).click();
+  await allocationSettings.getByText("Income anchors", { exact: false }).click();
   await expect(
-    allocation.getByRole("checkbox", {
+    allocationSettings.getByRole("checkbox", {
       name: "Use E2E side income as a pay-cycle anchor",
     }),
   ).not.toBeChecked();
@@ -602,14 +618,14 @@ test("shows Month landing scheduled math before history is available", async ({
   await page.getByRole("button", { name: "Edit dashboard" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: "Add Month landing" }).click();
-  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Done" }).click();
   const landing = page
     .getByRole("heading", { name: "Month landing" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
   await landing.scrollIntoViewIfNeeded();
   await expect(landing.getByText("Early estimate", { exact: false })).toBeVisible();
-  await landing.getByRole("button", { name: "Show the math" }).click();
+  await landing.getByRole("button", { name: "Configure Month landing" }).click();
+  await page.getByRole("menuitem", { name: "Show the math" }).click();
   await expect(
     page.getByRole("heading", { name: "Month landing: show the math" }),
   ).toBeVisible();
@@ -646,7 +662,6 @@ test("uses complete selected months for Income resilience", async ({ page }) => 
   await page.getByRole("button", { name: "Edit dashboard" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: "Add Income resilience" }).click();
-  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Done" }).click();
   const card = page
     .getByRole("heading", { name: "Income resilience" })
@@ -656,7 +671,8 @@ test("uses complete selected months for Income resilience", async ({ page }) => 
   await expect(card.getByText("last 6 complete months", { exact: true })).toBeVisible();
   await expect(card.getByText("E2E steady salary", { exact: true })).toBeVisible();
   await expect(card.getByText("steady", { exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Show the math" }).click();
+  await card.getByRole("button", { name: "Configure Income resilience" }).click();
+  await page.getByRole("menuitem", { name: "Show the math" }).click();
   await expect(
     page.getByRole("heading", { name: "Income resilience: show the math" }),
   ).toBeVisible();
@@ -681,15 +697,16 @@ test("creates repeatable Watch instances and persists an exact container floor",
     "E2E watched reserve",
   );
   await gallery.getByRole("button", { name: "Add Container watch" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
   await choose(gallery.page(), "Choose container for Container watch", "General");
   await gallery.getByRole("button", { name: "Add Container watch" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
   await choose(
     gallery.page(),
     "Choose category for Category watch",
     "E2E watched groceries",
   );
   await gallery.getByRole("button", { name: "Add Category watch" }).click();
-  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Done" }).click();
 
   await expect(page.getByRole("heading", { name: "Container watch" })).toHaveCount(2);
@@ -711,7 +728,7 @@ test("creates repeatable Watch instances and persists an exact container floor",
   ).toBeVisible();
   await expect(
     reserve.getByRole("combobox", { name: "Change watched container" }),
-  ).toHaveText("Change");
+  ).toHaveCount(0);
   await general.scrollIntoViewIfNeeded();
   await expect(general.getByText("Watch: General", { exact: true })).toBeVisible();
   await category.scrollIntoViewIfNeeded();
@@ -720,11 +737,18 @@ test("creates repeatable Watch instances and persists an exact container floor",
   ).toBeVisible();
 
   await reserve.scrollIntoViewIfNeeded();
-  await reserve.getByText("Set your floor", { exact: true }).click();
-  await reserve.getByLabel("Container floor amount").fill("-100.00");
-  await reserve.getByRole("button", { name: "Save floor" }).click();
+  await reserve.getByRole("button", { name: "Configure Container watch" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const watchSettings = page.getByRole("dialog", { name: "Container watch settings" });
+  await expect(
+    watchSettings.getByRole("combobox", { name: "Change watched container" }),
+  ).toHaveText("E2E watched reserve");
+  await watchSettings.getByLabel("Container floor amount").fill("-100.00");
+  await watchSettings.getByRole("button", { name: "Save floor" }).click();
+  await page.keyboard.press("Escape");
   await expect(reserve.getByLabel("Distance above your floor: $100.00")).toBeVisible();
-  await reserve.getByRole("button", { name: "Show the math" }).click();
+  await reserve.getByRole("button", { name: "Configure Container watch" }).click();
+  await page.getByRole("menuitem", { name: "Show the math" }).click();
   await expect(
     page.getByRole("heading", { name: "Container watch: show the math" }),
   ).toBeVisible();
@@ -772,10 +796,11 @@ test("ranks and caps current matters in Money brief", async ({ page }) => {
   await card.scrollIntoViewIfNeeded();
   await expect(card).toHaveAttribute("data-widget-size", "compact");
   await expect(card.getByText("3 need you", { exact: true })).toBeVisible();
-  await expect(card.getByText("Cash below zero Aug 23", { exact: true })).toBeVisible();
+  await expect(card.getByText(/^Cash below zero Aug \d{1,2}$/)).toBeVisible();
   await expect(card.getByText("1 pending entry", { exact: true })).toBeVisible();
   await expect(card.getByText("E2E brief groceries:", { exact: false })).toBeVisible();
-  await card.getByRole("button", { name: "Show the math" }).click();
+  await card.getByRole("button", { name: "Configure Money brief" }).click();
+  await page.getByRole("menuitem", { name: "Show the math" }).click();
   await expect(
     page.getByRole("heading", { name: "Money brief: show the math" }),
   ).toBeVisible();

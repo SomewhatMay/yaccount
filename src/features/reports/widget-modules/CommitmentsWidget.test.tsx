@@ -9,7 +9,11 @@ import {
 } from "@/core/model";
 import { createDashboardAggregates } from "../dashboard-aggregates";
 import { DASHBOARD_WIDGETS, type WidgetContext } from "../registry";
-import { CommitmentsCompact, CommitmentsExpanded } from "./CommitmentsWidget";
+import {
+  CommitmentsCompact,
+  CommitmentsExpanded,
+  CommitmentsSettings,
+} from "./CommitmentsWidget";
 
 const general = makeGeneralContainer();
 const housing = makeCategory({ id: "housing", name: "Housing", type: "expense" });
@@ -150,6 +154,7 @@ it("renders Regular contracts by category with compact parity", () => {
   expect(expanded).toContain("Goal contribution");
   expect(expanded).toContain("set later");
   expect(expanded).toContain("Active expense rules normalized over exact occurrences");
+  expect(expanded).not.toContain('aria-label="Commitment mode"');
   expect(compact).toContain('aria-label="Monthly load: $1,665.00"');
   expect(compact).toContain("Next: Internet, Aug 27");
   expect(compact).toContain("5 active expense rules");
@@ -175,7 +180,7 @@ it("renders Irregular costs as dated reserve rows and a reconciled month strip",
 
 it("persists the selected mode in synced instance settings", () => {
   const save = vi.fn(async () => {});
-  const tree = CommitmentsExpanded(context({ save, settings: { retained: true } }));
+  const tree = CommitmentsSettings(context({ save, settings: { retained: true } }));
 
   findByAriaLabel(tree, "Show irregular commitments")?.props.onClick?.();
 

@@ -9,6 +9,7 @@ import {
   categoriesAtom,
   containersAtom,
   dispatchManyAtom,
+  flashRowAtom,
   goalsAtom,
   readyAtom,
   recurringRulesAtom,
@@ -40,6 +41,7 @@ import {
   layoutFromDashboard,
   resetDashboardLayout,
   setWidgetVisible,
+  setWidgetSize,
   type DashboardDefinition,
   type DashboardWidgetEntry,
 } from "./dashboard-layout";
@@ -69,6 +71,7 @@ export function DashboardView() {
   const goals = useAtomValue(goalsAtom);
   const settings = useAtomValue(settingsAtom);
   const dispatchOps = useSetAtom(dispatchManyAtom);
+  const flashRow = useSetAtom(flashRowAtom);
   // `today` is stable for the session's render; `core` stays clock-free.
   const today = useMemo(() => todayIso(), []);
   const data = useMemo(() => {
@@ -202,6 +205,18 @@ export function DashboardView() {
     });
   }
 
+  function saveInstanceSize(
+    instanceId: string,
+    size: "compact" | "expanded",
+  ): Promise<void> {
+    const pinnedId = dashboardSets.activeDashboard.instances.find(
+      (instance) => instance.widgetType === "balance",
+    )?.instanceId;
+    return dashboardSets.saveLayout(
+      setWidgetSize(dashboardSets.layout, instanceId, size, pinnedId),
+    );
+  }
+
   function cancelEditing() {
     setGalleryOpen(false);
     setDraftDashboard(null);
@@ -318,6 +333,7 @@ export function DashboardView() {
           widgets={visibleWidgets}
           onSaveInstanceSettings={saveInstanceSettings}
           onSaveInstanceSubject={saveInstanceSubject}
+          onSaveInstanceSize={saveInstanceSize}
         />
       ) : (
         <WidgetColumn
@@ -326,6 +342,7 @@ export function DashboardView() {
           widgets={visibleWidgets}
           onSaveInstanceSettings={saveInstanceSettings}
           onSaveInstanceSubject={saveInstanceSubject}
+          onSaveInstanceSize={saveInstanceSize}
         />
       )}
       <WidgetGallerySheet
@@ -336,11 +353,11 @@ export function DashboardView() {
         hiddenInstanceIds={activeLayout.hidden}
         context={{ ...data, range: primaryRange }}
         onRestore={(instanceId) => {
-          setDraftDashboard((current) => {
-            if (!current) return current;
-            const layout = layoutFromDashboard(current, DASHBOARD_WIDGETS);
-            return applyDashboardLayout(
-              current,
+          if (!draftDashboard) return;
+          const layout = layoutFromDashboard(draftDashboard, DASHBOARD_WIDGETS);
+          setDraftDashboard(
+            applyDashboardLayout(
+              draftDashboard,
               setWidgetVisible(
                 layout,
                 instanceId,
@@ -349,15 +366,23 @@ export function DashboardView() {
                   ?.instance.instanceId,
               ),
               DASHBOARD_WIDGETS,
-            );
-          });
+            ),
+          );
+          setGalleryOpen(false);
+          flashRow({ id: instanceId, scroll: true });
         }}
         onCreate={(widgetType, configuration) => {
-          setDraftDashboard((current) =>
-            current
-              ? addDashboardWidgetInstance(current, widgetType, configuration, newId)
-              : current,
+          if (!draftDashboard) return;
+          const next = addDashboardWidgetInstance(
+            draftDashboard,
+            widgetType,
+            configuration,
+            newId,
           );
+          const instanceId = next.instances.at(-1)!.instanceId;
+          setDraftDashboard(next);
+          setGalleryOpen(false);
+          flashRow({ id: instanceId, scroll: true });
         }}
       />
     </div>
@@ -374,6 +399,7 @@ function WidgetColumn({
   widgets,
   onSaveInstanceSettings,
   onSaveInstanceSubject,
+  onSaveInstanceSize,
 }: {
   range: DateRange;
   data: Omit<WidgetContext, "range">;
@@ -386,6 +412,7 @@ function WidgetColumn({
     instanceId: string,
     subject: { type: string; id: string },
   ) => Promise<void>;
+  onSaveInstanceSize: (instanceId: string, size: "compact" | "expanded") => Promise<void>;
 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -410,6 +437,7 @@ function WidgetColumn({
               size={instance.size}
               def={def}
               base={base}
+              onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
             />
           </div>
         );
@@ -425,6 +453,7 @@ function ComparisonWidgets({
   widgets,
   onSaveInstanceSettings,
   onSaveInstanceSubject,
+  onSaveInstanceSize,
 }: {
   primaryRange: DateRange;
   compareRange: DateRange;
@@ -438,6 +467,7 @@ function ComparisonWidgets({
     instanceId: string,
     subject: { type: string; id: string },
   ) => Promise<void>;
+  onSaveInstanceSize: (instanceId: string, size: "compact" | "expanded") => Promise<void>;
 }) {
   return (
     <div className="space-y-6">
@@ -466,6 +496,7 @@ function ComparisonWidgets({
                 def={def}
                 base={primary}
                 comparisonUnsupported
+                onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
               />
             </div>
           );
@@ -478,6 +509,7 @@ function ComparisonWidgets({
               instance={instance}
               def={def}
               base={primary}
+              onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
             />
             <ComparisonCell
               side="compare"
@@ -485,6 +517,7 @@ function ComparisonWidgets({
               instance={instance}
               def={def}
               base={{ ...primary, range: compareRange }}
+              onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
             />
           </div>
         );
@@ -499,12 +532,14 @@ function ComparisonCell({
   instance,
   def,
   base,
+  onSizeChange,
 }: {
   side: "primary" | "compare";
   label: string;
   instance: DashboardWidgetEntry["instance"];
   def: DashboardWidgetEntry["def"];
   base: WidgetContext;
+  onSizeChange: (size: "compact" | "expanded") => Promise<void>;
 }) {
   return (
     <section className="space-y-2" aria-label={`${def.title}, ${label}`}>
@@ -515,6 +550,7 @@ function ComparisonCell({
         size={instance.size}
         def={def}
         base={base}
+        onSizeChange={onSizeChange}
       />
     </section>
   );

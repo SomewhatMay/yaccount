@@ -69,7 +69,7 @@ function RuleAmount({ amount }: { amount: number | null }) {
   return amount === null ? (
     <span className="text-muted-foreground text-xs">set later</span>
   ) : (
-    <Money cents={amount} tone="quiet" />
+    <Money cents={amount} tone="quiet" className="text-sm" />
   );
 }
 
@@ -89,7 +89,7 @@ function RegularView({ result }: { result: Commitments }) {
             key={group.categoryId}
             aria-labelledby={`commitment-${group.categoryId}`}
           >
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-baseline justify-between gap-3 text-sm">
               <Eyebrow id={`commitment-${group.categoryId}`} as="h3">
                 {group.categoryName}
               </Eyebrow>
@@ -118,7 +118,10 @@ function RegularView({ result }: { result: Commitments }) {
         className="rule-double mt-5 flex items-baseline justify-between gap-3 pt-2"
       >
         <Eyebrow as="span">Scheduled monthly load</Eyebrow>
-        <Money cents={result.regular.monthlyEquivalent} className="figure-md" />
+        <Money
+          cents={result.regular.monthlyEquivalent}
+          className="text-sm font-semibold"
+        />
       </div>
       <Marginalia className="mt-3 text-xs">
         Active expense rules normalized over exact occurrences in the next 12 months.
@@ -165,7 +168,10 @@ function IrregularView({ result }: { result: Commitments }) {
         className="rule-double mt-5 flex items-baseline justify-between gap-3 pt-2"
       >
         <Eyebrow as="span">Monthly equivalent</Eyebrow>
-        <Money cents={result.irregular.monthlyEquivalent} className="figure-md" />
+        <Money
+          cents={result.irregular.monthlyEquivalent}
+          className="text-sm font-semibold"
+        />
       </div>
       <div className="-mx-1 mt-5 [scrollbar-width:none] overflow-x-auto px-1 [&::-webkit-scrollbar]:hidden">
         <div className="flex w-max gap-4" aria-label="Irregular costs by month">
@@ -197,9 +203,6 @@ export function CommitmentsExpanded(context: WidgetContext) {
   const mode = selectedMode(context);
   return (
     <div>
-      <div className="mb-4 flex justify-end">
-        <ModePicker context={context} mode={mode} />
-      </div>
       {mode === "regular" ? (
         <RegularView result={result} />
       ) : (
@@ -216,9 +219,7 @@ export function CommitmentsCompact(context: WidgetContext) {
   const label = mode === "regular" ? "Monthly load" : "Monthly equivalent";
   return (
     <div>
-      <div className="flex justify-end">
-        <ModePicker context={context} mode={mode} />
-      </div>
+      <Eyebrow>{mode === "regular" ? "Regular commitments" : "Irregular costs"}</Eyebrow>
       <div
         className="mt-3"
         aria-label={`${label}: ${formatCents(section.monthlyEquivalent)}`}
@@ -237,6 +238,21 @@ export function CommitmentsCompact(context: WidgetContext) {
         {result.activeExpenseRuleCount} active expense{" "}
         {result.activeExpenseRuleCount === 1 ? "rule" : "rules"}.
       </Marginalia>
+    </div>
+  );
+}
+
+export function CommitmentsSettings(context: WidgetContext) {
+  const mode = selectedMode(context);
+  return (
+    <div>
+      <Eyebrow>Commitment view</Eyebrow>
+      <div className="mt-2 flex justify-start">
+        <ModePicker context={context} mode={mode} />
+      </div>
+      <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+        Regular shows monthly obligations. Irregular shows less frequent costs.
+      </p>
     </div>
   );
 }

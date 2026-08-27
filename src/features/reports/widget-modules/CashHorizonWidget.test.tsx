@@ -9,7 +9,11 @@ import {
 } from "@/core/model";
 import { createDashboardAggregates } from "../dashboard-aggregates";
 import { DASHBOARD_WIDGETS, type WidgetContext } from "../registry";
-import { CashHorizonCompact, CashHorizonExpanded } from "./CashHorizonWidget";
+import {
+  CashHorizonCompact,
+  CashHorizonExpanded,
+  CashHorizonSettings,
+} from "./CashHorizonWidget";
 
 const general = makeGeneralContainer();
 const income = makeCategory({ id: "income", name: "Income", type: "income" });
@@ -143,12 +147,13 @@ it("renders the low, next-income landmark, event links, and compact parity", () 
   expect(expanded).toContain('aria-label="Sep 22: $2,117.00"');
   expect(compact).toContain("Low: $817.00 on Aug 27");
   expect(compact).toContain("Next income: Aug 30, +$2,900.00");
+  expect(expanded).not.toContain('aria-label="Forecast window"');
 });
 
 it("persists a horizon choice through the synced instance settings seam", () => {
   const save = vi.fn(async () => {});
   const ctx = context(rules, { horizonDays: 14, another: true }, save);
-  const tree = CashHorizonExpanded(ctx);
+  const tree = CashHorizonSettings(ctx);
   const button = findByAriaLabel(tree, "Forecast 60 days");
 
   expect(renderToStaticMarkup(tree)).toContain('aria-pressed="true">14d');

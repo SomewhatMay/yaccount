@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/features/ErrorBoundary";
 import { useLocalPref } from "@/features/prefs";
-import { Marginalia, RowActions } from "@/features/ui";
+import { Marginalia, ResponsiveSheet, RowActions } from "@/features/ui";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -20,6 +20,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -76,6 +77,7 @@ export function DashboardWidget({
   editing = false,
   comparisonUnsupported = false,
   surfaceId = instanceId,
+  onSizeChange,
 }: {
   instanceId: string;
   size: "compact" | "expanded";
@@ -84,8 +86,10 @@ export function DashboardWidget({
   editing?: boolean;
   comparisonUnsupported?: boolean;
   surfaceId?: string;
+  onSizeChange?: (size: "compact" | "expanded") => void | Promise<void>;
 }) {
   const [mathOpen, setMathOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [openPref, setOpenPref] = useLocalPref(openKey(instanceId), "open", isOpenState);
   const [windowPref, setWindowPref] = useLocalPref(
     windowKey(instanceId),
@@ -126,7 +130,9 @@ export function DashboardWidget({
   ) : (
     renderAvailabilityState(availability)
   );
-  const hasMath = active && availability.status === "ready" && Boolean(def.math);
+  const hasMath = Boolean(def.math);
+  const hasSettings = Boolean(def.renderSettings || def.settingsComponent);
+  const supportsCompact = Boolean(def.renderCompact || def.compactComponent);
   const math = hasMath && mathOpen ? def.math?.(ctx) : null;
   const content = (
     <>
@@ -135,27 +141,6 @@ export function DashboardWidget({
         <Marginalia className="mt-3 text-xs">
           <span>Period comparison isn&apos;t supported for this current view.</span>
         </Marginalia>
-      )}
-      {hasMath && (
-        <div className="mt-3 flex justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setMathOpen(true)}
-          >
-            Show the math
-          </Button>
-        </div>
-      )}
-      {math && (
-        <ShowMathSheet
-          open={mathOpen}
-          onOpenChange={setMathOpen}
-          title={def.title}
-          idPrefix={surfaceId}
-          disclosure={math}
-        />
       )}
     </>
   );
@@ -185,9 +170,18 @@ export function DashboardWidget({
             aria-hidden
           />
         </CollapsibleTrigger>
-        {!def.fixedWindow && (
-          <WindowMenu title={def.title} value={windowPref} onChange={setWindowPref} />
-        )}
+        {WidgetMenu({
+          def,
+          size,
+          windowPref,
+          supportsCompact,
+          hasMath,
+          hasSettings,
+          onWindowChange: setWindowPref,
+          onSizeChange,
+          onShowMath: () => setMathOpen(true),
+          onShowSettings: () => setSettingsOpen(true),
+        })}
       </div>
 
       {/* A widget looking at a different window than the rest of the page has to
@@ -201,6 +195,37 @@ export function DashboardWidget({
       <CollapsibleContent className={cn("pt-4", size === "compact" && "pt-3")}>
         {content}
       </CollapsibleContent>
+      {math && (
+        <ShowMathSheet
+          open={mathOpen}
+          onOpenChange={setMathOpen}
+          title={def.title}
+          idPrefix={surfaceId}
+          disclosure={math}
+        />
+      )}
+      {hasSettings && (
+        <ResponsiveSheet
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          title={`${def.title} settings`}
+          description="Changes apply to this widget only."
+        >
+          <div className="px-4 pb-5">
+            {settingsOpen &&
+              (def.renderSettings ? (
+                def.renderSettings(ctx)
+              ) : def.settingsComponent ? (
+                <DeferredWidgetContent
+                  title={`${def.title} settings`}
+                  Renderer={def.settingsComponent}
+                  context={ctx}
+                  immediate
+                />
+              ) : null)}
+          </div>
+        </ResponsiveSheet>
+      )}
     </Collapsible>
   );
 }
@@ -284,42 +309,79 @@ function renderAvailabilityState(
   );
 }
 
-/**
- * The per-widget window (§6.1's "optional per-widget override").
- *
- * Presets only, deliberately: a pair of date inputs inside a dropdown is a menu
- * that can't be dismissed by clicking an option, and the dashboard's own picker
- * already carries custom dates for the case that needs them.
- */
-function WindowMenu({
-  title,
-  value,
-  onChange,
+/** One title menu for display size, widget settings, math, and period override. */
+function WidgetMenu({
+  def,
+  size,
+  windowPref,
+  supportsCompact,
+  hasMath,
+  hasSettings,
+  onWindowChange,
+  onSizeChange,
+  onShowMath,
+  onShowSettings,
 }: {
-  title: string;
-  value: string;
-  onChange: (value: string) => void;
+  def: WidgetDef;
+  size: "compact" | "expanded";
+  windowPref: string;
+  supportsCompact: boolean;
+  hasMath: boolean;
+  hasSettings: boolean;
+  onWindowChange: (value: string) => void;
+  onSizeChange?: (size: "compact" | "expanded") => void | Promise<void>;
+  onShowMath: () => void;
+  onShowSettings: () => void;
 }) {
+  const canChooseSize = supportsCompact && Boolean(onSizeChange);
+  if (def.fixedWindow && !canChooseSize && !hasMath && !hasSettings) return null;
   return (
-    <RowActions
-      label={`${title}: choose a period`}
-      className={cn(value !== FOLLOW && "opacity-100")}
-    >
-      <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-        Show this widget for
-      </DropdownMenuLabel>
-      <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
-        <DropdownMenuRadioItem value={FOLLOW}>The dashboard period</DropdownMenuRadioItem>
+    <RowActions label={`Configure ${def.title}`} className="opacity-100">
+      {hasSettings && (
+        <DropdownMenuItem onSelect={onShowSettings}>Settings</DropdownMenuItem>
+      )}
+      {hasMath && (
+        <DropdownMenuItem onSelect={onShowMath}>Show the math</DropdownMenuItem>
+      )}
+      {(hasSettings || hasMath) && (canChooseSize || !def.fixedWindow) && (
         <DropdownMenuSeparator />
-        {PERIOD_PRESETS.map((preset) => (
-          <DropdownMenuRadioItem
-            key={preset}
-            value={encodePeriod({ kind: "preset", preset })}
+      )}
+      {canChooseSize && (
+        <>
+          <DropdownMenuLabel>Size</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={size}
+            onValueChange={(value) =>
+              void onSizeChange?.(value === "compact" ? "compact" : "expanded")
+            }
           >
-            {PRESET_LABEL[preset]}
-          </DropdownMenuRadioItem>
-        ))}
-      </DropdownMenuRadioGroup>
+            <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="expanded">Expanded</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </>
+      )}
+      {canChooseSize && !def.fixedWindow && <DropdownMenuSeparator />}
+      {!def.fixedWindow && (
+        <>
+          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+            Show this widget for
+          </DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={windowPref} onValueChange={onWindowChange}>
+            <DropdownMenuRadioItem value={FOLLOW}>
+              The dashboard period
+            </DropdownMenuRadioItem>
+            <DropdownMenuSeparator />
+            {PERIOD_PRESETS.map((preset) => (
+              <DropdownMenuRadioItem
+                key={preset}
+                value={encodePeriod({ kind: "preset", preset })}
+              >
+                {PRESET_LABEL[preset]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </>
+      )}
     </RowActions>
   );
 }

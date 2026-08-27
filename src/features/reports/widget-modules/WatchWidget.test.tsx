@@ -15,8 +15,10 @@ import { DASHBOARD_WIDGETS, type WidgetContext } from "../registry";
 import {
   CategoryWatchCompact,
   CategoryWatchExpanded,
+  CategoryWatchSettings,
   ContainerWatchCompact,
   ContainerWatchExpanded,
+  ContainerWatchSettings,
 } from "./WatchWidget";
 
 const general = makeGeneralContainer();
@@ -52,6 +54,7 @@ function context(options: {
   containers?: ReturnType<typeof makeContainer>[];
   settings?: Record<string, unknown>;
   saveSubject?: (subject: { type: string; id: string }) => Promise<void>;
+  saveSettings?: (settings: Record<string, unknown>) => Promise<void>;
 }): WidgetContext {
   const containers = options.containers ?? [general, reserve];
   const budgetTargets = [
@@ -88,6 +91,7 @@ function context(options: {
     instanceSubject: options.subject,
     instanceSettings: options.settings ?? {},
     saveInstanceSubject: options.saveSubject,
+    saveInstanceSettings: options.saveSettings,
     aggregates: createDashboardAggregates({
       budgetTargets,
       categories,
@@ -133,6 +137,7 @@ it("renders a raw container forecast and exact floor with compact parity", () =>
   });
   const expanded = renderToStaticMarkup(<ContainerWatchExpanded {...ctx} />);
   const compact = renderToStaticMarkup(<ContainerWatchCompact {...ctx} />);
+  const settings = renderToStaticMarkup(<ContainerWatchSettings {...ctx} />);
 
   expect(expanded).toContain("Watch: Reserve");
   expect(expanded).not.toContain("Reserve Change");
@@ -141,6 +146,10 @@ it("renders a raw container forecast and exact floor with compact parity", () =>
   expect(expanded).toContain('aria-label="User floor: $1,500.00"');
   expect(expanded).toContain('aria-label="Distance above your floor: $112.00"');
   expect(expanded).toContain("forecast uses scheduled items only");
+  expect(expanded).not.toContain('aria-label="Change watched container"');
+  expect(expanded).not.toContain("Change your floor");
+  expect(settings).toContain('aria-label="Change watched container"');
+  expect(settings).toContain('aria-label="Container floor amount"');
   expect(compact).toContain("Watch: Reserve");
   expect(compact).toContain("Low $1,612.00");
   expect(compact).toContain("$112.00 above your floor");
@@ -162,6 +171,7 @@ it("renders category history, budget, and recent-pace projection", () => {
   });
   const expanded = renderToStaticMarkup(<CategoryWatchExpanded {...ctx} />);
   const compact = renderToStaticMarkup(<CategoryWatchCompact {...ctx} />);
+  const settings = renderToStaticMarkup(<CategoryWatchSettings {...ctx} />);
 
   expect(expanded).toContain("Watch: Groceries");
   expect(expanded).toContain(">$510<");
@@ -173,6 +183,8 @@ it("renders category history, budget, and recent-pace projection", () => {
   expect(compact).toContain("$540.00 of $625.00");
   expect(compact).toContain("Likely $706.86");
   expect(compact).toContain("$85.00 left");
+  expect(expanded).not.toContain('aria-label="Change watched category"');
+  expect(settings).toContain('aria-label="Change watched category"');
 });
 
 it("keeps a missing subject in place and changes to an explicit choice", () => {
@@ -184,8 +196,8 @@ it("keeps a missing subject in place and changes to an explicit choice", () => {
     containers: [general, archived],
     saveSubject: save,
   });
-  const tree = ContainerWatchExpanded(ctx);
-  const html = renderToStaticMarkup(tree);
+  const tree = ContainerWatchSettings(ctx);
+  const html = renderToStaticMarkup(<ContainerWatchExpanded {...ctx} />);
 
   expect(html).toContain("Choose another container");
   const picker = findComponent(tree, "Select");

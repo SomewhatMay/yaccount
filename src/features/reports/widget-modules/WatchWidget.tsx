@@ -4,7 +4,13 @@ import { differenceInCalendarDays } from "date-fns";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CategoryWatch, ContainerWatch } from "@/core/engine";
 import { formatCents, parseDollars } from "@/core/money";
 import { Eyebrow, LeaderRow, Marginalia, Money } from "@/features/ui";
@@ -59,11 +65,9 @@ function saveFloor(event: FormEvent<HTMLFormElement>, context: WidgetContext): v
 function SubjectPicker({
   context,
   type,
-  label = "Change",
 }: {
   context: WidgetContext;
   type: "container" | "category";
-  label?: string;
 }) {
   const options = watchSubjectOptions(type, context.containers, context.categories);
   const current = options.some((option) => option.id === context.instanceSubject?.id)
@@ -74,11 +78,8 @@ function SubjectPicker({
       value={current}
       onValueChange={(id) => void context.saveInstanceSubject?.({ type, id })}
     >
-      <SelectTrigger
-        aria-label={`Change watched ${type}`}
-        className="h-8 w-auto min-w-20 gap-1.5 rounded-full px-3 text-xs"
-      >
-        <span aria-hidden>{label}</span>
+      <SelectTrigger aria-label={`Change watched ${type}`} className="w-full">
+        <SelectValue placeholder={`Choose a ${type}`} />
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
@@ -91,36 +92,22 @@ function SubjectPicker({
   );
 }
 
-function MissingSubject({
-  context,
-  type,
-}: {
-  context: WidgetContext;
-  type: "container" | "category";
-}) {
+function MissingSubject({ type }: { type: "container" | "category" }) {
   return (
     <div role="status" className="border-rule rounded-xl border border-dashed p-4">
       <Eyebrow>Choose another {type}</Eyebrow>
       <p className="text-muted-foreground mt-2 text-sm">
         The watched {type} is archived, missing, or no longer reportable.
       </p>
-      <div className="mt-3">
-        {SubjectPicker({ context, type, label: "Choose another" })}
-      </div>
+      <Marginalia className="mt-3 text-xs">
+        Open widget settings to choose another {type}.
+      </Marginalia>
     </div>
   );
 }
 
-function ContainerHeader({ context, name }: { context: WidgetContext; name: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Eyebrow as="h3">Watch: {name}</Eyebrow>
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-xs">Container</span>
-        <SubjectPicker context={context} type="container" />
-      </div>
-    </div>
-  );
+function ContainerHeader({ name }: { name: string }) {
+  return <Eyebrow as="h3">Watch: {name}</Eyebrow>;
 }
 
 function ContainerChart({
@@ -213,41 +200,36 @@ function FloorEditor({
   floor: number | null;
 }) {
   return (
-    <details className="mt-3 text-xs">
-      <summary className="text-muted-foreground hover:text-foreground cursor-pointer select-none">
-        {floor === null ? "Set your floor" : "Change your floor"}
-      </summary>
-      <form
-        className="mt-2 flex flex-wrap items-end gap-2"
-        onSubmit={(event) => saveFloor(event, context)}
-      >
-        <label className="grid gap-1">
-          <span className="text-muted-foreground">Floor amount</span>
-          <Input
-            name="floor"
-            inputMode="decimal"
-            aria-label="Container floor amount"
-            defaultValue={floor === null ? "" : (floor / 100).toFixed(2)}
-            placeholder="0.00"
-            className="h-8 w-32 font-mono"
-          />
-        </label>
-        <Button type="submit" size="sm" className="h-8">
-          Save floor
+    <form
+      className="mt-2 flex flex-wrap items-end gap-2"
+      onSubmit={(event) => saveFloor(event, context)}
+    >
+      <label className="grid gap-1">
+        <span className="text-muted-foreground">Floor amount</span>
+        <Input
+          name="floor"
+          inputMode="decimal"
+          aria-label="Container floor amount"
+          defaultValue={floor === null ? "" : (floor / 100).toFixed(2)}
+          placeholder="0.00"
+          className="h-8 w-32 font-mono"
+        />
+      </label>
+      <Button type="submit" size="sm" className="h-8">
+        Save floor
+      </Button>
+      {floor !== null && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8"
+          onClick={() => saveWithoutFloor(context)}
+        >
+          Remove floor
         </Button>
-        {floor !== null && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => saveWithoutFloor(context)}
-          >
-            Remove floor
-          </Button>
-        )}
-      </form>
-    </details>
+      )}
+    </form>
   );
 }
 
@@ -268,11 +250,11 @@ function containerResult(context: WidgetContext) {
 
 export function ContainerWatchExpanded(context: WidgetContext) {
   const resolved = containerResult(context);
-  if (!resolved) return MissingSubject({ context, type: "container" });
+  if (!resolved) return MissingSubject({ type: "container" });
   const { container, floor, result } = resolved;
   return (
     <div>
-      <ContainerHeader context={context} name={container.name} />
+      <ContainerHeader name={container.name} />
       <div className="mt-4">
         <Eyebrow>Current balance</Eyebrow>
         <p aria-label={`Current balance: ${formatCents(result.currentBalance)}`}>
@@ -327,18 +309,17 @@ export function ContainerWatchExpanded(context: WidgetContext) {
       <Marginalia className="mt-3 text-xs">
         Floor is your setting; forecast uses scheduled items only.
       </Marginalia>
-      <FloorEditor context={context} floor={floor} />
     </div>
   );
 }
 
 export function ContainerWatchCompact(context: WidgetContext) {
   const resolved = containerResult(context);
-  if (!resolved) return MissingSubject({ context, type: "container" });
+  if (!resolved) return MissingSubject({ type: "container" });
   const { container, result } = resolved;
   return (
     <div>
-      <ContainerHeader context={context} name={container.name} />
+      <ContainerHeader name={container.name} />
       <p aria-label={`Current balance: ${formatCents(result.currentBalance)}`}>
         <Money cents={result.currentBalance} className="figure-md mt-3" />
       </p>
@@ -373,16 +354,8 @@ export function ContainerWatchCompact(context: WidgetContext) {
   );
 }
 
-function CategoryHeader({ context, name }: { context: WidgetContext; name: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Eyebrow as="h3">Watch: {name}</Eyebrow>
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-xs">Category</span>
-        <SubjectPicker context={context} type="category" />
-      </div>
-    </div>
-  );
+function CategoryHeader({ name }: { name: string }) {
+  return <Eyebrow as="h3">Watch: {name}</Eyebrow>;
 }
 
 function categoryResult(context: WidgetContext) {
@@ -478,11 +451,11 @@ function SpendingFigure({ result }: { result: CategoryWatch }) {
 
 export function CategoryWatchExpanded(context: WidgetContext) {
   const resolved = categoryResult(context);
-  if (!resolved) return MissingSubject({ context, type: "category" });
+  if (!resolved) return MissingSubject({ type: "category" });
   const { category, result } = resolved;
   return (
     <div>
-      <CategoryHeader context={context} name={category.name} />
+      <CategoryHeader name={category.name} />
       <SpendingFigure result={result} />
       <section className="mt-5" aria-labelledby="category-watch-history">
         <Eyebrow id="category-watch-history" as="h3">
@@ -518,11 +491,11 @@ export function CategoryWatchExpanded(context: WidgetContext) {
 
 export function CategoryWatchCompact(context: WidgetContext) {
   const resolved = categoryResult(context);
-  if (!resolved) return MissingSubject({ context, type: "category" });
+  if (!resolved) return MissingSubject({ type: "category" });
   const { category, result } = resolved;
   return (
     <div>
-      <CategoryHeader context={context} name={category.name} />
+      <CategoryHeader name={category.name} />
       <p
         aria-label={
           result.budget === null
@@ -559,6 +532,37 @@ export function CategoryWatchCompact(context: WidgetContext) {
             ; <span className="tnum font-mono">{formatCents(result.remaining)}</span> left
           </>
         )}
+      </p>
+    </div>
+  );
+}
+
+export function ContainerWatchSettings(context: WidgetContext) {
+  const floor = floorSetting(context);
+  return (
+    <div className="space-y-6">
+      <section>
+        <Eyebrow as="h3">Watched container</Eyebrow>
+        <div className="mt-2">{SubjectPicker({ context, type: "container" })}</div>
+      </section>
+      <section className="border-t pt-4">
+        <Eyebrow as="h3">Floor amount</Eyebrow>
+        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+          Compare the scheduled low against a floor you choose.
+        </p>
+        <FloorEditor context={context} floor={floor} />
+      </section>
+    </div>
+  );
+}
+
+export function CategoryWatchSettings(context: WidgetContext) {
+  return (
+    <div>
+      <Eyebrow as="h3">Watched category</Eyebrow>
+      <div className="mt-2">{SubjectPicker({ context, type: "category" })}</div>
+      <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+        Current spending, budget progress, and history stay scoped to this category.
       </p>
     </div>
   );
