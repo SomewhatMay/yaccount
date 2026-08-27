@@ -102,7 +102,7 @@ export function PlanView() {
 
   if (!ready)
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <FigureSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton rows={4} />
@@ -111,7 +111,7 @@ export function PlanView() {
     );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader eyebrow="Monthly allocation" title="Plan">
         Give the month&apos;s income a job — steady category allowances and goal
         contributions — until nothing is left unassigned.

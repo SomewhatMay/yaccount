@@ -418,7 +418,7 @@ function WidgetColumn({
   onHideInstance: (instanceId: string) => Promise<void>;
 }) {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-3 md:grid-cols-2 md:gap-6">
       {widgets.map(({ instance, def }) => {
         const base: WidgetContext = {
           ...data,
@@ -476,7 +476,7 @@ function ComparisonWidgets({
   onHideInstance: (instanceId: string) => Promise<void>;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {widgets.map(({ instance, def }) => {
         const primary: WidgetContext = {
           ...data,
@@ -509,7 +509,7 @@ function ComparisonWidgets({
           );
         }
         return (
-          <div key={instance.instanceId} className="grid gap-6 lg:grid-cols-2">
+          <div key={instance.instanceId} className="grid gap-3 lg:grid-cols-2 lg:gap-6">
             <ComparisonCell
               side="primary"
               label={rangeText(primaryRange)}

@@ -273,7 +273,7 @@ export function GoalsView() {
 
   if (!ready)
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton rows={3} />
@@ -282,7 +282,7 @@ export function GoalsView() {
     );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         eyebrow="Long-term savings"
         title="Goals"
