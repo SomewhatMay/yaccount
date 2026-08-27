@@ -48,6 +48,7 @@ import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands"
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
 import { operationLogFacts } from "@/lib/strategic-logging";
+import { nextLedgerChangeNonce } from "@/features/ledger/change-nonce";
 import type {
   EntryRead,
   LedgerContainerFact,
@@ -293,7 +294,10 @@ export const dispatchAtom = atom(null, async (_get, set, op: Op) => {
       op.payload.row.inbox_status === "approved" &&
       !op.payload.row.is_template
     ) {
-      set(ledgerLocalAddAtom, { id: op.payload.row.id, nonce: Date.now() });
+      set(ledgerLocalAddAtom, {
+        id: op.payload.row.id,
+        nonce: nextLedgerChangeNonce(),
+      });
     }
     scheduleSync(set);
     log.info("write succeeded", { ...facts, durationMs: Date.now() - startedAt });
@@ -412,7 +416,7 @@ export const syncAtom = atom(null, async (_get, set) => {
       const repoSnapshot = await repo.getLedgerReadSnapshot();
       set(ledgerRemoteChangeAtom, {
         revision: repoSnapshot.revision,
-        nonce: Date.now(),
+        nonce: nextLedgerChangeNonce(),
       });
     }
 

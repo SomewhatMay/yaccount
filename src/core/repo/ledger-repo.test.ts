@@ -654,4 +654,36 @@ describe("Repo Ledger read model", () => {
     );
     repo.close();
   });
+
+  it("converges pages and facts after shuffled remote arrival", async () => {
+    const left = await Repo.open("paging-converge-left");
+    const right = await Repo.open("paging-converge-right");
+    const ops = createOps(rows());
+    await left.applyRemoteOps([...ops].reverse());
+    await right.applyRemoteOps([ops[1], ops[3], ops[0], ops[2]]);
+
+    for (const sort of ["newest", "oldest", "largest", "smallest"] as const) {
+      expect(
+        (await left.getLedgerPage({ sort, limit: 50, cursor: null })).rows,
+      ).toEqual((await right.getLedgerPage({ sort, limit: 50, cursor: null })).rows);
+    }
+    expect(await left.getLedgerReadSnapshot()).toEqual(
+      await right.getLedgerReadSnapshot(),
+    );
+    left.close();
+    right.close();
+  });
+
+  it("reset clears obsolete projections and rebuilds exact empty facts", async () => {
+    const repo = await Repo.open("paging-reset-projection");
+    await repo.resetTo(createOps(rows()));
+    expect((await repo.getLedgerReadSnapshot()).ledgerCount).toBe(4);
+
+    await repo.resetTo([]);
+
+    expect(await repo.getEntryCollection("ledger")).toEqual([]);
+    expect((await repo.getLedgerReadSnapshot()).ledgerCount).toBe(0);
+    expect(await repo.getContainerFact("general")).toBeUndefined();
+    repo.close();
+  });
 });

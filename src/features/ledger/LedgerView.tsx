@@ -90,6 +90,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   initialLedgerPagingState,
   createLedgerSessionCache,
+  needsImmediateLocalAddReload,
   ledgerPagingReducer,
   pageSizeForWidth,
   type LedgerPagingState,
@@ -438,10 +439,14 @@ export function LedgerView() {
     lastLocalAdd.current = localAdd.nonce;
     request.current += 1;
     pageDispatch({ type: "local-add", id: localAdd.id });
+    flashRow({ id: localAdd.id });
     setDraft(NO_FILTER);
     setSort("newest");
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [localAdd, setSort]);
+    if (needsImmediateLocalAddReload(sort, filtering)) {
+      void loadPage(null, false);
+    }
+  }, [filtering, flashRow, loadPage, localAdd, setSort, sort]);
 
   useEffect(() => {
     if (!ready || paging.rows.length === 0 || paging.revision === revision) return;

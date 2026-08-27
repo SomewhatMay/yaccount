@@ -5,6 +5,7 @@ import {
   createLedgerSessionCache,
   ledgerPagingReducer,
   pageSizeForWidth,
+  needsImmediateLocalAddReload,
 } from "./paging-state";
 
 const row = (id: string) =>
@@ -64,6 +65,12 @@ describe("Ledger paging session state", () => {
     expect(
       ledgerPagingReducer(loaded, { type: "local-add", id: "new" }),
     ).toMatchObject({ rows: [], cursor: null, flashId: "new", status: "loading" });
+  });
+
+  it("reloads local add immediately only when its query already is newest/clear", () => {
+    expect(needsImmediateLocalAddReload("newest", false)).toBe(true);
+    expect(needsImmediateLocalAddReload("oldest", false)).toBe(false);
+    expect(needsImmediateLocalAddReload("newest", true)).toBe(false);
   });
 
   it("preserves loaded rows and exposes remote entries until jump", () => {

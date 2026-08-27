@@ -1,4 +1,5 @@
 import type { Transaction } from "@/core/model";
+import type { LedgerReadSort } from "@/core/repo/ledger-read";
 
 export type LedgerPagingStatus = "loading" | "ready" | "error";
 
@@ -40,6 +41,13 @@ export type LedgerPagingAction =
 
 export function pageSizeForWidth(width: number): 25 | 50 {
   return width < 640 ? 25 : 50;
+}
+
+export function needsImmediateLocalAddReload(
+  sort: LedgerReadSort,
+  filtering: boolean,
+): boolean {
+  return sort === "newest" && !filtering;
 }
 
 export function initialLedgerPagingState(pageSize: 25 | 50): LedgerPagingState {
