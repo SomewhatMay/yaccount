@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
@@ -49,6 +49,8 @@ import {
 } from "@/features/shell/command-history";
 import { needsCommandIndex } from "@/features/shell/command-state";
 import { DESTINATIONS } from "@/features/shell/nav";
+import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
+import { useVisualViewportBox } from "@/features/ui/useVisualViewportBox";
 import {
   Command,
   CommandEmpty,
@@ -154,6 +156,16 @@ export function CommandPalette() {
   const flashRow = useSetAtom(flashRowAtom);
   const sync = useSetAtom(syncAtom);
   const [history, setHistory] = useCommandHistory();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const sideways = useMediaQuery(SM_UP, true);
+  const visualViewport = useVisualViewportBox();
+  const viewportStyle =
+    !sideways && visualViewport
+      ? ({
+          "--visual-viewport-top": `${visualViewport.top}px`,
+          "--visual-viewport-height": `${visualViewport.height}px`,
+        } as React.CSSProperties)
+      : undefined;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -332,9 +344,18 @@ export function CommandPalette() {
       }}
       title="Search yaccount"
       description="Run a common action or find anything you have recorded."
+      contentStyle={viewportStyle}
+      onOpenAutoFocus={(event) => {
+        if (!sideways) {
+          event.preventDefault();
+          inputRef.current?.focus({ preventScroll: true });
+        }
+      }}
     >
       <Command shouldFilter={false}>
         <CommandInput
+          ref={inputRef}
+          autoFocus={!sideways}
           placeholder="Search everything — try a note, an amount, or is:transfer"
           value={query}
           onValueChange={setQuery}

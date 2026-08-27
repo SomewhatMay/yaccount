@@ -32,18 +32,27 @@ function CommandDialog({
   description = "Search for a command to run...",
   children,
   className,
+  contentStyle,
+  onOpenAutoFocus,
   showCloseButton = false,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   title?: string;
   description?: string;
   className?: string;
+  contentStyle?: React.CSSProperties;
+  onOpenAutoFocus?: React.ComponentProps<typeof DialogContent>["onOpenAutoFocus"];
   showCloseButton?: boolean;
 }) {
   return (
     <Dialog {...props}>
       <DialogContent
-        className={cn("top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0", className)}
+        style={contentStyle}
+        onOpenAutoFocus={onOpenAutoFocus}
+        className={cn(
+          "top-[calc(var(--visual-viewport-top,0px)+env(safe-area-inset-top,0px)+0.5rem)] h-[calc(var(--visual-viewport-height,100dvh)-env(safe-area-inset-top,0px)-1rem)] max-h-none translate-y-0 overflow-hidden rounded-xl! p-0 sm:top-1/3 sm:h-auto sm:max-h-[calc(100dvh-2rem)]",
+          className,
+        )}
         showCloseButton={showCloseButton}
       >
         {/* Radix names the dialog from a Title INSIDE the content — as shipped,
@@ -90,7 +99,8 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
+        "no-scrollbar max-h-none flex-1",
+        "min-h-0 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none sm:max-h-72",
         className,
       )}
       {...props}

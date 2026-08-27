@@ -180,9 +180,98 @@ test("opens search from the mobile topbar", async ({ page }, testInfo) => {
   const search = page.getByRole("button", { name: "Search yaccount" });
   await expect(search).toBeVisible();
   await search.click();
-  await expect(page.getByPlaceholder(/Search everything/)).toBeVisible();
+  const input = page.getByPlaceholder(/Search everything/);
+  await expect(input).toBeVisible();
+  await expect(input).toBeFocused();
+  const dialog = page.getByRole("dialog", { name: "Search yaccount" });
+  const box = await dialog.boundingBox();
+  expect(box?.y ?? Infinity).toBeLessThan(80);
   await page.keyboard.press("Escape");
-  await expect(page.getByPlaceholder(/Search everything/)).toBeHidden();
+  await expect(input).toBeHidden();
+});
+
+test("fits repeated Search cycles inside a synthetic keyboard viewport", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile viewport regression.");
+
+  await context.addInitScript(() => {
+    const fake = Object.assign(new EventTarget(), {
+      height: window.innerHeight,
+      offsetTop: 0,
+      width: window.innerWidth,
+      pageLeft: 0,
+      pageTop: 0,
+      scale: 1,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: fake,
+    });
+  });
+
+  await openReady(page, "/", "How the money moved");
+  const openSearch = page.getByRole("button", { name: "Search yaccount" });
+  const input = page.getByPlaceholder(/Search everything/);
+  const dialog = page.getByRole("dialog", { name: "Search yaccount" });
+
+  for (let cycle = 0; cycle < 3; cycle++) {
+    await openSearch.click();
+    await expect(input).toBeFocused();
+    await page.evaluate(() => {
+      const viewport = window.visualViewport as VisualViewport & {
+        height: number;
+        offsetTop: number;
+      };
+      viewport.height = 360;
+      viewport.offsetTop = 120;
+      viewport.dispatchEvent(new Event("resize"));
+      viewport.dispatchEvent(new Event("scroll"));
+    });
+
+    await expect
+      .poll(async () => {
+        const box = await dialog.boundingBox();
+        return box
+          ? { top: Math.round(box.y), bottom: Math.round(box.y + box.height) }
+          : null;
+      })
+      .toEqual({ top: 128, bottom: 472 });
+    const list = dialog.locator('[data-slot="command-list"]');
+    expect(await list.evaluate((node) => getComputedStyle(node).overflowY)).toBe("auto");
+    const regions = await dialog.evaluate((node) => {
+      const input = node.querySelector('[data-slot="command-input-wrapper"]');
+      const list = node.querySelector('[data-slot="command-list"]');
+      if (!(input instanceof HTMLElement) || !(list instanceof HTMLElement)) {
+        throw new Error("Search regions missing");
+      }
+      const dialogBox = node.getBoundingClientRect();
+      const inputBox = input.getBoundingClientRect();
+      const listBox = list.getBoundingClientRect();
+      return {
+        inputInset: Math.round(inputBox.top - dialogBox.top),
+        listBottomGap: Math.round(dialogBox.bottom - listBox.bottom),
+        listHeight: Math.round(listBox.height),
+      };
+    });
+    expect(regions.inputInset).toBeLessThanOrEqual(12);
+    expect(regions.listBottomGap).toBeLessThanOrEqual(8);
+    expect(regions.listHeight).toBeGreaterThan(250);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await page.evaluate(() => {
+      const viewport = window.visualViewport as VisualViewport & {
+        height: number;
+        offsetTop: number;
+      };
+      viewport.height = window.innerHeight;
+      viewport.offsetTop = 0;
+      viewport.dispatchEvent(new Event("resize"));
+      viewport.dispatchEvent(new Event("scroll"));
+    });
+  }
 });
 
 test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, testInfo) => {
@@ -221,7 +310,7 @@ test("changes theme only in Settings", async ({ page }, testInfo) => {
   }
 });
 
-test("commits once for a keyboard resize burst and ignores viewport scroll", async ({
+test("coalesces keyboard resize and tracks later viewport pan", async ({
   page,
   context,
 }, testInfo) => {
@@ -335,10 +424,67 @@ test("commits once for a keyboard resize burst and ignores viewport scroll", asy
   });
   await page.waitForTimeout(100);
 
-  await expect(sheet).toHaveAttribute(
-    "data-test-style-commits",
-    String(commitsAfterResize),
-  );
+  await expect
+    .poll(async () => Number(await sheet.getAttribute("data-test-style-commits")))
+    .toBe(commitsAfterResize + 1);
+  expect(
+    await sheet.evaluate((node) => ({
+      inset: node.style.getPropertyValue("--kb"),
+      translate: node.style.translate,
+    })),
+  ).toEqual({ inset: "264px", translate: "0px -44px" });
+});
+
+test("keeps a focused long-sheet field above a synthetic keyboard", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile viewport regression.");
+
+  await context.addInitScript(() => {
+    const fake = Object.assign(new EventTarget(), {
+      height: 616,
+      offsetTop: 0,
+      width: window.innerWidth,
+      pageLeft: 0,
+      pageTop: 0,
+      scale: 1,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: fake,
+    });
+  });
+
+  await openReady(page, "/recurring", "Scheduled transactions");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  const body = page.locator('[data-slot="sheet-body"]');
+  const bottomInput = body.getByLabel("Ends (optional)");
+  await bottomInput.evaluate((input) => input.focus({ preventScroll: true }));
+  const before = await body.evaluate((node) => node.scrollTop);
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as VisualViewport & {
+      height: number;
+      offsetTop: number;
+    };
+    viewport.height = 352;
+    viewport.offsetTop = 196.66;
+    viewport.dispatchEvent(new Event("resize"));
+  });
+
+  await expect
+    .poll(() => body.evaluate((node) => node.scrollTop))
+    .toBeGreaterThan(before);
+  const geometry = await body.evaluate((node) => {
+    const field = node.querySelector("#rr-end");
+    if (!(field instanceof HTMLElement)) throw new Error("End date missing");
+    return {
+      bodyBottom: node.getBoundingClientRect().bottom,
+      fieldBottom: field.getBoundingClientRect().bottom,
+    };
+  });
+  expect(geometry.fieldBottom).toBeLessThanOrEqual(geometry.bodyBottom - 15);
 });
 
 test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo) => {

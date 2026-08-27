@@ -37,8 +37,8 @@ describe("iPhone PWA interaction layout", () => {
     expect(sheet).toContain("touch-pan-y");
     expect(sheet).not.toContain("offsetTop");
     expect(sheet).not.toContain("innerHeight");
-    expect(sheet).not.toContain("requestAnimationFrame");
-    expect(sheet).not.toContain('"scroll"');
+    expect(sheet).toContain("requestAnimationFrame");
+    expect(sheet).toContain('"scroll"');
   });
 
   it("scopes the sheet transition to keyboard movement", () => {
@@ -50,6 +50,17 @@ describe("iPhone PWA interaction layout", () => {
 
     expect(sheet).not.toContain("transition-[translate]");
     expect(sheet).toContain("transition-none");
+  });
+
+  it("gives phone Search explicit focus and visual-viewport geometry", () => {
+    const palette = read("../shell/CommandPalette.tsx");
+    const command = read("../../components/ui/command.tsx");
+
+    expect(palette).toContain("useVisualViewportBox");
+    expect(palette).toContain("autoFocus={!sideways}");
+    expect(command).toContain("--visual-viewport-top");
+    expect(command).toContain("--visual-viewport-height");
+    expect(command).toContain("max-h-none flex-1");
   });
 
   it("waits for the FAB click before mounting quick-add", () => {
