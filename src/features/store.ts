@@ -4,6 +4,8 @@ import {
   withGeneralWallet,
   type LedgerFocusQuery,
   type LedgerPageQuery,
+  type LedgerScanQuery,
+  type SearchEntryScanQuery,
 } from "@/core/repo";
 import { DB_VERSION, STORE } from "@/core/repo/db";
 import {
@@ -175,6 +177,14 @@ function getRepo(): Promise<Repo> {
 
 export async function readLedgerPage(query: LedgerPageQuery) {
   return (await getRepo()).getLedgerPage(query);
+}
+
+export async function scanLedgerEntries(query: LedgerScanQuery) {
+  return (await getRepo()).scanLedgerEntries(query);
+}
+
+export async function scanSearchEntries(query: SearchEntryScanQuery) {
+  return (await getRepo()).scanSearchEntries(query);
 }
 
 export async function readLedgerFocus(query: LedgerFocusQuery) {

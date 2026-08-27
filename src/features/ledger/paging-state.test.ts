@@ -102,4 +102,21 @@ describe("Ledger paging session state", () => {
     expect(next.rows).toEqual([updated]);
     expect(next.revision).toBe(2);
   });
+
+  it("publishes provisional matches without claiming completion", () => {
+    const provisional = ledgerPagingReducer(initialLedgerPagingState(25), {
+      type: "provisional",
+      rows: [row("early")],
+      cursor: "scan-one",
+      revision: 1,
+      append: false,
+    });
+
+    expect(provisional.rows.map((entry) => entry.id)).toEqual(["early"]);
+    expect(provisional).toMatchObject({
+      cursor: "scan-one",
+      complete: false,
+      status: "loading",
+    });
+  });
 });

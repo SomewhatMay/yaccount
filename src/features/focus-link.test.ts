@@ -65,8 +65,10 @@ describe("every screen ⌘K can point at reads the param", () => {
   it("routes palette results through the engine's ranking, not the register's order", () => {
     const palette = source("./shell/CommandPalette.tsx");
     expect(palette).toContain("buildSearchIndex");
-    expect(palette).toContain("createSession");
+    expect(palette).toContain("createProgressiveSearch");
+    expect(palette).toContain("scanSearchEntries");
     expect(palette).toContain("focusHref");
+    expect(palette).not.toContain("transactionsAtom");
     // The old palette sorted the whole register on every data change.
     expect(palette).not.toContain("sortForRegister");
   });

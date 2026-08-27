@@ -23,6 +23,13 @@ export type LedgerPagingAction =
       complete: boolean;
       append: boolean;
     }
+  | {
+      type: "provisional";
+      rows: Transaction[];
+      cursor: string;
+      revision: number;
+      append: boolean;
+    }
   | { type: "query-change" }
   | { type: "local-add"; id: string }
   | { type: "remote-change"; revision: number; hasNewEntries: boolean }
@@ -79,6 +86,23 @@ export function ledgerPagingReducer(
         revision: action.revision,
         complete: action.complete,
         status: "ready",
+        error: null,
+      };
+    }
+    case "provisional": {
+      const rows = action.append
+        ? [...state.rows, ...action.rows].filter(
+            (row, index, all) =>
+              all.findIndex((candidate) => candidate.id === row.id) === index,
+          )
+        : action.rows;
+      return {
+        ...state,
+        rows,
+        cursor: action.cursor,
+        revision: action.revision,
+        complete: false,
+        status: "loading",
         error: null,
       };
     }

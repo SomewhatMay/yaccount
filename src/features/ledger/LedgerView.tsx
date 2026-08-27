@@ -38,6 +38,7 @@ import {
   readOverallBalanceSeries,
   readPeriodCashFlow,
   readyAtom,
+  scanLedgerEntries,
   usageFactsAtom,
   type FlashedRow,
 } from "@/features/store";
@@ -127,6 +128,10 @@ const SORT_OPTIONS = [
   { value: "largest", label: "Largest" },
   { value: "smallest", label: "Smallest" },
 ] as const;
+
+const SCAN_CANDIDATES = 100;
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
 const KINDS: { value: TransactionKind; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -299,10 +304,43 @@ export function LedgerView() {
       const id = ++request.current;
       pageDispatch({ type: "loading" });
       try {
-        const page = await readLedgerPage({ sort, limit: pageSize, cursor, filter });
-        if (request.current !== id) return;
         savedPagingQuery = queryKey;
-        pageDispatch({ type: "page", ...page, append });
+        if (!filtering) {
+          const page = await readLedgerPage({ sort, limit: pageSize, cursor });
+          if (request.current !== id) return;
+          pageDispatch({ type: "page", ...page, append });
+          return;
+        }
+
+        let scanCursor = cursor;
+        let matched = 0;
+        let appendChunk = append;
+        while (true) {
+          const chunk = await scanLedgerEntries({
+            sort,
+            candidateLimit: SCAN_CANDIDATES,
+            matchLimit: pageSize - matched,
+            cursor: scanCursor,
+            filter,
+          });
+          if (request.current !== id) return;
+          matched += chunk.rows.length;
+          const pageReady = chunk.complete || matched >= pageSize;
+          if (pageReady) {
+            pageDispatch({ type: "page", ...chunk, append: appendChunk });
+            return;
+          }
+          pageDispatch({
+            type: "provisional",
+            rows: chunk.rows,
+            cursor: chunk.cursor!,
+            revision: chunk.revision,
+            append: appendChunk,
+          });
+          appendChunk = true;
+          scanCursor = chunk.cursor;
+          await yieldToBrowser();
+        }
       } catch (error) {
         if (request.current !== id) return;
         pageDispatch({
@@ -311,7 +349,7 @@ export function LedgerView() {
         });
       }
     },
-    [filter, pageSize, queryKey, sort],
+    [filter, filtering, pageSize, queryKey, sort],
   );
 
   useEffect(() => {

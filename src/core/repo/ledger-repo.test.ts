@@ -251,6 +251,94 @@ describe("Repo Ledger read model", () => {
     repo.close();
   });
 
+  it("yields bounded provisional filter chunks without early definitive empty", async () => {
+    const repo = await Repo.open("paging-progressive-filter");
+    const transactions = [
+      makeTransaction({
+        id: "last-match",
+        date: "2026-08-01",
+        amount: -900,
+        entered_at: at(1),
+        vendor_source: "Needle",
+        category_id: "food",
+      }),
+      ...Array.from({ length: 24 }, (_, index) =>
+        makeTransaction({
+          id: `newer-noise-${String(index).padStart(2, "0")}`,
+          date: "2026-08-22",
+          amount: -100,
+          entered_at: at(index),
+          vendor_source: "Noise",
+          category_id: "other",
+        }),
+      ),
+    ];
+    await repo.resetTo(createOps(transactions));
+
+    const found: string[] = [];
+    let cursor: string | null = null;
+    let chunks = 0;
+    do {
+      const chunk = await repo.scanLedgerEntries({
+        sort: "newest",
+        candidateLimit: 10,
+        cursor,
+        filter: { text: "needle" },
+      });
+      chunks += 1;
+      found.push(...chunk.rows.map((row) => row.id));
+      if (chunks < 3) {
+        expect(chunk.rows).toEqual([]);
+        expect(chunk.complete).toBe(false);
+        expect(chunk.cursor).not.toBeNull();
+      }
+      cursor = chunk.cursor;
+    } while (cursor !== null);
+
+    expect(chunks).toBe(3);
+    expect(found).toEqual(["last-match"]);
+    repo.close();
+  });
+
+  it("stops a scan at its match limit without skipping later matches", async () => {
+    const repo = await Repo.open("paging-progressive-match-limit");
+    await repo.resetTo(
+      createOps(
+        ["one", "two", "three"].map((id, index) =>
+          makeTransaction({
+            id,
+            date: "2026-08-20",
+            amount: -100,
+            entered_at: at(index),
+            vendor_source: `Match ${id}`,
+            category_id: "food",
+          }),
+        ),
+      ),
+    );
+
+    const found: string[] = [];
+    let cursor: string | null = null;
+    let chunks = 0;
+    do {
+      const chunk = await repo.scanLedgerEntries({
+        sort: "newest",
+        candidateLimit: 10,
+        matchLimit: 1,
+        cursor,
+        filter: { text: "match" },
+      });
+      chunks += 1;
+      expect(chunk.rows).toHaveLength(1);
+      found.push(...chunk.rows.map((row) => row.id));
+      cursor = chunk.cursor;
+    } while (cursor !== null);
+
+    expect(chunks).toBe(3);
+    expect(found).toEqual(["three", "two", "one"]);
+    repo.close();
+  });
+
   it("reads complete active date ranges and revalidates ids without full scans", async () => {
     const repo = await Repo.open("paging-selectors");
     const transactions = rows();
@@ -435,6 +523,36 @@ describe("Repo Ledger read model", () => {
     expect((await repo.getEntryCollection("template")).map((row) => row.id)).toEqual([
       template.id,
     ]);
+    repo.close();
+  });
+
+  it("scans every findable entry state in bounded Search chunks", async () => {
+    const repo = await Repo.open("paging-search-scan");
+    const approved = rows()[0];
+    const pending = { ...rows()[1], inbox_status: "pending" as const };
+    const template = makeTemplate({
+      id: "template",
+      template_name: "Coffee",
+      amount: -500,
+      vendor_source: "Coffee",
+      container_id: "general",
+      category_id: "food",
+    });
+    await repo.resetTo(createOps([approved, pending, template]));
+
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    let chunks = 0;
+    do {
+      const chunk = await repo.scanSearchEntries({ candidateLimit: 2, cursor });
+      chunks += 1;
+      expect(chunk.rows.length).toBeLessThanOrEqual(2);
+      ids.push(...chunk.rows.map((row) => row.id));
+      cursor = chunk.cursor;
+    } while (cursor !== null);
+
+    expect(chunks).toBe(2);
+    expect(ids.sort()).toEqual([approved.id, pending.id, template.id].sort());
     repo.close();
   });
 

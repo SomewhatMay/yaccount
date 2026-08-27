@@ -111,6 +111,27 @@ export interface LedgerPageResult {
   staleCursor: boolean;
 }
 
+export interface LedgerScanQuery {
+  sort: LedgerReadSort;
+  candidateLimit: number;
+  matchLimit?: number;
+  cursor: string | null;
+  filter?: TransactionFilter;
+}
+
+export interface SearchEntryScanQuery {
+  candidateLimit: number;
+  cursor: string | null;
+}
+
+export interface SearchEntryScanResult {
+  rows: EntryRead[];
+  cursor: string | null;
+  revision: number;
+  complete: boolean;
+  staleCursor: boolean;
+}
+
 export interface LedgerFocusQuery {
   id: string;
   sort: LedgerReadSort;
@@ -138,6 +159,12 @@ interface LedgerCursorToken {
   revision: number;
   sort: LedgerReadSort;
   filter: string;
+  key: IDBValidKey;
+}
+
+interface SearchCursorToken {
+  version: number;
+  revision: number;
   key: IDBValidKey;
 }
 
@@ -853,6 +880,133 @@ export class Repo {
       revision,
       complete: !hasMore,
       staleCursor,
+    };
+  }
+
+  async scanLedgerEntries(query: LedgerScanQuery): Promise<LedgerPageResult> {
+    if (!Number.isInteger(query.candidateLimit) || query.candidateLimit <= 0) {
+      throw new Error("Ledger scan candidate limit must be a positive integer");
+    }
+    const matchLimit = query.matchLimit ?? Number.POSITIVE_INFINITY;
+    if (matchLimit !== Number.POSITIVE_INFINITY && (!Number.isInteger(matchLimit) || matchLimit <= 0)) {
+      throw new Error("Ledger scan match limit must be a positive integer");
+    }
+    const signature = filterSignature(query.filter);
+    const token = query.cursor === null ? null : parseCursor(query.cursor);
+    if (token && (token.sort !== query.sort || token.filter !== signature)) {
+      throw new Error("Ledger cursor does not match the query");
+    }
+    const tx = this.db.transaction(
+      [STORE.entryRead, STORE.appMeta, STORE.categories, STORE.containers],
+      "readonly",
+    );
+    const meta = (await tx.objectStore(STORE.appMeta).get(LEDGER_READ_REVISION_KEY)) as
+      | { value: number }
+      | undefined;
+    const revision = meta?.value ?? 0;
+    const categories = (await tx.objectStore(STORE.categories).getAll()) as Category[];
+    const containers = (await tx.objectStore(STORE.containers).getAll()) as Container[];
+    const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+    const containerNames = new Map(
+      containers.map((container) => [container.id, container.name]),
+    );
+    const label = (row: Transaction): string =>
+      [
+        row.category_id ? categoryNames.get(row.category_id) : "Transfer",
+        containerNames.get(row.container_id),
+        row.to_container_id ? containerNames.get(row.to_container_id) : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    const direction: IDBCursorDirection =
+      query.sort === "newest" || query.sort === "largest" ? "prev" : "next";
+    const indexName =
+      query.sort === "largest"
+        ? INDEX.entryLargest
+        : query.sort === "smallest"
+          ? INDEX.entrySmallest
+          : INDEX.entryChronology;
+    const lower: IDBValidKey = ["ledger"];
+    const upper: IDBValidKey = ["ledger", []];
+    const range = token
+      ? direction === "next"
+        ? IDBKeyRange.bound(token.key, upper, true, false)
+        : IDBKeyRange.bound(lower, token.key, false, true)
+      : IDBKeyRange.bound(lower, upper);
+    const index = tx.objectStore(STORE.entryRead).index(indexName);
+    let cursor = await index.openCursor(range, direction);
+    const rows: EntryRead[] = [];
+    let scanned = 0;
+    let lastKey: IDBValidKey | null = null;
+    while (cursor && scanned < query.candidateLimit && rows.length < matchLimit) {
+      const entry = cursor.value as EntryRead;
+      if (matchesFilter(entry, query.filter ?? {}, { label })) rows.push(entry);
+      lastKey = entryIndexKey(entry, query.sort);
+      scanned += 1;
+      cursor = await cursor.continue();
+    }
+    const complete = cursor === null;
+    await tx.done;
+    const nextToken =
+      !complete && lastKey !== null
+        ? JSON.stringify({
+            version: LEDGER_READ_MODEL_VERSION,
+            revision,
+            sort: query.sort,
+            filter: signature,
+            key: lastKey,
+          } satisfies LedgerCursorToken)
+        : null;
+    return {
+      rows,
+      cursor: nextToken,
+      revision,
+      complete,
+      staleCursor: token !== null && token.revision !== revision,
+    };
+  }
+
+  async scanSearchEntries(query: SearchEntryScanQuery): Promise<SearchEntryScanResult> {
+    if (!Number.isInteger(query.candidateLimit) || query.candidateLimit <= 0) {
+      throw new Error("Search scan candidate limit must be a positive integer");
+    }
+    const token =
+      query.cursor === null
+        ? null
+        : (JSON.parse(query.cursor) as SearchCursorToken);
+    if (token && token.version !== LEDGER_READ_MODEL_VERSION) {
+      throw new Error("invalid Search cursor");
+    }
+    const tx = this.db.transaction([STORE.entryRead, STORE.appMeta], "readonly");
+    const revisionRecord = (await tx
+      .objectStore(STORE.appMeta)
+      .get(LEDGER_READ_REVISION_KEY)) as { value: number } | undefined;
+    const revision = revisionRecord?.value ?? 0;
+    const store = tx.objectStore(STORE.entryRead);
+    const range = token ? IDBKeyRange.lowerBound(token.key, true) : undefined;
+    let cursor = await store.openCursor(range, "next");
+    const rows: EntryRead[] = [];
+    let lastKey: IDBValidKey | null = null;
+    while (cursor && rows.length < query.candidateLimit) {
+      rows.push(cursor.value as EntryRead);
+      lastKey = cursor.primaryKey;
+      cursor = await cursor.continue();
+    }
+    const complete = cursor === null;
+    await tx.done;
+    return {
+      rows,
+      cursor:
+        !complete && lastKey !== null
+          ? JSON.stringify({
+              version: LEDGER_READ_MODEL_VERSION,
+              revision,
+              key: lastKey,
+            } satisfies SearchCursorToken)
+          : null,
+      revision,
+      complete,
+      staleCursor: token !== null && token.revision !== revision,
     };
   }
 
