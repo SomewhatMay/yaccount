@@ -8,6 +8,9 @@ if (isGitHubPagesBuild && !process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
 }
 
 const nextConfig: NextConfig = {
+  // Playwright drives the development server; the dev-tools portal can cover
+  // application controls and intercept otherwise valid pointer events.
+  devIndicators: false,
   // Static export — compiles to plain HTML/JS/CSS (§2.2). This is what a
   // plain browser serves with no server and what Capacitor wraps (M10).
   output: "export",
