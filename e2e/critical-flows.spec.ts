@@ -1043,11 +1043,12 @@ test("overflowing selects scroll by touch in independent sheets", async ({
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Touch regression.");
 
-  for (let i = 1; i <= 18; i++) {
+  for (let i = 1; i <= 12; i++) {
     await createCategory(page, `E2E scroll category ${String(i).padStart(2, "0")}`);
   }
-  const last = "E2E scroll category 18";
+  const last = "E2E scroll category 12";
 
+  await page.setViewportSize({ width: 390, height: 500 });
   await openReady(page, "/ledger", "Overall balance");
   await openQuickAdd(page);
   await page.getByRole("combobox", { name: "Category" }).tap();
@@ -1057,7 +1058,6 @@ test("overflowing selects scroll by touch in independent sheets", async ({
   await page.getByRole("option", { name: last, exact: true }).tap();
   await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(last);
 
-  await page.setViewportSize({ width: 390, height: 500 });
   await openReady(page, "/", "How the money moved");
   await page.getByRole("button", { name: "Edit dashboard" }).tap();
   await page.getByRole("button", { name: "Add widgets" }).tap();
