@@ -6,8 +6,11 @@ import type { Category, Container, Transaction } from "@/core/model";
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
-  rankVendorSourcesByUsage,
 } from "@/core/engine/usage-ranking";
+import {
+  rankVendorSourcesForKind,
+  recallVendorSelection,
+} from "@/core/engine/autocomplete";
 import { dispatchAtom, flashRowAtom } from "@/features/store";
 import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
 import { composeOp } from "@/features/ledger/compose";
@@ -62,11 +65,6 @@ export function useComposeFields({
       ),
     [containers, transactions],
   );
-  const vendorSources = useMemo(
-    () => rankVendorSourcesByUsage(transactions),
-    [transactions],
-  );
-
   const [kind, setKindState] = useState<ComposeKind>(initialKind);
   // One control for "when" — date and time together. Untouched, the row takes the
   // op's timestamp (full precision, so a burst of entries never ties); once the
@@ -100,6 +98,21 @@ export function useComposeFields({
   const to = containers.find((c) => c.id === toContainerId);
   const type = category?.type ?? (kind === "income" ? "income" : "expense");
   const sign: Sign = pickedSign ?? defaultSign(type);
+  const vendorSources = useMemo(
+    () => rankVendorSourcesForKind(transactions, categories, kind, vendor),
+    [categories, kind, transactions, vendor],
+  );
+
+  function recallVendor(value: string) {
+    const recalled = recallVendorSelection(transactions, categories, kind, value);
+    if (!recalled) return;
+    if (categoriesOfKind.some((candidate) => candidate.id === recalled.categoryId)) {
+      setPickedCategoryId(recalled.categoryId);
+    }
+    if (activeContainers.some((candidate) => candidate.id === recalled.containerId)) {
+      setPickedContainerId(recalled.containerId);
+    }
+  }
 
   /** Switching kind is a deliberate "I'm logging something else now": drop a
    * pinned sign, and drop a category that no longer belongs to this kind. */
@@ -209,6 +222,7 @@ export function useComposeFields({
     },
     vendor,
     setVendor,
+    recallVendor,
     vendorSources,
     notes,
     setNotes,

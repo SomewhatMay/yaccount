@@ -19,12 +19,18 @@ import {
 import {
   rankCategoriesByUsage,
   rankContainersByUsage,
-  rankVendorSourcesByUsage,
 } from "@/core/engine/usage-ranking";
+import {
+  rankVendorSourcesForKind,
+  recallVendorSelection,
+} from "@/core/engine/autocomplete";
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import { VendorSourceInput } from "@/features/ledger/VendorSourceInput";
+import {
+  CreationEntityCombobox,
+  CreationTextCombobox,
+} from "@/features/ledger/CreationCombobox";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { Button } from "@/components/ui/button";
@@ -126,19 +132,17 @@ function RuleForm({
       ),
     [containers, rule, transactions],
   );
-  const vendorSources = useMemo(
-    () => rankVendorSourcesByUsage(transactions),
-    [transactions],
-  );
-
   const editingTransfer = rule ? isTransferRule(rule) : false;
   const [mode, setMode] = useState<"entry" | "transfer">(
     editingTransfer ? "transfer" : "entry",
   );
+  const [creationKind, setCreationKind] = useState<"expense" | "income">("expense");
 
   const [vendor, setVendor] = useState(rule?.template_vendor_source ?? "");
   const [categoryId, setCategoryId] = useState(
-    rule?.template_category_id ?? activeCategories[0]?.id ?? "",
+    rule?.template_category_id ??
+      activeCategories.find((category) => category.type === "expense")?.id ??
+      "",
   );
   const [fromId, setFromId] = useState(rule?.template_container_id ?? "general");
   const [toId, setToId] = useState(rule?.template_to_container_id ?? "");
@@ -159,6 +163,46 @@ function RuleForm({
 
   const cat = categories.find((c) => c.id === categoryId);
   const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
+  const currentKind = mode === "transfer" ? "transfer" : rule ? cat?.type : creationKind;
+  const categoriesOfKind = activeCategories.filter(
+    (category) => category.type === currentKind,
+  );
+  const vendorSources = useMemo(
+    () =>
+      rule
+        ? []
+        : rankVendorSourcesForKind(
+            transactions,
+            categories,
+            currentKind ?? "expense",
+            vendor,
+          ),
+    [categories, currentKind, rule, transactions, vendor],
+  );
+
+  function setNewKind(kind: "expense" | "income" | "transfer") {
+    setMode(kind === "transfer" ? "transfer" : "entry");
+    if (kind === "transfer") return;
+    setCreationKind(kind);
+    setPickedSign(null);
+    if (cat?.type !== kind) {
+      setCategoryId(
+        activeCategories.find((category) => category.type === kind)?.id ?? "",
+      );
+    }
+  }
+
+  function recallVendor(value: string) {
+    if (rule || currentKind === "transfer" || !currentKind) return;
+    const recalled = recallVendorSelection(transactions, categories, currentKind, value);
+    if (!recalled) return;
+    if (categoriesOfKind.some((category) => category.id === recalled.categoryId)) {
+      setCategoryId(recalled.categoryId);
+    }
+    if (activeContainers.some((container) => container.id === recalled.containerId)) {
+      setFromId(recalled.containerId);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -210,77 +254,146 @@ function RuleForm({
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
         {error && <InlineError id="recurring-error">{error}</InlineError>}
-        <ToggleGroup
-          type="single"
-          value={mode}
-          onValueChange={(v) => v && setMode(v as "entry" | "transfer")}
-          className="bg-muted/50 w-fit rounded-full p-0.5"
-        >
-          <ToggleGroupItem
-            value="entry"
-            className="data-[state=on]:bg-background h-7 rounded-full px-3 text-xs"
+        {rule ? (
+          <ToggleGroup
+            type="single"
+            value={mode}
+            onValueChange={(v) => v && setMode(v as "entry" | "transfer")}
+            className="bg-muted/50 w-fit rounded-full p-0.5"
           >
-            Expense / income
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="transfer"
-            className="data-[state=on]:bg-background h-7 rounded-full px-3 text-xs"
+            <ToggleGroupItem
+              value="entry"
+              className="data-[state=on]:bg-background h-7 rounded-full px-3 text-xs"
+            >
+              Expense / income
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="transfer"
+              className="data-[state=on]:bg-background h-7 rounded-full px-3 text-xs"
+            >
+              Transfer
+            </ToggleGroupItem>
+          </ToggleGroup>
+        ) : (
+          <ToggleGroup
+            type="single"
+            value={mode === "transfer" ? "transfer" : creationKind}
+            onValueChange={(value) =>
+              value && setNewKind(value as "expense" | "income" | "transfer")
+            }
+            className="bg-muted/50 w-full rounded-full p-0.5"
           >
-            Transfer
-          </ToggleGroupItem>
-        </ToggleGroup>
+            {(["expense", "income", "transfer"] as const).map((kind) => (
+              <ToggleGroupItem
+                key={kind}
+                value={kind}
+                className="data-[state=on]:bg-background h-7 flex-1 rounded-full px-3 text-xs capitalize"
+              >
+                {kind}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        )}
 
         <div className="grid gap-1.5">
           <Label htmlFor="rr-vendor">
             {mode === "transfer" ? "Note" : "Payee / source"}
           </Label>
-          <VendorSourceInput
-            id="rr-vendor"
-            value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-            placeholder={mode === "transfer" ? "e.g. Move to savings" : "e.g. Netflix"}
-            suggestions={mode === "transfer" ? [] : vendorSources}
-          />
+          {!rule && mode === "entry" ? (
+            <CreationTextCombobox
+              id="rr-vendor"
+              value={vendor}
+              onValueChange={setVendor}
+              onMatch={recallVendor}
+              placeholder="e.g. Netflix"
+              suggestions={vendorSources}
+            />
+          ) : (
+            <Input
+              id="rr-vendor"
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+              placeholder={mode === "transfer" ? "e.g. Move to savings" : "e.g. Netflix"}
+            />
+          )}
         </div>
 
         {mode === "entry" ? (
           <div className="grid gap-1.5">
             <Label>Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
-                    {c.name}
-                    <span className="text-muted-foreground ml-1">· {c.type}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {rule ? (
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger aria-label="Category">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
+                      {c.name}
+                      <span className="text-muted-foreground ml-1">· {c.type}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <CreationEntityCombobox
+                value={categoryId}
+                onValueChange={setCategoryId}
+                options={categoriesOfKind.map((c) => ({
+                  value: c.id,
+                  label: c.name,
+                  detail: `· ${c.type}`,
+                  leading: <CategoryGlyph icon={c.icon} color={categoryColor(c)} />,
+                }))}
+                aria-label="Category"
+                placeholder={`No ${creationKind} categories yet`}
+              />
+            )}
           </div>
         ) : null}
 
         <div className="grid gap-1.5">
           <Label>{mode === "transfer" ? "From container" : "Container"}</Label>
-          <ContainerSelect
-            value={fromId}
-            onChange={setFromId}
-            containers={activeContainers}
-          />
+          {rule ? (
+            <ContainerSelect
+              value={fromId}
+              onChange={setFromId}
+              containers={activeContainers}
+              label={mode === "transfer" ? "From container" : "Container"}
+            />
+          ) : (
+            <CreationEntityCombobox
+              value={fromId}
+              onValueChange={setFromId}
+              options={activeContainers.map((c) => ({ value: c.id, label: c.name }))}
+              aria-label={mode === "transfer" ? "From container" : "Container"}
+            />
+          )}
         </div>
 
         {mode === "transfer" && (
           <div className="grid gap-1.5">
             <Label>To container</Label>
-            <ContainerSelect
-              value={toId}
-              onChange={setToId}
-              containers={activeContainers.filter((c) => c.id !== fromId)}
-              placeholder="To…"
-            />
+            {rule ? (
+              <ContainerSelect
+                value={toId}
+                onChange={setToId}
+                containers={activeContainers.filter((c) => c.id !== fromId)}
+                placeholder="To…"
+                label="To container"
+              />
+            ) : (
+              <CreationEntityCombobox
+                value={toId}
+                onValueChange={setToId}
+                options={activeContainers
+                  .filter((c) => c.id !== fromId)
+                  .map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="To…"
+                aria-label="To container"
+              />
+            )}
           </div>
         )}
 
@@ -308,7 +421,7 @@ function RuleForm({
         <div className="grid gap-1.5">
           <Label>Repeats</Label>
           <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Repeats">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -357,16 +470,18 @@ function ContainerSelect({
   value,
   onChange,
   containers,
+  label,
   placeholder = "Container",
 }: {
   value: string;
   onChange: (v: string) => void;
   containers: Container[];
+  label: string;
   placeholder?: string;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger>
+      <SelectTrigger aria-label={label}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
