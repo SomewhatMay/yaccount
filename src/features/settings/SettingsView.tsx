@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
  */
 export function SettingsView() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-8">
       <PageHeader eyebrow="Device & data" title="Settings">
         How yaccount looks, how this copy is running, and what to send when something goes
         wrong.
