@@ -60,6 +60,7 @@ describe("iPhone PWA interaction layout", () => {
     expect(palette).toContain("autoFocus={!sideways}");
     expect(command).toContain("--visual-viewport-top");
     expect(command).toContain("--visual-viewport-height");
+    expect(command).toContain("env(safe-area-inset-bottom,0px)-3.25rem");
     expect(command).toContain("max-h-none flex-1");
   });
 
