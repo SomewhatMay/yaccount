@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:perf": "playwright test --config playwright.performance.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
