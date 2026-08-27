@@ -130,6 +130,14 @@ async function logIncomeOn(
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
 }
 
+async function addDashboardWidget(page: Page, title: string) {
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await page.getByRole("button", { name: "Add widgets" }).click();
+  await page.getByRole("button", { name: `Add ${title}` }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+}
+
 test.beforeEach(async ({ context }) => {
   // Every test gets a fresh context: no IndexedDB, localStorage, cookies, auth,
   // Drive profile, or ordering dependency can leak from another test.
@@ -515,7 +523,9 @@ test("adds Commitments and persists its cadence view", async ({ page }) => {
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByLabel("Scheduled monthly load: $65.00").first()).toBeVisible();
   await expect(card.getByText("E2E internet", { exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Configure Commitments" }).click();
+  const configure = card.getByRole("button", { name: "Configure Commitments" });
+  await configure.scrollIntoViewIfNeeded();
+  await configure.click();
   await page.getByRole("menuitem", { name: "Settings" }).click();
   const commitmentSettings = page.getByRole("dialog", {
     name: "Commitments settings",
@@ -529,8 +539,8 @@ test("adds Commitments and persists its cadence view", async ({ page }) => {
   await page.keyboard.press("Escape");
 
   await page.reload();
-  await card.scrollIntoViewIfNeeded();
-  await card.getByRole("button", { name: "Configure Commitments" }).click();
+  await configure.scrollIntoViewIfNeeded();
+  await configure.click();
   await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(
     commitmentSettings.getByRole("button", { name: "Show irregular commitments" }),
@@ -974,10 +984,16 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await logExpense(page, "E2E hidden expense", "12.34", "E2E hidden stats");
 
   await openReady(page, "/", "How the money moved");
+  await addDashboardWidget(page, "Where it went");
   const balance = page.getByText("Overall balance", { exact: true }).locator("..");
-  const out = page.getByText("Out", { exact: true }).locator("..");
+  const breakdown = page
+    .getByRole("heading", { name: "Where it went" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  const categoryBreakdown = breakdown.getByRole("link", {
+    name: /^E2E hidden stats /,
+  });
   await expect(balance.getByText("-$12.34", { exact: true })).toBeVisible();
-  await expect(out.getByText("$12.34", { exact: true })).toBeVisible();
+  await expect(categoryBreakdown).toContainText("$12.34");
 
   await openReady(page, "/categories", "What your money does");
   const actions = page.getByRole("button", { name: "Actions for E2E hidden stats" });
@@ -990,7 +1006,7 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
 
   await openReady(page, "/", "How the money moved");
   await expect(balance.getByText("-$12.34", { exact: true })).toBeVisible();
-  await expect(out.getByText("$0.00", { exact: true })).toBeVisible();
+  await expect(categoryBreakdown).toHaveCount(0);
 });
 
 test("scrolls from a row menu trigger and opens it on tap", async ({
@@ -1022,7 +1038,7 @@ test("scrolls from a row menu trigger and opens it on tap", async ({
   await expect(page.getByRole("menu")).toBeVisible();
 });
 
-test("overflowing selects scroll by touch in sheets and pages", async ({
+test("overflowing selects scroll by touch in independent sheets", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Touch regression.");
@@ -1041,13 +1057,18 @@ test("overflowing selects scroll by touch in sheets and pages", async ({
   await page.getByRole("option", { name: last, exact: true }).tap();
   await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(last);
 
+  await page.setViewportSize({ width: 390, height: 500 });
   await openReady(page, "/", "How the money moved");
-  await page.getByText("Pick a category", { exact: true }).tap();
+  await page.getByRole("button", { name: "Edit dashboard" }).tap();
+  await page.getByRole("button", { name: "Add widgets" }).tap();
+  await page.getByRole("combobox", { name: "Choose category for Category watch" }).tap();
   viewport = page.locator("[data-radix-select-viewport]");
   await swipeUp(page, viewport);
   await expect.poll(() => viewport.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
   await page.getByRole("option", { name: last, exact: true }).tap();
-  await expect(page.getByRole("combobox").filter({ hasText: last })).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Choose category for Category watch" }),
+  ).toHaveText(last);
 });
 
 test("moves money between containers", async ({ page }) => {
@@ -1098,6 +1119,7 @@ test("scopes investment contributions to the reporting period", async ({ page })
   ).toBeVisible();
 
   await openReady(page, "/", "How the money moved");
+  await addDashboardWidget(page, "Investments");
   await page.getByRole("button", { name: /Reporting period:/ }).click();
   await page.getByRole("button", { name: "All time", exact: true }).click();
   const card = page
@@ -1446,9 +1468,9 @@ test("FAB hold hints how to create the first shortcut", async ({ page }) => {
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.keyboard.up("Enter");
 
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
-  await expect(page.getByText("No shortcuts yet", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Save as shortcut/)).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeVisible();
+  await expect(page.getByText("No saved transaction shortcuts yet.")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Log a craving win" })).toBeVisible();
 });
 
 test("separates FAB quick press, hold chooser, and movement cancellation", async ({
@@ -1472,7 +1494,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeVisible();
   await page.mouse.up();
   await page.keyboard.press("Escape");
 
@@ -1481,7 +1503,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   await page.mouse.move(x + 11, y);
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.mouse.up();
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeHidden();
 
   await fab.evaluate((button) => {
     button.addEventListener(
@@ -1506,7 +1528,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
   });
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.mouse.up();
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeHidden();
 });
 
 test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
@@ -1516,22 +1538,22 @@ test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
   await fab.focus();
   await page.keyboard.down("Enter");
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeVisible();
   await page.keyboard.up("Enter");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeHidden();
   await expect(fab).toBeFocused();
 
   await page.keyboard.down(" ");
   await page.waitForTimeout(200);
   await page.keyboard.press("Escape");
   await page.keyboard.up(" ");
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeHidden();
 
   await page.keyboard.down(" ");
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
   await page.keyboard.up(" ");
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Log a craving win" })).toBeFocused();
 });
 
 test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
@@ -1560,7 +1582,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     touchPoints: [point],
   });
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeVisible();
   await session.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
     touchPoints: [],
@@ -1577,7 +1599,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
     touchPoints: [],
   });
   await page.waitForTimeout(FAB_HOLD_PAST_THRESHOLD_MS);
-  await expect(page.getByRole("menu", { name: "Quick shortcuts" })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Quick actions" })).toBeHidden();
 });
 
 test("keeps FAB geometry and shows a compact money-add mark", async ({
