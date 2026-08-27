@@ -13,17 +13,9 @@ export type EntryRead = Transaction & {
   state: LedgerReadState;
   normalizedVendor: string;
   normalizedNotes: string;
-  chronologyKey: IDBValidKey;
-  largestKey: IDBValidKey;
-  smallestKey: IDBValidKey;
-  categoryChronologyKey: IDBValidKey | null;
-  sourceChronologyKey: IDBValidKey;
-  destinationChronologyKey: IDBValidKey | null;
-  ruleChronologyKey: IDBValidKey | null;
-  occurrenceChronologyKey: IDBValidKey | null;
-  cravingChronologyKey: IDBValidKey | null;
-  vendorUsageKey: IDBValidKey | null;
-  shortcutUsageKey: IDBValidKey;
+  absAmount: number;
+  smallestTieKey: string;
+  shortcutShape: string;
 };
 
 export interface LedgerBalanceBucket {
@@ -79,18 +71,14 @@ export interface LedgerReadModel {
   counts: Record<LedgerReadState, number>;
 }
 
-/** IndexedDB-order key that reverses every UTF-16 string, including prefixes. */
-export function reverseStringKey(value: string): number[] {
-  const key: number[] = [];
+/** Compact IndexedDB string key that reverses UTF-16 order, including prefixes. */
+export function reverseStringKey(value: string): string {
+  let key = "";
   for (let index = 0; index < value.length; index += 1) {
-    key.push(-value.charCodeAt(index));
+    const code = value.charCodeAt(index);
+    key += String.fromCharCode(256 - (code >> 8), 256 - (code & 255));
   }
-  key.push(65_536);
-  return key;
-}
-
-function chronology(row: Transaction, state: LedgerReadState): IDBValidKey {
-  return [state, row.date, row.entered_at ?? "", row.id];
+  return `${key}${String.fromCharCode(257)}`;
 }
 
 export function ledgerShortcutShape(row: Transaction, template = false): string {
@@ -108,9 +96,7 @@ export function ledgerUsageRecent(row: Transaction): string {
   return row.entered_at ?? `${row.date}T00:00:00.000Z`;
 }
 
-export function ledgerUsageContributions(
-  row: Transaction,
-): LedgerUsageContribution[] {
+export function ledgerUsageContributions(row: Transaction): LedgerUsageContribution[] {
   const contributions: LedgerUsageContribution[] = [];
   if (row.category_id) {
     contributions.push({
@@ -122,9 +108,7 @@ export function ledgerUsageContributions(
     });
   }
   for (const containerId of new Set(
-    [row.container_id, row.to_container_id].filter(
-      (id): id is string => id !== null,
-    ),
+    [row.container_id, row.to_container_id].filter((id): id is string => id !== null),
   )) {
     contributions.push({
       id: `usage:container:${containerId}`,
@@ -160,7 +144,6 @@ export function ledgerUsageContributions(
 
 function projection(row: Transaction, state: LedgerReadState): EntryRead {
   const instant = row.entered_at ?? "";
-  const chronologyKey = chronology(row, state);
   return {
     ...row,
     state,
@@ -170,66 +153,19 @@ function projection(row: Transaction, state: LedgerReadState): EntryRead {
       .replace(/\s+/gu, " ")
       .toLocaleLowerCase(),
     normalizedNotes: (row.notes ?? "").normalize("NFC").toLocaleLowerCase(),
-    chronologyKey,
-    largestKey: [state, Math.abs(row.amount), row.date, instant, row.id],
-    smallestKey: [
-      state,
-      Math.abs(row.amount),
-      reverseStringKey(row.date),
-      reverseStringKey(instant),
-      reverseStringKey(row.id),
-    ],
-    categoryChronologyKey:
-      row.category_id === null ? null : [state, row.category_id, row.date, instant, row.id],
-    sourceChronologyKey: [state, row.container_id, row.date, instant, row.id],
-    destinationChronologyKey:
-      row.to_container_id === null
-        ? null
-        : [state, row.to_container_id, row.date, instant, row.id],
-    ruleChronologyKey:
-      row.recurring_rule_id === null
-        ? null
-        : [state, row.recurring_rule_id, row.date, instant, row.id],
-    occurrenceChronologyKey:
-      row.recurring_rule_id === null
-        ? null
-        : [
-            state,
-            row.recurring_rule_id,
-            row.recurring_occurrence_date ?? row.date,
-            row.id,
-          ],
-    cravingChronologyKey: null,
-    vendorUsageKey:
-      row.to_container_id === null && row.category_id !== null
-        ? [
-            state,
-            row.vendor_source
-              .normalize("NFC")
-              .trim()
-              .replace(/\s+/gu, " ")
-              .toLocaleLowerCase(),
-            row.category_id,
-            row.container_id,
-            row.date,
-            instant,
-            row.id,
-          ]
-        : null,
-    shortcutUsageKey: [
-      state,
-      ledgerShortcutShape(row),
-      row.date,
-      instant,
-      row.id,
-    ],
+    absAmount: Math.abs(row.amount),
+    smallestTieKey: reverseStringKey(`${row.date}\u0000${instant}\u0000${row.id}`),
+    shortcutShape: ledgerShortcutShape(row),
   };
 }
 
 export function entryIndexKey(entry: EntryRead, sort: LedgerReadSort): IDBValidKey {
-  if (sort === "largest") return entry.largestKey;
-  if (sort === "smallest") return entry.smallestKey;
-  return entry.chronologyKey;
+  const chronology = [entry.state, entry.date, entry.entered_at ?? "", entry.id];
+  if (sort === "largest") return [entry.state, entry.absAmount, ...chronology.slice(1)];
+  if (sort === "smallest") {
+    return [entry.state, entry.absAmount, entry.smallestTieKey];
+  }
+  return chronology;
 }
 
 function addBucket(
@@ -239,7 +175,10 @@ function addBucket(
   containerId: string,
   values: Pick<
     LedgerBalanceBucket,
-    "balanceDelta" | "transferInflow" | "transferOutflow" | "netContribution"
+    | "balanceDelta"
+    | "transferInflow"
+    | "transferOutflow"
+    | "netContribution"
     | "ordinaryIn"
     | "ordinaryOut"
     | "ordinaryCount"

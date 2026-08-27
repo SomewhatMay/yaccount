@@ -78,7 +78,6 @@ export const INDEX = {
   entryDestinationChronology: "by_destination_chronology",
   entryRuleChronology: "by_rule_chronology",
   entryOccurrenceChronology: "by_occurrence_chronology",
-  entryCravingChronology: "by_craving_chronology",
   entryVendorUsage: "by_vendor_usage",
   entryShortcutUsage: "by_shortcut_usage",
   balanceBucketByPeriodContainer: "by_period_container_key",
@@ -102,7 +101,8 @@ export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
         keyPath: string | string[],
       ) => {
         const objectStore = upgradeTx.objectStore(storeName);
-        if (!objectStore.indexNames.contains(name)) objectStore.createIndex(name, keyPath);
+        if (!objectStore.indexNames.contains(name))
+          objectStore.createIndex(name, keyPath);
       };
 
       store(STORE.categories);
@@ -155,35 +155,80 @@ export function openDb(name: string = DB_NAME): Promise<IDBPDatabase> {
       store(STORE.goals);
       store(STORE.cravingWins);
       store(STORE.entryRead);
-      ensureIndex(STORE.entryRead, INDEX.entryChronology, "chronologyKey");
-      ensureIndex(STORE.entryRead, INDEX.entryLargest, "largestKey");
-      ensureIndex(STORE.entryRead, INDEX.entrySmallest, "smallestKey");
-      ensureIndex(
-        STORE.entryRead,
-        INDEX.entryCategoryChronology,
-        "categoryChronologyKey",
-      );
-      ensureIndex(STORE.entryRead, INDEX.entrySourceChronology, "sourceChronologyKey");
-      ensureIndex(
-        STORE.entryRead,
-        INDEX.entryDestinationChronology,
-        "destinationChronologyKey",
-      );
-      ensureIndex(STORE.entryRead, INDEX.entryRuleChronology, "ruleChronologyKey");
-      ensureIndex(
-        STORE.entryRead,
-        INDEX.entryOccurrenceChronology,
-        "occurrenceChronologyKey",
-      );
-      ensureIndex(STORE.entryRead, INDEX.entryCravingChronology, "cravingChronologyKey");
-      ensureIndex(STORE.entryRead, INDEX.entryVendorUsage, "vendorUsageKey");
-      ensureIndex(STORE.entryRead, INDEX.entryShortcutUsage, "shortcutUsageKey");
+      ensureIndex(STORE.entryRead, INDEX.entryChronology, [
+        "state",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryLargest, [
+        "state",
+        "absAmount",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entrySmallest, [
+        "state",
+        "absAmount",
+        "smallestTieKey",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryCategoryChronology, [
+        "state",
+        "category_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entrySourceChronology, [
+        "state",
+        "container_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryDestinationChronology, [
+        "state",
+        "to_container_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryRuleChronology, [
+        "state",
+        "recurring_rule_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryOccurrenceChronology, [
+        "state",
+        "recurring_rule_id",
+        "recurring_occurrence_date",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryVendorUsage, [
+        "state",
+        "normalizedVendor",
+        "category_id",
+        "container_id",
+        "date",
+        "entered_at",
+        "id",
+      ]);
+      ensureIndex(STORE.entryRead, INDEX.entryShortcutUsage, [
+        "state",
+        "shortcutShape",
+        "date",
+        "entered_at",
+        "id",
+      ]);
       store(STORE.ledgerBalanceBucket);
-      ensureIndex(
-        STORE.ledgerBalanceBucket,
-        INDEX.balanceBucketByPeriodContainer,
-        ["period", "containerId", "key"],
-      );
+      ensureIndex(STORE.ledgerBalanceBucket, INDEX.balanceBucketByPeriodContainer, [
+        "period",
+        "containerId",
+        "key",
+      ]);
       store(STORE.ledgerReadFact);
       store(STORE.settings, "key"); // added in DB v2 (M3)
 

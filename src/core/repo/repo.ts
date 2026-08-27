@@ -1,4 +1,4 @@
-import type { IDBPDatabase, IDBPTransaction } from "idb";
+import { unwrap, type IDBPDatabase, type IDBPTransaction } from "idb";
 import {
   openDb,
   DB_NAME,
@@ -293,8 +293,7 @@ export class Repo {
   ): Promise<number> {
     const meta = tx.objectStore(STORE.appMeta);
     const current = (await meta.get(LEDGER_READ_REVISION_KEY)) as
-      | { value: number }
-      | undefined;
+      { value: number } | undefined;
     const revision = (current?.value ?? 0) + 1;
     await meta.put({ key: LEDGER_READ_REVISION_KEY, value: revision });
     return revision;
@@ -303,19 +302,21 @@ export class Repo {
   private async rebuildLedgerReadModel(
     tx: IDBPTransaction<unknown, StoreName[], "readwrite">,
   ): Promise<number> {
-    const transactions = (await tx.objectStore(STORE.transactions).getAll()) as Transaction[];
+    const transactions = (await tx
+      .objectStore(STORE.transactions)
+      .getAll()) as Transaction[];
     const model = deriveLedgerReadModel(transactions);
     for (const store of READ_STORES) await tx.objectStore(store).clear();
-    const entries = tx.objectStore(STORE.entryRead);
-    for (const entry of model.entries) await entries.put(entry);
-    const buckets = tx.objectStore(STORE.ledgerBalanceBucket);
-    for (const bucket of model.buckets) await buckets.put(bucket);
-    const facts = tx.objectStore(STORE.ledgerReadFact);
-    for (const fact of model.facts.values()) await facts.put(fact);
-    for (const fact of model.usage) await facts.put(fact);
+    const entries = unwrap(tx.objectStore(STORE.entryRead));
+    for (const entry of model.entries) entries.put(entry);
+    const buckets = unwrap(tx.objectStore(STORE.ledgerBalanceBucket));
+    for (const bucket of model.buckets) buckets.put(bucket);
+    const facts = unwrap(tx.objectStore(STORE.ledgerReadFact));
+    const readFacts: unknown[] = [...model.facts.values(), ...model.usage];
     for (const [state, count] of Object.entries(model.counts)) {
-      await facts.put({ id: `count:${state}`, state, count });
+      readFacts.push({ id: `count:${state}`, state, count });
     }
+    for (const fact of readFacts) facts.put(fact);
     await tx.objectStore(STORE.appMeta).put({
       key: LEDGER_READ_VERSION_KEY,
       value: LEDGER_READ_MODEL_VERSION,
@@ -325,8 +326,7 @@ export class Repo {
 
   private async ensureLedgerReadModel(): Promise<void> {
     const marker = (await this.db.get(STORE.appMeta, LEDGER_READ_VERSION_KEY)) as
-      | { value: number }
-      | undefined;
+      { value: number } | undefined;
     if (marker?.value === LEDGER_READ_MODEL_VERSION) return;
     const tx = this.db.transaction(
       [STORE.transactions, ...READ_STORES, STORE.appMeta],
@@ -374,8 +374,7 @@ export class Repo {
         balanceDelta: (current?.balanceDelta ?? 0) + sign * delta.balanceDelta,
         transferInflow: (current?.transferInflow ?? 0) + sign * delta.transferInflow,
         transferOutflow: (current?.transferOutflow ?? 0) + sign * delta.transferOutflow,
-        netContribution:
-          (current?.netContribution ?? 0) + sign * delta.netContribution,
+        netContribution: (current?.netContribution ?? 0) + sign * delta.netContribution,
         ordinaryIn: (current?.ordinaryIn ?? 0) + sign * delta.ordinaryIn,
         ordinaryOut: (current?.ordinaryOut ?? 0) + sign * delta.ordinaryOut,
         ordinaryCount: (current?.ordinaryCount ?? 0) + sign * delta.ordinaryCount,
@@ -384,10 +383,10 @@ export class Repo {
         next.balanceDelta === 0 &&
         next.transferInflow === 0 &&
         next.transferOutflow === 0 &&
-        next.netContribution === 0
-        && next.ordinaryIn === 0
-        && next.ordinaryOut === 0
-        && next.ordinaryCount === 0
+        next.netContribution === 0 &&
+        next.ordinaryIn === 0 &&
+        next.ordinaryOut === 0 &&
+        next.ordinaryCount === 0
       ) {
         await buckets.delete(next.id);
       } else {
@@ -401,8 +400,7 @@ export class Repo {
         id: delta.id,
         containerId: delta.containerId,
         balance: (current?.balance ?? 0) + sign * delta.balance,
-        netContribution:
-          (current?.netContribution ?? 0) + sign * delta.netContribution,
+        netContribution: (current?.netContribution ?? 0) + sign * delta.netContribution,
       };
       await facts.put(next);
     }
@@ -472,7 +470,11 @@ export class Repo {
     for (const state of ["ledger", "pending", "template"] as const) {
       if (countDelta[state] === 0) continue;
       const id = `count:${state}`;
-      const current = (await facts.get(id)) as { id: string; state: string; count: number };
+      const current = (await facts.get(id)) as {
+        id: string;
+        state: string;
+        count: number;
+      };
       await facts.put({ id, state, count: (current?.count ?? 0) + countDelta[state] });
     }
     await this.bumpLedgerRevision(tx);
@@ -695,8 +697,7 @@ export class Repo {
           oldTransactions.set(
             transactionId,
             (await tx.objectStore(STORE.transactions).get(transactionId)) as
-              | Transaction
-              | undefined,
+              Transaction | undefined,
           );
         }
         await oplog.put(op);
@@ -743,10 +744,8 @@ export class Repo {
   }
 
   async getContainerFact(containerId: string): Promise<LedgerContainerFact | undefined> {
-    return (await this.db.get(
-      STORE.ledgerReadFact,
-      `container:${containerId}`,
-    )) as LedgerContainerFact | undefined;
+    return (await this.db.get(STORE.ledgerReadFact, `container:${containerId}`)) as
+      LedgerContainerFact | undefined;
   }
 
   async getUsageFacts(): Promise<LedgerUsageFact[]> {
@@ -781,7 +780,9 @@ export class Repo {
     const pending = await collection("pending");
     const templates = await collection("template");
     const facts = (await tx.objectStore(STORE.ledgerReadFact).getAll()) as Array<
-      LedgerUsageFact | LedgerContainerFact | { id: string; state?: string; count?: number }
+      | LedgerUsageFact
+      | LedgerContainerFact
+      | { id: string; state?: string; count?: number }
     >;
     const revisionRecord = (await tx
       .objectStore(STORE.appMeta)
@@ -790,7 +791,7 @@ export class Repo {
     const ledgerCount = facts.find((fact) => fact.id === "count:ledger");
     return {
       revision: revisionRecord?.value ?? 0,
-      ledgerCount: ledgerCount && "count" in ledgerCount ? ledgerCount.count ?? 0 : 0,
+      ledgerCount: ledgerCount && "count" in ledgerCount ? (ledgerCount.count ?? 0) : 0,
       pending,
       templates,
       containerFacts: facts.filter(
@@ -818,13 +819,14 @@ export class Repo {
       "readonly",
     );
     const meta = (await tx.objectStore(STORE.appMeta).get(LEDGER_READ_REVISION_KEY)) as
-      | { value: number }
-      | undefined;
+      { value: number } | undefined;
     const revision = meta?.value ?? 0;
     const staleCursor = token !== null && token.revision !== revision;
     const categories = (await tx.objectStore(STORE.categories).getAll()) as Category[];
     const containers = (await tx.objectStore(STORE.containers).getAll()) as Container[];
-    const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+    const categoryNames = new Map(
+      categories.map((category) => [category.id, category.name]),
+    );
     const containerNames = new Map(
       containers.map((container) => [container.id, container.name]),
     );
@@ -893,7 +895,10 @@ export class Repo {
       throw new Error("Ledger scan candidate limit must be a positive integer");
     }
     const matchLimit = query.matchLimit ?? Number.POSITIVE_INFINITY;
-    if (matchLimit !== Number.POSITIVE_INFINITY && (!Number.isInteger(matchLimit) || matchLimit <= 0)) {
+    if (
+      matchLimit !== Number.POSITIVE_INFINITY &&
+      (!Number.isInteger(matchLimit) || matchLimit <= 0)
+    ) {
       throw new Error("Ledger scan match limit must be a positive integer");
     }
     const signature = filterSignature(query.filter);
@@ -906,12 +911,13 @@ export class Repo {
       "readonly",
     );
     const meta = (await tx.objectStore(STORE.appMeta).get(LEDGER_READ_REVISION_KEY)) as
-      | { value: number }
-      | undefined;
+      { value: number } | undefined;
     const revision = meta?.value ?? 0;
     const categories = (await tx.objectStore(STORE.categories).getAll()) as Category[];
     const containers = (await tx.objectStore(STORE.containers).getAll()) as Container[];
-    const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+    const categoryNames = new Map(
+      categories.map((category) => [category.id, category.name]),
+    );
     const containerNames = new Map(
       containers.map((container) => [container.id, container.name]),
     );
@@ -976,9 +982,7 @@ export class Repo {
       throw new Error("Search scan candidate limit must be a positive integer");
     }
     const token =
-      query.cursor === null
-        ? null
-        : (JSON.parse(query.cursor) as SearchCursorToken);
+      query.cursor === null ? null : (JSON.parse(query.cursor) as SearchCursorToken);
     if (token && token.version !== LEDGER_READ_MODEL_VERSION) {
       throw new Error("invalid Search cursor");
     }
@@ -1046,9 +1050,7 @@ export class Repo {
       .index(INDEX.transactionsByDate)
       .getAll(IDBKeyRange.bound(start, end))) as Transaction[];
     await tx.done;
-    return rows.filter(
-      (row) => row.inbox_status === "approved" && !row.is_template,
-    );
+    return rows.filter((row) => row.inbox_status === "approved" && !row.is_template);
   }
 
   async getLedgerEntriesById(ids: readonly string[]): Promise<EntryRead[]> {
@@ -1071,8 +1073,7 @@ export class Repo {
     const store = tx.objectStore(STORE.entryRead);
     const target = (await store.get(query.id)) as EntryRead | undefined;
     const meta = (await tx.objectStore(STORE.appMeta).get(LEDGER_READ_REVISION_KEY)) as
-      | { value: number }
-      | undefined;
+      { value: number } | undefined;
     if (!target || target.state !== "ledger") {
       await tx.done;
       return {
@@ -1156,10 +1157,7 @@ export class Repo {
     >();
     for (const containerId of new Set(containerIds)) {
       const months = (await index.getAll(
-        IDBKeyRange.bound(
-          ["month", containerId],
-          ["month", containerId, []],
-        ),
+        IDBKeyRange.bound(["month", containerId], ["month", containerId, []]),
       )) as LedgerBalanceBucket[];
       const daily = (await index.getAll(
         IDBKeyRange.bound(["day", containerId], ["day", containerId, []]),
@@ -1197,9 +1195,8 @@ export class Repo {
     let outgoing = 0;
     let count = 0;
     for (const containerId of new Set(containerIds)) {
-      const bucket = (await store.get(
-        `month:${yearMonth}:${containerId}`,
-      )) as LedgerBalanceBucket | undefined;
+      const bucket = (await store.get(`month:${yearMonth}:${containerId}`)) as
+        LedgerBalanceBucket | undefined;
       incoming += bucket?.ordinaryIn ?? 0;
       outgoing += bucket?.ordinaryOut ?? 0;
       count += bucket?.ordinaryCount ?? 0;
@@ -1217,10 +1214,7 @@ export class Repo {
       .objectStore(STORE.ledgerBalanceBucket)
       .index(INDEX.balanceBucketByPeriodContainer);
     const buckets = (await index.getAll(
-      IDBKeyRange.bound(
-        ["day", containerId, start],
-        ["day", containerId, []],
-      ),
+      IDBKeyRange.bound(["day", containerId, start], ["day", containerId, []]),
     )) as LedgerBalanceBucket[];
     await tx.done;
     return buckets.reduce((total, bucket) => total + bucket.netContribution, 0);
