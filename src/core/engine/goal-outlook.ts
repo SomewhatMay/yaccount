@@ -5,6 +5,7 @@ import {
   projectedCompletion,
   requiredMonthly,
   requiresReplan,
+  type GoalLedgerFacts,
 } from "./goals";
 
 export type GoalOutlookStatus = "on-track" | "needs-change" | "passive";
@@ -37,6 +38,7 @@ export function goalOutlook(
   containers: Container[],
   transactions: Transaction[],
   today: string,
+  facts?: ReadonlyMap<string, GoalLedgerFacts>,
 ): GoalOutlook {
   const containerName = new Map(
     containers.map((container) => [container.id, container.name]),
@@ -44,10 +46,11 @@ export function goalOutlook(
   const rows = goals
     .filter((goal) => goal.status === "active" && !goal.is_archived)
     .map((goal): GoalOutlookRow => {
-      const basis = goalBasis(goal, transactions);
-      const monthlyAsk = requiredMonthly(goal, transactions, today);
-      const replan = requiresReplan(goal, transactions, today);
-      const projection = projectedCompletion(goal, transactions, today);
+      const ledger = facts?.get(goal.id) ?? transactions;
+      const basis = goalBasis(goal, ledger);
+      const monthlyAsk = requiredMonthly(goal, ledger, today);
+      const replan = requiresReplan(goal, ledger, today);
+      const projection = projectedCompletion(goal, ledger, today);
       const stalledFixed =
         goal.mode === "fixed" &&
         goal.target_amount !== null &&
@@ -67,7 +70,7 @@ export function goalOutlook(
         mode: goal.mode,
         basis,
         target: goal.target_amount,
-        progress: goalProgress(goal, transactions),
+        progress: goalProgress(goal, ledger),
         monthlyAsk,
         deadline: goal.deadline,
         projectedCompletion: projection,

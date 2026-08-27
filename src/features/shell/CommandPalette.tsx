@@ -284,6 +284,13 @@ export function CommandPalette() {
   const deferred = useDeferredValue(query);
   const blank = deferred.trim() === "";
   const words = useMemo(() => parseQuery(deferred).words, [deferred]);
+  const baseResults = useMemo(
+    () =>
+      index && !blank
+        ? createProgressiveSearch(index, deferred, { limit: 24, perKind: 5 }).results
+        : [],
+    [blank, deferred, index],
+  );
   const [progress, setProgress] = useState<{
     query: string;
     results: SearchResult[];
@@ -296,12 +303,6 @@ export function CommandPalette() {
     let accumulator = createProgressiveSearch(index, deferred, {
       limit: 24,
       perKind: 5,
-    });
-    setProgress({
-      query: deferred,
-      results: accumulator.results,
-      complete: false,
-      error: false,
     });
     void (async () => {
       let cursor: string | null = null;
@@ -354,7 +355,7 @@ export function CommandPalette() {
   const current =
     progress.query === deferred
       ? progress
-      : { query: deferred, results: [], complete: false, error: false };
+      : { query: deferred, results: baseResults, complete: false, error: false };
   const results = current.results;
 
   // Grouped, but ordered by the best hit in each group — so whatever ⏎ would

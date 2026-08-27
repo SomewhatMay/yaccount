@@ -4,6 +4,7 @@ import { IDBFactory } from "fake-indexeddb";
 import {
   makeTemplate,
   makeTransaction,
+  makeTransfer,
   makeVoidRow,
   type Transaction,
 } from "@/core/model";
@@ -353,6 +354,28 @@ describe("Repo Ledger read model", () => {
     repo.close();
   });
 
+  it("reads bounded reversal-inclusive approved ranges for cash forecasts", async () => {
+    const repo = await Repo.open("paging-approved-range");
+    const original = rows()[0];
+    const reversal = makeVoidRow(original, { id: "void-a", on: "2026-08-22" });
+    await repo.resetTo([
+      ...createOps([original]),
+      {
+        id: "op-void-a",
+        ts: at(20),
+        type: "transaction.void",
+        payload: { row: reversal },
+      },
+    ]);
+
+    expect(
+      (await repo.getApprovedTransactionRange("2026-08-20", "2026-08-22")).map(
+        (row) => row.id,
+      ),
+    ).toEqual([original.id, reversal.id]);
+    repo.close();
+  });
+
   it("commits transaction mutation, liveness, balances, and revision together", async () => {
     const repo = await Repo.open("paging-dispatch");
     const original = rows()[0];
@@ -497,6 +520,7 @@ describe("Repo Ledger read model", () => {
     expect(focus.rows.map((row) => row.id)).toContain("row-050");
     expect(focus.rows.findIndex((row) => row.id === "row-050")).toBeGreaterThan(0);
     expect(focus.rows.findIndex((row) => row.id === "row-050")).toBeLessThan(24);
+    expect(focus.cursor).toEqual(expect.any(String));
     repo.close();
   });
 
@@ -513,6 +537,8 @@ describe("Repo Ledger read model", () => {
       category_id: "food",
     });
     await repo.resetTo(createOps([approved, pending, template]));
+
+    expect(await repo.count(STORE.transactions)).toBe(3);
 
     expect((await repo.getEntryCollection("ledger")).map((row) => row.id)).toEqual([
       approved.id,
@@ -589,6 +615,43 @@ describe("Repo Ledger read model", () => {
       net: 0,
       count: 2,
     });
+    repo.close();
+  });
+
+  it("sums exact net transfers for a container from a goal cycle date", async () => {
+    const repo = await Repo.open("paging-goal-contribution");
+    const before = makeTransfer({
+      id: "before",
+      date: "2025-12-31",
+      amount: 1000,
+      container_id: "general",
+      to_container_id: "goal",
+      fromName: "General",
+      toName: "Goal",
+    });
+    const incoming = makeTransfer({
+      id: "incoming",
+      date: "2026-01-05",
+      amount: 5000,
+      container_id: "general",
+      to_container_id: "goal",
+      fromName: "General",
+      toName: "Goal",
+    });
+    const outgoing = makeTransfer({
+      id: "outgoing",
+      date: "2026-02-05",
+      amount: 1200,
+      container_id: "goal",
+      to_container_id: "general",
+      fromName: "Goal",
+      toName: "General",
+    });
+    await repo.resetTo(createOps([before, incoming, outgoing]));
+
+    expect(await repo.getContainerTransferContribution("goal", "2026-01-01")).toBe(
+      3800,
+    );
     repo.close();
   });
 });

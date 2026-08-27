@@ -29,6 +29,7 @@ import type {
   RecurringRule,
   Transaction,
 } from "@/core/model";
+import type { GoalLedgerFacts } from "@/core/engine";
 
 export interface DashboardAggregateInputs {
   budgetTargets: BudgetTarget[];
@@ -39,6 +40,9 @@ export interface DashboardAggregateInputs {
   recurringRules: RecurringRule[];
   snapshots: ContainerSnapshot[];
   goals: Goal[];
+  currentBalances?: ReadonlyMap<string, number>;
+  balancesAsOfToday?: ReadonlyMap<string, number>;
+  goalFacts?: ReadonlyMap<string, GoalLedgerFacts>;
 }
 
 export interface DashboardAggregateCalculators {
@@ -192,6 +196,8 @@ export function createDashboardAggregates(
       inputs.recurringRules,
       today,
       days,
+      undefined,
+      inputs.balancesAsOfToday,
     );
     cashHorizonCache.set(key, result);
     return result;
@@ -224,7 +230,15 @@ export function createDashboardAggregates(
     },
     balance() {
       if (!hasBalance) {
-        balance = calculate.overallBalance(inputs.ledgerTransactions, inputs.containers);
+        balance = inputs.currentBalances
+          ? inputs.containers.reduce(
+              (total, container) =>
+                container.include_in_overall_balance && !container.is_archived
+                  ? total + (inputs.currentBalances?.get(container.id) ?? 0)
+                  : total,
+              0,
+            )
+          : calculate.overallBalance(inputs.ledgerTransactions, inputs.containers);
         hasBalance = true;
       }
       return balance;
@@ -246,6 +260,7 @@ export function createDashboardAggregates(
           inputs.snapshots,
           inputs.ledgerTransactions,
           inputs.goals,
+          inputs.currentBalances,
         );
       }
       return cachedMoneyMap;
@@ -272,6 +287,7 @@ export function createDashboardAggregates(
         inputs.containers,
         inputs.ledgerTransactions,
         today,
+        inputs.goalFacts,
       );
       goalOutlookCache.set(today, result);
       return result;
@@ -291,6 +307,7 @@ export function createDashboardAggregates(
         goals: inputs.goals,
         budgetTargets: inputs.budgetTargets,
         rules: inputs.recurringRules,
+        goalFacts: inputs.goalFacts,
       });
       allocationMonthCache.set(key, result);
       return result;
@@ -309,6 +326,7 @@ export function createDashboardAggregates(
         goals: inputs.goals,
         budgetTargets: inputs.budgetTargets,
         rules: inputs.recurringRules,
+        goalFacts: inputs.goalFacts,
       });
       allocationPayCycleCache.set(key, result);
       return result;
@@ -351,6 +369,8 @@ export function createDashboardAggregates(
         categories: inputs.categories,
         containers: inputs.containers,
         recurringRules: inputs.recurringRules,
+        currentBalances: inputs.balancesAsOfToday,
+        balancesAsOfToday: inputs.balancesAsOfToday,
       });
       containerWatchCache.set(key, result);
       return result;

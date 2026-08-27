@@ -2,6 +2,7 @@ import type { BudgetTarget, Category, Goal, RecurringRule, Transaction } from ".
 import { isTransferRule } from "../model";
 import { budgetOnDate } from "./budgets";
 import { requiredMonthly } from "./goals";
+import type { GoalLedgerFacts } from "./goals";
 import { firstOccurrenceOnOrAfter, nextOccurrence } from "./recurring";
 
 /**
@@ -114,6 +115,7 @@ export function monthlyPlan(input: {
   yearMonth: YearMonth;
   today: ISO;
   txns: Transaction[];
+  goalFacts?: ReadonlyMap<string, GoalLedgerFacts>;
   categories: Category[];
   goals: Goal[];
   budgetTargets: BudgetTarget[];
@@ -142,7 +144,8 @@ export function monthlyPlan(input: {
   const asks: PlanAsk[] = [];
   for (const g of goals) {
     if (g.status !== "active" || g.is_archived) continue;
-    const amount = requiredMonthly(g, txns, today);
+    const ledger = input.goalFacts?.get(g.id) ?? txns;
+    const amount = requiredMonthly(g, ledger, today);
     if (amount === 0) continue;
     asks.push({ goalId: g.id, name: g.name ?? "Goal", amount });
   }

@@ -25,7 +25,6 @@ vi.mock("jotai", () => ({
 vi.mock("@/features/store", () => ({
   readyAtom: "ready",
   cravingWinsAtom: "cravingWins",
-  transactionsAtom: "transactions",
   categoriesAtom: "categories",
   containersAtom: "containers",
   goalsAtom: "goals",
@@ -33,6 +32,10 @@ vi.mock("@/features/store", () => ({
   dispatchManyAtom: "dispatchMany",
   runGoalMaintenanceAtom: "maintainGoals",
   flashRowAtom: "flashRow",
+}));
+
+vi.mock("@/features/useLedgerEntries", () => ({
+  useLedgerEntriesById: () => fixture.values.get("transactions"),
 }));
 
 vi.mock("@/features/ui", async (importOriginal) => {

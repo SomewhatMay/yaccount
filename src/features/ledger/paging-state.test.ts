@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { makeTransaction } from "@/core/model";
 import {
   initialLedgerPagingState,
+  createLedgerSessionCache,
   ledgerPagingReducer,
   pageSizeForWidth,
 } from "./paging-state";
@@ -118,5 +119,18 @@ describe("Ledger paging session state", () => {
       complete: false,
       status: "loading",
     });
+  });
+
+  it("restores pages and scroll only for the same session query", () => {
+    const cache = createLedgerSessionCache<string>();
+    const state = {
+      ...initialLedgerPagingState(25),
+      rows: [row("saved")],
+      status: "ready" as const,
+    };
+    cache.save("newest", state, "filter", 420);
+
+    expect(cache.restore("newest")).toEqual({ state, filter: "filter", scrollY: 420 });
+    expect(cache.restore("oldest")).toBeNull();
   });
 });

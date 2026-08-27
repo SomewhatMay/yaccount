@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { createStore } from "jotai";
+import { readFileSync } from "node:fs";
 import { makeTemplate, makeTransaction } from "@/core/model";
 import type { Op } from "@/core/oplog";
 import { Repo } from "@/core/repo";
@@ -21,6 +22,12 @@ beforeEach(() => {
 });
 
 describe("store paging bootstrap", () => {
+  it("has no count-proportional transaction atom", () => {
+    expect(readFileSync(new URL("./store.ts", import.meta.url), "utf8")).not.toContain(
+      "transactionsAtom",
+    );
+  });
+
   it("loads compact facts and non-Ledger collections without canonical getAll", async () => {
     const seed = await Repo.open();
     const approved = makeTransaction({

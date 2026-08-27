@@ -89,6 +89,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   initialLedgerPagingState,
+  createLedgerSessionCache,
   ledgerPagingReducer,
   pageSizeForWidth,
   type LedgerPagingState,
@@ -142,6 +143,7 @@ const KINDS: { value: TransactionKind; label: string }[] = [
 let savedPaging: LedgerPagingState | null = null;
 let savedPagingQuery = "";
 let savedFilter: FilterDraft | null = null;
+const ledgerSession = createLedgerSessionCache<FilterDraft>();
 
 export function LedgerView() {
   const ready = useAtomValue(readyAtom);
@@ -159,8 +161,8 @@ export function LedgerView() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const initialQuery = useRef(parseLedgerQuery(searchParams.toString()));
-  const focusId = useRef(initialQuery.current.focus);
+  const [initialQuery] = useState(() => parseLedgerQuery(searchParams.toString()));
+  const focusId = useRef(initialQuery.focus);
 
   // Sort is remembered; the filters are deliberately not (§12.4 M11 — a filter
   // still on from yesterday is a hidden reason the list looks wrong). The one
@@ -176,8 +178,8 @@ export function LedgerView() {
   const [draft, setDraft] = useState<FilterDraft>(
     () =>
       searchParams.toString()
-        ? initialQuery.current.draft
-        : (savedFilter ?? initialQuery.current.draft),
+        ? initialQuery.draft
+        : (savedFilter ?? initialQuery.draft),
   );
   const filter = useMemo(() => toFilter(draft), [draft]);
   const filtering = isFilterActive(filter);
@@ -207,7 +209,12 @@ export function LedgerView() {
     [containers],
   );
 
+  const summaryKey = useMemo(
+    () => JSON.stringify([revision, today, counted.map((container) => container.id)]),
+    [counted, revision, today],
+  );
   const [summary, setSummary] = useState<{
+    key: string;
     curve: number[];
     monthIn: number;
     monthOut: number;
@@ -217,7 +224,6 @@ export function LedgerView() {
   useEffect(() => {
     if (!ready) return;
     let active = true;
-    setSummary(null);
     const ids = counted.map((container) => container.id);
     void Promise.all([
       readOverallBalanceSeries(ids, trailingDays(today, CURVE_DAYS)),
@@ -226,6 +232,7 @@ export function LedgerView() {
     ]).then(([curve, current, previous]) => {
       if (!active) return;
       setSummary({
+        key: summaryKey,
         curve,
         monthIn: current.incoming,
         monthOut: current.outgoing,
@@ -236,7 +243,8 @@ export function LedgerView() {
     return () => {
       active = false;
     };
-  }, [counted, ready, revision, today]);
+  }, [counted, ready, revision, summaryKey, today]);
+  const currentSummary = summary?.key === summaryKey ? summary : null;
 
   const nameOf = useMemo(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
@@ -358,6 +366,31 @@ export function LedgerView() {
   useEffect(() => {
     savedPaging = paging;
   }, [paging]);
+  const latestSession = useRef({ queryKey, paging, draft });
+  useEffect(() => {
+    latestSession.current = { queryKey, paging, draft };
+  }, [draft, paging, queryKey]);
+  useEffect(
+    () => () => {
+      const latest = latestSession.current;
+      ledgerSession.save(latest.queryKey, latest.paging, latest.draft, window.scrollY);
+    },
+    [],
+  );
+  const restoredScroll = useRef(false);
+  useEffect(() => {
+    if (!ready || restoredScroll.current) return;
+    restoredScroll.current = true;
+    const saved = ledgerSession.restore(queryKey);
+    if (!saved) return;
+    window.requestAnimationFrame(() => window.scrollTo({ top: saved.scrollY }));
+  }, [queryKey, ready]);
+  const previousQuery = useRef(queryKey);
+  useEffect(() => {
+    if (previousQuery.current === queryKey) return;
+    previousQuery.current = queryKey;
+    window.scrollTo({ top: 0 });
+  }, [queryKey]);
   useEffect(() => {
     if (!ready) return;
     const focus = focusId.current;
@@ -372,9 +405,9 @@ export function LedgerView() {
           pageDispatch({
             type: "page",
             rows: window.rows,
-            cursor: null,
+            cursor: window.cursor,
             revision: window.revision,
-            complete: window.completeBefore && window.completeAfter,
+            complete: window.completeAfter,
             append: false,
           });
           flashRow({ id: focus, scroll: true });
@@ -474,10 +507,16 @@ export function LedgerView() {
   // The carried balance, one ordered pass over the days on screen rather than a
   // full scan per header. Computed from the WHOLE ledger, not the filtered rows —
   // it is the running overall balance, which is why it hides when filtered.
-  const [carried, setCarried] = useState<Map<string, number> | null>(null);
+  const carriedKey = useMemo(
+    () => JSON.stringify([revision, groups.map((group) => group.day)]),
+    [groups, revision],
+  );
+  const [carried, setCarried] = useState<{
+    key: string;
+    values: Map<string, number>;
+  } | null>(null);
   useEffect(() => {
     if (!grouped || filtering || groups.length === 0) {
-      setCarried(null);
       return;
     }
     let active = true;
@@ -487,14 +526,20 @@ export function LedgerView() {
         (container) => container.include_in_overall_balance && !container.is_archived,
       )
       .map((container) => container.id);
-    setCarried(null);
     void readOverallBalanceSeries(ids, days).then((values) => {
-      if (active) setCarried(new Map(days.map((day, index) => [day, values[index]])));
+      if (active) {
+        setCarried({
+          key: carriedKey,
+          values: new Map(days.map((day, index) => [day, values[index]])),
+        });
+      }
     });
     return () => {
       active = false;
     };
-  }, [containers, filtering, grouped, groups, revision]);
+  }, [carriedKey, containers, filtering, grouped, groups, revision]);
+  const currentCarried =
+    grouped && !filtering && carried?.key === carriedKey ? carried.values : null;
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const loadMore = useCallback(() => {
@@ -565,10 +610,10 @@ export function LedgerView() {
       </div>
     );
 
-  const monthIn = summary?.monthIn ?? 0;
-  const monthOut = summary?.monthOut ?? 0;
+  const monthIn = currentSummary?.monthIn ?? 0;
+  const monthOut = currentSummary?.monthOut ?? 0;
   const monthNet = monthIn - monthOut;
-  const versusLastMonth = monthNet - (summary?.lastMonthNet ?? 0);
+  const versusLastMonth = monthNet - (currentSummary?.lastMonthNet ?? 0);
 
   return (
     <div className="space-y-6">
@@ -579,11 +624,11 @@ export function LedgerView() {
           Every approved entry, with the running balance it creates.
         </p>
       </section>
-      {summary ? (
+      {currentSummary ? (
         <Figure
           label="Overall balance"
           cents={balance}
-          series={ledgerCount > 0 ? summary.curve : undefined}
+          series={ledgerCount > 0 ? currentSummary.curve : undefined}
         >
           <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
             <span className="text-foreground/70 font-medium">This month</span>
@@ -598,7 +643,7 @@ export function LedgerView() {
               out
             </span>
           </div>
-          {summary.hadLastMonth && (
+          {currentSummary.hadLastMonth && (
             <Marginalia className="mt-2">
               {versusLastMonth === 0
                 ? "level with last month"
@@ -752,7 +797,7 @@ export function LedgerView() {
         ) : grouped ? (
           groups.map((g, gi) => (
             <div key={g.day} className={cn(gi > 0 && "border-t")}>
-              <DayHeader day={g.day} carried={carried?.get(g.day) ?? null} />
+              <DayHeader day={g.day} carried={currentCarried?.get(g.day) ?? null} />
               {g.items.map((t) => (
                 <LedgerRow
                   key={t.id}

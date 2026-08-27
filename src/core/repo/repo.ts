@@ -140,6 +140,7 @@ export interface LedgerFocusQuery {
 
 export interface LedgerFocusResult {
   rows: EntryRead[];
+  cursor: string | null;
   revision: number;
   completeBefore: boolean;
   completeAfter: boolean;
@@ -737,6 +738,10 @@ export class Repo {
     return (await this.db.getAll(store)) as T[];
   }
 
+  async count(store: StoreName): Promise<number> {
+    return this.db.count(store);
+  }
+
   async getContainerFact(containerId: string): Promise<LedgerContainerFact | undefined> {
     return (await this.db.get(
       STORE.ledgerReadFact,
@@ -1034,6 +1039,18 @@ export class Repo {
     return rows;
   }
 
+  async getApprovedTransactionRange(start: string, end: string): Promise<Transaction[]> {
+    const tx = this.db.transaction(STORE.transactions, "readonly");
+    const rows = (await tx
+      .objectStore(STORE.transactions)
+      .index(INDEX.transactionsByDate)
+      .getAll(IDBKeyRange.bound(start, end))) as Transaction[];
+    await tx.done;
+    return rows.filter(
+      (row) => row.inbox_status === "approved" && !row.is_template,
+    );
+  }
+
   async getLedgerEntriesById(ids: readonly string[]): Promise<EntryRead[]> {
     const tx = this.db.transaction(STORE.entryRead, "readonly");
     const store = tx.objectStore(STORE.entryRead);
@@ -1060,6 +1077,7 @@ export class Repo {
       await tx.done;
       return {
         rows: [],
+        cursor: null,
         revision: meta?.value ?? 0,
         completeBefore: true,
         completeAfter: true,
@@ -1103,9 +1121,21 @@ export class Repo {
       before = await scan(oppositeDirection, query.limit - 1 - after.rows.length);
     }
     await tx.done;
+    const rows = [...before.rows.reverse(), target, ...after.rows];
+    const revision = meta?.value ?? 0;
     return {
-      rows: [...before.rows.reverse(), target, ...after.rows],
-      revision: meta?.value ?? 0,
+      rows,
+      cursor:
+        !after.complete && rows.length > 0
+          ? JSON.stringify({
+              version: LEDGER_READ_MODEL_VERSION,
+              revision,
+              sort: query.sort,
+              filter: filterSignature(undefined),
+              key: entryIndexKey(rows[rows.length - 1], query.sort),
+            } satisfies LedgerCursorToken)
+          : null,
+      revision,
       completeBefore: before.complete,
       completeAfter: after.complete,
     };
@@ -1176,6 +1206,24 @@ export class Repo {
     }
     await tx.done;
     return { incoming, outgoing, net: incoming - outgoing, count };
+  }
+
+  async getContainerTransferContribution(
+    containerId: string,
+    start: string,
+  ): Promise<number> {
+    const tx = this.db.transaction(STORE.ledgerBalanceBucket, "readonly");
+    const index = tx
+      .objectStore(STORE.ledgerBalanceBucket)
+      .index(INDEX.balanceBucketByPeriodContainer);
+    const buckets = (await index.getAll(
+      IDBKeyRange.bound(
+        ["day", containerId, start],
+        ["day", containerId, []],
+      ),
+    )) as LedgerBalanceBucket[];
+    await tx.done;
+    return buckets.reduce((total, bucket) => total + bucket.netContribution, 0);
   }
 
   async getDeviceId(): Promise<string> {

@@ -56,6 +56,24 @@ export function initialLedgerPagingState(pageSize: 25 | 50): LedgerPagingState {
   };
 }
 
+export function createLedgerSessionCache<TFilter>() {
+  let saved: {
+    query: string;
+    state: LedgerPagingState;
+    filter: TFilter;
+    scrollY: number;
+  } | null = null;
+  return {
+    save(query: string, state: LedgerPagingState, filter: TFilter, scrollY: number) {
+      saved = { query, state, filter, scrollY };
+    },
+    restore(query: string) {
+      if (!saved || saved.query !== query) return null;
+      return { state: saved.state, filter: saved.filter, scrollY: saved.scrollY };
+    },
+  };
+}
+
 function reset(state: LedgerPagingState): LedgerPagingState {
   return {
     ...state,

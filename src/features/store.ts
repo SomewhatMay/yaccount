@@ -43,7 +43,7 @@ import { buildExport, exportFileName, serializeExport } from "@/core/data";
 import { getAuthProvider } from "@/auth/web";
 import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
-import { requiredMonthly } from "@/core/engine/goals";
+import { requiredMonthly, type GoalLedgerFacts } from "@/core/engine/goals";
 import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands";
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
@@ -78,7 +78,6 @@ export const readyAtom = atom(false);
 export const bootErrorAtom = atom<string | null>(null);
 export const categoriesAtom = atom<Category[]>([]);
 export const containersAtom = atom<Container[]>([]);
-export const transactionsAtom = atom<Transaction[]>([]);
 export const pendingEntriesAtom = atom<EntryRead[]>([]);
 export const containerFactsAtom = atom<Map<string, LedgerContainerFact>>(new Map());
 export const usageFactsAtom = atom<LedgerUsageFact[]>([]);
@@ -93,6 +92,7 @@ export const settingsAtom = atom<Setting[]>([]);
 export const budgetTargetsAtom = atom<BudgetTarget[]>([]);
 export const recurringRulesAtom = atom<RecurringRule[]>([]);
 export const goalsAtom = atom<Goal[]>([]);
+export const goalFactsAtom = atom<Map<string, GoalLedgerFacts>>(new Map());
 export const cravingWinsAtom = atom<CravingWin[]>([]);
 
 /** The synced-setting key holding a month's manually-entered expected income
@@ -195,6 +195,10 @@ export async function readLedgerRange(start: string, end: string) {
   return (await getRepo()).getLedgerRange(start, end);
 }
 
+export async function readApprovedTransactionRange(start: string, end: string) {
+  return (await getRepo()).getApprovedTransactionRange(start, end);
+}
+
 export async function readLedgerEntriesById(ids: readonly string[]) {
   return (await getRepo()).getLedgerEntriesById(ids);
 }
@@ -228,14 +232,28 @@ export const refreshAtom = atom(null, async (_get, set) => {
       repo.getAll<Goal>(STORE.goals),
       repo.getAll<CravingWin>(STORE.cravingWins),
     ]);
+  const containerFacts = new Map(
+    ledgerRead.containerFacts.map((fact) => [fact.containerId, fact]),
+  );
+  const goalFacts = new Map(
+    await Promise.all(
+      goals.map(async (goal) => [
+        goal.id,
+        {
+          balance: containerFacts.get(goal.container_id)?.balance ?? 0,
+          netContribution: await repo.getContainerTransferContribution(
+            goal.container_id,
+            goal.created_date,
+          ),
+        } satisfies GoalLedgerFacts,
+      ] as const),
+    ),
+  );
   set(categoriesAtom, cats);
   set(containersAtom, conts);
   set(pendingEntriesAtom, ledgerRead.pending);
   set(templatesAtom, ledgerRead.templates);
-  set(
-    containerFactsAtom,
-    new Map(ledgerRead.containerFacts.map((fact) => [fact.containerId, fact])),
-  );
+  set(containerFactsAtom, containerFacts);
   set(usageFactsAtom, ledgerRead.usageFacts);
   set(ledgerCountAtom, ledgerRead.ledgerCount);
   set(ledgerRevisionAtom, ledgerRead.revision);
@@ -244,6 +262,7 @@ export const refreshAtom = atom(null, async (_get, set) => {
   set(budgetTargetsAtom, budgetTargets);
   set(recurringRulesAtom, rules);
   set(goalsAtom, goals);
+  set(goalFactsAtom, goalFacts);
   set(cravingWinsAtom, cravingWins);
 });
 
@@ -600,7 +619,7 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
   const today = todayIso();
   const rules = get(recurringRulesAtom).filter((r) => r.status === "active");
   const goals = get(goalsAtom);
-  const txns = get(transactionsAtom);
+  const goalFacts = get(goalFactsAtom);
   for (const rule of rules) {
     // A goal_derived rule logs the linked goal's CURRENT required_monthly (§5.9.5),
     // recomputed here at generation time so a deadline goal's drifting ask never
@@ -608,7 +627,15 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
     let opts: { goalDerivedAmount?: number } | undefined;
     if (rule.amount_mode === "goal_derived" && rule.linked_goal_id) {
       const goal = goals.find((g) => g.id === rule.linked_goal_id);
-      opts = goal ? { goalDerivedAmount: requiredMonthly(goal, txns, today) } : undefined;
+      opts = goal
+        ? {
+            goalDerivedAmount: requiredMonthly(
+              goal,
+              goalFacts.get(goal.id) ?? { balance: 0, netContribution: 0 },
+              today,
+            ),
+          }
+        : undefined;
     }
     const { rows, rule: advanced } = generateDueOccurrences(rule, today, opts);
     // Advance the cursor even when nothing was logged (a goal_derived $0), so the
@@ -631,11 +658,11 @@ export const runRecurringGenerationAtom = atom(null, async (get, set) => {
  */
 export const runGoalMaintenanceAtom = atom(null, async (get, set) => {
   const today = todayIso();
-  const txns = get(transactionsAtom);
+  const goalFacts = get(goalFactsAtom);
   const rules = get(recurringRulesAtom);
   const goals = get(goalsAtom);
   const repo = await getRepo();
-  const ops = goalMaintenanceOps(goals, txns, rules, today);
+  const ops = goalMaintenanceOps(goals, goalFacts, rules, today);
   if (ops.length === 0) return;
   await repo.dispatchMany(ops);
   await set(refreshAtom);
