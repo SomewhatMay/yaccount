@@ -342,7 +342,7 @@ export function LedgerView() {
 
   if (!ready)
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton />
         <FigureSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
@@ -355,7 +355,7 @@ export function LedgerView() {
   const versusLastMonth = monthNet - lastMonthNet;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <section className="pt-3 pb-1">
         <Eyebrow className="hidden sm:block">Register</Eyebrow>
         <h1 className={SCREEN_TITLE_CLASS}>Ledger</h1>

@@ -221,7 +221,7 @@ export function InboxView() {
 
   if (!ready)
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton rows={4} />
@@ -230,7 +230,7 @@ export function InboxView() {
     );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         eyebrow={pending.length === 0 ? "All clear" : `${pending.length} to review`}
         title="Inbox"

@@ -16,7 +16,7 @@ export default function ContainersPage() {
 
 function Fallback() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeaderSkeleton />
       <div className="bg-card overflow-hidden rounded-2xl border">
         <ListSkeleton />

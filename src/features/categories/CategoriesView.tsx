@@ -163,7 +163,7 @@ export function CategoriesView() {
 
   if (!ready)
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton rows={6} />
@@ -172,7 +172,7 @@ export function CategoriesView() {
     );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         eyebrow="Ledger structure"
         title="Categories"

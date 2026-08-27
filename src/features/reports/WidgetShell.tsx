@@ -149,7 +149,7 @@ export function DashboardWidget({
 
   // Edit mode keeps the report visible while its ordinary controls stand down.
   // The editor supplies one shared card frame and movement controls around it.
-  if (editing) return <div className="p-5">{content}</div>;
+  if (editing) return <div className="p-4 sm:p-5">{content}</div>;
 
   // The hero and the KPI strip are the screen's opening statement, not panels:
   // no chrome, nothing to fold, and no window of their own to choose.
@@ -160,7 +160,10 @@ export function DashboardWidget({
       data-widget-size={size}
       open={open}
       onOpenChange={(next) => setOpenPref(next ? "open" : "closed")}
-      className="bg-card group rounded-2xl border p-5 [contain-intrinsic-size:auto_4rem] [content-visibility:auto]"
+      className={cn(
+        "bg-card group rounded-2xl border p-4 sm:p-5",
+        "[contain-intrinsic-size:auto_4rem] [content-visibility:auto]",
+      )}
     >
       <div className="flex items-center gap-2">
         <CollapsibleTrigger className="group/w flex min-w-0 flex-1 items-center gap-2 text-left">

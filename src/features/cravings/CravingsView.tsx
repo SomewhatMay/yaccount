@@ -141,7 +141,7 @@ export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
 
   if (!ready) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <FigureSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton rows={4} />
@@ -151,7 +151,7 @@ export function CravingsView({ today = todayIso() }: { today?: string } = {}) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <CravingsHero summary={summary} series={series} onNew={() => openSheet("new")} />
 
       {groups.length === 0 ? (
