@@ -27,6 +27,7 @@ afterEach(() => {
 const base = {
   range: { start: "2026-08-01", end: "2026-08-31" },
   today: "2026-08-23",
+  cravingWins: [],
   categories: [],
   containers: [],
   ledgerTransactions: [],

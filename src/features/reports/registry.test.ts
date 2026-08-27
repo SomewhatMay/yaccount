@@ -22,6 +22,7 @@ describe("the dashboard widget registry", () => {
       "money-map",
       "pace",
       "recent",
+      "cravings",
       "saved",
       "flow",
       "calendar",
@@ -71,6 +72,7 @@ describe("the dashboard widget registry", () => {
       ),
     ).toEqual([
       "money-map",
+      "cravings",
       "saved",
       "flow",
       "calendar",
@@ -235,6 +237,7 @@ describe("the dashboard widget registry", () => {
       "money-map",
       "pace",
       "recent",
+      "cravings",
       "commitments",
       "upcoming",
       "allocation",

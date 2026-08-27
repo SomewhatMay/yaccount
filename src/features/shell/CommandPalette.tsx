@@ -9,6 +9,7 @@ import {
   LineChartIcon,
   ListIcon,
   PlusIcon,
+  PiggyBankIcon,
   RefreshCwIcon,
   RepeatIcon,
   TagsIcon,
@@ -30,6 +31,7 @@ import {
   categoriesAtom,
   commandPaletteAtom,
   containersAtom,
+  cravingWinSheetAtom,
   flashRowAtom,
   goalsAtom,
   quickAddAtom,
@@ -147,6 +149,7 @@ export function CommandPalette() {
   const goals = useAtomValue(goalsAtom);
   const rules = useAtomValue(recurringRulesAtom);
   const openQuickAdd = useSetAtom(quickAddAtom);
+  const openCravingWin = useSetAtom(cravingWinSheetAtom);
   const reportBalance = useSetAtom(reportedBalanceContainerIdAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const sync = useSetAtom(syncAtom);
@@ -194,6 +197,13 @@ export function CommandPalette() {
         icon: ArrowRightIcon,
         go: () => openQuickAdd("transfer"),
       },
+      {
+        id: "act:craving-win",
+        title: "Log a craving win",
+        subtitle: "Record money you chose to keep",
+        icon: PiggyBankIcon,
+        go: () => openCravingWin("new"),
+      },
       ...buildInvestmentValueActions(containers).map((action) => ({
         ...action,
         icon: LineChartIcon,
@@ -207,7 +217,7 @@ export function CommandPalette() {
         go: () => void sync(),
       },
     ],
-    [containers, openQuickAdd, reportBalance, sync],
+    [containers, openCravingWin, openQuickAdd, reportBalance, sync],
   );
   const actionIds = useMemo(() => actions.map((action) => action.id), [actions]);
   const defaults = useMemo(

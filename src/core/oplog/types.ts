@@ -6,6 +6,7 @@ import type { Setting } from "../model/setting";
 import type { BudgetTarget } from "../model/budgetTarget";
 import type { RecurringRule } from "../model/recurringRule";
 import type { Goal } from "../model/goal";
+import type { CravingWin } from "../model/cravingWin";
 
 /**
  * Every mutation is an idempotent op appended to the journal AND applied to the
@@ -80,7 +81,12 @@ export type Op =
   | (OpBase & { type: "goal.cancel"; payload: { id: string } })
   | (OpBase & { type: "goal.uncancel"; payload: { id: string } })
   | (OpBase & { type: "goal.archive"; payload: { id: string } })
-  | (OpBase & { type: "goal.unarchive"; payload: { id: string } });
+  | (OpBase & { type: "goal.unarchive"; payload: { id: string } })
+  // A craving win records avoided spending, not money movement. A linked real
+  // transfer remains an ordinary transaction and is committed beside this op.
+  | (OpBase & { type: "cravingWin.create"; payload: { row: CravingWin } })
+  | (OpBase & { type: "cravingWin.update"; payload: { row: CravingWin } })
+  | (OpBase & { type: "cravingWin.remove"; payload: { id: string } });
 
 export type OpType = Op["type"];
 
@@ -126,6 +132,9 @@ export const OP_TYPES = [
   "goal.uncancel",
   "goal.archive",
   "goal.unarchive",
+  "cravingWin.create",
+  "cravingWin.update",
+  "cravingWin.remove",
 ] as const satisfies readonly OpType[];
 
 /** Compile-time proof that `OP_TYPES` lists every member of the `Op` union. */

@@ -81,6 +81,7 @@ export interface OverviewEligibility {
   hasActiveGoal: boolean;
   hasLandingHistory: boolean;
   hasLandingSignal: boolean;
+  hasCravingWins: boolean;
 }
 
 const STARTER_WIDGETS: Record<
@@ -134,6 +135,9 @@ export function curatedOverviewWidgets(
       : []),
     ...(eligibility.hasLandingHistory && eligibility.hasLandingSignal
       ? [{ widgetType: "landing", size: "expanded" as const }]
+      : []),
+    ...(eligibility.hasCravingWins
+      ? [{ widgetType: "cravings", size: "compact" as const }]
       : []),
   ];
 }

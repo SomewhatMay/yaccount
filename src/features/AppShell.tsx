@@ -17,6 +17,7 @@ import { SidebarRail } from "@/features/shell/SidebarRail";
 import { SyncErrorBanner } from "@/features/SyncErrorBanner";
 import { TopBar } from "@/features/shell/TopBar";
 import { ReportedBalanceSheet } from "@/features/containers/ReportedBalanceSheet";
+import { CravingWinSheet } from "@/features/cravings/CravingWinSheet";
 
 /**
  * The chrome around every screen, and the two whole-app failure states.
@@ -72,6 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <>
           <QuickAddFab />
           <QuickAddSheet />
+          <CravingWinSheet />
           <ReportedBalanceSheet />
         </>
       )}

@@ -65,6 +65,7 @@ function context(range: WidgetContext["range"]): WidgetContext {
   return {
     range,
     today: "2026-08-23",
+    cravingWins: [],
     categories,
     containers: [container],
     ledgerTransactions,

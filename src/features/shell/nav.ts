@@ -4,6 +4,7 @@ import {
   InboxIcon,
   ListIcon,
   MoreHorizontalIcon,
+  PiggyBankIcon,
   RepeatIcon,
   SettingsIcon,
   TagsIcon,
@@ -42,6 +43,12 @@ export const DESTINATIONS: Destination[] = [
     hint: "Give every dollar a purpose",
   },
   { href: "/goals", label: "Goals", icon: TargetIcon, hint: "What you're saving toward" },
+  {
+    href: "/cravings",
+    label: "Cravings",
+    icon: PiggyBankIcon,
+    hint: "Wins and money you chose to keep",
+  },
   {
     href: "/recurring",
     label: "Recurring",

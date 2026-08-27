@@ -1,6 +1,11 @@
 import { expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
-import { makeCategory, makeGeneralContainer, makeTransaction } from "@/core/model";
+import {
+  makeCategory,
+  makeCravingWin,
+  makeGeneralContainer,
+  makeTransaction,
+} from "@/core/model";
 import { DashboardView } from "./DashboardView";
 import type { WidgetContext, WidgetDef } from "./registry";
 
@@ -109,6 +114,7 @@ vi.mock("@/features/store", () => ({
   readyAtom: "ready",
   categoriesAtom: "categories",
   containersAtom: "containers",
+  cravingWinsAtom: "cravingWins",
   transactionsAtom: "transactions",
   budgetTargetsAtom: "budgetTargets",
   snapshotsAtom: "snapshots",
@@ -206,6 +212,15 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   fixture.values.set("snapshots", []);
   fixture.values.set("recurringRules", []);
   fixture.values.set("goals", []);
+  fixture.values.set("cravingWins", [
+    makeCravingWin({
+      id: "craving-win",
+      description: "Delivery",
+      amount_kept: 2_000,
+      date: "2026-08-20",
+      occurred_at: "2026-08-20T18:00:00.000Z",
+    }),
+  ]);
   fixture.values.set("settings", [{ key: "expected_income:2026-08", value: "250000" }]);
   fixture.periodKeys = [];
   fixture.compareKeys = [];
@@ -219,6 +234,7 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
       { widgetType: "balance", size: "expanded" },
       { widgetType: "brief", size: "expanded" },
       { widgetType: "recent", size: "expanded" },
+      { widgetType: "cravings", size: "compact" },
     ],
   ]);
   expect(fixture.periodKeys).toEqual(["yaccount.dashboard.period.overview"]);
@@ -245,6 +261,7 @@ it("keeps hidden-from-stats rows in balance while excluding them from reports", 
   expect(savedWidget.props.base.syncedSettings).toEqual([
     { key: "expected_income:2026-08", value: "250000" },
   ]);
+  expect(savedWidget.props.base.cravingWins).toHaveLength(1);
   await savedWidget.props.base.dispatchOps?.([]);
   expect(fixture.dispatchMany).toHaveBeenCalledWith([]);
   await savedWidget.props.base.saveInstanceSettings?.({ horizonDays: 14 });
