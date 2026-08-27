@@ -1324,6 +1324,12 @@ test("records an investment value from search", async ({ page }) => {
   await page.getByLabel("Name").fill("E2E command investment");
   await page.getByRole("radio", { name: "Investment", exact: true }).click();
   await page.getByRole("button", { name: "Create container" }).click();
+  // A click dispatches the async submit but does not await its IndexedDB commit.
+  // Observe the created row before navigating so a busy four-worker run cannot
+  // tear down the page while the write is still in flight.
+  await expect(
+    page.getByRole("button", { name: "Actions for E2E command investment" }),
+  ).toBeVisible();
 
   await openReady(page, "/", "How the money moved");
   await openPalette(page);
