@@ -1,5 +1,22 @@
 const KEYBOARD_THRESHOLD = 60;
 
+interface VerticalRect {
+  top: number;
+  bottom: number;
+}
+
+export function focusedScrollDelta(
+  scrollport: VerticalRect,
+  field: VerticalRect,
+  padding: number,
+): number {
+  const visibleTop = scrollport.top + padding;
+  const visibleBottom = scrollport.bottom - padding;
+  if (field.bottom > visibleBottom) return Math.round(field.bottom - visibleBottom);
+  if (field.top < visibleTop) return Math.round(field.top - visibleTop);
+  return 0;
+}
+
 export function keyboardInset(base: number, height: number): number {
   const delta = Math.round(base - height);
   return delta > KEYBOARD_THRESHOLD ? delta : 0;

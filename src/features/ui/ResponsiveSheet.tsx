@@ -11,6 +11,7 @@ import { SM_UP, useMediaQuery } from "@/features/ui/useMediaQuery";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
+  focusedScrollDelta,
   keyboardGeometry,
   nextBaseline,
   sheetViewportStyle,
@@ -39,18 +40,25 @@ function useKeyboardInset(active: boolean): { inset: number; lift: number } {
     if (!visual) return;
 
     baseline.current = visual.height;
+    let frame = 0;
     const update = () => {
-      baseline.current = nextBaseline(baseline.current, visual.height);
-      setState({
-        active: true,
-        ...keyboardGeometry(baseline.current, visual.height, viewportTop(visual)),
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        baseline.current = nextBaseline(baseline.current, visual.height);
+        setState({
+          active: true,
+          ...keyboardGeometry(baseline.current, visual.height, viewportTop(visual)),
+        });
       });
     };
 
     visual.addEventListener("resize", update);
+    visual.addEventListener("scroll", update);
 
     return () => {
+      cancelAnimationFrame(frame);
       visual.removeEventListener("resize", update);
+      visual.removeEventListener("scroll", update);
     };
   }, [active]);
 
@@ -86,6 +94,25 @@ export function ResponsiveSheet({
   const sideways = useMediaQuery(SM_UP, true);
   const { inset, lift } = useKeyboardInset(open && !sideways);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  function revealFocusedField() {
+    const body = bodyRef.current;
+    const focused = document.activeElement;
+    if (!body || !(focused instanceof HTMLElement) || !body.contains(focused)) return;
+    const delta = focusedScrollDelta(
+      body.getBoundingClientRect(),
+      focused.getBoundingClientRect(),
+      16,
+    );
+    if (delta) body.scrollTop += delta;
+  }
+
+  useEffect(() => {
+    if (!open || sideways) return;
+    const frame = requestAnimationFrame(revealFocusedField);
+    return () => cancelAnimationFrame(frame);
+  }, [inset, lift, open, sideways]);
   const header = (
     <SheetHeader>
       <SheetTitle ref={titleRef} tabIndex={-1} className="font-display text-xl">
@@ -121,7 +148,9 @@ export function ResponsiveSheet({
       >
         {!scrollHeader && header}
         <div
+          ref={bodyRef}
           data-slot="sheet-body"
+          onFocusCapture={() => requestAnimationFrame(revealFocusedField)}
           className={cn(
             "min-h-0 flex-1 [scroll-padding-bottom:calc(1rem+env(safe-area-inset-bottom,0px))] overflow-x-hidden overflow-y-auto overscroll-contain",
             scrollHeader && "space-y-4",

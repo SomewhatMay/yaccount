@@ -3,6 +3,7 @@ import {
   keyboardGeometry,
   keyboardInset,
   nextBaseline,
+  focusedScrollDelta,
   sheetKeyboardStyle,
   sheetViewportStyle,
 } from "@/features/ui/sheet-viewport";
@@ -62,5 +63,13 @@ describe("iOS bottom-sheet keyboard inset", () => {
       "--kb": "264px",
       "--sheet-occlusion": "67px",
     });
+  });
+
+  it("scrolls only enough to reveal a focused field inside its scrollport", () => {
+    const scrollport = { top: 100, bottom: 400 };
+
+    expect(focusedScrollDelta(scrollport, { top: 360, bottom: 450 }, 16)).toBe(66);
+    expect(focusedScrollDelta(scrollport, { top: 70, bottom: 120 }, 16)).toBe(-46);
+    expect(focusedScrollDelta(scrollport, { top: 150, bottom: 350 }, 16)).toBe(0);
   });
 });
