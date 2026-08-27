@@ -2,13 +2,14 @@ import { expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { defaultDashboardDefinition } from "./dashboard-layout";
 import { DASHBOARD_WIDGETS } from "./registry";
-import { DashboardSetBar } from "./DashboardSets";
+import { DashboardOverflowMenu, DashboardSetBar } from "./DashboardSets";
 
 interface ElementProps {
   children?: ReactNode;
   "aria-label"?: string;
   "aria-current"?: string;
   onClick?: (event: never) => void;
+  onSelect?: () => void;
 }
 
 vi.mock("react", async (importOriginal) => {
@@ -33,7 +34,14 @@ function findElements(
   ];
 }
 
-it("renders named dashboard tabs with accessible create and manage actions", () => {
+function textOf(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join(" ");
+  if (!isValidElement<ElementProps>(node)) return "";
+  return textOf(node.props.children);
+}
+
+it("renders compact named dashboard tabs with one create action", () => {
   const overview = defaultDashboardDefinition(DASHBOARD_WIDGETS);
   const planning = { ...overview, id: "planning", name: "Planning", rank: 1 };
   const onSelect = vi.fn();
@@ -61,7 +69,32 @@ it("renders named dashboard tabs with accessible create and manage actions", () 
   planningTab.props.onClick?.({} as never);
   expect(onSelect).toHaveBeenCalledWith(planning.id);
   expect(buttons.map((button) => button.props["aria-label"])).toContain("Add dashboard");
-  expect(buttons.map((button) => button.props["aria-label"])).toContain(
+  expect(buttons.map((button) => button.props["aria-label"])).not.toContain(
     "Manage dashboards",
   );
+});
+
+it("puts customization and dashboard management in one overflow menu", () => {
+  const onCustomize = vi.fn();
+  const onManage = vi.fn();
+  const menu = DashboardOverflowMenu({ onCustomize, onManage });
+  const trigger = findElements(
+    menu,
+    (element) => element.props["aria-label"] === "Dashboard options",
+  )[0];
+  const items = findElements(
+    menu,
+    (element) =>
+      typeof element.type === "function" && element.type.name === "DropdownMenuItem",
+  );
+
+  expect(trigger).toBeDefined();
+  expect(items.map((item) => textOf(item))).toEqual([
+    "Customize dashboard",
+    "Manage dashboards",
+  ]);
+  items[0].props.onSelect?.();
+  items[1].props.onSelect?.();
+  expect(onCustomize).toHaveBeenCalledOnce();
+  expect(onManage).toHaveBeenCalledOnce();
 });

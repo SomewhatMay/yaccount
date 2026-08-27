@@ -64,6 +64,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const SCREEN_TITLE_CLASS =
+  "font-display col-start-1 row-start-1 text-xl font-semibold tracking-tight sm:row-start-2 sm:mt-1.5 sm:text-2xl";
 
 function dayLabel(date: string): string {
   return DAY.format(new Date(`${date}T00:00:00`));
@@ -215,14 +217,24 @@ export function CravingsHero({
 }) {
   return (
     <section className="pt-3">
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <Eyebrow>Cravings savings</Eyebrow>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
+        <Eyebrow className="hidden sm:col-start-1 sm:row-start-1 sm:block">
+          Saved choices
+        </Eyebrow>
+        <h1 className={SCREEN_TITLE_CLASS}>Cravings</h1>
         <Button className="rounded-full" onClick={onNew}>
           <PlusIcon className="size-4" />
           New
         </Button>
+        <p className="text-muted-foreground col-span-2 mt-3 hidden max-w-md text-sm sm:block">
+          An estimate of spending you avoided. Only linked goal transfers change your
+          balances.
+        </p>
       </div>
-      <h1 className="figure-hero mt-1.5">{formatCents(summary.totalKept)}</h1>
+      <div className="mt-4">
+        <Eyebrow>Savings kept</Eyebrow>
+        <p className="figure-hero mt-1.5">{formatCents(summary.totalKept)}</p>
+      </div>
       {series.length > 1 && (
         <Sparkline
           values={series}
@@ -247,10 +259,6 @@ export function CravingsHero({
           </span>
         )}
       </div>
-      <p className="text-muted-foreground mt-3 max-w-md text-sm">
-        An estimate of spending you avoided. Only linked goal transfers change your
-        balances.
-      </p>
     </section>
   );
 }

@@ -250,7 +250,7 @@ describe("the dashboard widget registry", () => {
 
   it("leads with current balance as the sole opening figure", () => {
     const bare = DASHBOARD_WIDGETS.filter((w) => w.bare).map((w) => w.id);
-    expect(bare).toEqual(["balance"]);
+    expect(bare).toEqual([]);
     expect(DASHBOARD_WIDGETS[0].id).toBe("balance");
   });
 

@@ -112,7 +112,7 @@ export function PlanView() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Monthly plan" title="Every dollar a purpose">
+      <PageHeader eyebrow="Monthly allocation" title="Plan">
         Give the month&apos;s income a job — steady category allowances and goal
         contributions — until nothing is left unassigned.
       </PageHeader>
@@ -154,18 +154,18 @@ export function PlanView() {
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex items-center gap-1.5">
                 <Input
-                autoFocus
-                value={incomeStr}
-                onChange={(e) => setIncomeStr(e.target.value)}
-                placeholder="0.00"
-                inputMode="decimal"
-                className="tnum h-8 w-28 font-mono"
-                aria-invalid={incomeError ? "true" : undefined}
-                aria-describedby={incomeError ? "expected-income-error" : undefined}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void saveIncome();
-                  if (e.key === "Escape") setEditingIncome(false);
-                }}
+                  autoFocus
+                  value={incomeStr}
+                  onChange={(e) => setIncomeStr(e.target.value)}
+                  placeholder="0.00"
+                  inputMode="decimal"
+                  className="tnum h-8 w-28 font-mono"
+                  aria-invalid={incomeError ? "true" : undefined}
+                  aria-describedby={incomeError ? "expected-income-error" : undefined}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveIncome();
+                    if (e.key === "Escape") setEditingIncome(false);
+                  }}
                 />
                 <Button size="sm" className="h-8 rounded-lg" onClick={saveIncome}>
                   Save

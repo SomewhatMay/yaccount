@@ -287,7 +287,7 @@ describe("dashboard layout v2", () => {
     });
   });
 
-  it("repairs a missing pinned balance without adding other widgets", () => {
+  it("preserves an existing dashboard that has no balance widget", () => {
     const planning = {
       ...defaultDashboardDefinition(widgets),
       id: "planning",
@@ -301,7 +301,6 @@ describe("dashboard layout v2", () => {
     );
 
     expect(state.dashboards[0].instances.map((instance) => instance.widgetType)).toEqual([
-      "balance",
       "pace",
     ]);
   });
@@ -352,18 +351,70 @@ describe("dashboard layout editing", () => {
     });
   });
 
-  it("pins balance while reordering and changing visibility", () => {
+  it("moves, hides, restores, and resizes balance like every other widget", () => {
     const initial = defaultDashboardLayout(widgets);
     expect(reorderDashboardLayout(initial, "recent", "pace")).toEqual({
       ...initial,
       order: ["balance", "recent", "pace", "later"],
     });
-    expect(reorderDashboardLayout(initial, "balance", "recent")).toBe(initial);
+    expect(reorderDashboardLayout(initial, "balance", "recent").order).toEqual([
+      "pace",
+      "recent",
+      "balance",
+      "later",
+    ]);
     expect(setWidgetVisible(initial, "pace", false).hidden).toEqual(["pace", "later"]);
     expect(setWidgetVisible(initial, "later", true).hidden).toEqual([]);
-    expect(setWidgetVisible(initial, "balance", false)).toBe(initial);
+    expect(setWidgetVisible(initial, "balance", false).hidden).toEqual([
+      "balance",
+      "later",
+    ]);
+    expect(
+      setWidgetVisible(setWidgetVisible(initial, "balance", false), "balance", true)
+        .hidden,
+    ).toEqual(["later"]);
     expect(setWidgetSize(initial, "pace", "compact").sizes.pace).toBe("compact");
-    expect(setWidgetSize(initial, "balance", "compact")).toBe(initial);
+    expect(setWidgetSize(initial, "balance", "compact").sizes.balance).toBe("compact");
+  });
+
+  it("reads existing balance order, visibility, and size without normalization", () => {
+    const dashboard: DashboardDefinition = {
+      ...defaultDashboardDefinition(widgets),
+      instances: [
+        { instanceId: "pace", widgetType: "pace", size: "expanded", hidden: false },
+        {
+          instanceId: "balance",
+          widgetType: "balance",
+          size: "compact",
+          hidden: true,
+          settings: { future: true },
+        },
+        { instanceId: "recent", widgetType: "recent", size: "expanded", hidden: false },
+      ],
+    };
+
+    expect(layoutFromDashboard(dashboard, widgets)).toEqual({
+      order: ["pace", "balance", "recent"],
+      hidden: ["balance"],
+      sizes: { pace: "expanded", balance: "compact", recent: "expanded" },
+    });
+  });
+
+  it("can reset balance to hidden when starter curation omits it", () => {
+    const dashboard = defaultDashboardDefinition(widgets);
+
+    expect(
+      resetDashboardLayout(dashboard, widgets, [{ widgetType: "pace", size: "compact" }]),
+    ).toEqual({
+      order: ["pace", "balance", "recent", "later"],
+      hidden: ["balance", "recent", "later"],
+      sizes: {
+        pace: "compact",
+        balance: "expanded",
+        recent: "expanded",
+        later: "expanded",
+      },
+    });
   });
 
   it("resets an edited dashboard to the same curated order, visibility, and sizes", () => {
@@ -550,19 +601,13 @@ describe("dashboard set lifecycle", () => {
     });
 
     expect(duplicate.instances).toEqual([
-      {
-        instanceId: ids[0],
-        widgetType: "balance",
-        size: "expanded",
-        hidden: false,
-      },
-      { ...source.instances[0], instanceId: ids[1] },
-      { ...source.instances[1], instanceId: ids[2] },
+      { ...source.instances[0], instanceId: ids[0] },
+      { ...source.instances[1], instanceId: ids[1] },
     ]);
     expect(layoutFromDashboard(duplicate, widgets)).toEqual({
-      order: [ids[0], ids[1]],
-      hidden: [ids[1]],
-      sizes: { [ids[0]]: "expanded", [ids[1]]: "compact" },
+      order: [ids[0]],
+      hidden: [ids[0]],
+      sizes: { [ids[0]]: "compact" },
     });
   });
 

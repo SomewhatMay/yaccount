@@ -52,9 +52,9 @@ export function FigureSkeleton({ className }: { className?: string }) {
 export function PageHeaderSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn("space-y-2.5 pt-1", className)} aria-hidden="true">
-      <Skeleton className="h-2.5 w-24" />
-      <Skeleton className="h-7 w-52" />
-      <Skeleton className="h-3 w-72 max-w-full" />
+      <Skeleton className="hidden h-2.5 w-24 sm:block" />
+      <Skeleton className="h-6 w-40 sm:h-7 sm:w-52" />
+      <Skeleton className="hidden h-3 w-72 max-w-full sm:block" />
     </div>
   );
 }
