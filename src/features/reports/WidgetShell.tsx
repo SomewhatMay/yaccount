@@ -78,6 +78,7 @@ export function DashboardWidget({
   comparisonUnsupported = false,
   surfaceId = instanceId,
   onSizeChange,
+  onHide,
 }: {
   instanceId: string;
   size: "compact" | "expanded";
@@ -87,6 +88,7 @@ export function DashboardWidget({
   comparisonUnsupported?: boolean;
   surfaceId?: string;
   onSizeChange?: (size: "compact" | "expanded") => void | Promise<void>;
+  onHide?: () => void | Promise<void>;
 }) {
   const [mathOpen, setMathOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -181,6 +183,7 @@ export function DashboardWidget({
           onSizeChange,
           onShowMath: () => setMathOpen(true),
           onShowSettings: () => setSettingsOpen(true),
+          onHide,
         })}
       </div>
 
@@ -321,6 +324,7 @@ function WidgetMenu({
   onSizeChange,
   onShowMath,
   onShowSettings,
+  onHide,
 }: {
   def: WidgetDef;
   size: "compact" | "expanded";
@@ -332,9 +336,11 @@ function WidgetMenu({
   onSizeChange?: (size: "compact" | "expanded") => void | Promise<void>;
   onShowMath: () => void;
   onShowSettings: () => void;
+  onHide?: () => void | Promise<void>;
 }) {
   const canChooseSize = supportsCompact && Boolean(onSizeChange);
-  if (def.fixedWindow && !canChooseSize && !hasMath && !hasSettings) return null;
+  const hasOtherActions = canChooseSize || hasMath || hasSettings || !def.fixedWindow;
+  if (!hasOtherActions && !onHide) return null;
   return (
     <RowActions label={`Configure ${def.title}`} className="opacity-100">
       {hasSettings && (
@@ -380,6 +386,12 @@ function WidgetMenu({
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
+        </>
+      )}
+      {onHide && (
+        <>
+          {hasOtherActions && <DropdownMenuSeparator />}
+          <DropdownMenuItem onSelect={() => void onHide()}>Hide widget</DropdownMenuItem>
         </>
       )}
     </RowActions>

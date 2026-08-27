@@ -70,7 +70,7 @@ const DASHBOARDS = [
 
 async function importFixture(page: Page) {
   await page.goto("/settings");
-  await expect(page.getByText("Under the hood", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles(FIXTURE);
   const confirmation = page.getByRole("alertdialog");
   await expect(confirmation).toContainText("212 changes", { timeout: 30_000 });

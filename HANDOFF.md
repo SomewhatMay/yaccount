@@ -8,12 +8,12 @@ repeat them — it says where things stand and what will bite you.
 ## State
 
 - `main` is clean and deployed. Live at <https://somewhatmay.github.io/yaccount/>.
-- M0–M9 and M11 are shipped, plus local diagnostics and thirteen post-M11 quality passes: mobile toast placement, ledger
+- M0–M9 and M11 are shipped, plus local diagnostics and fourteen post-M11 quality passes: mobile toast placement, ledger
   notes, the FAB money mark, the FAB hold chooser, Settings data tools, GitHub Pages delivery, and
   blocking clear/import/rollback operations, iPhone PWA interaction fixes, and deliberate
   feedback with fewer toasts, usage-ranked selectors, starter categories, creation autocomplete,
-  and iOS keyboard-aware sheets/Search.
-- 129 Vitest files, 1,311 tests passing. Playwright is 101 passes and 13 expected platform
+  iOS keyboard-aware sheets/Search, and compact page/Dashboard hierarchy.
+- 133 Vitest files, 1,324 tests passing. Playwright is 106 passes and 14 expected platform
   skips, with no failures. `playwright.config.ts` pins `workers: 4`; do not raise it (see Known
   issues).
 - **Quick Add and new recurring forms use accessible searchable comboboxes** for vendor/source,
@@ -24,6 +24,11 @@ repeat them — it says where things stand and what will bite you.
   field within their own scroll body. CSS fallbacks remain when Visual Viewport is unavailable.
   **No real iOS hardware was available:** Safari and Home Screen PWA approval remains open in
   [#44](https://github.com/SomewhatMay/yaccount/issues/44).
+- **Every screen uses its direct name as a compact `<h1>`.** Phone list headers show only that
+  name and their action; desktop restores context. Dashboard keeps title/period/overflow on row 1
+  and horizontally scrolling set tabs on row 2. Comparison lives inside the single period picker.
+  Overall balance now has ordinary card/fold/menu chrome and can move, hide, and restore without
+  rewriting existing synced layout order/settings.
 - **Diagnostics survive reloads and financial-DB failures** in a separate `yaccount-diagnostics`
   IndexedDB. Writes batch off-path; retention is 2,000 records/14 days. Copy/download is explicit
   and local-only. Deployed builds carry exact version/SHA/build time; local builds say `local`.
@@ -39,13 +44,13 @@ repeat them — it says where things stand and what will bite you.
 - `DB_VERSION = 4`. The Drive layout is `snapshot.json`, `ledger_<id>.json`,
   `ledger_<id>_<YYYY-MM>.json`, `origin.json`, and inert `backup_*` / `orphan_*` worlds.
 - Dashboard widgets edit in place. Cards drag to reorder, hidden widgets return through the
-  descriptive gallery, and the versioned layout setting syncs. Overall balance stays visible and
-  first. Reporting periods and fold state remain browser-local.
+  descriptive gallery, and the versioned layout setting syncs. Overall balance follows the same
+  move/hide/restore rules. Reporting periods and fold state remain browser-local.
 
 ## Next
 
 Continue the approved sequence in [`next-features-build-plan.md`](next-features-build-plan.md).
-Next: compact hierarchy and Dashboard redesign, on fresh pulled `main`.
+Next: true-paging architecture ADR only, on fresh pulled `main`; no paging code before review.
 
 **Deferred — do not start without an explicit go-ahead:**
 

@@ -82,6 +82,52 @@ function render(def: WidgetDef, size: "compact" | "expanded" = "expanded") {
   });
 }
 
+it("gives Overall balance standard collapsible card chrome", () => {
+  const def = {
+    id: "balance",
+    title: "Overall balance",
+    description: "Current total.",
+    defaultVisible: true,
+    fixedWindow: true,
+    render: () => <div>$42</div>,
+  } as WidgetDef;
+
+  const tree = render(def);
+
+  expect(findComponent(tree, "Collapsible")).not.toBeNull();
+  expect(textOf(tree)).toContain("Overall balance");
+});
+
+it("gives Overall balance the standard widget menu", () => {
+  const hide = vi.fn();
+  const def = {
+    id: "balance",
+    title: "Overall balance",
+    description: "Current total.",
+    defaultVisible: true,
+    fixedWindow: true,
+    render: () => <div>$42</div>,
+  } as WidgetDef;
+
+  const tree = DashboardWidget({
+    instanceId: "balance",
+    size: "expanded",
+    def,
+    base,
+    onHide: hide,
+  });
+  const actions = findComponent(tree, "RowActions");
+  const hideItem = findComponent(
+    actions?.props.children as ReactNode,
+    "DropdownMenuItem",
+  );
+
+  expect(actions?.props.label).toBe("Configure Overall balance");
+  expect(textOf(actions?.props.children as ReactNode)).toContain("Hide widget");
+  (hideItem?.props.onSelect as (() => void) | undefined)?.();
+  expect(hide).toHaveBeenCalledOnce();
+});
+
 it("uses dedicated compact content instead of clipping expanded content", () => {
   const def = {
     id: "test",

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { LayoutDashboardIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   budgetTargetsAtom,
@@ -31,7 +30,7 @@ import { PeriodPicker } from "./PeriodPicker";
 import { useComparePref, usePeriodPref } from "./period-pref";
 import { DASHBOARD_WIDGETS, rangeText, type WidgetContext } from "./registry";
 import { DashboardEditor } from "./DashboardEditor";
-import { DashboardSetBar } from "./DashboardSets";
+import { DashboardOverflowMenu, DashboardSetBar } from "./DashboardSets";
 import { DashboardWidget } from "./WidgetShell";
 import { WidgetGallerySheet } from "./WidgetGallerySheet";
 import {
@@ -62,6 +61,7 @@ export function DashboardView() {
   const [draftDashboard, setDraftDashboard] = useState<DashboardDefinition | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
+  const [manageDashboardsOpen, setManageDashboardsOpen] = useState(false);
   const ready = useAtomValue(readyAtom);
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
@@ -214,11 +214,14 @@ export function DashboardView() {
     instanceId: string,
     size: "compact" | "expanded",
   ): Promise<void> {
-    const pinnedId = dashboardSets.activeDashboard.instances.find(
-      (instance) => instance.widgetType === "balance",
-    )?.instanceId;
     return dashboardSets.saveLayout(
-      setWidgetSize(dashboardSets.layout, instanceId, size, pinnedId),
+      setWidgetSize(dashboardSets.layout, instanceId, size),
+    );
+  }
+
+  function hideInstance(instanceId: string): Promise<void> {
+    return dashboardSets.saveLayout(
+      setWidgetVisible(dashboardSets.layout, instanceId, false),
     );
   }
 
@@ -243,70 +246,67 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Dashboard"
-        title={draftDashboard ? "Arrange your dashboard" : "How the money moved"}
-        action={
-          ready ? (
-            draftDashboard ? (
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={savingLayout}
-                  onClick={cancelEditing}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={savingLayout}
-                  onClick={() => void finishEditing()}
-                >
-                  {savingLayout ? "Saving…" : "Done"}
-                </Button>
-              </div>
-            ) : (
-              <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-                <PeriodPicker
-                  period={period}
-                  onPeriodChange={setPeriod}
-                  comparePeriod={comparePeriod}
-                  onCompareChange={setComparePeriod}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 shrink-0 rounded-full px-2"
-                  aria-label="Edit dashboard"
-                  onClick={beginEditing}
-                >
-                  <LayoutDashboardIcon className="size-4" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">Edit</span>
-                </Button>
-              </div>
-            )
-          ) : undefined
-        }
-      />
-
-      {ready && !draftDashboard && (
-        <DashboardSetBar
-          dashboards={dashboardSets.dashboards}
-          activeId={dashboardSets.activeDashboard.id}
-          defaultId={dashboardSets.defaultDashboardId}
-          onSelect={dashboardSets.setActiveDashboard}
-          onCreate={dashboardSets.createDashboard}
-          onRename={dashboardSets.renameDashboard}
-          onDuplicate={dashboardSets.duplicateDashboard}
-          onReorder={dashboardSets.reorderDashboard}
-          onMakeDefault={dashboardSets.makeDefault}
-          onDelete={dashboardSets.deleteDashboard}
+      <div className="space-y-2">
+        <PageHeader
+          eyebrow={draftDashboard ? "Arrange widgets" : "Financial overview"}
+          title="Dashboard"
+          action={
+            ready ? (
+              draftDashboard ? (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={savingLayout}
+                    onClick={cancelEditing}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={savingLayout}
+                    onClick={() => void finishEditing()}
+                  >
+                    {savingLayout ? "Saving…" : "Done"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex min-w-0 items-center justify-end gap-1.5">
+                  <PeriodPicker
+                    period={period}
+                    onPeriodChange={setPeriod}
+                    comparePeriod={comparePeriod}
+                    onCompareChange={setComparePeriod}
+                  />
+                  <DashboardOverflowMenu
+                    onCustomize={beginEditing}
+                    onManage={() => setManageDashboardsOpen(true)}
+                  />
+                </div>
+              )
+            ) : undefined
+          }
         />
-      )}
+
+        {ready && !draftDashboard && (
+          <DashboardSetBar
+            dashboards={dashboardSets.dashboards}
+            activeId={dashboardSets.activeDashboard.id}
+            defaultId={dashboardSets.defaultDashboardId}
+            onSelect={dashboardSets.setActiveDashboard}
+            onCreate={dashboardSets.createDashboard}
+            onRename={dashboardSets.renameDashboard}
+            onDuplicate={dashboardSets.duplicateDashboard}
+            onReorder={dashboardSets.reorderDashboard}
+            onMakeDefault={dashboardSets.makeDefault}
+            onDelete={dashboardSets.deleteDashboard}
+            manageOpen={manageDashboardsOpen}
+            onManageOpenChange={setManageDashboardsOpen}
+          />
+        )}
+      </div>
 
       {!ready ? (
         <>
@@ -339,6 +339,7 @@ export function DashboardView() {
           onSaveInstanceSettings={saveInstanceSettings}
           onSaveInstanceSubject={saveInstanceSubject}
           onSaveInstanceSize={saveInstanceSize}
+          onHideInstance={hideInstance}
         />
       ) : (
         <WidgetColumn
@@ -348,6 +349,7 @@ export function DashboardView() {
           onSaveInstanceSettings={saveInstanceSettings}
           onSaveInstanceSubject={saveInstanceSubject}
           onSaveInstanceSize={saveInstanceSize}
+          onHideInstance={hideInstance}
         />
       )}
       <WidgetGallerySheet
@@ -363,13 +365,7 @@ export function DashboardView() {
           setDraftDashboard(
             applyDashboardLayout(
               draftDashboard,
-              setWidgetVisible(
-                layout,
-                instanceId,
-                true,
-                widgetEntries.find(({ instance }) => instance.widgetType === "balance")
-                  ?.instance.instanceId,
-              ),
+              setWidgetVisible(layout, instanceId, true),
               DASHBOARD_WIDGETS,
             ),
           );
@@ -405,6 +401,7 @@ function WidgetColumn({
   onSaveInstanceSettings,
   onSaveInstanceSubject,
   onSaveInstanceSize,
+  onHideInstance,
 }: {
   range: DateRange;
   data: Omit<WidgetContext, "range">;
@@ -418,6 +415,7 @@ function WidgetColumn({
     subject: { type: string; id: string },
   ) => Promise<void>;
   onSaveInstanceSize: (instanceId: string, size: "compact" | "expanded") => Promise<void>;
+  onHideInstance: (instanceId: string) => Promise<void>;
 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -443,6 +441,7 @@ function WidgetColumn({
               def={def}
               base={base}
               onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+              onHide={() => onHideInstance(instance.instanceId)}
             />
           </div>
         );
@@ -459,6 +458,7 @@ function ComparisonWidgets({
   onSaveInstanceSettings,
   onSaveInstanceSubject,
   onSaveInstanceSize,
+  onHideInstance,
 }: {
   primaryRange: DateRange;
   compareRange: DateRange;
@@ -473,6 +473,7 @@ function ComparisonWidgets({
     subject: { type: string; id: string },
   ) => Promise<void>;
   onSaveInstanceSize: (instanceId: string, size: "compact" | "expanded") => Promise<void>;
+  onHideInstance: (instanceId: string) => Promise<void>;
 }) {
   return (
     <div className="space-y-6">
@@ -502,6 +503,7 @@ function ComparisonWidgets({
                 base={primary}
                 comparisonUnsupported
                 onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+                onHide={() => onHideInstance(instance.instanceId)}
               />
             </div>
           );
@@ -515,6 +517,7 @@ function ComparisonWidgets({
               def={def}
               base={primary}
               onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+              onHide={() => onHideInstance(instance.instanceId)}
             />
             <ComparisonCell
               side="compare"
@@ -523,6 +526,7 @@ function ComparisonWidgets({
               def={def}
               base={{ ...primary, range: compareRange }}
               onSizeChange={(size) => onSaveInstanceSize(instance.instanceId, size)}
+              onHide={() => onHideInstance(instance.instanceId)}
             />
           </div>
         );
@@ -538,6 +542,7 @@ function ComparisonCell({
   def,
   base,
   onSizeChange,
+  onHide,
 }: {
   side: "primary" | "compare";
   label: string;
@@ -545,6 +550,7 @@ function ComparisonCell({
   def: DashboardWidgetEntry["def"];
   base: WidgetContext;
   onSizeChange: (size: "compact" | "expanded") => Promise<void>;
+  onHide: () => Promise<void>;
 }) {
   return (
     <section className="space-y-2" aria-label={`${def.title}, ${label}`}>
@@ -556,6 +562,7 @@ function ComparisonCell({
         def={def}
         base={base}
         onSizeChange={onSizeChange}
+        onHide={onHide}
       />
     </section>
   );

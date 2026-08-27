@@ -174,8 +174,8 @@ export function CategoriesView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Categories"
-        title="What your money does"
+        eyebrow="Ledger structure"
+        title="Categories"
         action={
           <Button className="rounded-full" onClick={() => setCreating(true)}>
             <PlusIcon className="size-4" />

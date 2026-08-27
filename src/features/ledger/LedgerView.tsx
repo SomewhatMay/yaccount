@@ -66,6 +66,7 @@ import {
   ListSkeleton,
   Marginalia,
   Money,
+  PageHeaderSkeleton,
   RowActions,
   useFlashRow,
 } from "@/features/ui";
@@ -95,6 +96,8 @@ function showsTime(iso: string): boolean {
 /** How far back the hero figure's ground reaches. A quarter is long enough to
  * show a shape and short enough that this month still moves it. */
 const CURVE_DAYS = 90;
+const SCREEN_TITLE_CLASS =
+  "font-display text-xl font-semibold tracking-tight sm:mt-1.5 sm:text-2xl";
 
 /** Device-local, because how you like to READ your ledger is not a fact about
  * your money (§8.4 — the synced ledgers carry the ledger, nothing else). */
@@ -340,6 +343,7 @@ export function LedgerView() {
   if (!ready)
     return (
       <div className="space-y-6">
+        <PageHeaderSkeleton />
         <FigureSkeleton />
         <div className="bg-card overflow-hidden rounded-2xl border">
           <ListSkeleton />
@@ -352,6 +356,13 @@ export function LedgerView() {
 
   return (
     <div className="space-y-6">
+      <section className="pt-3 pb-1">
+        <Eyebrow className="hidden sm:block">Register</Eyebrow>
+        <h1 className={SCREEN_TITLE_CLASS}>Ledger</h1>
+        <p className="text-muted-foreground mt-3 hidden max-w-md text-sm sm:block">
+          Every approved entry, with the running balance it creates.
+        </p>
+      </section>
       <Figure
         label="Overall balance"
         cents={balance}

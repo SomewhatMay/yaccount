@@ -7,7 +7,6 @@ import {
   CheckIcon,
   GripVerticalIcon,
   PlusIcon,
-  Settings2Icon,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -62,7 +61,7 @@ const STARTERS: {
   {
     id: "empty",
     title: "Empty",
-    description: "Start with only the pinned overall balance.",
+    description: "Start with Overall balance only.",
   },
 ];
 
@@ -77,11 +76,12 @@ export interface DashboardSetBarProps {
   onReorder: (activeId: string, overId: string) => Promise<void>;
   onMakeDefault: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  manageOpen?: boolean;
+  onManageOpenChange?: (open: boolean) => void;
 }
 
 export function DashboardSetBar(props: DashboardSetBarProps) {
   const [addOpen, setAddOpen] = useState(false);
-  const [manageOpen, setManageOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<DashboardDefinition | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DashboardDefinition | null>(null);
 
@@ -119,14 +119,6 @@ export function DashboardSetBar(props: DashboardSetBarProps) {
           >
             <PlusIcon className="size-4" aria-hidden />
           </button>
-          <button
-            type="button"
-            aria-label="Manage dashboards"
-            onClick={() => setManageOpen(true)}
-            className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 place-items-center rounded-lg focus-visible:ring-3 focus-visible:outline-none"
-          >
-            <Settings2Icon className="size-4" aria-hidden />
-          </button>
         </nav>
       </div>
 
@@ -136,8 +128,8 @@ export function DashboardSetBar(props: DashboardSetBarProps) {
         onCreate={props.onCreate}
       />
       <ManageDashboardsSheet
-        open={manageOpen}
-        onOpenChange={setManageOpen}
+        open={props.manageOpen ?? false}
+        onOpenChange={props.onManageOpenChange ?? (() => undefined)}
         dashboards={props.dashboards}
         defaultId={props.defaultId}
         onRename={setRenameTarget}
@@ -158,6 +150,23 @@ export function DashboardSetBar(props: DashboardSetBarProps) {
         onDelete={props.onDelete}
       />
     </>
+  );
+}
+
+export function DashboardOverflowMenu({
+  onCustomize,
+  onManage,
+}: {
+  onCustomize: () => void;
+  onManage: () => void;
+}) {
+  return (
+    <div role="group" aria-label="Dashboard options">
+      <RowActions label="Dashboard options" className="rounded-full opacity-100">
+        <DropdownMenuItem onSelect={onCustomize}>Customize dashboard</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onManage}>Manage dashboards</DropdownMenuItem>
+      </RowActions>
+    </div>
   );
 }
 

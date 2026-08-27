@@ -15,7 +15,9 @@ const hydrationFailures = new WeakMap<Page, string[]>();
 
 async function openReady(page: Page, path: string, marker: string | RegExp) {
   await page.goto(path);
-  await expect(page.getByText(marker, { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText(marker, { exact: true }).filter({ visible: true }).first(),
+  ).toBeVisible();
 }
 
 async function choose(page: Page, label: string, option: string) {
@@ -83,7 +85,7 @@ async function createCategory(
   name: string,
   direction: "Expense" | "Income" = "Expense",
 ) {
-  await openReady(page, "/categories", "What your money does");
+  await openReady(page, "/categories", "Categories");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New category" })).toBeVisible();
   await page.getByLabel("Name").fill(name);
@@ -93,7 +95,7 @@ async function createCategory(
 }
 
 async function createContainer(page: Page, name: string) {
-  await openReady(page, "/containers", "Where your money lives");
+  await openReady(page, "/containers", "Containers");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New container" })).toBeVisible();
   await page.getByLabel("Name").fill(name);
@@ -136,8 +138,28 @@ async function logIncomeOn(
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
 }
 
+async function customizeDashboard(page: Page, touch = false) {
+  const options = page.getByRole("button", { name: "Dashboard options" });
+  if (touch) await options.tap();
+  else await options.click();
+  const customize = page.getByRole("menuitem", { name: "Customize dashboard" });
+  if (touch) await customize.tap();
+  else await customize.click();
+}
+
+async function manageDashboards(page: Page) {
+  await page.getByRole("button", { name: "Dashboard options" }).click();
+  await page.getByRole("menuitem", { name: "Manage dashboards" }).click();
+}
+
+async function toggleDashboardComparison(page: Page) {
+  await page.getByRole("button", { name: /Reporting period:/ }).click();
+  await page.getByRole("button", { name: "Compare periods" }).click();
+  await page.keyboard.press("Escape");
+}
+
 async function addDashboardWidget(page: Page, title: string) {
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: `Add ${title}` }).click();
   await page.getByRole("button", { name: "Done" }).click();
@@ -176,7 +198,7 @@ test("opens Ledger on the first immediate tab tap", async ({ page }, testInfo) =
 test("opens search from the mobile topbar", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Mobile topbar regression.");
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const search = page.getByRole("button", { name: "Search yaccount" });
   await expect(search).toBeVisible();
   await search.click();
@@ -188,6 +210,70 @@ test("opens search from the mobile topbar", async ({ page }, testInfo) => {
   expect(box?.y ?? Infinity).toBeLessThan(80);
   await page.keyboard.press("Escape");
   await expect(input).toBeHidden();
+});
+
+test("uses direct compact page identity with desktop-only context", async ({
+  page,
+}, testInfo) => {
+  await openReady(page, "/categories", "Categories");
+  const title = page.getByRole("heading", { name: "Categories", level: 1 });
+  const context = page.getByText("Ledger structure", { exact: true });
+  const explanation = page.getByText(
+    "Rename or archive anytime — old transactions keep their label.",
+    { exact: true },
+  );
+
+  if (testInfo.project.name === "mobile") {
+    await expect(context).toBeHidden();
+    await expect(explanation).toBeHidden();
+    const titleBox = await title.boundingBox();
+    const actionBox = await page
+      .getByRole("button", { name: "New", exact: true })
+      .boundingBox();
+    expect(Math.abs((titleBox?.y ?? 0) - (actionBox?.y ?? 0))).toBeLessThan(10);
+  } else {
+    await expect(context).toBeVisible();
+    await expect(explanation).toBeVisible();
+  }
+});
+
+test("keeps Dashboard controls to two phone rows and compares inside period", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Phone hierarchy regression.");
+
+  await openReady(page, "/", "Dashboard");
+  const title = page.getByRole("heading", { name: "Dashboard", level: 1 });
+  const period = page.getByRole("button", { name: /Reporting period:/ });
+  const options = page.getByRole("button", { name: "Dashboard options" });
+  const tabs = page.getByRole("navigation", { name: "Dashboard sets" });
+  const [titleBox, periodBox, optionsBox, tabsBox] = await Promise.all([
+    title.boundingBox(),
+    period.boundingBox(),
+    options.boundingBox(),
+    tabs.boundingBox(),
+  ]);
+
+  expect(Math.abs((titleBox?.y ?? 0) - (periodBox?.y ?? 0))).toBeLessThan(10);
+  expect(Math.abs((periodBox?.y ?? 0) - (optionsBox?.y ?? 0))).toBeLessThan(10);
+  expect(tabsBox?.y ?? 0).toBeGreaterThan((titleBox?.y ?? 0) + 24);
+  await period.click();
+  await expect(page.getByRole("button", { name: "Compare periods" })).toBeVisible();
+  await page.getByRole("button", { name: "Compare periods" }).click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", {
+      name: "Reporting period: Last 3 months vs Last month",
+    }),
+  ).toBeVisible();
+  await toggleDashboardComparison(page);
+  await addDashboardWidget(page, "Where it went");
+  await toggleDashboardComparison(page);
+  const compared = page.getByRole("heading", { name: "Where it went" });
+  await expect(compared).toHaveCount(2);
+  const first = await compared.nth(0).boundingBox();
+  const second = await compared.nth(1).boundingBox();
+  expect(second?.y ?? 0).toBeGreaterThan(first?.y ?? 0);
 });
 
 test("fits repeated Search cycles inside a synthetic keyboard viewport", async ({
@@ -211,7 +297,7 @@ test("fits repeated Search cycles inside a synthetic keyboard viewport", async (
     });
   });
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const openSearch = page.getByRole("button", { name: "Search yaccount" });
   const input = page.getByPlaceholder(/Search everything/);
   const dialog = page.getByRole("dialog", { name: "Search yaccount" });
@@ -277,7 +363,7 @@ test("fits repeated Search cycles inside a synthetic keyboard viewport", async (
 test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Mobile navigation regression.");
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const primary = page.getByRole("navigation", { name: "Primary" });
   await expect(primary.getByRole("link", { name: "Goals" })).toBeVisible();
   await expect(primary.getByRole("link", { name: "Inbox" })).toHaveCount(0);
@@ -289,7 +375,7 @@ test("shows Goals in mobile tabs and Inbox in the topbar", async ({ page }, test
 });
 
 test("changes theme only in Settings", async ({ page }, testInfo) => {
-  await openReady(page, "/settings", "Under the hood");
+  await openReady(page, "/settings", "Settings");
   await expect(page.getByLabel("System")).toBeVisible();
   await expect(page.getByLabel("Light")).toBeVisible();
   await expect(page.getByLabel("Dark")).toBeVisible();
@@ -298,7 +384,7 @@ test("changes theme only in Settings", async ({ page }, testInfo) => {
   await page.getByLabel("Dark").click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.reload();
-  await expect(page.getByText("Under the hood", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByLabel("Dark")).toHaveAttribute("data-state", "on");
 
   await page.getByLabel("Light").click();
@@ -331,7 +417,7 @@ test("coalesces keyboard resize and tracks later viewport pan", async ({
     });
   });
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await page.evaluate(() => {
     const viewport = window.visualViewport as VisualViewport & {
       height: number;
@@ -456,7 +542,7 @@ test("keeps a focused long-sheet field above a synthetic keyboard", async ({
     });
   });
 
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   const body = page.locator('[data-slot="sheet-body"]');
   const bottomInput = body.getByLabel("Ends (optional)");
@@ -490,7 +576,7 @@ test("keeps a focused long-sheet field above a synthetic keyboard", async ({
 test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Mobile sheet regression.");
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await openQuickAdd(page);
 
   const body = page.locator('[data-slot="sheet-body"]');
@@ -502,7 +588,7 @@ test("scrolls the Quick Add heading with its fields", async ({ page }, testInfo)
 });
 
 test("curates a fresh Overview without empty cards", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
 
   const brief = page
     .getByRole("heading", { name: "Money brief" })
@@ -530,15 +616,14 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Budget" }).click();
   await page.getByLabel("Monthly amount").fill("100.00");
   await page.getByRole("button", { name: "Set budget" }).click();
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Arrange your dashboard" }),
-  ).toBeVisible();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
+  await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
 
   const rows = page.locator("[data-widget-id]");
   await expect(rows.first()).toHaveAttribute("data-widget-id", "balance");
-  await expect(page.getByText("Pinned", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Move Overall balance" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hide Overall balance" })).toBeVisible();
 
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
   await page.getByRole("menuitem", { name: "Before Budget triage" }).click();
@@ -547,10 +632,10 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
   await page.getByRole("button", { name: "Hide Budget triage" }).click();
   await expect(page.locator('[data-widget-id="pace"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("heading", { name: "How the money moved" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Budget triage" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
   await page.getByRole("menuitem", { name: "Before Budget triage" }).click();
   await page.getByRole("button", { name: "Hide Budget triage" }).click();
@@ -559,7 +644,7 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Budget triage" })).toBeHidden();
-  await page.getByRole("button", { name: "Compare with another period" }).click();
+  await toggleDashboardComparison(page);
   await expect(page.getByRole("heading", { name: "Recent entries" })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Budget triage" })).toHaveCount(0);
   await expect(
@@ -567,18 +652,40 @@ test("edits dashboard cards in place and commits on Done", async ({ page }) => {
       exact: true,
     }),
   ).toHaveCount(3);
-  await page.getByRole("button", { name: "Compare with another period" }).click();
+  await toggleDashboardComparison(page);
 
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await customizeDashboard(page);
   await expect(rows.nth(2)).toHaveAttribute("data-widget-id", "recent");
   await page.getByRole("button", { name: "Reset" }).click();
   await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.locator("h3").first()).toHaveText("Money brief");
+  await expect(page.locator("h3").first()).toHaveText("Overall balance");
+  await expect(page.locator("h3").nth(1)).toHaveText("Money brief");
+});
+
+test("moves, hides, and restores Overall balance like any widget", async ({ page }) => {
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
+  await page.getByRole("button", { name: "Configure Overall balance" }).click();
+  await page.getByRole("menuitem", { name: "After Money brief" }).click();
+  await expect(page.locator("[data-widget-id]").nth(1)).toHaveAttribute(
+    "data-widget-id",
+    "balance",
+  );
+  await page.getByRole("button", { name: "Hide Overall balance" }).click();
+  await expect(page.locator('[data-widget-id="balance"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Add widgets" }).click();
+  await page.getByRole("button", { name: "Add Overall balance" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("heading", { name: "Overall balance" })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("[data-widget-size]").nth(1)).toContainText(
+    "Overall balance",
+  );
 });
 
 test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Hide Recent entries" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
 
@@ -596,8 +703,8 @@ test("restores hidden widgets from a descriptive gallery", async ({ page }) => {
 });
 
 test("searches the grouped widget gallery by recognition language", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Hide Recent entries" }).click();
   await page.getByRole("button", { name: "Add widgets" }).click();
 
@@ -610,7 +717,7 @@ test("searches the grouped widget gallery by recognition language", async ({ pag
 });
 
 test("persists a useful compact widget mode", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await page.getByRole("button", { name: "Configure Recent entries" }).click();
   await page.getByRole("menuitemradio", { name: "Compact" }).click();
 
@@ -625,7 +732,7 @@ test("persists a useful compact widget mode", async ({ page }) => {
 
 test("persists the synced Cash horizon window", async ({ page }) => {
   await createCategory(page, "E2E cash bill");
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E future power");
   await page.getByRole("combobox", { name: "Category" }).fill("E2E cash bill");
@@ -636,7 +743,7 @@ test("persists the synced Cash horizon window", async ({ page }) => {
   await page.getByLabel("Day of month").fill("30");
   await page.getByRole("button", { name: "Add recurring" }).click();
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const horizon = page
     .getByRole("heading", { name: "Cash horizon" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
@@ -663,7 +770,7 @@ test("persists the synced Cash horizon window", async ({ page }) => {
 
 test("adds Commitments and persists its cadence view", async ({ page }) => {
   await createCategory(page, "E2E commitment bills");
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E internet");
   await page.getByRole("combobox", { name: "Category" }).fill("E2E commitment bills");
@@ -674,8 +781,8 @@ test("adds Commitments and persists its cadence view", async ({ page }) => {
   await page.getByLabel("Day of month").fill("27");
   await page.getByRole("button", { name: "Add recurring" }).click();
 
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: "Add Commitments" }).click();
   await page.getByRole("button", { name: "Done" }).click();
@@ -724,7 +831,7 @@ test("persists Allocation plan pay-cycle mode and income anchors", async ({ page
     { source: "E2E salary", amount: "2900.00", day: "30" },
     { source: "E2E side income", amount: "100.00", day: "25" },
   ]) {
-    await openReady(page, "/recurring", "Scheduled transactions");
+    await openReady(page, "/recurring", "Recurring");
     await page.getByRole("button", { name: "New", exact: true }).click();
     await page.getByRole("radio", { name: "Income" }).click();
     await page.getByLabel("Payee / source").fill(income.source);
@@ -737,7 +844,7 @@ test("persists Allocation plan pay-cycle mode and income anchors", async ({ page
     await page.getByRole("button", { name: "Add recurring" }).click();
   }
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const allocation = page
     .getByRole("heading", { name: "Allocation plan" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
@@ -777,7 +884,7 @@ test("shows Month landing scheduled math before history is available", async ({
   page,
 }) => {
   await createCategory(page, "E2E landing bill");
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E month-end bill");
   await page.getByRole("combobox", { name: "Category" }).fill("E2E landing bill");
@@ -788,8 +895,8 @@ test("shows Month landing scheduled math before history is available", async ({
   await page.getByLabel("Day of month").fill("30");
   await page.getByRole("button", { name: "Add recurring" }).click();
 
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: "Add Month landing" }).click();
   await page.getByRole("button", { name: "Done" }).click();
@@ -830,10 +937,10 @@ test("uses complete selected months for Income resilience", async ({ page }) => 
     );
   }
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await page.getByRole("button", { name: /Reporting period:/ }).click();
   await page.getByRole("button", { name: "Last 6 months", exact: true }).click();
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Add widgets" }).click();
   await page.getByRole("button", { name: "Add Income resilience" }).click();
   await page.getByRole("button", { name: "Done" }).click();
@@ -861,8 +968,8 @@ test("creates repeatable Watch instances and persists an exact container floor",
   await openReady(page, "/ledger", "Overall balance");
   await logExpense(page, "E2E groceries", "54.00", "E2E watched groceries");
 
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page);
   await page.getByRole("button", { name: "Add widgets" }).click();
   const gallery = page.getByRole("dialog", { name: "Add widgets" });
   await choose(
@@ -949,7 +1056,7 @@ test("ranks and caps current matters in Money brief", async ({ page }) => {
   await openReady(page, "/ledger", "Overall balance");
   await logExpense(page, "E2E brief market", "95.00", "E2E brief groceries");
 
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E due review");
   await page.getByRole("combobox", { name: "Category" }).fill("E2E brief groceries");
@@ -963,7 +1070,7 @@ test("ranks and caps current matters in Money brief", async ({ page }) => {
   await page.reload();
   await expect(page.getByText("E2E due review", { exact: true })).toBeVisible();
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const card = page
     .getByRole("heading", { name: "Money brief" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
@@ -994,7 +1101,7 @@ test("explicitly matches a manual entry during month close", async ({ page }) =>
     "2026-07-29",
   );
 
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("radio", { name: "Income" }).click();
   await page.getByLabel("Payee / source").fill("E2E salary");
@@ -1007,7 +1114,7 @@ test("explicitly matches a manual entry during month close", async ({ page }) =>
   await page.getByLabel("Starts").fill("2026-07-30");
   await page.getByRole("button", { name: "Add recurring" }).click();
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const card = page
     .getByRole("heading", { name: "Money brief" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
@@ -1029,7 +1136,7 @@ test("explicitly matches a manual entry during month close", async ({ page }) =>
   await page.reload();
   await expect(page.getByRole("heading", { name: "Money brief" })).toBeVisible();
   await expect(page.getByText("Close July", { exact: true })).toBeHidden();
-  await openReady(page, "/inbox", "All clear");
+  await openReady(page, "/inbox", "Inbox");
 });
 
 test("keeps lazy dashboard detail within the mobile viewport", async ({
@@ -1037,7 +1144,7 @@ test("keeps lazy dashboard detail within the mobile viewport", async ({
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Mobile overflow regression.");
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await expect(page.getByRole("heading", { name: "Money brief" })).toBeVisible();
   const widths = await page.evaluate(() => ({
     content: document.documentElement.scrollWidth,
@@ -1050,8 +1157,8 @@ test("keeps lazy dashboard detail within the mobile viewport", async ({
 test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Touch regression.");
 
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).tap();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page, true);
   const recentHandle = page.getByRole("button", {
     name: "Move Recent entries",
     exact: true,
@@ -1071,7 +1178,7 @@ test("reorders dashboard widgets by touch", async ({ page }, testInfo) => {
 });
 
 test("manages named dashboard sets and keeps the active set local", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await expect(
     page.getByRole("button", { name: "Overview", exact: true }),
   ).toHaveAttribute("aria-current", "page");
@@ -1096,7 +1203,7 @@ test("manages named dashboard sets and keeps the active set local", async ({ pag
   await page.reload();
   await expect(quarterlyTab).toHaveAttribute("aria-current", "page");
 
-  await page.getByRole("button", { name: "Manage dashboards" }).click();
+  await manageDashboards(page);
   const manager = page.getByRole("dialog", { name: "Your dashboards" });
   await manager.getByRole("button", { name: "Actions for Quarterly planning" }).click();
   await page.getByRole("menuitem", { name: "Rename" }).click();
@@ -1148,9 +1255,11 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await openReady(page, "/ledger", "Overall balance");
   await logExpense(page, "E2E hidden expense", "12.34", "E2E hidden stats");
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await addDashboardWidget(page, "Where it went");
-  const balance = page.getByText("Overall balance", { exact: true }).locator("..");
+  const balance = page
+    .getByRole("heading", { name: "Overall balance" })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
   const breakdown = page
     .getByRole("heading", { name: "Where it went" })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
@@ -1160,7 +1269,7 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await expect(balance.getByText("-$12.34", { exact: true })).toBeVisible();
   await expect(categoryBreakdown).toContainText("$12.34");
 
-  await openReady(page, "/categories", "What your money does");
+  await openReady(page, "/categories", "Categories");
   const actions = page.getByRole("button", { name: "Actions for E2E hidden stats" });
   await actions.click();
   await page.getByRole("menuitem", { name: "Hide from stats" }).click();
@@ -1169,7 +1278,7 @@ test("hides a category expense from dashboard statistics", async ({ page }) => {
   await expect(page.getByRole("menuitem", { name: "Show in stats" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await expect(balance.getByText("-$12.34", { exact: true })).toBeVisible();
   await expect(categoryBreakdown).toHaveCount(0);
 });
@@ -1223,8 +1332,8 @@ test("overflowing selects scroll by touch in independent sheets", async ({
   await page.getByRole("option", { name: last, exact: true }).tap();
   await expect(page.getByRole("combobox", { name: "Category" })).toHaveValue(last);
 
-  await openReady(page, "/", "How the money moved");
-  await page.getByRole("button", { name: "Edit dashboard" }).tap();
+  await openReady(page, "/", "Dashboard");
+  await customizeDashboard(page, true);
   await page.getByRole("button", { name: "Add widgets" }).tap();
   await page.getByRole("combobox", { name: "Choose category for Category watch" }).tap();
   viewport = page.locator("[data-radix-select-viewport]");
@@ -1322,7 +1431,7 @@ test("creation comboboxes search choices and recall an exact vendor", async ({
 });
 
 test("scopes investment contributions to the reporting period", async ({ page }) => {
-  await openReady(page, "/containers", "Where your money lives");
+  await openReady(page, "/containers", "Containers");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Name").fill("E2E investment period");
   await page.getByRole("radio", { name: "Investment", exact: true }).click();
@@ -1353,7 +1462,7 @@ test("scopes investment contributions to the reporting period", async ({ page })
     page.getByText("E2E investment contribution", { exact: true }),
   ).toBeVisible();
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await addDashboardWidget(page, "Investments");
   await page.getByRole("button", { name: /Reporting period:/ }).click();
   await page.getByRole("button", { name: "All time", exact: true }).click();
@@ -1432,7 +1541,7 @@ test("creates, edits, refreshes, and quietly hides ledger notes", async ({ page 
 });
 
 test("creates a savings goal", async ({ page }) => {
-  await openReady(page, "/goals", "Savings goals");
+  await openReady(page, "/goals", "Goals");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New savings goal" })).toBeVisible();
   await page.getByLabel("Goal name").fill("E2E rainy day");
@@ -1452,7 +1561,7 @@ test("creates a savings goal", async ({ page }) => {
   await choose(page, "To container", "E2E rainy day");
   await page.getByRole("button", { name: "Move money" }).click();
 
-  await openReady(page, "/goals", "Savings goals");
+  await openReady(page, "/goals", "Goals");
   const closed = page.getByRole("heading", { name: "Achieved & closed" }).locator("..");
   await expect(closed.getByRole("heading", { name: "E2E rainy day" })).toBeVisible();
 
@@ -1503,7 +1612,7 @@ test("creates a savings goal", async ({ page }) => {
 
 test("approves a generated Inbox occurrence", async ({ page }) => {
   await createCategory(page, "E2E subscriptions");
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E recurring");
   await page.getByRole("combobox", { name: "Category" }).fill("E2E subscriptions");
@@ -1515,14 +1624,14 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
   await page.getByRole("button", { name: "Add recurring" }).click();
 
   await page.goto("/inbox");
-  await expect(page.getByRole("heading", { name: /to review/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
   const inboxBadge = page
     .getByRole("link", { name: "Inbox", exact: true })
     .locator('[aria-label="1 pending"]');
   await expect(inboxBadge).toBeVisible();
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Approve E2E recurring" }).click();
-  await expect(page.getByRole("heading", { name: "All clear" })).toBeVisible();
+  await expect(page.getByText("Nothing to review", { exact: true })).toBeVisible();
   await expect(inboxBadge).toBeHidden();
 
   await openReady(page, "/ledger", "Overall balance");
@@ -1544,7 +1653,7 @@ test("new recurring recalls vendor fields while edit stays plain", async ({
   await choose(page, "Container", "E2E recurring card");
   await page.getByRole("button", { name: "Log expense" }).click();
 
-  await openReady(page, "/recurring", "Scheduled transactions");
+  await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   const vendor = page.getByRole("combobox", { name: "Payee / source" });
   await vendor.click();
@@ -1569,7 +1678,7 @@ test("new recurring recalls vendor fields while edit stays plain", async ({
 });
 
 test("views the monthly plan", async ({ page }) => {
-  await openReady(page, "/plan", "Every dollar a purpose");
+  await openReady(page, "/plan", "Plan");
 
   await expect(page.getByRole("heading", { name: "Income expected" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Allowances" })).toBeVisible();
@@ -1583,7 +1692,7 @@ async function openPalette(page: Page) {
 }
 
 test("records an investment value from search", async ({ page }) => {
-  await openReady(page, "/containers", "Where your money lives");
+  await openReady(page, "/containers", "Containers");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Name").fill("E2E command investment");
   await page.getByRole("radio", { name: "Investment", exact: true }).click();
@@ -1595,7 +1704,7 @@ test("records an investment value from search", async ({ page }) => {
     page.getByRole("button", { name: "Actions for E2E command investment" }),
   ).toBeVisible();
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await openPalette(page);
   await page
     .getByRole("option", {
@@ -1611,7 +1720,7 @@ test("records an investment value from search", async ({ page }) => {
 });
 
 test("shows common and recent command actions", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await openPalette(page);
   await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
   await expect(page.getByText("Go to", { exact: true })).toHaveCount(0);
@@ -1628,7 +1737,7 @@ test("shows common and recent command actions", async ({ page }) => {
   await page.keyboard.press("Escape");
 
   await page.reload();
-  await expect(page.getByText("How the money moved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Dashboard", { exact: true })).toBeVisible();
   await openPalette(page);
   await expect(page.getByText("Recent actions", { exact: true })).toBeVisible();
   await page.getByPlaceholder(/Search everything/).fill("settings");
@@ -1657,7 +1766,7 @@ test("keeps common actions usable when command history storage is blocked", asyn
     };
   });
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await openPalette(page);
   await expect(page.getByText("Common actions", { exact: true })).toBeVisible();
   await page.getByRole("option", { name: "Log income", exact: true }).click();
@@ -1681,7 +1790,7 @@ test("⌘K finds an entry by a word that is only in its notes", async ({ page })
   await page.getByRole("button", { name: "Log expense" }).click();
   await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
 
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await openPalette(page);
   // The word appears in no title anywhere — only in that one row's notes.
   await page.getByPlaceholder(/Search everything/).fill("aubergine");
@@ -1708,7 +1817,7 @@ test("⌘K narrows entries by an amount token", async ({ page }) => {
 
 test("⌘K lands on a category, flagged on its own screen", async ({ page }) => {
   await createCategory(page, "E2E findable category");
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
 
   await openPalette(page);
   await page.getByPlaceholder(/Search everything/).fill("E2E findable");
@@ -1724,7 +1833,7 @@ test("⌘K lands on a category, flagged on its own screen", async ({ page }) => 
 });
 
 test("⌘K toggles closed on the same shortcut that opened it", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   await openPalette(page);
   await page.keyboard.press("ControlOrMeta+k");
   await expect(page.getByPlaceholder(/Search everything/)).toBeHidden();
@@ -1743,7 +1852,7 @@ test("filters the ledger by visible text", async ({ page }) => {
 });
 
 test("FAB hold hints how to create the first shortcut", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const fab = page.getByRole("button", { name: "Log a transaction" });
   await fab.focus();
   await page.keyboard.down("Enter");
@@ -1758,7 +1867,7 @@ test("FAB hold hints how to create the first shortcut", async ({ page }) => {
 test("separates FAB quick press, hold chooser, and movement cancellation", async ({
   page,
 }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const fab = page.getByRole("button", { name: "Log a transaction" });
   const box = (await fab.boundingBox())!;
   const x = box.x + box.width / 2;
@@ -1814,7 +1923,7 @@ test("separates FAB quick press, hold chooser, and movement cancellation", async
 });
 
 test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const fab = page.getByRole("button", { name: "Log a transaction" });
 
   await fab.focus();
@@ -1840,7 +1949,7 @@ test("supports FAB keyboard hold and Escape cancellation", async ({ page }) => {
 
 test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "touch project only");
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
   const fab = page.getByRole("button", { name: "Log a transaction" });
   const box = (await fab.boundingBox())!;
   const session = await page.context().newCDPSession(page);
@@ -1887,7 +1996,7 @@ test("opens the FAB chooser from a touch hold", async ({ page }, testInfo) => {
 test("keeps FAB geometry and shows a compact money-add mark", async ({
   page,
 }, testInfo) => {
-  await openReady(page, "/", "How the money moved");
+  await openReady(page, "/", "Dashboard");
 
   const fab = page.getByRole("button", { name: "Log a transaction" });
   const fabBox = await fab.boundingBox();
@@ -1982,7 +2091,7 @@ test("renders diagnostics without a hydration mismatch", async ({ page }) => {
     }
   });
 
-  await openReady(page, "/settings", "Under the hood");
+  await openReady(page, "/settings", "Settings");
 
   // Every blanked fact still arrives — the blanking lasts one render, not for
   // good, and `Copy diagnostics` reads the same unblanked `facts()`.
@@ -1999,7 +2108,7 @@ test("exports every change as a versioned file", async ({ page }) => {
   await openReady(page, "/ledger", "Overall balance");
   await logExpense(page, "E2E exported", "9.99", "E2E export me");
 
-  await openReady(page, "/settings", "Under the hood");
+  await openReady(page, "/settings", "Settings");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export", exact: true }).click(),
@@ -2025,7 +2134,7 @@ test("exports every change as a versioned file", async ({ page }) => {
 
 test("refuses an invalid import and changes nothing", async ({ page }) => {
   await createCategory(page, "E2E keep me");
-  await openReady(page, "/settings", "Under the hood");
+  await openReady(page, "/settings", "Settings");
 
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
@@ -2039,7 +2148,7 @@ test("refuses an invalid import and changes nothing", async ({ page }) => {
 
   await expect(page.getByText("That file wasn't imported.")).toBeVisible();
   await expect(page.getByText("That file is not a yaccount export.")).toBeVisible();
-  await openReady(page, "/categories", "What your money does");
+  await openReady(page, "/categories", "Categories");
   await expect(page.getByText("E2E keep me", { exact: true })).toBeVisible();
 });
 
@@ -2048,7 +2157,7 @@ test("clear-all cannot be triggered by accident", async ({ page }) => {
   await openReady(page, "/ledger", "Overall balance");
   await logExpense(page, "E2E doomed", "4.50", "E2E clear me");
 
-  await openReady(page, "/settings", "Under the hood");
+  await openReady(page, "/settings", "Settings");
   await page.getByRole("button", { name: "Clear everything", exact: true }).click();
 
   const confirm = page.getByRole("alertdialog");
@@ -2067,13 +2176,13 @@ test("clear-all cannot be triggered by accident", async ({ page }) => {
 
   await openReady(page, "/ledger", "Overall balance");
   await expect(page.getByText("E2E doomed", { exact: true })).toBeHidden();
-  await openReady(page, "/categories", "What your money does");
+  await openReady(page, "/categories", "Categories");
   await expect(page.getByText("E2E clear me", { exact: true })).toBeHidden();
 });
 
 test("clear-all can be abandoned without touching anything", async ({ page }) => {
   await createCategory(page, "E2E survivor");
-  await openReady(page, "/settings", "Under the hood");
+  await openReady(page, "/settings", "Settings");
 
   await page.getByRole("button", { name: "Clear everything", exact: true }).click();
   const confirm = page.getByRole("alertdialog");
@@ -2081,6 +2190,6 @@ test("clear-all can be abandoned without touching anything", async ({ page }) =>
   await confirm.getByRole("button", { name: "Keep it" }).click();
   await expect(confirm).toBeHidden();
 
-  await openReady(page, "/categories", "What your money does");
+  await openReady(page, "/categories", "Categories");
   await expect(page.getByText("E2E survivor", { exact: true })).toBeVisible();
 });

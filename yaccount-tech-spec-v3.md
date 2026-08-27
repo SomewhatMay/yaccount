@@ -737,8 +737,9 @@ Never set an amount in the body sans; never set body copy in Fraunces.
 
 **The figure scale** cuts Fraunces for size rather than scaling it — each step sets its own
 optical size, softness and tracking, all fluid and tabular. `.figure-hero` is the one balance
-moment per screen (never two); `.figure-lg` is a page title or secondary figure; `.figure-md` is a
-total or card headline. `WONK` alternates are allowed only at hero size.
+moment per screen (never two); `.figure-lg` is a secondary figure; `.figure-md` is a total or card
+headline. Direct screen-name headings use the compact 20–24px display scale. `WONK` alternates
+are allowed only at hero size.
 
 **`.marginalia`** — the accountant's pencil note, Fraunces italic between light guillemets. A
 short aside saying something the figure cannot say about itself ("up $312 on last month"). Never
@@ -763,9 +764,9 @@ varies per screen is noise wearing a label's clothes.
   a screen where some records are made in a bar and others in a panel teaches the reader nothing
   about either, and a one-line bar can never hold the third field a real record needs.*
   `border-primary/15 bg-primary/[0.04]` is no longer a pattern in this app.
-- **The page header.** An eyebrow naming the screen, a `.figure-lg` title, one line of lede, and
-  the screen's single **New** action **on the eyebrow's line, never the title's** — beside a fluid
-  serif heading a button competes for the same 350px and the block reads as cramped.
+- **The page header.** The direct screen name is a compact 20–24px `<h1>`. On phones it shares one
+  row with the screen's single action; the eyebrow and one-line lede are hidden. Larger screens
+  restore that explanatory context, with the action on the eyebrow's row.
 - **Register rows, date-grouped.** `[dot or icon] [payee + category] ……… [mono amount] [⋯]`, with
   quiet dividers and right-aligned mono money.
 - **The day header carries the balance** — an eyebrow on `--surface-sunken`, sticky, printing the
@@ -797,11 +798,11 @@ varies per screen is noise wearing a label's clothes.
   text, labels, amounts or timestamps — and blocked/corrupt storage degrades to no history. Typed
   search still covers every destination and indexed entity.
 - **Dashboard = an ordered widget registry** of stable ids. The synced layout setting reorders and
-  hides registry entries; Overall balance is always visible and first. Cards edit directly in
-  place, with hidden reports available through a descriptive gallery. Secondary widgets fold;
-  fold state and any period override persist in the browser per id. Numbers identifying an honest
-  ledger subset use real `/ledger` deep links; summaries and ambiguous chart marks do not pretend
-  to be links.
+  hides every registry entry, including Overall balance; defaults may still curate it first.
+  Every widget uses the same card, fold, and menu chrome. Cards edit directly in place, with
+  hidden reports available through a descriptive gallery. Fold state and any period override
+  persist in the browser per id. Numbers identifying an honest ledger subset use real `/ledger`
+  deep links; summaries and ambiguous chart marks do not pretend to be links.
 - **Row actions hide until hover — but only where there is a hover.** A touch device has none, so
   the hiding is scoped to hover-capable pointers, and the whole control lives in one place
   (`RowActions`). Reading this rule literally once left phones with no row actions at all.

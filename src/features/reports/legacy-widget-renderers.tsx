@@ -91,6 +91,8 @@ function BalanceFigure({
   return (
     <Figure
       label="Overall balance"
+      showLabel={false}
+      className="pt-0"
       cents={balance}
       series={recentRows(ledgerTransactions, 1).length > 0 ? curve : undefined}
     />

@@ -201,8 +201,8 @@ export function ContainersView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Containers"
-        title="Where your money lives"
+        eyebrow="Accounts & pots"
+        title="Containers"
         action={
           <Button className="rounded-full" onClick={() => setCreating(true)}>
             <PlusIcon className="size-4" />

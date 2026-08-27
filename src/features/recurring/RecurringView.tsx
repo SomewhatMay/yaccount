@@ -182,8 +182,8 @@ export function RecurringView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Recurring"
-        title="Scheduled transactions"
+        eyebrow="Scheduled entries"
+        title="Recurring"
         action={
           <Button className="rounded-full" onClick={() => setSheet("new")}>
             <PlusIcon className="size-4" />

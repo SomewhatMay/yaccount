@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 export function SettingsView() {
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Settings" title="Under the hood">
+      <PageHeader eyebrow="Device & data" title="Settings">
         How yaccount looks, how this copy is running, and what to send when something goes
         wrong.
       </PageHeader>

@@ -232,8 +232,8 @@ export function InboxView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Inbox"
-        title={pending.length === 0 ? "All clear" : `${pending.length} to review`}
+        eyebrow={pending.length === 0 ? "All clear" : `${pending.length} to review`}
+        title="Inbox"
       >
         Recurring transactions wait here until you approve them. Nothing counts toward a
         balance until it does.

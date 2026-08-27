@@ -14,13 +14,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import {
-  EyeOffIcon,
-  GripVerticalIcon,
-  LockKeyholeIcon,
-  PlusIcon,
-  RotateCcwIcon,
-} from "lucide-react";
+import { EyeOffIcon, GripVerticalIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
@@ -32,7 +26,6 @@ import {
 import { RowActions, useFlashRow } from "@/features/ui";
 import { cn } from "@/lib/utils";
 import {
-  PINNED_WIDGET_ID,
   reorderDashboardLayout,
   setWidgetSize,
   setWidgetVisible,
@@ -63,16 +56,8 @@ export function DashboardEditor({
 
   function finishDrag(event: DragEndEvent) {
     if (!event.over) return;
-    const pinnedId = widgets.find(
-      ({ instance }) => instance.widgetType === PINNED_WIDGET_ID,
-    )?.instance.instanceId;
     onLayoutChange(
-      reorderDashboardLayout(
-        layout,
-        String(event.active.id),
-        String(event.over.id),
-        pinnedId,
-      ),
+      reorderDashboardLayout(layout, String(event.active.id), String(event.over.id)),
     );
   }
 
@@ -137,10 +122,6 @@ function SortableDashboardWidget({
   onLayoutChange: (layout: DashboardLayout) => void;
 }) {
   const { def, instance } = entry;
-  const pinned = instance.widgetType === PINNED_WIDGET_ID;
-  const pinnedId = widgets.find(
-    (candidate) => candidate.instance.widgetType === PINNED_WIDGET_ID,
-  )?.instance.instanceId;
   const {
     attributes,
     listeners,
@@ -150,7 +131,7 @@ function SortableDashboardWidget({
     transition,
     isDragging,
     isOver,
-  } = useSortable({ id: instance.instanceId, disabled: pinned });
+  } = useSortable({ id: instance.instanceId });
   const { ref: flashRef, flashed } = useFlashRow<HTMLElement>(instance.instanceId);
 
   return (
@@ -174,49 +155,34 @@ function SortableDashboardWidget({
       )}
     >
       <div className="bg-surface-sunken flex min-h-11 items-center gap-2 px-3">
-        {pinned ? (
-          <LockKeyholeIcon
-            className="text-muted-foreground mx-2 size-4 shrink-0"
-            aria-hidden
-          />
-        ) : (
-          <button
-            ref={setActivatorNodeRef}
-            type="button"
-            {...attributes}
-            {...listeners}
-            aria-label={`Move ${def.title}`}
-            className="text-muted-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg focus-visible:ring-3 focus-visible:outline-none active:cursor-grabbing"
-          >
-            <GripVerticalIcon className="size-4" aria-hidden />
-          </button>
-        )}
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label={`Move ${def.title}`}
+          className="text-muted-foreground focus-visible:ring-ring/50 grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg focus-visible:ring-3 focus-visible:outline-none active:cursor-grabbing"
+        >
+          <GripVerticalIcon className="size-4" aria-hidden />
+        </button>
         <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{def.title}</h2>
-        {pinned ? (
-          <span className="text-muted-foreground text-xs">Pinned</span>
-        ) : (
-          <>
-            <MoveMenu
-              entry={entry}
-              widgets={widgets}
-              layout={layout}
-              onLayoutChange={onLayoutChange}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Hide ${def.title}`}
-              onClick={() =>
-                onLayoutChange(
-                  setWidgetVisible(layout, instance.instanceId, false, pinnedId),
-                )
-              }
-            >
-              <EyeOffIcon aria-hidden />
-            </Button>
-          </>
-        )}
+        <MoveMenu
+          entry={entry}
+          widgets={widgets}
+          layout={layout}
+          onLayoutChange={onLayoutChange}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Hide ${def.title}`}
+          onClick={() =>
+            onLayoutChange(setWidgetVisible(layout, instance.instanceId, false))
+          }
+        >
+          <EyeOffIcon aria-hidden />
+        </Button>
       </div>
       <div inert className="pointer-events-none select-none">
         <DashboardWidget
@@ -250,24 +216,14 @@ function MoveMenu({
   const index = widgets.findIndex(
     (candidate) => candidate.instance.instanceId === instance.instanceId,
   );
-  const first = widgets.find(
-    (candidate) => candidate.instance.widgetType !== PINNED_WIDGET_ID,
-  );
-  const previous = index > 1 ? widgets[index - 1] : null;
+  const first = widgets[0];
+  const previous = index > 0 ? widgets[index - 1] : null;
   const next = index >= 0 && index < widgets.length - 1 ? widgets[index + 1] : null;
   const last = widgets.at(-1);
-  const pinnedId = widgets.find(
-    (candidate) => candidate.instance.widgetType === PINNED_WIDGET_ID,
-  )?.instance.instanceId;
   const moveOver = (target: DashboardWidgetEntry | undefined | null) => {
     if (target) {
       onLayoutChange(
-        reorderDashboardLayout(
-          layout,
-          instance.instanceId,
-          target.instance.instanceId,
-          pinnedId,
-        ),
+        reorderDashboardLayout(layout, instance.instanceId, target.instance.instanceId),
       );
     }
   };
@@ -283,7 +239,6 @@ function MoveMenu({
               layout,
               instance.instanceId,
               size === "compact" ? "compact" : "expanded",
-              pinnedId,
             ),
           )
         }
@@ -299,7 +254,7 @@ function MoveMenu({
       <DropdownMenuSeparator />
       <DropdownMenuLabel>Move {def.title}</DropdownMenuLabel>
       <DropdownMenuSeparator />
-      <DropdownMenuItem disabled={index <= 1} onSelect={() => moveOver(first)}>
+      <DropdownMenuItem disabled={index <= 0} onSelect={() => moveOver(first)}>
         To top
       </DropdownMenuItem>
       <DropdownMenuItem disabled={!previous} onSelect={() => moveOver(previous)}>

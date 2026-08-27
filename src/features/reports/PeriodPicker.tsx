@@ -34,34 +34,28 @@ export function periodLabel(period: ReportingPeriod): string {
   return `${f(period.start)} – ${f(period.end)}`;
 }
 
-/**
- * The unified reporting-period control (§6.1) + two-range compare (§6.2).
- *
- * It is a CHIP over a popover rather than the inline select-plus-date-inputs it
- * used to be: that row was ~370px wide and this control now sits on the page
- * header's eyebrow line, inside a 350px column. A chip is ~130px, says which
- * window is active, and hands the custom dates a surface with room for them.
- */
-function PeriodChip({
+export function periodPickerLabel(
+  period: ReportingPeriod,
+  comparePeriod: ReportingPeriod | null,
+): string {
+  return comparePeriod
+    ? `${periodLabel(period)} vs ${periodLabel(comparePeriod)}`
+    : periodLabel(period);
+}
+
+function PeriodOptions({
   period,
   onChange,
   label,
 }: {
   period: ReportingPeriod;
-  onChange: (p: ReportingPeriod) => void;
-  /** Names the chip for a screen reader — two of these can be on screen. */
+  onChange: (period: ReportingPeriod) => void;
   label: string;
 }) {
   const custom = period.kind === "custom";
   return (
-    <Popover>
-      <PopoverTrigger
-        aria-label={`${label}: ${periodLabel(period)}`}
-        className={cn(chipClass(true), "max-w-44 truncate")}
-      >
-        {periodLabel(period)}
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-60 p-1.5">
+    <div role="group" aria-label={label}>
+      <div className="grid gap-0.5">
         {PERIOD_PRESETS.map((preset) => {
           const active = period.kind === "preset" && period.preset === preset;
           return (
@@ -122,8 +116,8 @@ function PeriodChip({
             </label>
           </div>
         )}
-      </PopoverContent>
-    </Popover>
+      </div>
+    </div>
   );
 }
 
@@ -139,33 +133,51 @@ export function PeriodPicker({
   onCompareChange: (p: ReportingPeriod | null) => void;
 }) {
   const comparing = comparePeriod !== null;
+  const label = periodPickerLabel(period, comparePeriod);
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-      <PeriodChip period={period} onChange={onPeriodChange} label="Reporting period" />
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-label="Compare with another period"
-        aria-pressed={comparing}
-        className={cn("h-8 shrink-0 rounded-full px-2", comparing && "text-primary")}
-        onClick={() =>
-          onCompareChange(comparing ? null : { kind: "preset", preset: "last-month" })
-        }
+    <Popover>
+      <PopoverTrigger
+        aria-label={`Reporting period: ${label}`}
+        className={cn(chipClass(true), "max-w-36 truncate sm:max-w-52")}
       >
-        <GitCompareIcon className="size-4" />
-        <span className="sr-only sm:not-sr-only">Compare</span>
-      </Button>
-      {comparePeriod && (
-        <>
-          <span className="text-muted-foreground text-xs">vs</span>
-          <PeriodChip
-            period={comparePeriod}
-            onChange={onCompareChange}
-            label="Compared period"
-          />
-        </>
-      )}
-    </div>
+        {label}
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="max-h-[min(32rem,calc(100dvh-2rem))] w-72 overflow-y-auto p-1.5"
+      >
+        <p className="text-muted-foreground px-2 py-1 text-xs font-semibold tracking-[0.12em] uppercase">
+          Period
+        </p>
+        <PeriodOptions period={period} onChange={onPeriodChange} label="Period" />
+        <div className="mt-1 border-t pt-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-pressed={comparing}
+            className={cn("w-full justify-start", comparing && "text-primary")}
+            onClick={() =>
+              onCompareChange(comparing ? null : { kind: "preset", preset: "last-month" })
+            }
+          >
+            <GitCompareIcon className="size-4" />
+            Compare periods
+          </Button>
+        </div>
+        {comparePeriod && (
+          <div className="mt-1 border-t pt-1">
+            <p className="text-muted-foreground px-2 py-1 text-xs font-semibold tracking-[0.12em] uppercase">
+              Compare with
+            </p>
+            <PeriodOptions
+              label="Compared period"
+              period={comparePeriod}
+              onChange={onCompareChange}
+            />
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

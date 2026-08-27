@@ -1234,8 +1234,8 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     title: "Overall balance",
     description: "Current total across every counted container.",
     defaultVisible: true,
-    bare: true,
     fixedWindow: true,
+    gallery: gallery("planning", ["total", "cash", "net worth", "current"]),
     ...legacy("balance"),
   },
   {

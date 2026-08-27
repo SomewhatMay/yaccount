@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { Setting } from "@/core/model";
 import type { WidgetDef } from "./registry";
 
-export const PINNED_WIDGET_ID = "balance";
 export const OVERVIEW_DASHBOARD_ID = "overview";
 export const DASHBOARD_ITEM_PREFIX = "dashboard.v2.item.";
 export const DASHBOARD_DEFAULT_KEY = "dashboard.v2.default";
@@ -147,27 +146,8 @@ function defaultInstance(widget: WidgetDef): DashboardWidgetInstance {
     instanceId: widget.id,
     widgetType: widget.id,
     size: "expanded",
-    hidden: !widget.defaultVisible && widget.id !== PINNED_WIDGET_ID,
+    hidden: !widget.defaultVisible,
   };
-}
-
-function withPinnedBalance(
-  dashboard: DashboardDefinition,
-  widgets: readonly WidgetDef[],
-): DashboardDefinition {
-  if (dashboard.instances.some((instance) => instance.widgetType === PINNED_WIDGET_ID)) {
-    return dashboard;
-  }
-  const widget = widgets.find((candidate) => candidate.id === PINNED_WIDGET_ID);
-  if (!widget) return dashboard;
-  const instance = defaultInstance(widget);
-  const usedIds = new Set(dashboard.instances.map((candidate) => candidate.instanceId));
-  let suffix = 0;
-  while (usedIds.has(instance.instanceId)) {
-    suffix += 1;
-    instance.instanceId = `${PINNED_WIDGET_ID}:${suffix}`;
-  }
-  return { ...dashboard, instances: [instance, ...dashboard.instances] };
 }
 
 export function defaultDashboardDefinition(
@@ -270,10 +250,9 @@ export function createDashboardDefinition({
     isDeleted: false,
     instances: source,
   });
-  const pinned = withPinnedBalance(draft, widgets);
   return DashboardDefinitionSchema.parse({
-    ...pinned,
-    instances: pinned.instances.map((instance) => ({
+    ...draft,
+    instances: draft.instances.map((instance) => ({
       ...instance,
       instanceId: makeId(),
     })),
@@ -348,7 +327,7 @@ export function resolveDashboardState(
     if (!keyId) continue;
     const dashboard = decodeDashboardDefinition(setting.value);
     if (!dashboard || dashboard.id !== keyId || dashboard.isDeleted) continue;
-    dashboards.push(withPinnedBalance(dashboard, widgets));
+    dashboards.push(dashboard);
   }
 
   dashboards.sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id));
@@ -375,30 +354,17 @@ export function layoutFromDashboard(
   dashboard: DashboardDefinition,
   widgets: readonly WidgetDef[],
 ): DashboardLayout {
-  dashboard = withPinnedBalance(dashboard, widgets);
   const known = new Set(widgets.map((widget) => widget.id));
   const instances = dashboard.instances.filter((instance) =>
     known.has(instance.widgetType),
   );
-  const pinned = instances.find((instance) => instance.widgetType === PINNED_WIDGET_ID);
-  const order = pinned
-    ? [
-        pinned.instanceId,
-        ...instances.flatMap((instance) =>
-          instance.instanceId === pinned.instanceId ? [] : [instance.instanceId],
-        ),
-      ]
-    : instances.map((instance) => instance.instanceId);
   return {
-    order,
+    order: instances.map((instance) => instance.instanceId),
     hidden: instances
-      .filter((instance) => instance.hidden && instance.instanceId !== pinned?.instanceId)
+      .filter((instance) => instance.hidden)
       .map((instance) => instance.instanceId),
     sizes: Object.fromEntries(
-      instances.map((instance) => [
-        instance.instanceId,
-        instance.instanceId === pinned?.instanceId ? "expanded" : instance.size,
-      ]),
+      instances.map((instance) => [instance.instanceId, instance.size]),
     ),
   };
 }
@@ -409,7 +375,6 @@ export function applyDashboardLayout(
   layout: DashboardLayout,
   widgets: readonly WidgetDef[],
 ): DashboardDefinition {
-  dashboard = withPinnedBalance(dashboard, widgets);
   const known = new Set(widgets.map((widget) => widget.id));
   const managed = new Map(
     dashboard.instances
@@ -423,11 +388,8 @@ export function applyDashboardLayout(
     return [
       {
         ...instance,
-        hidden: instance.widgetType === PINNED_WIDGET_ID ? false : hidden.has(id),
-        size:
-          instance.widgetType === PINNED_WIDGET_ID
-            ? "expanded"
-            : (layout.sizes[id] ?? instance.size),
+        hidden: hidden.has(id),
+        size: layout.sizes[id] ?? instance.size,
       },
     ];
   });
@@ -451,7 +413,6 @@ export function resetDashboardLayout(
   widgets: readonly WidgetDef[],
   curation: readonly DashboardWidgetPreset[],
 ): DashboardLayout {
-  dashboard = withPinnedBalance(dashboard, widgets);
   const knownTypes = new Set(widgets.map((widget) => widget.id));
   const registryRank = new Map(widgets.map((widget, index) => [widget.id, index]));
   const curatedRank = new Map(
@@ -478,18 +439,12 @@ export function resetDashboardLayout(
   return {
     order: instances.map((instance) => instance.instanceId),
     hidden: instances
-      .filter(
-        (instance) =>
-          instance.widgetType !== PINNED_WIDGET_ID &&
-          !visibleTypes.has(instance.widgetType),
-      )
+      .filter((instance) => !visibleTypes.has(instance.widgetType))
       .map((instance) => instance.instanceId),
     sizes: Object.fromEntries(
       instances.map((instance) => [
         instance.instanceId,
-        instance.widgetType === PINNED_WIDGET_ID
-          ? "expanded"
-          : (curatedSize.get(instance.widgetType) ?? "expanded"),
+        curatedSize.get(instance.widgetType) ?? "expanded",
       ]),
     ),
   };
@@ -515,11 +470,8 @@ export function reorderDashboardLayout(
   layout: DashboardLayout,
   activeId: string,
   overId: string,
-  pinnedId = PINNED_WIDGET_ID,
 ): DashboardLayout {
-  if (activeId === pinnedId || overId === pinnedId || activeId === overId) {
-    return layout;
-  }
+  if (activeId === overId) return layout;
 
   const from = layout.order.indexOf(activeId);
   const to = layout.order.indexOf(overId);
@@ -534,9 +486,7 @@ export function setWidgetVisible(
   layout: DashboardLayout,
   id: string,
   visible: boolean,
-  pinnedId = PINNED_WIDGET_ID,
 ): DashboardLayout {
-  if (id === pinnedId) return layout;
   const hidden = new Set(layout.hidden);
   if (visible) hidden.delete(id);
   else hidden.add(id);
@@ -553,8 +503,7 @@ export function setWidgetSize(
   layout: DashboardLayout,
   id: string,
   size: DashboardWidgetInstance["size"],
-  pinnedId = PINNED_WIDGET_ID,
 ): DashboardLayout {
-  if (id === pinnedId || !layout.order.includes(id)) return layout;
+  if (!layout.order.includes(id)) return layout;
   return { ...layout, sizes: { ...layout.sizes, [id]: size } };
 }

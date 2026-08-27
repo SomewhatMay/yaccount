@@ -19,6 +19,7 @@ export function Figure({
   cents,
   size = "hero",
   negativeIsAlarming = true,
+  showLabel = true,
   series,
   className,
   children,
@@ -29,6 +30,7 @@ export function Figure({
   /** Rose when below zero. True for a balance; false for a delta, where a
    *  negative number is ordinary rather than a warning. */
   negativeIsAlarming?: boolean;
+  showLabel?: boolean;
   series?: number[];
   className?: string;
   /** Marginalia and supporting stats sit here, under the figure. */
@@ -37,10 +39,10 @@ export function Figure({
   const alarming = negativeIsAlarming && cents < 0;
   return (
     <section className={cn("pt-3", className)}>
-      <Eyebrow>{label}</Eyebrow>
+      {showLabel && <Eyebrow>{label}</Eyebrow>}
       <p
         className={cn(
-          "mt-1.5",
+          showLabel && "mt-1.5",
           size === "hero" && "figure-hero",
           size === "lg" && "figure-lg",
           size === "md" && "figure-md",

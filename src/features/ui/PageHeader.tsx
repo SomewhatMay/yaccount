@@ -2,19 +2,7 @@
 
 import { Eyebrow } from "@/features/ui/Eyebrow";
 
-/**
- * The top of a list screen: what you are looking at, and the one thing you can
- * add to it.
- *
- * The action sits on the EYEBROW's line, not the title's. Beside a `.figure-lg`
- * heading and a paragraph, a "New" button was competing with both for the same
- * 350px on a phone — the title wrapped, the lede squeezed into two thirds of the
- * column and the whole block read as cramped. Next to a short uppercase label it
- * has room to spare at every width, and the title and lede get the full column.
- *
- * `min-h-8` on that row is the button's own height, so screens without an action
- * (the Inbox) sit their title at exactly the same place as the ones with one.
- */
+/** Compact screen identity on phones; fuller context returns on larger screens. */
 export function PageHeader({
   eyebrow,
   title,
@@ -30,18 +18,18 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="pt-3 pb-1">
-      {/* The eyebrow never shrinks: it is two words, and letting flexbox take
-          width from it wraps "DASHBOARD" onto two lines to save a control eight
-          pixels. The action absorbs the squeeze instead — the dashboard's period
-          picker wraps its own chips when there isn't room. */}
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <Eyebrow className="shrink-0">{eyebrow}</Eyebrow>
-        {action}
-      </div>
-      <h1 className="figure-lg mt-1.5">{title}</h1>
+    <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 pt-3 pb-1">
+      <Eyebrow className="hidden shrink-0 sm:col-start-1 sm:row-start-1 sm:block">
+        {eyebrow}
+      </Eyebrow>
+      <h1 className="font-display col-start-1 row-start-1 truncate text-xl font-semibold tracking-tight sm:row-start-2 sm:mt-1.5 sm:text-2xl">
+        {title}
+      </h1>
+      {action && <div className="col-start-2 row-start-1">{action}</div>}
       {children && (
-        <p className="text-muted-foreground mt-3 max-w-md text-sm">{children}</p>
+        <p className="text-muted-foreground col-span-2 mt-3 hidden max-w-md text-sm sm:block">
+          {children}
+        </p>
       )}
     </section>
   );

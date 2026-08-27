@@ -284,8 +284,8 @@ export function GoalsView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Goals"
-        title="Savings goals"
+        eyebrow="Long-term savings"
+        title="Goals"
         action={
           <Button className="rounded-full" onClick={() => setSheet("new")}>
             <PlusIcon className="size-4" />
