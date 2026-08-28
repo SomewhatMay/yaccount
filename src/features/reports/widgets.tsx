@@ -91,7 +91,7 @@ export function CategoryDoughnut({
           so their z-index compares; without it the label (a later sibling) always
           painted over the tooltip, hiding it behind the total. */}
       <div className="relative isolate shrink-0" style={{ width: 168, height: 168 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" className="chart-enter">
           <PieChart>
             <Pie
               data={slices}
@@ -171,7 +171,7 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
   const withYear = spansYears(monthly.map((m) => m.month));
   const data = monthly.map((m) => ({ ...m, label: monthLabel(m.month, withYear) }));
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={260} className="chart-enter">
       <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
         <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
@@ -254,7 +254,7 @@ export function WaterfallChart({
     },
   ];
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={240} className="chart-enter">
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
         <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="name" tick={axisTick} tickLine={false} axisLine={false} />
@@ -332,7 +332,7 @@ export function CategoryDrilldown({
           Pick a category to see its month-by-month spend against budget.
         </EmptyNote>
       ) : (
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={220} className="chart-enter">
           <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />
             <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
@@ -620,7 +620,7 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
         )}
       </div>
       {data.length > 0 && (
-        <ResponsiveContainer width="100%" height={200} className="mt-3">
+        <ResponsiveContainer width="100%" height={200} className="chart-enter mt-3">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />
             <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
