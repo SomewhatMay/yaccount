@@ -274,7 +274,6 @@ export function MoneyFlowChart({
     <ResponsiveContainer
       width="100%"
       height={Math.min(360, 40 + flows.nodes.length * 26)}
-      className="chart-enter"
     >
       <Sankey
         data={data}

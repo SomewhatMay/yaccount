@@ -156,6 +156,28 @@ test("imports and renders every dashboard widget lab", async ({ page }, testInfo
   }
 });
 
+test("switches dashboards during native Recharts animation", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.clock.setFixedTime(new Date("2026-08-26T12:00:00-04:00"));
+  await importFixture(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "03 · Analysis", exact: true }).click();
+  const breakdown = page
+    .getByRole("heading", { name: "Where it went", exact: true })
+    .locator("xpath=ancestor::*[@data-widget-size][1]");
+  const sector = breakdown.locator(".recharts-sector").first();
+  await expect(sector).toBeVisible();
+  const firstGeometry = await sector.getAttribute("d");
+  await expect
+    .poll(() => sector.getAttribute("d"), { timeout: 800 })
+    .not.toBe(firstGeometry);
+
+  const compact = page.getByRole("button", { name: "04 · Compact", exact: true });
+  await compact.click({ timeout: 750 });
+  await expect(compact).toHaveAttribute("aria-current", "page", { timeout: 750 });
+});
+
 test("month close explicitly matches an approved manual entry", async ({ page }) => {
   test.setTimeout(60_000);
   await page.clock.setFixedTime(new Date("2026-08-31T12:00:00-04:00"));

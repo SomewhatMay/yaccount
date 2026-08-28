@@ -361,23 +361,6 @@
   }
 }
 
-/* Charts arrive as one compositor-friendly figure. Recharts' per-shape JS
-   animation stays off so dashboard navigation never waits on a frame loop. */
-@keyframes chart-enter {
-  from {
-    opacity: 0;
-    transform: translateY(0.25rem) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.chart-enter {
-  animation: chart-enter var(--dur-3) var(--ease-register) both;
-}
-
 /* Reduced motion is a kill switch, not a suggestion: nothing in this app needs
    to move for it to be usable, so honour the request everywhere at once. */
 @media (prefers-reduced-motion: reduce) {
