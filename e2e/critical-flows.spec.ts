@@ -323,7 +323,7 @@ test("fits repeated Search cycles inside a synthetic keyboard viewport", async (
           ? { top: Math.round(box.y), bottom: Math.round(box.y + box.height) }
           : null;
       })
-      .toEqual({ top: 128, bottom: 436 });
+      .toEqual({ top: 164, bottom: 472 });
     const list = dialog.locator('[data-slot="command-list"]');
     expect(await list.evaluate((node) => getComputedStyle(node).overflowY)).toBe("auto");
     const regions = await dialog.evaluate((node) => {
@@ -346,7 +346,7 @@ test("fits repeated Search cycles inside a synthetic keyboard viewport", async (
     expect(regions.listHeight).toBeGreaterThan(250);
 
     if (cycle === 0) {
-      await page.mouse.click(195, 460);
+      await page.mouse.click(195, 140);
     } else {
       await page.keyboard.press("Escape");
     }

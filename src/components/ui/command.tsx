@@ -50,7 +50,7 @@ function CommandDialog({
         style={contentStyle}
         onOpenAutoFocus={onOpenAutoFocus}
         className={cn(
-          "top-[calc(var(--visual-viewport-top,0px)+env(safe-area-inset-top,0px)+0.5rem)] h-[calc(var(--visual-viewport-height,100dvh)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-3.25rem)] max-h-none translate-y-0 overflow-hidden rounded-xl! p-0 sm:top-1/3 sm:h-auto sm:max-h-[calc(100dvh-2rem)]",
+          "top-[calc(var(--visual-viewport-top,0px)+env(safe-area-inset-top,0px)+2.75rem)] h-[calc(var(--visual-viewport-height,100dvh)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-3.25rem)] max-h-none translate-y-0 overflow-hidden rounded-xl! p-0 sm:top-1/3 sm:h-auto sm:max-h-[calc(100dvh-2rem)]",
           className,
         )}
         showCloseButton={showCloseButton}
