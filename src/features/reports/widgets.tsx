@@ -53,10 +53,6 @@ import { CHART, EmptyNote, formatAxisCents, monthLabel, MoneyTooltip } from "./c
 
 const axisTick = { fontSize: 11, fill: CHART.axis };
 
-// Recharts' browser-default entrance motion calls React state on every animation
-// frame. A dashboard can mount several charts together, so that decorative work
-// must not compete with dashboard-tab input. Every data shape below opts out.
-
 /** True if the month keys straddle more than one calendar year (→ show years). */
 function spansYears(months: string[]): boolean {
   return new Set(months.map((m) => m.slice(0, 4))).size > 1;
@@ -91,13 +87,13 @@ export function CategoryDoughnut({
           so their z-index compares; without it the label (a later sibling) always
           painted over the tooltip, hiding it behind the total. */}
       <div className="relative isolate shrink-0" style={{ width: 168, height: 168 }}>
-        <ResponsiveContainer width="100%" height="100%" className="chart-enter">
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={slices}
               dataKey="amount"
               nameKey="name"
-              isAnimationActive={false}
+              isAnimationActive="auto"
               innerRadius={54}
               outerRadius={82}
               paddingAngle={slices.length > 1 ? 2 : 0}
@@ -171,7 +167,7 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
   const withYear = spansYears(monthly.map((m) => m.month));
   const data = monthly.map((m) => ({ ...m, label: monthLabel(m.month, withYear) }));
   return (
-    <ResponsiveContainer width="100%" height={260} className="chart-enter">
+    <ResponsiveContainer width="100%" height={260}>
       <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
         <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
@@ -193,21 +189,21 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
           name="Income"
           fill={CHART.income}
           radius={[3, 3, 0, 0]}
-          isAnimationActive={false}
+          isAnimationActive="auto"
         />
         <Bar
           dataKey="expense"
           name="Expenses"
           fill={CHART.expense}
           radius={[3, 3, 0, 0]}
-          isAnimationActive={false}
+          isAnimationActive="auto"
         />
         <Bar
           dataKey="savings"
           name="Savings"
           fill={CHART.savings}
           radius={[3, 3, 0, 0]}
-          isAnimationActive={false}
+          isAnimationActive="auto"
         />
         <Line
           dataKey="budget"
@@ -217,7 +213,7 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
           strokeDasharray="5 4"
           strokeWidth={1.5}
           dot={false}
-          isAnimationActive={false}
+          isAnimationActive="auto"
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -254,7 +250,7 @@ export function WaterfallChart({
     },
   ];
   return (
-    <ResponsiveContainer width="100%" height={240} className="chart-enter">
+    <ResponsiveContainer width="100%" height={240}>
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
         <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="name" tick={axisTick} tickLine={false} axisLine={false} />
@@ -274,13 +270,13 @@ export function WaterfallChart({
           dataKey="base"
           stackId="w"
           fill="transparent"
-          isAnimationActive={false}
+          isAnimationActive="auto"
         />
         <Bar
           dataKey="bar"
           stackId="w"
           radius={[3, 3, 0, 0]}
-          isAnimationActive={false}
+          isAnimationActive="auto"
         >
           {data.map((d) => (
             <Cell key={d.name} fill={d.tipColor} />
@@ -332,7 +328,7 @@ export function CategoryDrilldown({
           Pick a category to see its month-by-month spend against budget.
         </EmptyNote>
       ) : (
-        <ResponsiveContainer width="100%" height={220} className="chart-enter">
+        <ResponsiveContainer width="100%" height={220}>
           <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />
             <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
@@ -353,7 +349,7 @@ export function CategoryDrilldown({
               name="Spent"
               fill={selectedId ? categoryColorFor(selectedId, categories) : CHART.expense}
               radius={[3, 3, 0, 0]}
-              isAnimationActive={false}
+              isAnimationActive="auto"
             />
             <Line
               dataKey="budget"
@@ -364,7 +360,7 @@ export function CategoryDrilldown({
               strokeWidth={1.5}
               dot={false}
               connectNulls
-              isAnimationActive={false}
+              isAnimationActive="auto"
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -620,7 +616,7 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
         )}
       </div>
       {data.length > 0 && (
-        <ResponsiveContainer width="100%" height={200} className="chart-enter mt-3">
+        <ResponsiveContainer width="100%" height={200} className="mt-3">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />
             <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
@@ -640,7 +636,7 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               stroke={CHART.expense}
               strokeWidth={1.75}
               dot={data.length === 1}
-              isAnimationActive={false}
+              isAnimationActive="auto"
             />
             <Line
               dataKey="value"
@@ -649,7 +645,7 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               stroke={CHART.savings}
               strokeWidth={1.75}
               dot={data.length === 1}
-              isAnimationActive={false}
+              isAnimationActive="auto"
             />
           </LineChart>
         </ResponsiveContainer>

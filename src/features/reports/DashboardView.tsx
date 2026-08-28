@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import { AnimationControllerProvider } from "recharts";
 import { Button } from "@/components/ui/button";
 import {
   budgetTargetsAtom,
@@ -47,6 +48,7 @@ import {
 } from "./dashboard-layout";
 import { useDashboardSets } from "./use-dashboard-layout";
 import { createDashboardAggregates } from "./dashboard-aggregates";
+import { interruptibleAnimationController } from "./chart-animation";
 
 /** The window the dashboard opens on when nothing has been chosen yet. */
 const DEFAULT_PERIOD: ReportingPeriod = { kind: "preset", preset: "last-3-months" };
@@ -308,50 +310,54 @@ export function DashboardView() {
         )}
       </div>
 
-      {!ready ? (
-        <>
-          <FigureSkeleton />
-          <ListSkeleton rows={4} />
-        </>
-      ) : draftDashboard ? (
-        <DashboardEditor
-          base={{ ...data, range: primaryRange }}
-          widgets={visibleWidgets}
-          layout={activeLayout}
-          resetLayout={resetDashboardLayout(
-            draftDashboard,
-            DASHBOARD_WIDGETS,
-            overviewCuration,
-          )}
-          onLayoutChange={(next) =>
-            setDraftDashboard((current) =>
-              current ? applyDashboardLayout(current, next, DASHBOARD_WIDGETS) : current,
-            )
-          }
-          onAddWidgets={() => setGalleryOpen(true)}
-        />
-      ) : compareRange ? (
-        <ComparisonWidgets
-          primaryRange={primaryRange}
-          compareRange={compareRange}
-          data={data}
-          widgets={visibleWidgets}
-          onSaveInstanceSettings={saveInstanceSettings}
-          onSaveInstanceSubject={saveInstanceSubject}
-          onSaveInstanceSize={saveInstanceSize}
-          onHideInstance={hideInstance}
-        />
-      ) : (
-        <WidgetColumn
-          range={primaryRange}
-          data={data}
-          widgets={visibleWidgets}
-          onSaveInstanceSettings={saveInstanceSettings}
-          onSaveInstanceSubject={saveInstanceSubject}
-          onSaveInstanceSize={saveInstanceSize}
-          onHideInstance={hideInstance}
-        />
-      )}
+      <AnimationControllerProvider value={interruptibleAnimationController}>
+        {!ready ? (
+          <>
+            <FigureSkeleton />
+            <ListSkeleton rows={4} />
+          </>
+        ) : draftDashboard ? (
+          <DashboardEditor
+            base={{ ...data, range: primaryRange }}
+            widgets={visibleWidgets}
+            layout={activeLayout}
+            resetLayout={resetDashboardLayout(
+              draftDashboard,
+              DASHBOARD_WIDGETS,
+              overviewCuration,
+            )}
+            onLayoutChange={(next) =>
+              setDraftDashboard((current) =>
+                current
+                  ? applyDashboardLayout(current, next, DASHBOARD_WIDGETS)
+                  : current,
+              )
+            }
+            onAddWidgets={() => setGalleryOpen(true)}
+          />
+        ) : compareRange ? (
+          <ComparisonWidgets
+            primaryRange={primaryRange}
+            compareRange={compareRange}
+            data={data}
+            widgets={visibleWidgets}
+            onSaveInstanceSettings={saveInstanceSettings}
+            onSaveInstanceSubject={saveInstanceSubject}
+            onSaveInstanceSize={saveInstanceSize}
+            onHideInstance={hideInstance}
+          />
+        ) : (
+          <WidgetColumn
+            range={primaryRange}
+            data={data}
+            widgets={visibleWidgets}
+            onSaveInstanceSettings={saveInstanceSettings}
+            onSaveInstanceSubject={saveInstanceSubject}
+            onSaveInstanceSize={saveInstanceSize}
+            onHideInstance={hideInstance}
+          />
+        )}
+      </AnimationControllerProvider>
       <WidgetGallerySheet
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
