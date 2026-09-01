@@ -42,6 +42,7 @@ import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands"
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
 import { operationLogFacts } from "@/lib/strategic-logging";
+import { createSyncScheduler, createTrailingRunner } from "@/features/sync-scheduling";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -248,19 +249,14 @@ export const lastSyncedAtAtom = atom<number | null>(null);
  * failure is diagnosable, not a mystery. */
 export const lastSyncErrorAtom = atom<string | null>(null);
 
-// Guard against overlapping cycles (the boot kick, the interval, and the
-// post-edit debounce can all fire close together). A skipped run is fine — the
-// next tick picks up whatever changed (every step is idempotent).
-let syncing = false;
-let syncDebounce: ReturnType<typeof setTimeout> | null = null;
+const syncScheduler = createSyncScheduler(1500);
 
 /** Debounce a background sync after local edits so a burst of dispatches results
  * in one push, not one per op. */
 function scheduleSync(set: Setter): void {
-  if (syncDebounce) clearTimeout(syncDebounce);
-  syncDebounce = setTimeout(() => {
+  syncScheduler.debounce(() => {
     void set(syncAtom);
-  }, 1500);
+  });
 }
 
 /**
@@ -271,12 +267,7 @@ function scheduleSync(set: Setter): void {
  * token can't be renewed silently, surface `disconnected` so the UI can offer an
  * interactive reconnect. Never throws — a Drive failure leaves the app usable.
  */
-export const syncAtom = atom(null, async (_get, set) => {
-  if (syncing) return;
-  // Claim the guard SYNCHRONOUSLY, before any await, so near-simultaneous
-  // triggers (a tab refocus fires both `visibilitychange` and `focus`) can't both
-  // slip past into overlapping cycles.
-  syncing = true;
+async function performSync(set: Setter): Promise<void> {
   let startedAt: number | null = null;
   try {
     const auth = getAuthProvider();
@@ -357,10 +348,19 @@ export const syncAtom = atom(null, async (_get, set) => {
     );
     set(lastSyncErrorAtom, describeSyncError(err));
     set(syncStatusAtom, "error");
-  } finally {
-    syncing = false;
   }
-});
+}
+
+// Focus + visibility can arrive together, and edits can land during a Drive
+// request. Serialize them and retain one latest follow-up instead of dropping it.
+const runSyncCycle = createTrailingRunner(performSync);
+
+export const syncAtom = atom(null, async (_get, set) => runSyncCycle(set));
+
+/** Lifecycle/auth/manual triggers run now and supersede any pending edit timer. */
+export const syncNowAtom = atom(null, async (_get, set) =>
+  syncScheduler.immediate(() => set(syncAtom)),
+);
 
 /**
  * Interactive reconnect (§3.3-B): a user gesture re-consents when a silent
@@ -374,7 +374,7 @@ export const reconnectAtom = atom(null, async (_get, set) => {
     set(syncStatusAtom, "disconnected");
     return;
   }
-  await set(syncAtom);
+  await set(syncNowAtom);
 });
 
 /**
@@ -603,5 +603,5 @@ export const bootstrapAtom = atom(null, async (_get, set) => {
 
   // Kick the first Drive sync in the background — never awaited on the boot path,
   // so the network can't gate the already-rendered UI (§8.6). No-ops if signed out.
-  void set(syncAtom);
+  void set(syncNowAtom);
 });

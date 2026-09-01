@@ -3,7 +3,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { CloudOffIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { syncStatusAtom, lastSyncErrorAtom, syncAtom } from "@/features/store";
+import { syncStatusAtom, lastSyncErrorAtom, syncNowAtom } from "@/features/store";
 
 /**
  * A sync that keeps failing (§12.6, §8.6). The `SyncIndicator` glyph in the
@@ -20,7 +20,7 @@ import { syncStatusAtom, lastSyncErrorAtom, syncAtom } from "@/features/store";
 export function SyncErrorBanner() {
   const status = useAtomValue(syncStatusAtom);
   const detail = useAtomValue(lastSyncErrorAtom);
-  const sync = useSetAtom(syncAtom);
+  const sync = useSetAtom(syncNowAtom);
 
   if (status !== "error") return null;
 

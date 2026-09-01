@@ -205,11 +205,26 @@ test("opens search from the mobile topbar", async ({ page }, testInfo) => {
   const input = page.getByPlaceholder(/Search everything/);
   await expect(input).toBeVisible();
   await expect(input).toBeFocused();
+  expect(
+    await input.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
+  ).toBeGreaterThanOrEqual(16);
   const dialog = page.getByRole("dialog", { name: "Search yaccount" });
   const box = await dialog.boundingBox();
   expect(box?.y ?? Infinity).toBeLessThan(80);
   await page.keyboard.press("Escape");
   await expect(input).toBeHidden();
+});
+
+test("keeps desktop search text compact", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop breakpoint regression.");
+
+  await openReady(page, "/", "Dashboard");
+  await page.getByRole("button", { name: "Search yaccount" }).click();
+  const input = page.getByPlaceholder(/Search everything/);
+  await expect(input).toBeFocused();
+  expect(
+    await input.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
+  ).toBe(14);
 });
 
 test("uses direct compact page identity with desktop-only context", async ({
@@ -1424,6 +1439,7 @@ test("creation comboboxes search choices and recall an exact vendor", async ({
   await from.fill("card");
   await page.getByRole("option", { name: "E2E autocomplete card", exact: true }).click();
   const destination = page.getByRole("combobox", { name: "To container" });
+  await expect(destination).toHaveJSProperty("tagName", "BUTTON");
   await destination.click();
   await expect(
     page.getByRole("option", { name: "E2E autocomplete reserve", exact: true }),
@@ -1640,6 +1656,23 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
 
   await openReady(page, "/ledger", "Overall balance");
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
+});
+
+test("uses a dropdown for a new recurring transfer destination", async ({ page }) => {
+  await createContainer(page, "E2E recurring reserve");
+  await openReady(page, "/recurring", "Recurring");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("radio", { name: "Transfer" }).click();
+
+  const destination = page.getByRole("combobox", { name: "To container" });
+  await expect(destination).toHaveJSProperty("tagName", "BUTTON");
+  await destination.click();
+  await expect(
+    page.getByRole("option", { name: "E2E recurring reserve", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("option", { name: "General", exact: true })).toBeHidden();
+  await page.getByRole("option", { name: "E2E recurring reserve", exact: true }).click();
+  await expect(destination).toHaveText("E2E recurring reserve");
 });
 
 test("new recurring recalls vendor fields while edit stays plain", async ({

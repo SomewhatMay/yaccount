@@ -55,14 +55,18 @@ describe("iPhone PWA interaction layout", () => {
   it("gives phone Search explicit focus and visual-viewport geometry", () => {
     const palette = read("../shell/CommandPalette.tsx");
     const command = read("../../components/ui/command.tsx");
+    const layout = read("../../app/layout.tsx");
 
     expect(palette).toContain("useVisualViewportBox");
     expect(palette).toContain("autoFocus={!sideways}");
+    expect(command).toContain("w-full text-base sm:text-sm");
     expect(command).toContain("--visual-viewport-top");
     expect(command).toContain("--visual-viewport-height");
     expect(command).toContain("env(safe-area-inset-top,0px)+2.75rem");
     expect(command).toContain("env(safe-area-inset-bottom,0px)-3.25rem");
     expect(command).toContain("max-h-none flex-1");
+    expect(layout).not.toContain("maximumScale");
+    expect(layout).not.toContain("userScalable");
   });
 
   it("waits for the FAB click before mounting quick-add", () => {

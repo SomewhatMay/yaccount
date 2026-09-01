@@ -12,24 +12,28 @@ const dashboardView = readFileSync(
 );
 const styles = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
 
-it("uses native Recharts geometry animations", () => {
+it("renders final Recharts geometry without a JavaScript animation loop", () => {
   const dataShapes = source.match(/<(?:Pie|Bar|Line)\b[\s\S]*?>/g) ?? [];
 
   expect(dataShapes).toHaveLength(11);
   expect(
-    dataShapes.filter((shape) => !shape.includes('isAnimationActive="auto"')),
+    dataShapes.filter((shape) => !shape.includes("isAnimationActive={false}")),
   ).toEqual([]);
-  expect(source).not.toContain("isAnimationActive={false}");
+  expect(dashboardView).not.toContain("AnimationControllerProvider");
+  expect(dashboardView).not.toContain("interruptibleAnimationController");
 });
 
-it("makes native animation updates interruptible", () => {
-  const containers = `${source}\n${dashboardSource}`.match(
-    /<ResponsiveContainer\b[\s\S]*?>/g,
-  );
+it("uses browser-native motion for every formerly animated chart family", () => {
+  const chartSource = `${source}\n${dashboardSource}`;
 
-  expect(containers).toHaveLength(6);
-  expect(containers?.some((container) => container.includes("chart-enter"))).toBe(false);
-  expect(styles).not.toContain("@keyframes chart-enter");
-  expect(dashboardView).toContain("AnimationControllerProvider");
-  expect(dashboardView).toContain("interruptibleAnimationController");
+  expect(chartSource).toContain("chart-pie-enter");
+  expect(chartSource.match(/chart-bar-enter/g)).toHaveLength(6);
+  expect(chartSource.match(/chart-line-enter/g)).toHaveLength(4);
+  expect(styles).toContain("@keyframes chart-pie-enter");
+  expect(styles).toContain("@keyframes chart-bar-enter");
+  expect(styles).toContain("@keyframes chart-line-enter");
+  expect(styles).toContain("stroke-dashoffset");
+  expect(styles).toContain("transform: scaleY(0)");
+  expect(styles).toContain("clip-path: inset(0 100% 0 0)");
+  expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
 });

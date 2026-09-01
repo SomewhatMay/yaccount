@@ -13,7 +13,7 @@ import {
   syncStatusAtom,
   lastSyncedAtAtom,
   lastSyncErrorAtom,
-  syncAtom,
+  syncNowAtom,
   reconnectAtom,
 } from "@/features/store";
 
@@ -42,7 +42,7 @@ export function SyncIndicator() {
   const status = useAtomValue(syncStatusAtom);
   const lastSyncedAt = useAtomValue(lastSyncedAtAtom);
   const lastError = useAtomValue(lastSyncErrorAtom);
-  const sync = useSetAtom(syncAtom);
+  const sync = useSetAtom(syncNowAtom);
   const reconnect = useSetAtom(reconnectAtom);
 
   if (status === "idle") return null; // signed out — nothing to show

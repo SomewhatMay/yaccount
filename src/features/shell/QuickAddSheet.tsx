@@ -31,6 +31,13 @@ import { useComposeFields, type ComposeKind } from "@/features/ledger/useCompose
 import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -282,16 +289,20 @@ function QuickAddForm({
               <ArrowRightIcon className="mr-1 inline size-3" aria-hidden />
               To
             </FieldLabel>
-            <CreationEntityCombobox
-              value={f.toContainerId}
-              onValueChange={f.setToContainerId}
-              options={f.activeContainers
-                .filter((c) => c.id !== f.containerId)
-                .map((c) => ({ value: c.id, label: c.name }))}
-              aria-label="To container"
-              placeholder="To…"
-              className="h-9"
-            />
+            <Select value={f.toContainerId} onValueChange={f.setToContainerId}>
+              <SelectTrigger aria-label="To container" className="h-9">
+                <SelectValue placeholder="To…" />
+              </SelectTrigger>
+              <SelectContent>
+                {f.activeContainers
+                  .filter((c) => c.id !== f.containerId)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </>
         )}
 
