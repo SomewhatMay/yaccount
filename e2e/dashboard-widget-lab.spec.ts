@@ -156,7 +156,7 @@ test("imports and renders every dashboard widget lab", async ({ page }, testInfo
   }
 });
 
-test("switches dashboards during native Recharts animation", async ({ page }) => {
+test("switches dashboards during native pie animation", async ({ page }) => {
   test.setTimeout(60_000);
   await page.clock.setFixedTime(new Date("2026-08-26T12:00:00-04:00"));
   await importFixture(page);
@@ -166,12 +166,19 @@ test("switches dashboards during native Recharts animation", async ({ page }) =>
   const breakdown = page
     .getByRole("heading", { name: "Where it went", exact: true })
     .locator("xpath=ancestor::*[@data-widget-size][1]");
-  const sector = breakdown.locator(".recharts-sector").first();
-  await expect(sector).toBeVisible();
-  const firstGeometry = await sector.getAttribute("d");
+  // Recharts mirrors definitions for its accessibility surface; either mask
+  // follows the same native animation contract.
+  const reveal = breakdown.locator(".chart-pie-enter").first();
+  await expect(reveal).toBeAttached();
   await expect
-    .poll(() => sector.getAttribute("d"), { timeout: 800 })
-    .not.toBe(firstGeometry);
+    .poll(
+      () =>
+        reveal.evaluate((node) =>
+          node.getAnimations().some((animation) => animation.playState === "running"),
+        ),
+      { timeout: 800 },
+    )
+    .toBe(true);
 
   const compact = page.getByRole("button", { name: "04 · Compact", exact: true });
   await compact.click({ timeout: 750 });

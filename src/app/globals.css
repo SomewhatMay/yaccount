@@ -361,6 +361,41 @@
   }
 }
 
+/* Dashboard data shapes render their final geometry immediately. Motion stays
+   in CSS/SVG, so no JavaScript frame loop can delay navigation input. */
+@keyframes chart-pie-enter {
+  from {
+    stroke-dashoffset: var(--chart-pie-length);
+  }
+}
+
+.chart-pie-enter {
+  stroke-dasharray: var(--chart-pie-length);
+  stroke-dashoffset: 0;
+  animation: chart-pie-enter calc(var(--dur-3) * 3) var(--ease-register) both;
+}
+
+@keyframes chart-bar-enter {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.chart-bar-enter {
+  transform-box: fill-box;
+  animation: chart-bar-enter calc(var(--dur-3) * 2) var(--ease-register) both;
+}
+
+@keyframes chart-line-enter {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+.chart-line-enter {
+  animation: chart-line-enter calc(var(--dur-3) * 2) var(--ease-register) both;
+}
+
 /* Reduced motion is a kill switch, not a suggestion: nothing in this app needs
    to move for it to be usable, so honour the request everywhere at once. */
 @media (prefers-reduced-motion: reduce) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   Bar,
   BarChart,
@@ -12,10 +13,14 @@ import {
   Pie,
   PieChart,
   ReferenceLine,
+  Rectangle,
   ResponsiveContainer,
+  Sector,
   Tooltip,
   XAxis,
   YAxis,
+  type BarShapeProps,
+  type PieSectorShapeProps,
 } from "recharts";
 import Link from "next/link";
 import { formatCents } from "@/core/money";
@@ -50,8 +55,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CHART, EmptyNote, formatAxisCents, monthLabel, MoneyTooltip } from "./chart-ui";
+import { barTransformOrigin } from "./chart-animation";
 
 const axisTick = { fontSize: 11, fill: CHART.axis };
+const DOUGHNUT_CENTER = 84;
+const DOUGHNUT_MASK_RADIUS = 68;
+const DOUGHNUT_MASK_WIDTH = 28;
+const DOUGHNUT_MASK_LENGTH = 2 * Math.PI * DOUGHNUT_MASK_RADIUS;
+
+function RisingBar(props: Partial<BarShapeProps>) {
+  const value = props.value ?? 0;
+  return (
+    <Rectangle
+      {...props}
+      style={{ ...props.style, transformOrigin: barTransformOrigin(value) }}
+    />
+  );
+}
+
+function DoughnutSector({
+  maskId,
+  ...props
+}: Partial<PieSectorShapeProps> & { maskId: string }) {
+  return <Sector {...props} mask={`url(#${maskId})`} />;
+}
 
 /** True if the month keys straddle more than one calendar year (→ show years). */
 function spansYears(months: string[]): boolean {
@@ -79,6 +106,7 @@ export function CategoryDoughnut({
    *  legend row beside it already solves. */
   hrefFor?: (categoryId: string) => string;
 }) {
+  const maskId = `doughnut-reveal-${useId().replaceAll(":", "")}`;
   if (slices.length === 0) return <EmptyNote>{emptyLabel}</EmptyNote>;
   const total = slices.reduce((s, x) => s + x.amount, 0);
   return (
@@ -89,15 +117,42 @@ export function CategoryDoughnut({
       <div className="relative isolate shrink-0" style={{ width: 168, height: 168 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
+            <defs>
+              <mask
+                id={maskId}
+                x={0}
+                y={0}
+                width={168}
+                height={168}
+                maskUnits="userSpaceOnUse"
+              >
+                <circle
+                  className="chart-pie-enter"
+                  cx={DOUGHNUT_CENTER}
+                  cy={DOUGHNUT_CENTER}
+                  r={DOUGHNUT_MASK_RADIUS}
+                  fill="none"
+                  stroke="white"
+                  strokeWidth={DOUGHNUT_MASK_WIDTH}
+                  transform={`rotate(-90 ${DOUGHNUT_CENTER} ${DOUGHNUT_CENTER})`}
+                  style={
+                    {
+                      "--chart-pie-length": DOUGHNUT_MASK_LENGTH,
+                    } as React.CSSProperties
+                  }
+                />
+              </mask>
+            </defs>
             <Pie
               data={slices}
               dataKey="amount"
               nameKey="name"
-              isAnimationActive="auto"
+              isAnimationActive={false}
               innerRadius={54}
               outerRadius={82}
               paddingAngle={slices.length > 1 ? 2 : 0}
               strokeWidth={0}
+              shape={<DoughnutSector maskId={maskId} />}
             >
               {slices.map((s) => (
                 <Cell key={s.categoryId} fill={colorOf(s.categoryId)} />
@@ -189,21 +244,27 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
           name="Income"
           fill={CHART.income}
           radius={[3, 3, 0, 0]}
-          isAnimationActive="auto"
+          isAnimationActive={false}
+          className="chart-bar-enter"
+          shape={<RisingBar />}
         />
         <Bar
           dataKey="expense"
           name="Expenses"
           fill={CHART.expense}
           radius={[3, 3, 0, 0]}
-          isAnimationActive="auto"
+          isAnimationActive={false}
+          className="chart-bar-enter"
+          shape={<RisingBar />}
         />
         <Bar
           dataKey="savings"
           name="Savings"
           fill={CHART.savings}
           radius={[3, 3, 0, 0]}
-          isAnimationActive="auto"
+          isAnimationActive={false}
+          className="chart-bar-enter"
+          shape={<RisingBar />}
         />
         <Line
           dataKey="budget"
@@ -213,7 +274,8 @@ export function MonthlyBarsChart({ monthly }: { monthly: MonthlyTotal[] }) {
           strokeDasharray="5 4"
           strokeWidth={1.5}
           dot={false}
-          isAnimationActive="auto"
+          isAnimationActive={false}
+          className="chart-line-enter"
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -270,13 +332,17 @@ export function WaterfallChart({
           dataKey="base"
           stackId="w"
           fill="transparent"
-          isAnimationActive="auto"
+          isAnimationActive={false}
+          className="chart-bar-enter"
+          shape={<RisingBar />}
         />
         <Bar
           dataKey="bar"
           stackId="w"
           radius={[3, 3, 0, 0]}
-          isAnimationActive="auto"
+          isAnimationActive={false}
+          className="chart-bar-enter"
+          shape={<RisingBar />}
         >
           {data.map((d) => (
             <Cell key={d.name} fill={d.tipColor} />
@@ -349,7 +415,9 @@ export function CategoryDrilldown({
               name="Spent"
               fill={selectedId ? categoryColorFor(selectedId, categories) : CHART.expense}
               radius={[3, 3, 0, 0]}
-              isAnimationActive="auto"
+              isAnimationActive={false}
+              className="chart-bar-enter"
+              shape={<RisingBar />}
             />
             <Line
               dataKey="budget"
@@ -360,7 +428,8 @@ export function CategoryDrilldown({
               strokeWidth={1.5}
               dot={false}
               connectNulls
-              isAnimationActive="auto"
+              isAnimationActive={false}
+              className="chart-line-enter"
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -636,7 +705,8 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               stroke={CHART.expense}
               strokeWidth={1.75}
               dot={data.length === 1}
-              isAnimationActive="auto"
+              isAnimationActive={false}
+              className="chart-line-enter"
             />
             <Line
               dataKey="value"
@@ -645,7 +715,8 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               stroke={CHART.savings}
               strokeWidth={1.75}
               dot={data.length === 1}
-              isAnimationActive="auto"
+              isAnimationActive={false}
+              className="chart-line-enter"
             />
           </LineChart>
         </ResponsiveContainer>
