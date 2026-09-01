@@ -205,11 +205,26 @@ test("opens search from the mobile topbar", async ({ page }, testInfo) => {
   const input = page.getByPlaceholder(/Search everything/);
   await expect(input).toBeVisible();
   await expect(input).toBeFocused();
+  expect(
+    await input.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
+  ).toBeGreaterThanOrEqual(16);
   const dialog = page.getByRole("dialog", { name: "Search yaccount" });
   const box = await dialog.boundingBox();
   expect(box?.y ?? Infinity).toBeLessThan(80);
   await page.keyboard.press("Escape");
   await expect(input).toBeHidden();
+});
+
+test("keeps desktop search text compact", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop breakpoint regression.");
+
+  await openReady(page, "/", "Dashboard");
+  await page.getByRole("button", { name: "Search yaccount" }).click();
+  const input = page.getByPlaceholder(/Search everything/);
+  await expect(input).toBeFocused();
+  expect(
+    await input.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
+  ).toBe(14);
 });
 
 test("uses direct compact page identity with desktop-only context", async ({
