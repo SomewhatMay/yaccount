@@ -37,7 +37,7 @@ import {
   quickAddAtom,
   reportedBalanceContainerIdAtom,
   recurringRulesAtom,
-  syncAtom,
+  syncNowAtom,
   transactionsAtom,
 } from "@/features/store";
 import { focusHref } from "@/features/focus-link";
@@ -154,7 +154,7 @@ export function CommandPalette() {
   const openCravingWin = useSetAtom(cravingWinSheetAtom);
   const reportBalance = useSetAtom(reportedBalanceContainerIdAtom);
   const flashRow = useSetAtom(flashRowAtom);
-  const sync = useSetAtom(syncAtom);
+  const sync = useSetAtom(syncNowAtom);
   const [history, setHistory] = useCommandHistory();
   const inputRef = useRef<HTMLInputElement>(null);
   const sideways = useMediaQuery(SM_UP, true);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useSetAtom } from "jotai";
-import { bootstrapAtom, syncAtom } from "@/features/store";
+import { bootstrapAtom, syncNowAtom } from "@/features/store";
 import { createLogger } from "@/lib/logger";
 import { reportUnhandledError } from "@/lib/unhandled-error";
 
@@ -23,7 +23,7 @@ const log = createLogger("app");
  */
 export function RepoBootstrap({ children }: { children: React.ReactNode }) {
   const bootstrap = useSetAtom(bootstrapAtom);
-  const sync = useSetAtom(syncAtom);
+  const sync = useSetAtom(syncNowAtom);
 
   useEffect(() => {
     void bootstrap();
@@ -56,10 +56,12 @@ export function RepoBootstrap({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", tick);
+    window.addEventListener("online", tick);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", tick);
+      window.removeEventListener("online", tick);
     };
   }, [sync]);
 

@@ -7,7 +7,7 @@ import { LogInIcon, LogOutIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { getAuthProvider } from "@/auth/web";
-import { syncAtom, syncStatusAtom } from "@/features/store";
+import { syncNowAtom, syncStatusAtom } from "@/features/store";
 import { SYNC_ATTENTION_CLASS } from "@/features/SyncIndicator";
 import { RowActions } from "@/features/ui";
 
@@ -28,7 +28,7 @@ export function AuthButton({ signedOutOnly = false }: { signedOutOnly?: boolean 
   // signed-out control for a frame on every load before the grant is read.
   const [connected, setConnected] = useAtom(connectedAtom);
   const [busy, setBusy] = useState(false);
-  const sync = useSetAtom(syncAtom);
+  const sync = useSetAtom(syncNowAtom);
   const setSyncStatus = useSetAtom(syncStatusAtom);
 
   // Restore the durable connection on mount — no popup, no network. The token is
