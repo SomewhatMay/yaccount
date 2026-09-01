@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, expect, it, vi } from "vitest";
-import {
-  createSyncScheduler,
-  createTrailingRunner,
-} from "@/features/sync-scheduling";
+import { createSyncScheduler, createTrailingRunner } from "@/features/sync-scheduling";
 
 afterEach(() => vi.useRealTimers());
 

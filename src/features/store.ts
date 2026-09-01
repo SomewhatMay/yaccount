@@ -42,10 +42,7 @@ import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands"
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
 import { operationLogFacts } from "@/lib/strategic-logging";
-import {
-  createSyncScheduler,
-  createTrailingRunner,
-} from "@/features/sync-scheduling";
+import { createSyncScheduler, createTrailingRunner } from "@/features/sync-scheduling";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).

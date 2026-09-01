@@ -1671,9 +1671,7 @@ test("uses a dropdown for a new recurring transfer destination", async ({ page }
     page.getByRole("option", { name: "E2E recurring reserve", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("option", { name: "General", exact: true })).toBeHidden();
-  await page
-    .getByRole("option", { name: "E2E recurring reserve", exact: true })
-    .click();
+  await page.getByRole("option", { name: "E2E recurring reserve", exact: true }).click();
   await expect(destination).toHaveText("E2E recurring reserve");
 });
 
