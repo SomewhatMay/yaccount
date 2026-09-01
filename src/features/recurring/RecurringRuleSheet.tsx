@@ -375,25 +375,13 @@ function RuleForm({
         {mode === "transfer" && (
           <div className="grid gap-1.5">
             <Label>To container</Label>
-            {rule ? (
-              <ContainerSelect
-                value={toId}
-                onChange={setToId}
-                containers={activeContainers.filter((c) => c.id !== fromId)}
-                placeholder="To…"
-                label="To container"
-              />
-            ) : (
-              <CreationEntityCombobox
-                value={toId}
-                onValueChange={setToId}
-                options={activeContainers
-                  .filter((c) => c.id !== fromId)
-                  .map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="To…"
-                aria-label="To container"
-              />
-            )}
+            <ContainerSelect
+              value={toId}
+              onChange={setToId}
+              containers={activeContainers.filter((c) => c.id !== fromId)}
+              placeholder="To…"
+              label="To container"
+            />
           </div>
         )}
 
