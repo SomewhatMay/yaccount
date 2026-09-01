@@ -30,6 +30,13 @@ async function choose(page: Page, label: string, option: string) {
   await page.getByRole("option", { name: option, exact: true }).click();
 }
 
+async function expectDropdown(page: Page, label: string) {
+  await expect(page.getByRole("combobox", { name: label })).toHaveJSProperty(
+    "tagName",
+    "BUTTON",
+  );
+}
+
 async function swipeUp(page: Page, target: Locator) {
   const box = await target.boundingBox();
   if (!box) throw new Error("Touch target is not visible.");
@@ -754,10 +761,7 @@ test("persists the synced Cash horizon window", async ({ page }) => {
   await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E future power");
-  await page.getByRole("combobox", { name: "Category" }).fill("E2E cash bill");
-  await page
-    .getByRole("option", { name: "E2E cash bill · expense", exact: true })
-    .click();
+  await choose(page, "Category", "E2E cash bill · expense");
   await page.getByLabel("Amount").fill("25.00");
   await page.getByLabel("Day of month").fill("30");
   await page.getByRole("button", { name: "Add recurring" }).click();
@@ -792,10 +796,7 @@ test("adds Commitments and persists its cadence view", async ({ page }) => {
   await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E internet");
-  await page.getByRole("combobox", { name: "Category" }).fill("E2E commitment bills");
-  await page
-    .getByRole("option", { name: "E2E commitment bills · expense", exact: true })
-    .click();
+  await choose(page, "Category", "E2E commitment bills · expense");
   await page.getByLabel("Amount").fill("65.00");
   await page.getByLabel("Day of month").fill("27");
   await page.getByRole("button", { name: "Add recurring" }).click();
@@ -854,10 +855,7 @@ test("persists Allocation plan pay-cycle mode and income anchors", async ({ page
     await page.getByRole("button", { name: "New", exact: true }).click();
     await page.getByRole("radio", { name: "Income" }).click();
     await page.getByLabel("Payee / source").fill(income.source);
-    await page.getByRole("combobox", { name: "Category" }).fill("E2E allocation income");
-    await page
-      .getByRole("option", { name: "E2E allocation income · income", exact: true })
-      .click();
+    await choose(page, "Category", "E2E allocation income · income");
     await page.getByLabel("Amount").fill(income.amount);
     await page.getByLabel("Day of month").fill(income.day);
     await page.getByRole("button", { name: "Add recurring" }).click();
@@ -906,10 +904,7 @@ test("shows Month landing scheduled math before history is available", async ({
   await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E month-end bill");
-  await page.getByRole("combobox", { name: "Category" }).fill("E2E landing bill");
-  await page
-    .getByRole("option", { name: "E2E landing bill · expense", exact: true })
-    .click();
+  await choose(page, "Category", "E2E landing bill · expense");
   await page.getByLabel("Amount").fill("125.00");
   await page.getByLabel("Day of month").fill("30");
   await page.getByRole("button", { name: "Add recurring" }).click();
@@ -1078,10 +1073,7 @@ test("ranks and caps current matters in Money brief", async ({ page }) => {
   await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E due review");
-  await page.getByRole("combobox", { name: "Category" }).fill("E2E brief groceries");
-  await page
-    .getByRole("option", { name: "E2E brief groceries · expense", exact: true })
-    .click();
+  await choose(page, "Category", "E2E brief groceries · expense");
   await page.getByLabel("Amount").fill("10.00");
   await page.getByLabel("Day of month").fill("23");
   await page.getByLabel("Starts").fill("2026-08-23");
@@ -1124,10 +1116,7 @@ test("explicitly matches a manual entry during month close", async ({ page }) =>
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("radio", { name: "Income" }).click();
   await page.getByLabel("Payee / source").fill("E2E salary");
-  await page.getByRole("combobox", { name: "Category" }).fill("E2E close income");
-  await page
-    .getByRole("option", { name: "E2E close income · income", exact: true })
-    .click();
+  await choose(page, "Category", "E2E close income · income");
   await page.getByLabel("Amount").fill("1000.00");
   await page.getByLabel("Day of month").fill("30");
   await page.getByLabel("Starts").fill("2026-07-30");
@@ -1345,11 +1334,11 @@ test("overflowing selects scroll by touch in independent sheets", async ({
   await openReady(page, "/ledger", "Overall balance");
   await openQuickAdd(page);
   await page.getByRole("combobox", { name: "Category" }).tap();
-  let viewport = page.getByRole("listbox");
+  let viewport = page.locator("[data-radix-select-viewport]");
   await swipeUp(page, viewport);
   await expect.poll(() => viewport.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
   await page.getByRole("option", { name: last, exact: true }).tap();
-  await expect(page.getByRole("combobox", { name: "Category" })).toHaveValue(last);
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(last);
 
   await openReady(page, "/", "Dashboard");
   await customizeDashboard(page, true);
@@ -1379,9 +1368,26 @@ test("moves money between containers", async ({ page }) => {
   await expect(page.getByText("$25.00", { exact: true })).toBeVisible();
 });
 
-test("creation comboboxes search choices and recall an exact vendor", async ({
-  page,
-}) => {
+test("uses dropdowns for every predefined Quick Add choice", async ({ page }) => {
+  await openReady(page, "/ledger", "Overall balance");
+  await openQuickAdd(page);
+
+  for (const kind of ["Expense", "Income"] as const) {
+    await page.getByRole("radio", { name: kind }).click();
+    await expectDropdown(page, "Category");
+    await expectDropdown(page, "Container");
+    await expect(
+      page.getByRole("combobox", { name: kind === "Expense" ? "Vendor" : "Source" }),
+    ).toHaveJSProperty("tagName", "INPUT");
+  }
+
+  await page.getByRole("radio", { name: "Transfer" }).click();
+  await expectDropdown(page, "From container");
+  await expectDropdown(page, "To container");
+  await expect(page.getByLabel("Transfer label")).toHaveJSProperty("tagName", "INPUT");
+});
+
+test("vendor autocomplete recalls dropdown choices", async ({ page }) => {
   await createCategory(page, "E2E autocomplete dining");
   await createCategory(page, "E2E autocomplete other");
   await createCategory(page, "E2E autocomplete income", "Income");
@@ -1404,39 +1410,39 @@ test("creation comboboxes search choices and recall an exact vendor", async ({
     page.getByRole("option", { name: "E2E exact vendor", exact: true }),
   ).toBeVisible();
   await page.getByRole("option", { name: "E2E exact vendor", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Category" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(
     "E2E autocomplete dining",
   );
-  await expect(page.getByRole("combobox", { name: "Container" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Container" })).toHaveText(
     "E2E autocomplete card",
   );
   await expect(page.getByLabel("Amount")).toHaveValue("");
 
   await vendor.fill("unknown variation");
-  await expect(page.getByRole("combobox", { name: "Category" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(
     "E2E autocomplete dining",
   );
-  await expect(page.getByRole("combobox", { name: "Container" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Container" })).toHaveText(
     "E2E autocomplete card",
   );
 
   await vendor.fill("  e2e EXACT vendor  ");
   await vendor.press("Tab");
-  await expect(page.getByRole("combobox", { name: "Category" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(
     "E2E autocomplete dining",
   );
-  await expect(page.getByRole("combobox", { name: "Container" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Container" })).toHaveText(
     "E2E autocomplete card",
   );
 
   const category = page.getByRole("combobox", { name: "Category" });
-  await category.fill("other");
+  await category.click();
   await page.getByRole("option", { name: "E2E autocomplete other", exact: true }).click();
-  await expect(category).toHaveValue("E2E autocomplete other");
+  await expect(category).toHaveText("E2E autocomplete other");
 
   await page.getByRole("radio", { name: "Transfer" }).click();
   const from = page.getByRole("combobox", { name: "From container" });
-  await from.fill("card");
+  await from.click();
   await page.getByRole("option", { name: "E2E autocomplete card", exact: true }).click();
   const destination = page.getByRole("combobox", { name: "To container" });
   await expect(destination).toHaveJSProperty("tagName", "BUTTON");
@@ -1635,10 +1641,7 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
   await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("Payee / source").fill("E2E recurring");
-  await page.getByRole("combobox", { name: "Category" }).fill("E2E subscriptions");
-  await page
-    .getByRole("option", { name: "E2E subscriptions · expense", exact: true })
-    .click();
+  await choose(page, "Category", "E2E subscriptions · expense");
   await page.getByLabel("Amount").fill("9.99");
   await choose(page, "Repeats", "Daily");
   await page.getByRole("button", { name: "Add recurring" }).click();
@@ -1658,12 +1661,24 @@ test("approves a generated Inbox occurrence", async ({ page }) => {
   await expect(page.getByText("E2E recurring", { exact: true })).toBeVisible();
 });
 
-test("uses a dropdown for a new recurring transfer destination", async ({ page }) => {
+test("uses dropdowns for every new recurring entity choice", async ({ page }) => {
   await createContainer(page, "E2E recurring reserve");
   await openReady(page, "/recurring", "Recurring");
   await page.getByRole("button", { name: "New", exact: true }).click();
+
+  for (const kind of ["Expense", "Income"] as const) {
+    await page.getByRole("radio", { name: kind }).click();
+    await expectDropdown(page, "Category");
+    await expectDropdown(page, "Container");
+    await expect(page.getByRole("combobox", { name: "Payee / source" })).toHaveJSProperty(
+      "tagName",
+      "INPUT",
+    );
+  }
+
   await page.getByRole("radio", { name: "Transfer" }).click();
 
+  await expectDropdown(page, "From container");
   const destination = page.getByRole("combobox", { name: "To container" });
   await expect(destination).toHaveJSProperty("tagName", "BUTTON");
   await destination.click();
@@ -1695,10 +1710,10 @@ test("new recurring recalls vendor fields while edit stays plain", async ({
   const vendor = page.getByRole("combobox", { name: "Payee / source" });
   await vendor.click();
   await page.getByRole("option", { name: "E2E recurring known", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Category" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveText(
     "E2E recurring autocomplete",
   );
-  await expect(page.getByRole("combobox", { name: "Container" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Container" })).toHaveText(
     "E2E recurring card",
   );
   await expect(page.getByLabel("Amount")).toHaveValue("");

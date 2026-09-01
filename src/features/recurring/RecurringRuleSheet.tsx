@@ -27,10 +27,7 @@ import {
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import {
-  CreationEntityCombobox,
-  CreationTextCombobox,
-} from "@/features/ledger/CreationCombobox";
+import { CreationTextCombobox } from "@/features/ledger/CreationCombobox";
 import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { Button } from "@/components/ui/button";
@@ -321,55 +318,35 @@ function RuleForm({
         {mode === "entry" ? (
           <div className="grid gap-1.5">
             <Label>Category</Label>
-            {rule ? (
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger aria-label="Category">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
-                      {c.name}
-                      <span className="text-muted-foreground ml-1">· {c.type}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <CreationEntityCombobox
-                value={categoryId}
-                onValueChange={setCategoryId}
-                options={categoriesOfKind.map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                  detail: `· ${c.type}`,
-                  leading: <CategoryGlyph icon={c.icon} color={categoryColor(c)} />,
-                }))}
-                aria-label="Category"
-                placeholder={`No ${creationKind} categories yet`}
-              />
-            )}
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger aria-label="Category">
+                <SelectValue
+                  placeholder={rule ? "Category" : `No ${creationKind} categories yet`}
+                >
+                  {cat?.name}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {(rule ? activeCategories : categoriesOfKind).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
+                    {c.name}
+                    <span className="text-muted-foreground ml-1">· {c.type}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
 
         <div className="grid gap-1.5">
           <Label>{mode === "transfer" ? "From container" : "Container"}</Label>
-          {rule ? (
-            <ContainerSelect
-              value={fromId}
-              onChange={setFromId}
-              containers={activeContainers}
-              label={mode === "transfer" ? "From container" : "Container"}
-            />
-          ) : (
-            <CreationEntityCombobox
-              value={fromId}
-              onValueChange={setFromId}
-              options={activeContainers.map((c) => ({ value: c.id, label: c.name }))}
-              aria-label={mode === "transfer" ? "From container" : "Container"}
-            />
-          )}
+          <ContainerSelect
+            value={fromId}
+            onChange={setFromId}
+            containers={activeContainers}
+            label={mode === "transfer" ? "From container" : "Container"}
+          />
         </div>
 
         {mode === "transfer" && (
