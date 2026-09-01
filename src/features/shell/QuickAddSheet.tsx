@@ -233,25 +233,27 @@ function QuickAddForm({
         <FieldLabel>
           {f.kind === "transfer" ? "Label" : f.kind === "income" ? "Source" : "Vendor"}
         </FieldLabel>
-        {f.kind === "transfer" ? (
-          <Input
-            value={f.vendor}
-            onChange={(e) => f.setVendor(e.target.value)}
-            placeholder="Optional"
-            aria-label="Transfer label"
-            className="h-9"
-          />
-        ) : (
-          <CreationTextCombobox
-            value={f.vendor}
-            onValueChange={f.setVendor}
-            onMatch={f.recallVendor}
-            suggestions={f.vendorSources}
-            placeholder={f.kind === "income" ? "e.g. Employer" : "e.g. Blue Bottle"}
-            aria-label={f.kind === "income" ? "Source" : "Vendor"}
-            className="h-9"
-          />
-        )}
+        <CreationTextCombobox
+          value={f.vendor}
+          onValueChange={f.setVendor}
+          onMatch={f.recallVendor}
+          suggestions={f.vendorSources}
+          placeholder={
+            f.kind === "transfer"
+              ? "Optional"
+              : f.kind === "income"
+                ? "e.g. Employer"
+                : "e.g. Blue Bottle"
+          }
+          aria-label={
+            f.kind === "transfer"
+              ? "Transfer label"
+              : f.kind === "income"
+                ? "Source"
+                : "Vendor"
+          }
+          className="h-9"
+        />
 
         {f.kind !== "transfer" && (
           <>

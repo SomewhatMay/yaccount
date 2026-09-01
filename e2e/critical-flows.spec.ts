@@ -1384,7 +1384,14 @@ test("uses dropdowns for every predefined Quick Add choice", async ({ page }) =>
   await page.getByRole("radio", { name: "Transfer" }).click();
   await expectDropdown(page, "From container");
   await expectDropdown(page, "To container");
-  await expect(page.getByLabel("Transfer label")).toHaveJSProperty("tagName", "INPUT");
+  await expect(page.getByRole("combobox", { name: "Transfer label" })).toHaveJSProperty(
+    "tagName",
+    "INPUT",
+  );
+  await expect(page.getByRole("combobox", { name: "Transfer label" })).toHaveAttribute(
+    "aria-autocomplete",
+    "list",
+  );
 });
 
 test("vendor autocomplete recalls dropdown choices", async ({ page }) => {
@@ -1679,6 +1686,10 @@ test("uses dropdowns for every new recurring entity choice", async ({ page }) =>
   await page.getByRole("radio", { name: "Transfer" }).click();
 
   await expectDropdown(page, "From container");
+  await expect(page.getByRole("combobox", { name: "Note" })).toHaveAttribute(
+    "aria-autocomplete",
+    "list",
+  );
   const destination = page.getByRole("combobox", { name: "To container" });
   await expect(destination).toHaveJSProperty("tagName", "BUTTON");
   await destination.click();

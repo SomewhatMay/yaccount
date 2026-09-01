@@ -296,13 +296,13 @@ function RuleForm({
           <Label htmlFor="rr-vendor">
             {mode === "transfer" ? "Note" : "Payee / source"}
           </Label>
-          {!rule && mode === "entry" ? (
+          {!rule ? (
             <CreationTextCombobox
               id="rr-vendor"
               value={vendor}
               onValueChange={setVendor}
               onMatch={recallVendor}
-              placeholder="e.g. Netflix"
+              placeholder={mode === "transfer" ? "e.g. Move to savings" : "e.g. Netflix"}
               suggestions={vendorSources}
             />
           ) : (
