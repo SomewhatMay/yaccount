@@ -19,6 +19,7 @@ const row = (over: {
   category_id?: string;
   container_id?: string;
   date?: string;
+  notes?: string | null;
 }): Transaction =>
   makeTransaction({
     id: over.id,
@@ -27,6 +28,7 @@ const row = (over: {
     vendor_source: over.vendor ?? "Blue Bottle",
     category_id: over.category_id ?? "coffee",
     container_id: over.container_id ?? "wallet",
+    notes: over.notes ?? null,
   });
 
 const move = (over: {
@@ -95,6 +97,19 @@ describe("matchesFilter — the one predicate every list view shares", () => {
     expect(applyFilter(all, { text: "housing" }, { label }).map((t) => t.id)).toEqual([
       "b",
     ]);
+  });
+
+  it("searches notes, including terms split across the payee and notes", () => {
+    const noted = row({
+      id: "noted",
+      amount: -1200,
+      vendor: "Corner Market",
+      notes: "AUBERGINE for the weekend",
+    });
+
+    expect(applyFilter([noted], { text: "aubergine" })).toEqual([noted]);
+    expect(applyFilter([noted], { text: "market weekend" })).toEqual([noted]);
+    expect(applyFilter([noted], { text: "aubergine weekday" })).toEqual([]);
   });
 
   it("narrows on category, and never matches a transfer (it has none)", () => {
