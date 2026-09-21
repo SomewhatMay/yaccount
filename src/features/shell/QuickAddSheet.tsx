@@ -23,10 +23,7 @@ import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { Eyebrow, Money, ResponsiveSheet } from "@/features/ui";
 import { SignToggle } from "@/features/ledger/SignToggle";
-import {
-  CreationEntityCombobox,
-  CreationTextCombobox,
-} from "@/features/ledger/CreationCombobox";
+import { CreationTextCombobox } from "@/features/ledger/CreationCombobox";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
 import { InlineError } from "@/features/ui/InlineError";
 import { Button } from "@/components/ui/button";
@@ -236,52 +233,63 @@ function QuickAddForm({
         <FieldLabel>
           {f.kind === "transfer" ? "Label" : f.kind === "income" ? "Source" : "Vendor"}
         </FieldLabel>
-        {f.kind === "transfer" ? (
-          <Input
-            value={f.vendor}
-            onChange={(e) => f.setVendor(e.target.value)}
-            placeholder="Optional"
-            aria-label="Transfer label"
-            className="h-9"
-          />
-        ) : (
-          <CreationTextCombobox
-            value={f.vendor}
-            onValueChange={f.setVendor}
-            onMatch={f.recallVendor}
-            suggestions={f.vendorSources}
-            placeholder={f.kind === "income" ? "e.g. Employer" : "e.g. Blue Bottle"}
-            aria-label={f.kind === "income" ? "Source" : "Vendor"}
-            className="h-9"
-          />
-        )}
+        <CreationTextCombobox
+          value={f.vendor}
+          onValueChange={f.setVendor}
+          onMatch={f.recallVendor}
+          suggestions={f.vendorSources}
+          placeholder={
+            f.kind === "transfer"
+              ? "Optional"
+              : f.kind === "income"
+                ? "e.g. Employer"
+                : "e.g. Blue Bottle"
+          }
+          aria-label={
+            f.kind === "transfer"
+              ? "Transfer label"
+              : f.kind === "income"
+                ? "Source"
+                : "Vendor"
+          }
+          className="h-9"
+        />
 
         {f.kind !== "transfer" && (
           <>
             <FieldLabel>Category</FieldLabel>
-            <CreationEntityCombobox
-              value={f.categoryId}
-              onValueChange={f.setCategoryId}
-              options={f.categoriesOfKind.map((c) => ({
-                value: c.id,
-                label: c.name,
-                leading: <CategoryGlyph icon={c.icon} color={categoryColor(c)} />,
-              }))}
-              placeholder={`No ${f.kind} categories yet`}
-              aria-label="Category"
-              className="h-9"
-            />
+            <Select value={f.categoryId} onValueChange={f.setCategoryId}>
+              <SelectTrigger aria-label="Category" className="h-9">
+                <SelectValue placeholder={`No ${f.kind} categories yet`} />
+              </SelectTrigger>
+              <SelectContent>
+                {f.categoriesOfKind.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </>
         )}
 
         <FieldLabel>{f.kind === "transfer" ? "From" : "Container"}</FieldLabel>
-        <CreationEntityCombobox
-          value={f.containerId}
-          onValueChange={f.setPickedContainerId}
-          options={f.activeContainers.map((c) => ({ value: c.id, label: c.name }))}
-          aria-label={f.kind === "transfer" ? "From container" : "Container"}
-          className="h-9"
-        />
+        <Select value={f.containerId} onValueChange={f.setPickedContainerId}>
+          <SelectTrigger
+            aria-label={f.kind === "transfer" ? "From container" : "Container"}
+            className="h-9"
+          >
+            <SelectValue placeholder="Container" />
+          </SelectTrigger>
+          <SelectContent>
+            {f.activeContainers.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {f.kind === "transfer" && (
           <>

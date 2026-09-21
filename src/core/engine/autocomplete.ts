@@ -36,7 +36,6 @@ export function rankVendorSourcesForKind(
   kind: CreationKind,
   query: string,
 ): string[] {
-  if (kind === "transfer") return [];
   const categoryKinds = new Map(
     categories.map((category) => [category.id, category.type]),
   );
@@ -47,13 +46,13 @@ export function rankVendorSourcesForKind(
   const normalizedQuery = normalize(query);
 
   for (const row of activeRows(transactions)) {
-    if (
-      row.to_container_id ||
-      !row.category_id ||
-      categoryKinds.get(row.category_id) !== kind
-    ) {
-      continue;
-    }
+    const matchesKind =
+      kind === "transfer"
+        ? row.to_container_id !== null
+        : row.to_container_id === null &&
+          row.category_id !== null &&
+          categoryKinds.get(row.category_id) === kind;
+    if (!matchesKind) continue;
     const value = row.vendor_source.trim().normalize("NFC");
     const key = normalize(value);
     if (!key) continue;

@@ -43,6 +43,30 @@ describe("creation autocomplete", () => {
       entry("cafe-2", " café ", "food", "card", "2026-08-02T10:00:00.000Z"),
       entry("market", "Market", "food", "cash", "2026-08-03T10:00:00.000Z"),
       entry("pay", "Café Payroll", "salary", "bank", "2026-08-04T10:00:00.000Z"),
+      makeTransfer({
+        id: "sweep-1",
+        date: "2026-08-05",
+        amount: 100,
+        vendor_source: "Savings sweep",
+        container_id: "cash",
+        to_container_id: "bank",
+      }),
+      makeTransfer({
+        id: "sweep-2",
+        date: "2026-08-06",
+        amount: 100,
+        vendor_source: "Savings sweep",
+        container_id: "cash",
+        to_container_id: "bank",
+      }),
+      makeTransfer({
+        id: "brokerage",
+        date: "2026-08-07",
+        amount: 100,
+        vendor_source: "Brokerage",
+        container_id: "cash",
+        to_container_id: "bank",
+      }),
     ];
 
     expect(rankVendorSourcesForKind(rows, categories, "expense", "")).toEqual([
@@ -52,7 +76,10 @@ describe("creation autocomplete", () => {
     expect(rankVendorSourcesForKind(rows, categories, "income", "")).toEqual([
       "Café Payroll",
     ]);
-    expect(rankVendorSourcesForKind(rows, categories, "transfer", "")).toEqual([]);
+    expect(rankVendorSourcesForKind(rows, categories, "transfer", "")).toEqual([
+      "Savings sweep",
+      "Brokerage",
+    ]);
   });
 
   it("prioritizes prefix similarity, then frequency, then recency", () => {
