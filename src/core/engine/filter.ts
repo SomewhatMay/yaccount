@@ -19,7 +19,7 @@ export const TRANSACTION_KINDS = ["expense", "income", "transfer"] as const;
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
 
 export interface TransactionFilter {
-  /** Free text over the payee, plus whatever else the caller can name a row by. */
+  /** Free text over the payee/notes, plus whatever else the caller names. */
   text?: string;
   categoryIds?: string[];
   /** Matches EITHER leg of a transfer (source or destination). */
@@ -34,8 +34,8 @@ export interface TransactionFilter {
 }
 
 export interface FilterContext {
-  /** Extra searchable text for a row — its category name, its wallet. The engine
-   *  keeps no lookup tables, so the view that has them passes them in. */
+  /** Extra searchable text for a row — its category name, its wallet. Notes live
+   *  on the row; lookup names do not, so the view that has them passes them in. */
   label?: (t: Transaction) => string;
 }
 
@@ -87,7 +87,7 @@ export function matchesText(
   words: string[],
   label?: (t: Transaction) => string,
 ): boolean {
-  return matchesWords(`${t.vendor_source} ${label?.(t) ?? ""}`, words);
+  return matchesWords(`${t.vendor_source} ${t.notes ?? ""} ${label?.(t) ?? ""}`, words);
 }
 
 export function matchesFilter(

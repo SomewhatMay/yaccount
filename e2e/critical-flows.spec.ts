@@ -1302,6 +1302,23 @@ test("edits an entry with categories scoped to its selected type", async ({ page
   await expect(page.getByText("$9.00", { exact: true }).last()).toBeVisible();
 });
 
+test("searches ledger entries by notes", async ({ page }) => {
+  await createCategory(page, "E2E ledger notes category");
+  await openReady(page, "/ledger", "Overall balance");
+
+  await openQuickAdd(page);
+  await page.getByLabel("Amount").fill("12.00");
+  await page.getByLabel("Vendor").fill("E2E notes-only match");
+  await page.getByLabel("Notes").fill("AUBERGINE for the weekend");
+  await choose(page, "Category", "E2E ledger notes category");
+  await page.getByRole("button", { name: "Log expense" }).click();
+  await logExpense(page, "E2E notes nonmatch", "8.00", "E2E ledger notes category");
+
+  await page.getByLabel("Search entries").fill("aubergine");
+  await expect(page.getByText("E2E notes-only match", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E notes nonmatch", { exact: true })).toHaveCount(0);
+});
+
 test("hides a category expense from dashboard statistics", async ({ page }) => {
   await createCategory(page, "E2E hidden stats");
   await openReady(page, "/ledger", "Overall balance");
