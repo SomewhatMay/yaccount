@@ -97,9 +97,9 @@ export function EditTransactionSheet({
   );
 }
 
-/** Keep an archived container selectable on a row that already uses it (§5.5). */
-function selectableContainers(containers: Container[], ...keep: (string | null)[]) {
-  return containers.filter((c) => !c.is_archived || keep.includes(c.id));
+/** Archived containers stay on historical rows, but never return to a picker. */
+function activeContainers(containers: Container[]) {
+  return containers.filter((c) => !c.is_archived);
 }
 
 /**
@@ -192,12 +192,8 @@ function EditForm({
     [categories, transactions, tx.category_id],
   );
   const wallets = useMemo(
-    () =>
-      rankContainersByUsage(
-        selectableContainers(containers, tx.container_id),
-        transactions,
-      ),
-    [containers, transactions, tx.container_id],
+    () => rankContainersByUsage(activeContainers(containers), transactions),
+    [containers, transactions],
   );
 
   const [date, setDate] = useState(tx.date);
@@ -220,6 +216,7 @@ function EditForm({
   const cat =
     categoriesOfType.find((c) => c.id === pickedCategoryId) ?? categoriesOfType[0];
   const categoryId = cat?.id ?? "";
+  const container = containers.find((c) => c.id === containerId);
   const sign: Sign = pickedSign ?? defaultSign(type);
 
   function selectType(next: CategoryType) {
@@ -326,10 +323,10 @@ function EditForm({
           </Select>
         </div>
         <div className="grid gap-1.5">
-          <Label>Container</Label>
+          <Label htmlFor="edit-container">Container</Label>
           <Select value={containerId} onValueChange={setContainerId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Container" />
+            <SelectTrigger id="edit-container" aria-label="Container">
+              <SelectValue placeholder="Container">{container?.name}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {wallets.map((c) => (
@@ -405,12 +402,8 @@ function TransferForm({
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const wallets = useMemo(
-    () =>
-      rankContainersByUsage(
-        selectableContainers(containers, tx.container_id, tx.to_container_id),
-        transactions,
-      ),
-    [containers, transactions, tx.container_id, tx.to_container_id],
+    () => rankContainersByUsage(activeContainers(containers), transactions),
+    [containers, transactions],
   );
 
   const [date, setDate] = useState(tx.date);
@@ -471,10 +464,10 @@ function TransferForm({
           onTime={setTime}
         />
         <div className="grid gap-1.5">
-          <Label>From</Label>
+          <Label htmlFor="transfer-from">From</Label>
           <Select value={fromId} onValueChange={setFromId}>
-            <SelectTrigger>
-              <SelectValue placeholder="From" />
+            <SelectTrigger id="transfer-from" aria-label="From container">
+              <SelectValue placeholder="From">{from?.name}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {wallets.map((c) => (
@@ -486,10 +479,10 @@ function TransferForm({
           </Select>
         </div>
         <div className="grid gap-1.5">
-          <Label>To</Label>
+          <Label htmlFor="transfer-to">To</Label>
           <Select value={toId} onValueChange={setToId}>
-            <SelectTrigger>
-              <SelectValue placeholder="To" />
+            <SelectTrigger id="transfer-to" aria-label="To container">
+              <SelectValue placeholder="To">{to?.name}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {wallets

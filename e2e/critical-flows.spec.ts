@@ -1319,6 +1319,118 @@ test("searches ledger entries by notes", async ({ page }) => {
   await expect(page.getByText("E2E notes nonmatch", { exact: true })).toHaveCount(0);
 });
 
+test("keeps archived containers out of entry dropdown options", async ({ page }) => {
+  await createCategory(page, "E2E archived-container category");
+  await createContainer(page, "E2E archived wallet");
+  await createContainer(page, "E2E active wallet");
+  await openReady(page, "/ledger", "Overall balance");
+
+  await openQuickAdd(page);
+  await page.getByLabel("Amount").fill("4.00");
+  await page.getByLabel("Vendor").fill("E2E archived-container expense");
+  await choose(page, "Category", "E2E archived-container category");
+  await choose(page, "Container", "E2E archived wallet");
+  await page.getByRole("button", { name: "Log expense" }).click();
+
+  await openQuickAdd(page);
+  await page.getByRole("radio", { name: "Transfer" }).click();
+  await page.getByLabel("Amount").fill("5.00");
+  await page.getByLabel("Transfer label").fill("E2E archived-container transfer");
+  await choose(page, "From container", "General");
+  await choose(page, "To container", "E2E archived wallet");
+  await page.getByRole("button", { name: "Move money" }).click();
+
+  await openReady(page, "/containers", "Containers");
+  await page.getByRole("button", { name: "Actions for E2E archived wallet" }).click();
+  await page.getByRole("menuitem", { name: "Archive" }).click();
+  await page
+    .getByRole("alertdialog", { name: "Archive E2E archived wallet?" })
+    .getByRole("button", { name: "Archive" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Actions for E2E archived wallet" }),
+  ).toHaveCount(0);
+
+  await openReady(page, "/ledger", "Overall balance");
+  await openQuickAdd(page);
+  await page.getByRole("combobox", { name: "Container" }).click();
+  await expect(
+    page.getByRole("option", { name: "E2E archived wallet", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("option", { name: "E2E active wallet", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("radio", { name: "Transfer" }).click();
+  await page.getByRole("combobox", { name: "From container" }).click();
+  await expect(
+    page.getByRole("option", { name: "E2E archived wallet", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("combobox", { name: "To container" }).click();
+  await expect(
+    page.getByRole("option", { name: "E2E archived wallet", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("option", { name: "E2E active wallet", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  const quickAdd = page.getByRole("dialog", { name: "Add an entry" });
+  await quickAdd.getByRole("button", { name: "Close" }).click();
+  await expect(quickAdd).toBeHidden();
+
+  await page
+    .getByRole("button", { name: "Actions for E2E archived-container expense" })
+    .click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  let sheet = page.getByRole("dialog", { name: "Edit transaction" });
+  let container = sheet.getByRole("combobox").nth(1);
+  await expect(container).toHaveText("E2E archived wallet");
+  await container.click();
+  await expect(
+    page.getByRole("option", { name: "E2E archived wallet", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("option", { name: "E2E active wallet", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await sheet.getByRole("button", { name: "Save changes" }).click();
+  await expect(sheet).toBeHidden();
+
+  await page
+    .getByRole("button", { name: "Actions for E2E archived-container transfer" })
+    .click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  sheet = page.getByRole("dialog", { name: "Edit transfer" });
+  const from = sheet.getByRole("combobox").nth(0);
+  const to = sheet.getByRole("combobox").nth(1);
+  await expect(to).toHaveText("E2E archived wallet");
+
+  await from.click();
+  await expect(
+    page.getByRole("option", { name: "E2E archived wallet", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await to.click();
+  await expect(
+    page.getByRole("option", { name: "E2E archived wallet", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("option", { name: "E2E active wallet", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await sheet.getByRole("button", { name: "Save changes" }).click();
+  await expect(sheet).toBeHidden();
+
+  await expect(
+    page.getByText("E2E archived-container expense", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("E2E archived-container transfer", { exact: true }),
+  ).toBeVisible();
+});
+
 test("hides a category expense from dashboard statistics", async ({ page }) => {
   await createCategory(page, "E2E hidden stats");
   await openReady(page, "/ledger", "Overall balance");
