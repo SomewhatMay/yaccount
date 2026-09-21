@@ -12,6 +12,7 @@ import { formatCents, parseDollars } from "@/core/money";
 import {
   transferLabel,
   type Category,
+  type CategoryType,
   type Container,
   type Transaction,
 } from "@/core/model";
@@ -39,6 +40,12 @@ import {
 import { SheetFooter } from "@/components/ui/sheet";
 import { ResponsiveSheet } from "@/features/ui";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+const ENTRY_TYPES: { value: CategoryType; label: string }[] = [
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+];
 
 export function EditTransactionSheet({
   editing,
@@ -197,7 +204,12 @@ function EditForm({
   const [time, setTime] = useState(() => timeInputValue(tx.entered_at));
   const [vendor, setVendor] = useState(tx.vendor_source);
   const [notes, setNotes] = useState(tx.notes ?? "");
-  const [categoryId, setCategoryId] = useState(tx.category_id ?? active[0]?.id ?? "");
+  const [type, setType] = useState<CategoryType>(() => {
+    const saved = categories.find((c) => c.id === tx.category_id);
+    return saved?.type ?? (tx.amount >= 0 ? "income" : "expense");
+  });
+  const categoriesOfType = active.filter((c) => c.type === type);
+  const [pickedCategoryId, setPickedCategoryId] = useState(tx.category_id ?? "");
   const [containerId, setContainerId] = useState(tx.container_id);
   const [amountStr, setAmountStr] = useState((Math.abs(tx.amount) / 100).toFixed(2));
   // The row's own direction is the starting point — editing a refund keeps it.
@@ -205,8 +217,18 @@ function EditForm({
   const [warn, setWarn] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const cat = categories.find((c) => c.id === categoryId);
-  const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
+  const cat =
+    categoriesOfType.find((c) => c.id === pickedCategoryId) ?? categoriesOfType[0];
+  const categoryId = cat?.id ?? "";
+  const sign: Sign = pickedSign ?? defaultSign(type);
+
+  function selectType(next: CategoryType) {
+    setType(next);
+    setPickedCategoryId("");
+    setPickedSign(null);
+    setWarn(null);
+    setError("");
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -242,6 +264,23 @@ function EditForm({
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
       <div className="grid gap-4 px-4">
         {error && <InlineError id="edit-transaction-error">{error}</InlineError>}
+        <ToggleGroup
+          type="single"
+          value={type}
+          onValueChange={(value) => value && selectType(value as CategoryType)}
+          aria-label="Type"
+          className="bg-muted/60 w-full rounded-full p-0.5"
+        >
+          {ENTRY_TYPES.map((entryType) => (
+            <ToggleGroupItem
+              key={entryType.value}
+              value={entryType.value}
+              className="data-[state=on]:bg-background data-[state=on]:text-primary h-8 flex-1 rounded-full text-xs"
+            >
+              {entryType.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         <WhenFields
           idPrefix="edit"
           date={date}
@@ -250,9 +289,7 @@ function EditForm({
           onTime={setTime}
         />
         <div className="grid gap-1.5">
-          <Label htmlFor="edit-vendor">
-            {cat?.type === "income" ? "Source" : "Vendor"}
-          </Label>
+          <Label htmlFor="edit-vendor">{type === "income" ? "Source" : "Vendor"}</Label>
           <Input
             id="edit-vendor"
             value={vendor}
@@ -260,23 +297,29 @@ function EditForm({
           />
         </div>
         <div className="grid gap-1.5">
-          <Label>Category</Label>
+          <Label htmlFor="edit-category">Category</Label>
           <Select
             value={categoryId}
             onValueChange={(v) => {
-              setCategoryId(v);
+              setPickedCategoryId(v);
               setWarn(null);
             }}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Category" />
+            <SelectTrigger id="edit-category" aria-label="Category">
+              <SelectValue placeholder={`No ${type} categories yet`}>
+                {cat ? (
+                  <span className="flex items-center gap-2">
+                    <CategoryGlyph icon={cat.icon} color={categoryColor(cat)} />
+                    {cat.name}
+                  </span>
+                ) : undefined}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {active.map((c) => (
+              {categoriesOfType.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
                   {c.name}
-                  <span className="text-muted-foreground ml-1">· {c.type}</span>
                 </SelectItem>
               ))}
             </SelectContent>

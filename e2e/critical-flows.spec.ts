@@ -1258,6 +1258,50 @@ test("logs an expense and shows it in the ledger", async ({ page }) => {
   await expect(page.getByText("-$12.34", { exact: true }).last()).toBeVisible();
 });
 
+test("edits an entry with categories scoped to its selected type", async ({ page }) => {
+  await createCategory(page, "E2E edit expense");
+  await createCategory(page, "E2E edit income", "Income");
+  await openReady(page, "/ledger", "Overall balance");
+  await logExpense(page, "E2E edit type entry", "9.00", "E2E edit expense");
+
+  await page.getByRole("button", { name: "Actions for E2E edit type entry" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  const sheet = page.getByRole("dialog", { name: "Edit transaction" });
+  await expect(sheet.getByRole("radio", { name: "Expense" })).toBeChecked();
+
+  const category = sheet.getByRole("combobox", { name: "Category" });
+  await category.click();
+  await expect(
+    page.getByRole("option", { name: "E2E edit expense", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "E2E edit income", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  await sheet.getByRole("radio", { name: "Income" }).click();
+  await expect(sheet.getByRole("textbox", { name: "Source" })).toBeVisible();
+  await expect(sheet.getByRole("textbox", { name: "Vendor" })).toHaveCount(0);
+  await expect(category).toHaveText("E2E edit income");
+  await expect(
+    sheet.getByRole("button", { name: "Money in — switch to money out" }),
+  ).toBeVisible();
+
+  await category.click();
+  await expect(
+    page.getByRole("option", { name: "E2E edit income", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "E2E edit expense", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  await sheet.getByRole("button", { name: "Save changes" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText("-$9.00", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("$9.00", { exact: true }).last()).toBeVisible();
+});
+
 test("hides a category expense from dashboard statistics", async ({ page }) => {
   await createCategory(page, "E2E hidden stats");
   await openReady(page, "/ledger", "Overall balance");
