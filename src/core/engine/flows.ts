@@ -1,6 +1,7 @@
 import type { Container, ContainerSnapshot, Transaction } from "../model";
+import { eachDayOfInterval, format } from "date-fns";
 import { isLiveLedgerRow, isTransfer, netContributions } from "./balances";
-import { inRange, monthKeysInRange, type DateRange } from "./period";
+import { inRange, type DateRange } from "./period";
 
 /**
  * Container Flows + investment/asset reporting (§5.4, §5.6). Deferred here from
@@ -25,7 +26,18 @@ export interface InvestmentReport {
   netContributions: number;
   gainLoss: number | null;
   firstSnapshotMonth: string | null;
-  series: { month: string; value: number; contributed: number }[];
+  series: { date: string; value: number; contributed: number }[];
+}
+
+function datesInRange(range: DateRange, fallbackDates: string[]): string[] {
+  const sorted = [...fallbackDates].sort();
+  const start = range.start ?? sorted[0];
+  const end = range.end ?? sorted.at(-1);
+  if (!start || !end || start > end) return [];
+  return eachDayOfInterval({
+    start: new Date(`${start}T00:00:00`),
+    end: new Date(`${end}T00:00:00`),
+  }).map((day) => format(day, "yyyy-MM-dd"));
 }
 
 /**
@@ -155,35 +167,28 @@ export function investmentReport(
         container.id,
       )
     : 0;
-  const keys = monthKeysInRange(
-    range,
-    ownSnapshots
-      .map((s) => s.date)
-      .concat(
-        txns
-          .filter(
-            (t) =>
-              isLiveLedgerRow(t) &&
-              isTransfer(t) &&
-              (t.container_id === container.id || t.to_container_id === container.id),
-          )
-          .map((t) => t.date),
-      ),
-  );
+  const relevantDates = ownSnapshots
+    .map((s) => s.date)
+    .concat(
+      txns
+        .filter(
+          (t) =>
+            isLiveLedgerRow(t) &&
+            isTransfer(t) &&
+            (t.container_id === container.id || t.to_container_id === container.id),
+        )
+        .map((t) => t.date),
+    );
   const series =
     ownSnapshots.length > 0
-      ? keys.flatMap((month) => {
-          const [year, number] = month.split("-").map(Number);
-          const day = new Date(year, number, 0).getDate();
-          const monthEnd = `${month}-${String(day).padStart(2, "0")}`;
-          const targetDate =
-            range.end !== null && monthEnd > range.end ? range.end : monthEnd;
+      ? datesInRange(range, relevantDates).flatMap((date) => {
+          const targetDate = date;
           const value = reconstructedBalance(container.id, snapshots, txns, targetDate);
           const contributed = netContributions(
             txns.filter((t) => t.date <= targetDate),
             container.id,
           );
-          return value === null ? [] : [{ month, value, contributed }];
+          return value === null ? [] : [{ date, value, contributed }];
         })
       : [];
   const firstSnapshot = ownSnapshots.reduce<ContainerSnapshot | null>(

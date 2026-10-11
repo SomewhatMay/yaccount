@@ -116,6 +116,37 @@ describe("unrealizedGainLoss — Current Value − Net Contributions (§5.6)", (
 });
 
 describe("investmentReport — one reporting window (§5.6)", () => {
+  it("reconstructs a daily series instead of one point per month", () => {
+    const snaps = [
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-06-28",
+        reported_balance: 100000,
+      }),
+    ];
+    const shortRange = resolvePeriod(
+      { kind: "custom", start: "2026-06-28", end: "2026-06-30" },
+      "2026-07-21",
+    );
+
+    const afterSnapshot = makeTransfer({
+      date: "2026-06-29",
+      amount: 5000,
+      container_id: "general",
+      to_container_id: "savings",
+      fromName: "General",
+      toName: "Savings",
+    });
+    const report = investmentReport(savings, snaps, [...txns, afterSnapshot], shortRange);
+
+    expect(report.series.map((point) => point.date)).toEqual([
+      "2026-06-28",
+      "2026-06-29",
+      "2026-06-30",
+    ]);
+    expect(report.series.map((point) => point.value)).toEqual([100000, 105000, 105000]);
+  });
+
   it("values every headline at the latest snapshot in a past range", () => {
     const snaps = [
       makeContainerSnapshot({
@@ -158,7 +189,9 @@ describe("investmentReport — one reporting window (§5.6)", () => {
 
     const report = investmentReport(savings, snaps, [], range);
 
-    expect(report.series.map((point) => point.month)).toEqual(["2026-05", "2026-06"]);
+    expect(report.series.map((point) => point.date)).toHaveLength(31);
+    expect(report.series[0]?.date).toBe("2026-05-31");
+    expect(report.series.at(-1)?.date).toBe("2026-06-30");
   });
 
   it("separates value from contributed basis when a deposit causes the increase", () => {
@@ -181,10 +214,16 @@ describe("investmentReport — one reporting window (§5.6)", () => {
 
     const report = investmentReport(savings, snaps, txns.slice(0, 2), throughJune);
 
-    expect(report.series).toEqual([
-      { month: "2026-05", value: 100000, contributed: 100000 },
-      { month: "2026-06", value: 150000, contributed: 150000 },
-    ]);
+    expect(report.series.find((point) => point.date === "2026-05-31")).toEqual({
+      date: "2026-05-31",
+      value: 100000,
+      contributed: 100000,
+    });
+    expect(report.series.find((point) => point.date === "2026-06-30")).toEqual({
+      date: "2026-06-30",
+      value: 150000,
+      contributed: 150000,
+    });
   });
 });
 

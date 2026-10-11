@@ -644,13 +644,14 @@ export function BudgetComparisonTable({
 // ── Investment gain/loss card + reconstructed-balance sparkline (§5.6) ────────
 export function InvestmentCard({ report }: { report: InvestmentReport }) {
   const { currentValue, netContributions, gainLoss, series } = report;
-  const withYear = spansYears(series.map((m) => m.month));
-  const data = series.map((m) => {
+  const withYear = spansYears(series.map((point) => point.date));
+  const data = series.map((point) => {
     const reconstructed =
-      report.firstSnapshotMonth !== null && m.month < report.firstSnapshotMonth;
+      report.firstSnapshotMonth !== null &&
+      point.date.slice(0, 7) < report.firstSnapshotMonth;
     return {
-      ...m,
-      label: `${monthLabel(m.month, withYear)}${reconstructed ? "*" : ""}`,
+      ...point,
+      label: `${dayLabel(point.date, withYear)}${reconstructed ? "*" : ""}`,
     };
   });
   const hasReconstructed = data.some((m) => m.label.endsWith("*"));
@@ -726,4 +727,9 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
       )}
     </div>
   );
+}
+
+function dayLabel(date: string, withYear: boolean): string {
+  const [year, , day] = date.split("-").map(Number);
+  return `${monthLabel(date.slice(0, 7))} ${day}${withYear ? ` '${String(year).slice(2)}` : ""}`;
 }
