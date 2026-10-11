@@ -474,6 +474,8 @@ function CategoryRow({
     flashRow({ id: category.id });
   }
 
+  const onEdit = () => setEditing(true);
+
   return (
     <div
       ref={ref}
@@ -517,7 +519,7 @@ function CategoryRow({
         )}
       </div>
       <RowActions label={`Actions for ${category.name}`}>
-        <DropdownMenuItem onClick={() => setEditing(true)}>
+        <DropdownMenuItem onClick={onEdit}>
           <PencilIcon className="size-4" />
           Rename
         </DropdownMenuItem>

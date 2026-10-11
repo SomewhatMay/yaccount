@@ -68,6 +68,7 @@ import { describeGoal } from "@/features/goals/describe";
 import { GoalSheet, type GoalFormInput } from "@/features/goals/GoalSheet";
 import { renamedGoalContainer } from "@/features/goals/rename-container";
 import { reopenedGoal } from "@/features/goals/reopen";
+import { activateCardOnClick } from "@/features/ui/card-interaction";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -510,8 +511,9 @@ function GoalCard({
   return (
     <div
       ref={ref}
+      onClick={(event) => activateCardOnClick(event, onEdit)}
       className={cn(
-        "rounded-2xl border p-5 transition-colors ease-[var(--ease-register)]",
+        "cursor-pointer rounded-2xl border p-5 transition-colors ease-[var(--ease-register)]",
         flashed
           ? "bg-primary/15 duration-[var(--dur-2)]"
           : "bg-card duration-[var(--dur-1)]",

@@ -444,6 +444,8 @@ function ContainerRow({
     flashRow({ id: container.id });
   }
 
+  const onEdit = () => setEditing(true);
+
   const marginalia = [
     container.include_in_overall_balance ? "counted" : "not counted",
     container.is_investment ? `contributed ${formatCents(contributed)}` : null,
@@ -499,7 +501,7 @@ function ContainerRow({
         className="text-sm tracking-tight"
       />
       <RowActions label={`Actions for ${container.name}`}>
-        <DropdownMenuItem onClick={() => setEditing(true)}>
+        <DropdownMenuItem onClick={onEdit}>
           <PencilIcon className="size-4" />
           Rename
         </DropdownMenuItem>

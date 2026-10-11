@@ -58,6 +58,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { todayIso } from "@/features/clock";
+import { activateCardOnClick } from "@/features/ui/card-interaction";
 import {
   CollapsibleSection,
   EmptyState,
@@ -413,8 +414,9 @@ function RuleRow({
   return (
     <div
       ref={ref}
+      onClick={(event) => activateCardOnClick(event, onEdit)}
       className={cn(
-        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        "group flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
         flashed
           ? "bg-primary/15 duration-[var(--dur-2)]"
           : "hover:bg-muted/40 duration-[var(--dur-1)]",
