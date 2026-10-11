@@ -74,7 +74,7 @@ describe("usage-ranked selectors", () => {
     ]);
   });
 
-  it("counts both transfer endpoints once for container participation", () => {
+  it("orders container dropdown options alphabetically regardless of activity", () => {
     const containers = [
       makeContainer({ id: "unused", name: "Alpha" }),
       makeContainer({ id: "destination", name: "Destination" }),
@@ -97,10 +97,10 @@ describe("usage-ranked selectors", () => {
     ];
 
     expect(rankContainersByUsage(containers, rows).map((c) => c.id)).toEqual([
-      "source",
-      "entry",
-      "destination",
       "unused",
+      "destination",
+      "entry",
+      "source",
     ]);
   });
 
