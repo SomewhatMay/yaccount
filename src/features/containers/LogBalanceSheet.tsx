@@ -26,6 +26,7 @@ import { ResponsiveSheet, RowActions } from "@/features/ui";
 import { InlineError } from "@/features/ui/InlineError";
 import { todayIso } from "@/features/clock";
 import { Eyebrow } from "@/features/ui";
+import { activateCardOnClick } from "@/features/ui/card-interaction";
 
 /**
  * What an investment container is really worth, over time (§5.6). Market growth
@@ -189,8 +190,9 @@ function BalanceHistory({
             history.map((s, i) => (
               <div
                 key={s.id}
+                onClick={(event) => activateCardOnClick(event, () => startEdit(s))}
                 className={cn(
-                  "group hover:bg-muted/40 flex items-center gap-3 px-4 py-2.5 transition-colors",
+                  "group hover:bg-muted/40 flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors",
                   i > 0 && "border-t",
                   editing?.id === s.id && "bg-primary/[0.06]",
                 )}

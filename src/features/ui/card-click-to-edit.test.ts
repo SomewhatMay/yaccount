@@ -6,15 +6,18 @@ const source = (path: string) => readFileSync(new URL(path, import.meta.url), "u
 
 describe("click-to-edit cards", () => {
   it.each([
-    "../ledger/LedgerView.tsx",
-    "../goals/GoalsView.tsx",
-    "../cravings/CravingsView.tsx",
-    "../containers/ContainersView.tsx",
-    "../categories/CategoriesView.tsx",
-    "../recurring/RecurringView.tsx",
-    "../containers/LogBalanceSheet.tsx",
-  ])("opens the editor when the card body is clicked (%s)", (path) => {
-    expect(source(path).includes("activateCardOnClick(event, onEdit)")).toBe(true);
+    ["../ledger/LedgerView.tsx", "activateCardOnClick(event, onEdit)"],
+    ["../goals/GoalsView.tsx", "activateCardOnClick(event, onEdit)"],
+    ["../cravings/CravingsView.tsx", "activateCardOnClick(event, onEdit)"],
+    ["../containers/ContainersView.tsx", "activateCardOnClick(event, onEdit)"],
+    ["../categories/CategoriesView.tsx", "activateCardOnClick(event, onEdit)"],
+    ["../recurring/RecurringView.tsx", "activateCardOnClick(event, onEdit)"],
+    [
+      "../containers/LogBalanceSheet.tsx",
+      "activateCardOnClick(event, () => startEdit(s))",
+    ],
+  ])("opens the editor when the card body is clicked (%s)", (path, handler) => {
+    expect(source(path).includes(handler)).toBe(true);
   });
 
   it("opens from card content", () => {
