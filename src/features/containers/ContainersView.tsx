@@ -41,7 +41,6 @@ import {
   ContainerSheet,
   type ContainerFormInput,
 } from "@/features/containers/ContainerSheet";
-import { activateCardOnClick } from "@/features/ui/card-interaction";
 import {
   activeContainerFilterCount,
   applyContainerFilter,
@@ -458,9 +457,8 @@ function ContainerRow({
   return (
     <div
       ref={ref}
-      onClick={(event) => !editing && activateCardOnClick(event, onEdit)}
       className={cn(
-        "group flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
         flashed
           ? "bg-primary/15 duration-[var(--dur-2)]"
           : "hover:bg-muted/40 duration-[var(--dur-1)]",
