@@ -152,7 +152,7 @@ describe("creation autocomplete", () => {
     expect(recallVendorSelection(rows, categories, "expense", "café unknown")).toBeNull();
   });
 
-  it("ranks existing entity options by prefix then supplied usage order", () => {
+  it("orders matching entity options alphabetically", () => {
     const options = [
       { id: "common", label: "Main Coffee Card" },
       { id: "prefix-common", label: "Cash" },
@@ -161,10 +161,15 @@ describe("creation autocomplete", () => {
     ];
 
     expect(rankAutocompleteOptions(options, "ca").map((option) => option.id)).toEqual([
-      "prefix-common",
       "prefix-other",
+      "prefix-common",
       "common",
     ]);
-    expect(rankAutocompleteOptions(options, "")).toEqual(options);
+    expect(rankAutocompleteOptions(options, "").map((option) => option.id)).toEqual([
+      "prefix-other",
+      "prefix-common",
+      "common",
+      "miss",
+    ]);
   });
 });
