@@ -34,15 +34,10 @@ function rank<T extends { id: string }>(
 }
 
 /** Rank only the candidates supplied; filtering/type/archive policy stays with the control. */
-export function rankCategoriesByUsage(
-  candidates: Category[],
-  transactions: Transaction[],
-): Category[] {
-  const usage = new Map<string, Usage>();
-  for (const row of activeRows(transactions)) {
-    if (row.category_id) touch(usage, row.category_id, row);
-  }
-  return rank(candidates, usage, (category) => category.name);
+export function sortCategoriesAlphabetically(candidates: Category[]): Category[] {
+  return [...candidates].sort(
+    (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+  );
 }
 
 /** Transfers count once at each endpoint; ordinary entries count their one container. */

@@ -5,8 +5,8 @@ import { Trash2Icon } from "lucide-react";
 import { updateTransaction } from "@/core/commands";
 import { isTransfer } from "@/core/engine/balances";
 import {
-  rankCategoriesByUsage,
   rankContainersByUsage,
+  sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import { formatCents, parseDollars } from "@/core/money";
 import {
@@ -185,11 +185,10 @@ function EditForm({
 }) {
   const active = useMemo(
     () =>
-      rankCategoriesByUsage(
+      sortCategoriesAlphabetically(
         categories.filter((c) => !c.is_archived || c.id === tx.category_id),
-        transactions,
       ),
-    [categories, transactions, tx.category_id],
+    [categories, tx.category_id],
   );
   const wallets = useMemo(
     () => rankContainersByUsage(activeContainers(containers), transactions),

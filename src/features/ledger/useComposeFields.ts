@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
 import type { Category, Container, Transaction } from "@/core/model";
 import {
-  rankCategoriesByUsage,
   rankContainersByUsage,
+  sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import {
   rankVendorSourcesForKind,
@@ -50,12 +50,8 @@ export function useComposeFields({
   const flashRow = useSetAtom(flashRowAtom);
 
   const activeCategories = useMemo(
-    () =>
-      rankCategoriesByUsage(
-        categories.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [categories, transactions],
+    () => sortCategoriesAlphabetically(categories.filter((c) => !c.is_archived)),
+    [categories],
   );
   const activeContainers = useMemo(
     () =>

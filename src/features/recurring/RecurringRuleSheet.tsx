@@ -17,8 +17,8 @@ import {
   type WeeklyConfig,
 } from "@/core/model";
 import {
-  rankCategoriesByUsage,
   rankContainersByUsage,
+  sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import {
   rankVendorSourcesForKind,
@@ -110,11 +110,10 @@ function RuleForm({
 }) {
   const activeCategories = useMemo(
     () =>
-      rankCategoriesByUsage(
+      sortCategoriesAlphabetically(
         categories.filter((c) => !c.is_archived || c.id === rule?.template_category_id),
-        transactions,
       ),
-    [categories, rule, transactions],
+    [categories, rule?.template_category_id],
   );
   const activeContainers = useMemo(
     () =>
