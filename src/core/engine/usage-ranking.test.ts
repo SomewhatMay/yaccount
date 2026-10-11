@@ -37,7 +37,7 @@ const entry = (
   });
 
 describe("usage-ranked selectors", () => {
-  it("ranks categories by active count, recency, locale-aware name, then id", () => {
+  it("sorts categories alphabetically, independent of use", () => {
     const categories = [
       makeCategory({ id: "unused-z", name: "Zulu", type: "expense" }),
       makeCategory({ id: "name-b", name: "Éclair", type: "expense" }),
@@ -55,11 +55,11 @@ describe("usage-ranked selectors", () => {
     ];
 
     expect(rankCategoriesByUsage(categories, rows).map((c) => c.id)).toEqual([
-      "frequent",
-      "recent",
+      "unused-a",
       "name-a",
       "name-b",
-      "unused-a",
+      "frequent",
+      "recent",
       "unused-z",
     ]);
   });
