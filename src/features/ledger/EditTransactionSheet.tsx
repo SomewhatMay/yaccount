@@ -5,7 +5,7 @@ import { Trash2Icon } from "lucide-react";
 import { updateTransaction } from "@/core/commands";
 import { isTransfer } from "@/core/engine/balances";
 import {
-  rankContainersByUsage,
+  sortContainersAlphabetically,
   sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import { formatCents, parseDollars } from "@/core/money";
@@ -191,8 +191,8 @@ function EditForm({
     [categories, tx.category_id],
   );
   const wallets = useMemo(
-    () => rankContainersByUsage(activeContainers(containers), transactions),
-    [containers, transactions],
+    () => sortContainersAlphabetically(activeContainers(containers)),
+    [containers, tx.category_id],
   );
 
   const [date, setDate] = useState(tx.date);
@@ -401,8 +401,8 @@ function TransferForm({
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const wallets = useMemo(
-    () => rankContainersByUsage(activeContainers(containers), transactions),
-    [containers, transactions],
+    () => sortContainersAlphabetically(activeContainers(containers)),
+    [containers, tx.container_id],
   );
 
   const [date, setDate] = useState(tx.date);

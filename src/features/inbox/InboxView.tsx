@@ -25,7 +25,7 @@ import { isTransfer } from "@/core/engine/balances";
 import { activeFilterCount, applyFilter, isFilterActive } from "@/core/engine/filter";
 import { isRegisterSort, pendingRows, sortRegister } from "@/core/engine/ledger";
 import {
-  rankContainersByUsage,
+  sortContainersAlphabetically,
   sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
@@ -103,12 +103,8 @@ export function InboxView() {
     [categories],
   );
   const rankedContainers = useMemo(
-    () =>
-      rankContainersByUsage(
-        containers.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [containers, transactions],
+    () => sortContainersAlphabetically(containers.filter((c) => !c.is_archived)),
+    [containers],
   );
 
   const nameOf = useMemo(() => {

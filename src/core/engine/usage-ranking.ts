@@ -40,19 +40,11 @@ export function sortCategoriesAlphabetically(candidates: Category[]): Category[]
   );
 }
 
-/** Transfers count once at each endpoint; ordinary entries count their one container. */
-export function rankContainersByUsage(
-  candidates: Container[],
-  transactions: Transaction[],
-): Container[] {
-  const usage = new Map<string, Usage>();
-  for (const row of activeRows(transactions)) {
-    touch(usage, row.container_id, row);
-    if (row.to_container_id && row.to_container_id !== row.container_id) {
-      touch(usage, row.to_container_id, row);
-    }
-  }
-  return rank(candidates, usage, (container) => container.name);
+/** Rank-independent A–Z order for container selectors. */
+export function sortContainersAlphabetically(candidates: Container[]): Container[] {
+  return [...candidates].sort(
+    (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+  );
 }
 
 /**

@@ -10,10 +10,10 @@ import {
   type Transaction,
 } from "@/core/model";
 import {
-  rankContainersByUsage,
   rankShortcutsByUsage,
   rankVendorSourcesByUsage,
   sortCategoriesAlphabetically,
+  sortContainersAlphabetically,
 } from "./usage-ranking";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -36,7 +36,7 @@ const entry = (
     inbox_status,
   });
 
-describe("usage-ranked selectors", () => {
+describe("selector ordering", () => {
   it("sorts categories alphabetically, independent of use", () => {
     const categories = [
       makeCategory({ id: "unused-z", name: "Zulu", type: "expense" }),
@@ -74,29 +74,14 @@ describe("usage-ranked selectors", () => {
     ]);
   });
 
-  it("orders container dropdown options alphabetically regardless of activity", () => {
+  it("orders container dropdown options alphabetically", () => {
     const containers = [
       makeContainer({ id: "unused", name: "Alpha" }),
       makeContainer({ id: "destination", name: "Destination" }),
       makeContainer({ id: "source", name: "Source" }),
       makeContainer({ id: "entry", name: "Entry" }),
     ];
-    const transfer = makeTransfer({
-      id: "transfer",
-      date: "2026-07-01",
-      amount: 100,
-      container_id: "source",
-      to_container_id: "destination",
-      vendor_source: "Move",
-      entered_at: "2026-07-02T00:00:00.000Z",
-    });
-    const rows = [
-      transfer,
-      entry("entry-1", "cat", "entry", "2026-07-03T00:00:00.000Z"),
-      entry("source-2", "cat", "source", "2026-07-01T00:00:00.000Z"),
-    ];
-
-    expect(rankContainersByUsage(containers, rows).map((c) => c.id)).toEqual([
+    expect(sortContainersAlphabetically(containers).map((c) => c.id)).toEqual([
       "unused",
       "destination",
       "entry",
@@ -265,23 +250,23 @@ describe("usage-ranked selectors", () => {
     ];
     const original = [...candidates];
 
-    expect(rankContainersByUsage(candidates, []).map((c) => c.id)).toEqual(["a", "b"]);
+    expect(sortContainersAlphabetically(candidates).map((c) => c.id)).toEqual(["a", "b"]);
     expect(candidates).toEqual(original);
-    expect(rankContainersByUsage(candidates, []).map((c) => c.id)).toEqual(["a", "b"]);
+    expect(sortContainersAlphabetically(candidates).map((c) => c.id)).toEqual(["a", "b"]);
   });
 
   it.each([
     ["../../features/ledger/useComposeFields.ts", "sortCategoriesAlphabetically"],
-    ["../../features/ledger/useComposeFields.ts", "rankContainersByUsage"],
+    ["../../features/ledger/useComposeFields.ts", "sortContainersAlphabetically"],
     ["../../features/ledger/EditTransactionSheet.tsx", "sortCategoriesAlphabetically"],
-    ["../../features/ledger/EditTransactionSheet.tsx", "rankContainersByUsage"],
+    ["../../features/ledger/EditTransactionSheet.tsx", "sortContainersAlphabetically"],
     ["../../features/recurring/RecurringRuleSheet.tsx", "sortCategoriesAlphabetically"],
-    ["../../features/recurring/RecurringRuleSheet.tsx", "rankContainersByUsage"],
+    ["../../features/recurring/RecurringRuleSheet.tsx", "sortContainersAlphabetically"],
     ["../../features/ledger/LedgerView.tsx", "sortCategoriesAlphabetically"],
-    ["../../features/ledger/LedgerView.tsx", "rankContainersByUsage"],
+    ["../../features/ledger/LedgerView.tsx", "sortContainersAlphabetically"],
     ["../../features/inbox/InboxView.tsx", "sortCategoriesAlphabetically"],
-    ["../../features/inbox/InboxView.tsx", "rankContainersByUsage"],
-    ["../../features/goals/GoalSheet.tsx", "rankContainersByUsage"],
+    ["../../features/inbox/InboxView.tsx", "sortContainersAlphabetically"],
+    ["../../features/goals/GoalSheet.tsx", "sortContainersAlphabetically"],
     ["../../features/shell/QuickAddSheet.tsx", "rankShortcutsByUsage"],
   ])("routes selector options in %s through %s", (path, helper) => {
     expect(source(path)).toContain(helper);

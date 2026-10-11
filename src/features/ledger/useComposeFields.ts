@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
 import type { Category, Container, Transaction } from "@/core/model";
 import {
-  rankContainersByUsage,
+  sortContainersAlphabetically,
   sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import {
@@ -54,12 +54,8 @@ export function useComposeFields({
     [categories],
   );
   const activeContainers = useMemo(
-    () =>
-      rankContainersByUsage(
-        containers.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [containers, transactions],
+    () => sortContainersAlphabetically(containers.filter((c) => !c.is_archived)),
+    [containers],
   );
   const [kind, setKindState] = useState<ComposeKind>(initialKind);
   // One control for "when" — date and time together. Untouched, the row takes the

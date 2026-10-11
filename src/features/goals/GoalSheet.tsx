@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { parseDollars } from "@/core/money";
 import type { Container, Goal, GoalKind, GoalMode, Transaction } from "@/core/model";
-import { rankContainersByUsage } from "@/core/engine/usage-ranking";
+import { sortContainersAlphabetically } from "@/core/engine/usage-ranking";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,12 +109,8 @@ function GoalForm({
   const [error, setError] = useState("");
 
   const activeContainers = useMemo(
-    () =>
-      rankContainersByUsage(
-        containers.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [containers, transactions],
+    () => sortContainersAlphabetically(containers.filter((c) => !c.is_archived)),
+    [containers],
   );
 
   const targetRequired = mode === "deadline" || kind === "reserve";
