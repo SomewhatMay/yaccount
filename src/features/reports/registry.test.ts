@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { isValidElement } from "react";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
+import { describe, it, expect, vi } from "vitest";
+import type { WidgetContext } from "./registry";
 import { DASHBOARD_WIDGETS } from "./registry";
 
 /**
@@ -204,6 +207,34 @@ describe("the dashboard widget registry", () => {
     expect(resilience?.loadCompact).toBeTypeOf("function");
     expect(resilience?.math).toBeTypeOf("function");
     expect(resilience?.availability).toBeTypeOf("function");
+  });
+
+  it("offers a persisted gain/loss-only chart option in the Investments menu", () => {
+    const investments = DASHBOARD_WIDGETS.find((widget) => widget.id === "investments");
+    const saveInstanceSettings = vi.fn(async () => {});
+    const context = {
+      instanceSettings: { otherPreference: true },
+      saveInstanceSettings,
+    } as unknown as WidgetContext;
+    const item = investments?.renderMenu?.(context);
+
+    expect(isValidElement(item)).toBe(true);
+    if (!isValidElement(item)) throw new Error("Expected an investment menu item");
+    const props = item.props as {
+      checked: boolean;
+      children: string;
+      onCheckedChange: (checked: boolean) => void;
+    };
+    expect(item.type).toBe(DropdownMenuCheckboxItem);
+    expect(props).toMatchObject({
+      checked: false,
+      children: "Show gain/loss only",
+    });
+    props.onCheckedChange(true);
+    expect(saveInstanceSettings).toHaveBeenCalledWith({
+      otherPreference: true,
+      showDifferenceOnly: true,
+    });
   });
 
   it("adds repeatable fixed-current Watch instance types", () => {
