@@ -116,6 +116,29 @@ describe("unrealizedGainLoss — Current Value − Net Contributions (§5.6)", (
 });
 
 describe("investmentReport — one reporting window (§5.6)", () => {
+  it("reconstructs a daily series instead of one point per month", () => {
+    const snaps = [
+      makeContainerSnapshot({
+        container_id: "savings",
+        date: "2026-06-28",
+        reported_balance: 100000,
+      }),
+    ];
+    const shortRange = resolvePeriod(
+      { kind: "custom", start: "2026-06-28", end: "2026-06-30" },
+      "2026-07-21",
+    );
+
+    const report = investmentReport(savings, snaps, txns, shortRange);
+
+    expect(report.series.map((point) => point.date)).toEqual([
+      "2026-06-28",
+      "2026-06-29",
+      "2026-06-30",
+    ]);
+    expect(report.series.map((point) => point.value)).toEqual([100000, 150000, 150000]);
+  });
+
   it("values every headline at the latest snapshot in a past range", () => {
     const snaps = [
       makeContainerSnapshot({
