@@ -26,6 +26,7 @@ import { categoryColor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
 import { formatEnteredTime, todayIso } from "@/features/clock";
 import { composeCravingWinRemoval } from "@/features/cravings/compose";
+import { activateCardOnClick } from "@/features/ui/card-interaction";
 import {
   categoriesAtom,
   containersAtom,
@@ -331,8 +332,9 @@ function CravingWinRow({
   return (
     <div
       ref={ref}
+      onClick={(event) => activateCardOnClick(event, onEdit)}
       className={cn(
-        "group flex items-start gap-3 px-5 py-4 transition-colors ease-[var(--ease-register)]",
+        "group flex cursor-pointer items-start gap-3 px-5 py-4 transition-colors ease-[var(--ease-register)]",
         flashed ? "bg-primary/15 duration-[var(--dur-2)]" : "duration-[var(--dur-1)]",
       )}
     >

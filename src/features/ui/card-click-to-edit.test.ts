@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { activateCardOnClick } from "./card-interaction";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -11,5 +12,17 @@ describe("click-to-edit cards", () => {
     "../containers/ContainersView.tsx",
   ])("opens the editor when the card body is clicked (%s)", (path) => {
     expect(source(path)).toContain("activateCardOnClick(event, onEdit)");
+  });
+
+  it("opens from card content", () => {
+    const onEdit = vi.fn();
+    activateCardOnClick({ target: { closest: () => null } } as never, onEdit);
+    expect(onEdit).toHaveBeenCalledOnce();
+  });
+
+  it("does not turn nested controls into edit clicks", () => {
+    const onEdit = vi.fn();
+    activateCardOnClick({ target: { closest: () => ({}) } } as never, onEdit);
+    expect(onEdit).not.toHaveBeenCalled();
   });
 });

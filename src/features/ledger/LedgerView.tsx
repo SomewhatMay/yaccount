@@ -74,6 +74,7 @@ import { FilterBar } from "@/features/FilterBar";
 import { EditTransactionSheet } from "@/features/ledger/EditTransactionSheet";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { activateCardOnClick } from "@/features/ui/card-interaction";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -632,8 +633,9 @@ function LedgerRow({
   return (
     <div
       ref={row}
+      onClick={(event) => activateCardOnClick(event, onEdit)}
       className={cn(
-        "group flex items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        "group flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
         // The end of §12.5's one orchestrated moment: the row lands carrying a
         // single iris wash, which then settles. Everywhere else on this row,
         // motion is a colour under the pointer — including the press state, which
