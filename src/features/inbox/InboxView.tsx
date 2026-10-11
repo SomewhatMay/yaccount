@@ -25,8 +25,8 @@ import { isTransfer } from "@/core/engine/balances";
 import { activeFilterCount, applyFilter, isFilterActive } from "@/core/engine/filter";
 import { isRegisterSort, pendingRows, sortRegister } from "@/core/engine/ledger";
 import {
-  rankCategoriesByUsage,
-  rankContainersByUsage,
+  sortContainersAlphabetically,
+  sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
@@ -99,20 +99,12 @@ export function InboxView() {
 
   const pending = useMemo(() => pendingRows(transactions), [transactions]);
   const rankedCategories = useMemo(
-    () =>
-      rankCategoriesByUsage(
-        categories.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [categories, transactions],
+    () => sortCategoriesAlphabetically(categories.filter((c) => !c.is_archived)),
+    [categories],
   );
   const rankedContainers = useMemo(
-    () =>
-      rankContainersByUsage(
-        containers.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [containers, transactions],
+    () => sortContainersAlphabetically(containers.filter((c) => !c.is_archived)),
+    [containers],
   );
 
   const nameOf = useMemo(() => {

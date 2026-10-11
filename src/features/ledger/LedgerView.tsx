@@ -41,8 +41,8 @@ import { NO_FILTER, toFilter, type FilterDraft } from "@/features/filter-draft";
 import { parseLedgerQuery } from "@/features/ledger/deep-link";
 import { activeRows, isRegisterSort, sortRegister } from "@/core/engine/ledger";
 import {
-  rankCategoriesByUsage,
-  rankContainersByUsage,
+  sortContainersAlphabetically,
+  sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import { trailingDays } from "@/core/engine/period";
 import {
@@ -255,20 +255,12 @@ export function LedgerView() {
   // palette and every M11 list view narrow rows by one rule.
   const live = useMemo(() => activeRows(transactions), [transactions]);
   const rankedCategories = useMemo(
-    () =>
-      rankCategoriesByUsage(
-        categories.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [categories, transactions],
+    () => sortCategoriesAlphabetically(categories.filter((c) => !c.is_archived)),
+    [categories],
   );
   const rankedContainers = useMemo(
-    () =>
-      rankContainersByUsage(
-        containers.filter((c) => !c.is_archived),
-        transactions,
-      ),
-    [containers, transactions],
+    () => sortContainersAlphabetically(containers.filter((c) => !c.is_archived)),
+    [containers],
   );
   const rows = useMemo(
     () => sortRegister(applyFilter(live, filter, { label: labelOf }), sort),

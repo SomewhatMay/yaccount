@@ -17,8 +17,8 @@ import {
   type WeeklyConfig,
 } from "@/core/model";
 import {
-  rankCategoriesByUsage,
-  rankContainersByUsage,
+  sortContainersAlphabetically,
+  sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import {
   rankVendorSourcesForKind,
@@ -110,24 +110,22 @@ function RuleForm({
 }) {
   const activeCategories = useMemo(
     () =>
-      rankCategoriesByUsage(
+      sortCategoriesAlphabetically(
         categories.filter((c) => !c.is_archived || c.id === rule?.template_category_id),
-        transactions,
       ),
-    [categories, rule, transactions],
+    [categories, rule?.template_category_id],
   );
   const activeContainers = useMemo(
     () =>
-      rankContainersByUsage(
+      sortContainersAlphabetically(
         containers.filter(
           (c) =>
             !c.is_archived ||
             c.id === rule?.template_container_id ||
             c.id === rule?.template_to_container_id,
         ),
-        transactions,
       ),
-    [containers, rule, transactions],
+    [containers, rule?.template_container_id, rule?.template_to_container_id],
   );
   const editingTransfer = rule ? isTransferRule(rule) : false;
   const [mode, setMode] = useState<"entry" | "transfer">(

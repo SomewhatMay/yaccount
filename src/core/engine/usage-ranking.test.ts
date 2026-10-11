@@ -10,10 +10,10 @@ import {
   type Transaction,
 } from "@/core/model";
 import {
-  rankCategoriesByUsage,
-  rankContainersByUsage,
   rankShortcutsByUsage,
   rankVendorSourcesByUsage,
+  sortCategoriesAlphabetically,
+  sortContainersAlphabetically,
 } from "./usage-ranking";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -36,8 +36,8 @@ const entry = (
     inbox_status,
   });
 
-describe("usage-ranked selectors", () => {
-  it("ranks categories by active count, recency, locale-aware name, then id", () => {
+describe("selector ordering", () => {
+  it("sorts categories alphabetically, independent of use", () => {
     const categories = [
       makeCategory({ id: "unused-z", name: "Zulu", type: "expense" }),
       makeCategory({ id: "name-b", name: "Éclair", type: "expense" }),
@@ -46,67 +46,14 @@ describe("usage-ranked selectors", () => {
       makeCategory({ id: "frequent", name: "Frequent", type: "expense" }),
       makeCategory({ id: "unused-a", name: "Alpha", type: "expense" }),
     ];
-    const rows = [
-      entry("f1", "frequent", "wallet", "2026-07-01T09:00:00.000Z"),
-      entry("f2", "frequent", "wallet", "2026-07-01T10:00:00.000Z"),
-      entry("r1", "recent", "wallet", "2026-07-02T10:00:00.000Z"),
-      entry("n1", "name-a", "wallet", "2026-07-01T08:00:00.000Z"),
-      entry("n2", "name-b", "wallet", "2026-07-01T08:00:00.000Z"),
-    ];
-
-    expect(rankCategoriesByUsage(categories, rows).map((c) => c.id)).toEqual([
-      "frequent",
-      "recent",
+    expect(sortCategoriesAlphabetically(categories).map((c) => c.id)).toEqual([
+      "unused-a",
       "name-a",
       "name-b",
-      "unused-a",
+      "frequent",
+      "recent",
       "unused-z",
     ]);
-  });
-
-  it("ignores voided, template, and pending category rows and uses date fallback", () => {
-    const categories = [
-      makeCategory({ id: "kept", name: "Kept", type: "expense" }),
-      makeCategory({ id: "ignored", name: "Ignored", type: "expense" }),
-      makeCategory({ id: "older", name: "Older", type: "expense" }),
-    ];
-    const voided = entry("voided", "ignored", "wallet", "2026-07-04T00:00:00.000Z");
-    const template = makeTemplate({
-      id: "template",
-      template_name: "Template",
-      amount: -100,
-      vendor_source: "Template",
-      container_id: "wallet",
-      category_id: "ignored",
-    });
-    const pending = entry(
-      "pending",
-      "ignored",
-      "wallet",
-      "2026-07-05T00:00:00.000Z",
-      "pending",
-    );
-    const fallback: Transaction = {
-      ...entry("fallback", "kept", "wallet", null),
-      date: "2026-07-03",
-      yearMonth: "2026-07",
-    };
-    const older: Transaction = {
-      ...entry("older-row", "older", "wallet", null),
-      date: "2026-07-02",
-      yearMonth: "2026-07",
-    };
-
-    expect(
-      rankCategoriesByUsage(categories, [
-        voided,
-        makeVoidRow(voided, { id: "void" }),
-        template,
-        pending,
-        fallback,
-        older,
-      ]).map((c) => c.id),
-    ).toEqual(["kept", "older", "ignored"]);
   });
 
   it("keeps category type partitions and caller-provided archived inclusion intact", () => {
@@ -116,51 +63,29 @@ describe("usage-ranked selectors", () => {
       ...makeCategory({ id: "archived", name: "Archived", type: "expense" }),
       is_archived: true,
     };
-    const rows = [
-      entry("i1", "income", "wallet", "2026-07-03T00:00:00.000Z"),
-      entry("a1", "archived", "wallet", "2026-07-02T00:00:00.000Z"),
-      entry("e1", "expense", "wallet", "2026-07-01T00:00:00.000Z"),
-    ];
-
     expect(
-      rankCategoriesByUsage(
+      sortCategoriesAlphabetically(
         [expense, income, archived].filter((c) => c.type === "expense" && !c.is_archived),
-        rows,
       ).map((c) => c.id),
     ).toEqual(["expense"]);
-    expect(rankCategoriesByUsage([expense, archived], rows).map((c) => c.id)).toEqual([
+    expect(sortCategoriesAlphabetically([expense, archived]).map((c) => c.id)).toEqual([
       "archived",
       "expense",
     ]);
   });
 
-  it("counts both transfer endpoints once for container participation", () => {
+  it("orders container dropdown options alphabetically", () => {
     const containers = [
       makeContainer({ id: "unused", name: "Alpha" }),
       makeContainer({ id: "destination", name: "Destination" }),
       makeContainer({ id: "source", name: "Source" }),
       makeContainer({ id: "entry", name: "Entry" }),
     ];
-    const transfer = makeTransfer({
-      id: "transfer",
-      date: "2026-07-01",
-      amount: 100,
-      container_id: "source",
-      to_container_id: "destination",
-      vendor_source: "Move",
-      entered_at: "2026-07-02T00:00:00.000Z",
-    });
-    const rows = [
-      transfer,
-      entry("entry-1", "cat", "entry", "2026-07-03T00:00:00.000Z"),
-      entry("source-2", "cat", "source", "2026-07-01T00:00:00.000Z"),
-    ];
-
-    expect(rankContainersByUsage(containers, rows).map((c) => c.id)).toEqual([
-      "source",
-      "entry",
-      "destination",
+    expect(sortContainersAlphabetically(containers).map((c) => c.id)).toEqual([
       "unused",
+      "destination",
+      "entry",
+      "source",
     ]);
   });
 
@@ -325,23 +250,23 @@ describe("usage-ranked selectors", () => {
     ];
     const original = [...candidates];
 
-    expect(rankContainersByUsage(candidates, []).map((c) => c.id)).toEqual(["a", "b"]);
+    expect(sortContainersAlphabetically(candidates).map((c) => c.id)).toEqual(["a", "b"]);
     expect(candidates).toEqual(original);
-    expect(rankContainersByUsage(candidates, []).map((c) => c.id)).toEqual(["a", "b"]);
+    expect(sortContainersAlphabetically(candidates).map((c) => c.id)).toEqual(["a", "b"]);
   });
 
   it.each([
-    ["../../features/ledger/useComposeFields.ts", "rankCategoriesByUsage"],
-    ["../../features/ledger/useComposeFields.ts", "rankContainersByUsage"],
-    ["../../features/ledger/EditTransactionSheet.tsx", "rankCategoriesByUsage"],
-    ["../../features/ledger/EditTransactionSheet.tsx", "rankContainersByUsage"],
-    ["../../features/recurring/RecurringRuleSheet.tsx", "rankCategoriesByUsage"],
-    ["../../features/recurring/RecurringRuleSheet.tsx", "rankContainersByUsage"],
-    ["../../features/ledger/LedgerView.tsx", "rankCategoriesByUsage"],
-    ["../../features/ledger/LedgerView.tsx", "rankContainersByUsage"],
-    ["../../features/inbox/InboxView.tsx", "rankCategoriesByUsage"],
-    ["../../features/inbox/InboxView.tsx", "rankContainersByUsage"],
-    ["../../features/goals/GoalSheet.tsx", "rankContainersByUsage"],
+    ["../../features/ledger/useComposeFields.ts", "sortCategoriesAlphabetically"],
+    ["../../features/ledger/useComposeFields.ts", "sortContainersAlphabetically"],
+    ["../../features/ledger/EditTransactionSheet.tsx", "sortCategoriesAlphabetically"],
+    ["../../features/ledger/EditTransactionSheet.tsx", "sortContainersAlphabetically"],
+    ["../../features/recurring/RecurringRuleSheet.tsx", "sortCategoriesAlphabetically"],
+    ["../../features/recurring/RecurringRuleSheet.tsx", "sortContainersAlphabetically"],
+    ["../../features/ledger/LedgerView.tsx", "sortCategoriesAlphabetically"],
+    ["../../features/ledger/LedgerView.tsx", "sortContainersAlphabetically"],
+    ["../../features/inbox/InboxView.tsx", "sortCategoriesAlphabetically"],
+    ["../../features/inbox/InboxView.tsx", "sortContainersAlphabetically"],
+    ["../../features/goals/GoalSheet.tsx", "sortContainersAlphabetically"],
     ["../../features/shell/QuickAddSheet.tsx", "rankShortcutsByUsage"],
   ])("routes selector options in %s through %s", (path, helper) => {
     expect(source(path)).toContain(helper);
