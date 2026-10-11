@@ -9,8 +9,6 @@ describe("click-to-edit cards", () => {
     ["../ledger/LedgerView.tsx", "activateCardOnClick(event, onEdit)"],
     ["../goals/GoalsView.tsx", "activateCardOnClick(event, onEdit)"],
     ["../cravings/CravingsView.tsx", "activateCardOnClick(event, onEdit)"],
-    ["../containers/ContainersView.tsx", "activateCardOnClick(event, onEdit)"],
-    ["../categories/CategoriesView.tsx", "activateCardOnClick(event, onEdit)"],
     ["../recurring/RecurringView.tsx", "activateCardOnClick(event, onEdit)"],
     [
       "../containers/LogBalanceSheet.tsx",
@@ -19,6 +17,15 @@ describe("click-to-edit cards", () => {
   ])("opens the editor when the card body is clicked (%s)", (path, handler) => {
     expect(source(path).includes(handler)).toBe(true);
   });
+
+  it.each(["../categories/CategoriesView.tsx", "../containers/ContainersView.tsx"])(
+    "keeps rename-only actions in the menu (%s)",
+    (path) => {
+      const view = source(path);
+      expect(view.includes("activateCardOnClick(event, onEdit)")).toBe(false);
+      expect(view.includes("Rename")).toBe(true);
+    },
+  );
 
   it("opens from card content", () => {
     const onEdit = vi.fn();
