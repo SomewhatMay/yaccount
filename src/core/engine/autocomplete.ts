@@ -23,10 +23,10 @@ export function rankAutocompleteOptions<T extends { label: string }>(
     .map((option, index) => ({
       option,
       index,
-      score: matchScore(normalize(option.label), normalizedQuery),
+      matches: matchScore(normalize(option.label), normalizedQuery) > 0,
     }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .filter(({ matches }) => matches)
+    .sort((a, b) => a.option.label.localeCompare(b.option.label) || a.index - b.index)
     .map(({ option }) => option);
 }
 
