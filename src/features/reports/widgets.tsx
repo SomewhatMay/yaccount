@@ -642,7 +642,13 @@ export function BudgetComparisonTable({
 }
 
 // ── Investment gain/loss card + reconstructed-balance sparkline (§5.6) ────────
-export function InvestmentCard({ report }: { report: InvestmentReport }) {
+export function InvestmentCard({
+  report,
+  showDifferenceOnly = false,
+}: {
+  report: InvestmentReport;
+  showDifferenceOnly?: boolean;
+}) {
   const { currentValue, netContributions, gainLoss, series } = report;
   const withYear = spansYears(series.map((point) => point.date));
   const data = series.map((point) => {
@@ -651,12 +657,15 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
       point.date.slice(0, 7) < report.firstSnapshotMonth;
     return {
       ...point,
+      difference: point.value - point.contributed,
       label: `${dayLabel(point.date, withYear)}${reconstructed ? "*" : ""}`,
     };
   });
   const hasReconstructed = data.some((m) => m.label.endsWith("*"));
   const gainColor =
     gainLoss === null ? "" : gainLoss >= 0 ? "text-positive" : "text-destructive";
+  const differenceStroke =
+    gainLoss !== null && gainLoss < 0 ? CHART.expense : CHART.savings;
 
   return (
     <div className="bg-background/40 rounded-xl border p-4">
@@ -697,28 +706,31 @@ export function InvestmentCard({ report }: { report: InvestmentReport }) {
               axisLine={false}
               width={56}
             />
+            {showDifferenceOnly && <ReferenceLine y={0} stroke={CHART.grid} />}
             <Tooltip content={<MoneyTooltip />} />
             <Legend />
             <Line
-              dataKey="contributed"
-              name="Contributed"
-              type="monotone"
-              stroke={CHART.expense}
+              dataKey={showDifferenceOnly ? "difference" : "contributed"}
+              name={showDifferenceOnly ? "Gain/loss" : "Contributed"}
+              type="natural"
+              stroke={showDifferenceOnly ? differenceStroke : CHART.expense}
               strokeWidth={1.75}
               dot={data.length === 1}
               isAnimationActive={false}
               className="chart-line-enter"
             />
-            <Line
-              dataKey="value"
-              name="Value"
-              type="monotone"
-              stroke={CHART.savings}
-              strokeWidth={1.75}
-              dot={data.length === 1}
-              isAnimationActive={false}
-              className="chart-line-enter"
-            />
+            {!showDifferenceOnly && (
+              <Line
+                dataKey="value"
+                name="Value"
+                type="natural"
+                stroke={CHART.savings}
+                strokeWidth={1.75}
+                dot={data.length === 1}
+                isAnimationActive={false}
+                className="chart-line-enter"
+              />
+            )}
           </LineChart>
         </ResponsiveContainer>
       )}

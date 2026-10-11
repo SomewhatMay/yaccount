@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState, type LazyExoticComponent } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  type LazyExoticComponent,
+  type ReactNode,
+} from "react";
 import { ChevronDownIcon } from "lucide-react";
 import {
   PERIOD_PRESETS,
@@ -186,6 +192,7 @@ export function DashboardWidget({
           onSizeChange,
           onShowMath: () => setMathOpen(true),
           onShowSettings: () => setSettingsOpen(true),
+          menuItems: def.renderMenu?.(ctx) ?? null,
           onHide,
         })}
       </div>
@@ -327,6 +334,7 @@ function WidgetMenu({
   onSizeChange,
   onShowMath,
   onShowSettings,
+  menuItems,
   onHide,
 }: {
   def: WidgetDef;
@@ -339,10 +347,13 @@ function WidgetMenu({
   onSizeChange?: (size: "compact" | "expanded") => void | Promise<void>;
   onShowMath: () => void;
   onShowSettings: () => void;
+  menuItems: ReactNode;
   onHide?: () => void | Promise<void>;
 }) {
   const canChooseSize = supportsCompact && Boolean(onSizeChange);
-  const hasOtherActions = canChooseSize || hasMath || hasSettings || !def.fixedWindow;
+  const hasMenuItems = menuItems !== null;
+  const hasOtherActions =
+    canChooseSize || hasMath || hasSettings || hasMenuItems || !def.fixedWindow;
   if (!hasOtherActions && !onHide) return null;
   return (
     <RowActions label={`Configure ${def.title}`} className="opacity-100">
@@ -352,9 +363,9 @@ function WidgetMenu({
       {hasMath && (
         <DropdownMenuItem onSelect={onShowMath}>Show the math</DropdownMenuItem>
       )}
-      {(hasSettings || hasMath) && (canChooseSize || !def.fixedWindow) && (
-        <DropdownMenuSeparator />
-      )}
+      {menuItems}
+      {(hasSettings || hasMath || hasMenuItems) &&
+        (canChooseSize || !def.fixedWindow || onHide) && <DropdownMenuSeparator />}
       {canChooseSize && (
         <>
           <DropdownMenuLabel>Size</DropdownMenuLabel>

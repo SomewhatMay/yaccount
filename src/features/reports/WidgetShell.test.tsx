@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import type { WidgetContext, WidgetDef } from "./registry";
 import { ShowMathSheet } from "./ShowMathSheet";
 import { DashboardWidget } from "./WidgetShell";
@@ -126,6 +127,31 @@ it("gives Overall balance the standard widget menu", () => {
   expect(textOf(actions?.props.children as ReactNode)).toContain("Hide widget");
   (hideItem?.props.onSelect as (() => void) | undefined)?.();
   expect(hide).toHaveBeenCalledOnce();
+});
+
+it("places widget-specific options in the three-dot menu", () => {
+  const def = {
+    id: "investments",
+    title: "Investments",
+    description: "Investment value and contributions.",
+    defaultVisible: true,
+    render: () => <div>Investment chart</div>,
+    renderMenu: () => (
+      <DropdownMenuCheckboxItem checked={false} onCheckedChange={vi.fn()}>
+        Show gain/loss only
+      </DropdownMenuCheckboxItem>
+    ),
+  } as WidgetDef;
+
+  const tree = render(def);
+  const actions = findComponent(tree, "RowActions");
+  const option = findComponent(
+    actions?.props.children as ReactNode,
+    "DropdownMenuCheckboxItem",
+  );
+
+  expect(textOf(actions?.props.children as ReactNode)).toContain("Show gain/loss only");
+  expect(option).not.toBeNull();
 });
 
 it("uses dedicated compact content instead of clipping expanded content", () => {

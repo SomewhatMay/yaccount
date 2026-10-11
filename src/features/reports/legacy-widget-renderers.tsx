@@ -423,6 +423,7 @@ function Investments({
   containers,
   ledgerTransactions,
   snapshots,
+  instanceSettings,
 }: WidgetContext) {
   const reports = useMemo<InvestmentReport[]>(
     () =>
@@ -437,7 +438,11 @@ function Investments({
   return (
     <div className="space-y-3">
       {reports.map((r) => (
-        <InvestmentCard key={r.containerId} report={r} />
+        <InvestmentCard
+          key={r.containerId}
+          report={r}
+          showDifferenceOnly={instanceSettings?.showDifferenceOnly === true}
+        />
       ))}
     </div>
   );

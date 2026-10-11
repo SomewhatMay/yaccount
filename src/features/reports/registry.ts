@@ -1,9 +1,11 @@
 import {
+  createElement,
   lazy,
   type ComponentType,
   type LazyExoticComponent,
   type ReactNode,
 } from "react";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import {
   activeRows,
   cravingWinSummary,
@@ -103,6 +105,7 @@ export interface WidgetDef {
   render?: (ctx: WidgetContext) => ReactNode;
   renderCompact?: (ctx: WidgetContext) => ReactNode;
   renderSettings?: (ctx: WidgetContext) => ReactNode;
+  renderMenu?: (ctx: WidgetContext) => ReactNode;
   availability?: (ctx: WidgetContext) => WidgetAvailability;
   math?: (ctx: WidgetContext) => WidgetMathDisclosure;
 }
@@ -1600,6 +1603,19 @@ export const DASHBOARD_WIDGETS: WidgetDef[] = [
     description: "Value, contributions, and gain or loss for each investment.",
     defaultVisible: false,
     gallery: gallery("analysis", ["investment", "value", "return", "snapshot"]),
+    renderMenu: (context) =>
+      createElement(
+        DropdownMenuCheckboxItem,
+        {
+          checked: context.instanceSettings?.showDifferenceOnly === true,
+          onCheckedChange: (checked: boolean) =>
+            void context.saveInstanceSettings?.({
+              ...context.instanceSettings,
+              showDifferenceOnly: checked,
+            }),
+        },
+        "Show gain/loss only",
+      ),
     ...legacy("investments"),
   },
   {
