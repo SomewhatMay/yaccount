@@ -10,8 +10,11 @@ describe("click-to-edit cards", () => {
     "../goals/GoalsView.tsx",
     "../cravings/CravingsView.tsx",
     "../containers/ContainersView.tsx",
+    "../categories/CategoriesView.tsx",
+    "../recurring/RecurringView.tsx",
+    "../containers/LogBalanceSheet.tsx",
   ])("opens the editor when the card body is clicked (%s)", (path) => {
-    expect(source(path)).toContain("activateCardOnClick(event, onEdit)");
+    expect(source(path).includes("activateCardOnClick(event, onEdit)")).toBe(true);
   });
 
   it("opens from card content", () => {
