@@ -71,9 +71,8 @@ type Pending =
  * Export, import, clear and roll back — the tools for putting a known state on
  * the app, and for getting your data back out of it.
  *
- * Two things shape every control here. First, these act on BOTH stores: clearing
- * only this device would simply be undone by the next sync pulling Drive back
- * down, so the Drive copy is replaced too and the copy says so plainly. Second,
+ * Two things shape every control here. First, signed-in replacement acts on both
+ * stores; signed-out clearing acts on this device only. Second,
  * nothing is destroyed — the world being replaced is retired to Drive first and
  * stays in the restore list below, so "clear" means the app stops reading your
  * data, not that it is gone (§1.1).
@@ -209,16 +208,16 @@ export function DataPanel() {
   }
 
   const driveLine = connected
-    ? "Your Google Drive copy is replaced too, so your other devices empty themselves the next time they sync."
-    : "You're not connected to Google, so this only changes this device. If you connect later, whatever is on Drive will merge back in.";
+    ? "Your Google Drive copy is replaced too, so your other devices empty themselves the next time they sync. To clear local data only, sign out, then return to this page."
+    : "You're not connected to Google; this device only. If you connect later, whatever is on Drive will merge back in.";
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="font-display text-lg tracking-tight">Your data</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Take a copy with you, put a known state on the app, or start over. Clearing and
-          importing replace your Google Drive copy as well.
+          Take a copy with you, put a known state on the app, or start over. When connected,
+          clearing and importing replace your Google Drive copy too.
         </p>
       </div>
 
@@ -267,6 +266,21 @@ export function DataPanel() {
       ) : null}
 
       <div className="bg-card divide-y rounded-2xl border">
+        <DataRow
+          title="Demo account"
+          hint="A complete sample ledger for showing the app. Download it, then import it here or on another device."
+          action={
+            <Button asChild size="sm" variant="outline" className="rounded-full">
+              <a
+                href="/demo-save/yaccount-demo-save.json"
+                download="yaccount-demo-save.json"
+              >
+                <DownloadIcon className="size-3.5" /> Download demo save
+              </a>
+            </Button>
+          }
+        />
+
         <DataRow
           title="Export everything"
           hint="A single file holding every change ever made here. Keep it somewhere safe — it's the only copy you can open yourself."
@@ -323,7 +337,7 @@ export function DataPanel() {
 
         <DataRow
           title="Clear everything"
-          hint={`Stands the app down to an empty ledger. Your current data is retired to Drive as a restore point first, so you can roll it back. ${driveLine}`}
+          hint={`Stands the app down to an empty ledger. ${connected ? "Your current data is retired to Drive as a restore point first, so you can roll it back." : "This device only; back up first if you want a copy."} ${driveLine}`}
           action={
             <Button
               size="sm"
@@ -508,10 +522,14 @@ export function DataPanel() {
           <>
             <p>yaccount starts over with an empty ledger and one wallet.</p>
             <p>{driveLine}</p>
-            <p>
-              Nothing is destroyed: your current data is retired to Drive as a restore
-              point first, and stays in the list on this screen.
-            </p>
+            {connected ? (
+              <p>
+                Nothing is destroyed: your current data is retired to Drive as a restore
+                point first, and stays in the list on this screen.
+              </p>
+            ) : (
+              <p>Back up first if you want to keep a copy of this device’s data.</p>
+            )}
           </>
         )}
       </ConfirmDestructive>

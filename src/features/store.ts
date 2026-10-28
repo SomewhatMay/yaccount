@@ -43,6 +43,11 @@ import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
 import { operationLogFacts } from "@/lib/strategic-logging";
 import { createSyncScheduler, createTrailingRunner } from "@/features/sync-scheduling";
+import {
+  hasCompletedSync,
+  runAdmittedSync,
+  SYNC_COMPLETED_META_KEY,
+} from "@/sync/admission";
 
 /**
  * Cross-component app state lives in Jotai atoms (boilerplate-free vs. context).
@@ -243,6 +248,8 @@ export const dispatchManyAtom = atom(null, async (_get, set, ops: Op[]) => {
  */
 export type SyncStatus = "idle" | "syncing" | "synced" | "disconnected" | "error";
 export const syncStatusAtom = atom<SyncStatus>("idle");
+/** A first sync with local user data needs an explicit merge decision. */
+export const newDeviceSyncPromptAtom = atom(false);
 export const lastSyncedAtAtom = atom<number | null>(null);
 /** Human-readable detail of the last sync failure (DriveError status+body when
  * available, formatted by the sync seam) — shown in the indicator tooltip so a
@@ -267,7 +274,10 @@ function scheduleSync(set: Setter): void {
  * token can't be renewed silently, surface `disconnected` so the UI can offer an
  * interactive reconnect. Never throws — a Drive failure leaves the app usable.
  */
-async function performSync(set: Setter): Promise<void> {
+async function performSync(
+  set: Setter,
+  options: { consent?: boolean } = {},
+): Promise<void> {
   let startedAt: number | null = null;
   try {
     const auth = getAuthProvider();
@@ -286,39 +296,61 @@ async function performSync(set: Setter): Promise<void> {
       return;
     }
 
-    set(syncStatusAtom, "syncing");
-    startedAt = Date.now();
-    log.info("sync started");
     const repo = await getRepo();
     const deviceId = await repo.getDeviceId();
     const fs = getDriveFS();
     const yearMonth = new Date().toISOString().slice(0, 7);
-    const result = await runSync({
-      fs,
-      deviceId,
-      listOps: () => repo.listOps(),
-      applyRemoteOps: (ops) => repo.applyRemoteOps(ops),
-      getOutboxOps: () => repo.getOutboxOps(),
-      clearOutbox: (ids) => repo.clearOutbox(ids),
-      yearMonth,
-      generation: driveGeneration({
-        fs,
-        repo,
-        deviceId,
-        now: () => new Date().toISOString(),
-      }),
-    });
+    let result: Awaited<ReturnType<typeof runSync>> | null = null;
+    const admitted = await runAdmittedSync(
+      {
+        listOps: () => repo.listOps(),
+        completed: async () =>
+          hasCompletedSync({
+            completed: (await repo.getMeta<boolean>(SYNC_COMPLETED_META_KEY)) === true,
+            originSeen: (await repo.getMeta<{ resetId: string | null }>(ORIGIN_META_KEY))
+              ?.resetId,
+          }),
+        run: async () => {
+          set(syncStatusAtom, "syncing");
+          startedAt = Date.now();
+          log.info("sync started");
+          result = await runSync({
+            fs,
+            deviceId,
+            listOps: () => repo.listOps(),
+            applyRemoteOps: (ops) => repo.applyRemoteOps(ops),
+            getOutboxOps: () => repo.getOutboxOps(),
+            clearOutbox: (ids) => repo.clearOutbox(ids),
+            yearMonth,
+            generation: driveGeneration({
+              fs,
+              repo,
+              deviceId,
+              now: () => new Date().toISOString(),
+            }),
+          });
+        },
+        remember: () => repo.setMeta(SYNC_COMPLETED_META_KEY, true),
+      },
+      options,
+    );
+    if (admitted === "confirmation_required") {
+      set(newDeviceSyncPromptAtom, true);
+      return;
+    }
+    const syncResult = result as unknown as Awaited<ReturnType<typeof runSync>>;
+    set(newDeviceSyncPromptAtom, false);
     await set(refreshAtom); // re-derive the UI from the merged state (§8.6)
 
     // This device just discovered the account was cleared or replaced somewhere
     // else. Its own data was set aside rather than dropped, and saying so is not
     // optional — a silent set-aside reads exactly like a silent loss (§0.3).
-    if (result.adopted) {
+    if (syncResult.adopted) {
       set(orphanNoteAtom, {
-        path: result.adopted.path,
-        at: result.adopted.resetAt,
-        kind: result.adopted.kind,
-        opCount: result.adopted.opCount,
+        path: syncResult.adopted.path,
+        at: syncResult.adopted.resetAt,
+        kind: syncResult.adopted.kind,
+        opCount: syncResult.adopted.opCount,
       });
       toast.message("This account was reset on another device.", {
         description:
@@ -330,11 +362,11 @@ async function performSync(set: Setter): Promise<void> {
     set(lastSyncErrorAtom, null);
     set(syncStatusAtom, "synced");
     log.info("sync succeeded", {
-      durationMs: Date.now() - startedAt,
-      pushed: result.pushed,
-      collapsed: result.collapsed,
-      rebuilt: result.rebuilt,
-      adopted: Boolean(result.adopted),
+      durationMs: Date.now() - (startedAt ?? Date.now()),
+      pushed: syncResult.pushed,
+      collapsed: syncResult.collapsed,
+      rebuilt: syncResult.rebuilt,
+      adopted: Boolean(syncResult.adopted),
     });
   } catch (err) {
     // DriveError / offline — stay usable, surface honestly (§8.6). The sync seam
@@ -360,6 +392,11 @@ export const syncAtom = atom(null, async (_get, set) => runSyncCycle(set));
 /** Lifecycle/auth/manual triggers run now and supersede any pending edit timer. */
 export const syncNowAtom = atom(null, async (_get, set) =>
   syncScheduler.immediate(() => set(syncAtom)),
+);
+
+/** Explicit consent from the new-device modal. */
+export const reconcileNewDeviceAtom = atom(null, async (_get, set) =>
+  syncScheduler.immediate(() => runSyncCycle(set, { consent: true })),
 );
 
 /**
