@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangleIcon, RotateCcwIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -10,7 +10,13 @@ import {
   CopyButton,
   DownloadDiagnosticsButton,
 } from "@/features/ErrorBoundary";
-import { bootErrorAtom } from "@/features/store";
+import {
+  bootErrorAtom,
+  newDeviceSyncPromptAtom,
+  reconcileNewDeviceAtom,
+} from "@/features/store";
+import { getAuthProvider } from "@/auth/web";
+import { NewDeviceSyncDialog } from "@/features/NewDeviceSyncDialog";
 import { Button } from "@/components/ui/button";
 import { BottomTabBar } from "@/features/shell/BottomTabBar";
 import { CommandPalette } from "@/features/shell/CommandPalette";
@@ -43,6 +49,9 @@ import { DB_NAME, DB_VERSION } from "@/core/repo/db";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const bootError = useAtomValue(bootErrorAtom);
+  const newDevicePrompt = useAtomValue(newDeviceSyncPromptAtom);
+  const reconcile = useSetAtom(reconcileNewDeviceAtom);
+  const [reconciling, setReconciling] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const maxWidth = pathname === "/" ? "max-w-5xl" : "max-w-2xl";
 
@@ -87,6 +96,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <BottomTabBar onMore={() => setMoreOpen(true)} />
       <MoreSheet open={moreOpen} onOpenChange={setMoreOpen} />
       <CommandPalette />
+      <NewDeviceSyncDialog
+        open={newDevicePrompt || reconciling}
+        syncing={reconciling}
+        onReconcile={() => {
+          setReconciling(true);
+          void reconcile().finally(() => setReconciling(false));
+        }}
+        onLogOut={() => {
+          getAuthProvider().signOut();
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

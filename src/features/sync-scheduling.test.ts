@@ -70,6 +70,7 @@ it("routes lifecycle triggers immediately and listens for network recovery", () 
   const bootstrap = readFileSync(new URL("./RepoBootstrap.tsx", import.meta.url), "utf8");
   const auth = readFileSync(new URL("./auth/AuthButton.tsx", import.meta.url), "utf8");
   const indicator = readFileSync(new URL("./SyncIndicator.tsx", import.meta.url), "utf8");
+  const shell = readFileSync(new URL("./AppShell.tsx", import.meta.url), "utf8");
 
   expect(store.match(/scheduleSync\(set\)/g)).toHaveLength(2);
   expect(store).toContain("syncScheduler.debounce");
@@ -79,4 +80,7 @@ it("routes lifecycle triggers immediately and listens for network recovery", () 
   expect(indicator).toContain("syncNowAtom");
   expect(bootstrap).toContain('window.addEventListener("online", tick)');
   expect(bootstrap).toContain('window.removeEventListener("online", tick)');
+  expect(store).toContain("runAdmittedSync");
+  expect(store).toContain("newDeviceSyncPromptAtom");
+  expect(shell).toContain("NewDeviceSyncDialog");
 });
