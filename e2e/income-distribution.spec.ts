@@ -103,11 +103,9 @@ async function logIncome(page: Page, source: string, amount: string) {
 async function expectBalances(page: Page, expected: Record<string, string>) {
   await openReady(page, "/containers", "Containers");
   for (const [name, amount] of Object.entries(expected)) {
-    const row = page
-      .locator("div.group")
-      .filter({
-        has: page.getByRole("button", { name: `Actions for ${name}`, exact: true }),
-      });
+    const row = page.locator("div.group").filter({
+      has: page.getByRole("button", { name: `Actions for ${name}`, exact: true }),
+    });
     await expect(row).toContainText(amount);
   }
 }

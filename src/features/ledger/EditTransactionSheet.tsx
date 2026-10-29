@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Trash2Icon } from "lucide-react";
-import { reconcileDistribution, updateTransaction } from "@/core/commands";
+import { updateTransaction } from "@/core/commands";
+import { editOps, needsResplit } from "@/features/ledger/edit-distribution";
 import { isTransfer } from "@/core/engine/balances";
 import { activeRows } from "@/core/engine/ledger";
 import {
@@ -17,7 +18,6 @@ import {
 } from "@/core/engine/usage-ranking";
 import { formatCents, parseDollars } from "@/core/money";
 import {
-  TransactionSchema,
   transferLabel,
   type Category,
   type CategoryType,
@@ -268,12 +268,14 @@ function EditForm({
   }
   // Re-split only when what the split depends on changed; a payee or date edit
   // keeps the pieces' cents exactly as they were.
-  const resplit =
-    distribute &&
-    !pending &&
-    (!wasDistributed ||
-      typedCents !== Math.abs(tx.amount) ||
-      presetId !== tx.distribution_preset_id);
+  const resplit = needsResplit({
+    tx,
+    amount: typedCents === null ? tx.amount : sign === "-" ? -typedCents : typedCents,
+    distribute,
+    moneyIn,
+    wasDistributed,
+    presetId,
+  });
   const preview = useMemo(() => {
     if (!distribute || !moneyIn) return null;
     if (!pending && !resplit && ownPieces.length > 0) {
@@ -334,67 +336,18 @@ function EditForm({
       yearMonth: date.slice(0, 7),
     };
 
-    if (distribute && !(cat.type === "income" && res.signed > 0)) {
-      return setError("Only money in can be distributed — untick Distribute first.");
-    }
-    if (distribute && (pending || resplit) && !preset) {
-      return setError("Pick a distribution to split this income.");
-    }
-
-    if (pending) {
-      const row = distribute
-        ? {
-            ...next,
-            container_id: preset!.rest_container_id,
-            distribution_preset_id: preset!.id,
-          }
-        : { ...next, distribution_preset_id: null };
-      return onSave([updateTransaction(TransactionSchema.parse(row))]);
-    }
-    if (!distribute && !wasDistributed) {
-      return onSave([updateTransaction(TransactionSchema.parse(next))]);
-    }
-    if (!distribute) {
-      // Untick: the pieces are voided (reversibly) and the income lands whole
-      // in the container picked below.
-      return onSave(
-        reconcileDistribution({
-          parent: { ...next, distribution_preset_id: null },
-          livePieces: ownPieces,
-          desired: [],
-          allTxns: transactions,
-        }),
-      );
-    }
-    if (resplit) {
-      const split = splitIncome(res.signed, preset!, containers);
-      if (!split.ok)
-        return setError("That distribution can't split right now — pick another.");
-      return onSave(
-        reconcileDistribution({
-          parent: {
-            ...next,
-            container_id: split.rest.container_id,
-            distribution_preset_id: preset!.id,
-          },
-          livePieces: ownPieces,
-          desired: split.pieces,
-          allTxns: transactions,
-        }),
-      );
-    }
-    // Same amount, same preset: keep every piece's cents, carry the rest along.
-    return onSave(
-      reconcileDistribution({
-        parent: { ...next, container_id: tx.container_id },
-        livePieces: ownPieces,
-        desired: ownPieces.map((p) => ({
-          container_id: p.to_container_id!,
-          amount: Math.abs(p.amount),
-        })),
-        allTxns: transactions,
-      }),
+    const out = editOps(
+      {
+        tx,
+        next,
+        moneyIn: cat.type === "income" && res.signed > 0,
+        distribute,
+        presetId,
+      },
+      { presets, containers, transactions },
     );
+    if (!out.ok) return setError(out.error);
+    await onSave(out.ops);
   }
 
   return (

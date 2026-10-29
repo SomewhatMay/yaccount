@@ -608,12 +608,15 @@ function DistributionForm({
           {addable.length > 0 && (
             <Select
               value=""
-              onValueChange={(id) =>
-                setDraft((d) => ({
-                  ...d,
-                  parts: [...d.parts, { containerId: id, pct: "" }],
-                }))
-              }
+              onValueChange={(id) => {
+                // Always-empty picker: a re-render may report "" — never a container.
+                if (!id) return;
+                setDraft((d) =>
+                  d.parts.some((p) => p.containerId === id)
+                    ? d
+                    : { ...d, parts: [...d.parts, { containerId: id, pct: "" }] },
+                );
+              }}
             >
               <SelectTrigger
                 aria-label="Add a container"
@@ -637,13 +640,14 @@ function DistributionForm({
               <span className="text-muted-foreground shrink-0 text-xs">Rest →</span>
               <Select
                 value={draft.restId}
-                onValueChange={(restId) =>
+                onValueChange={(restId) => {
+                  if (!restId) return;
                   setDraft((d) => ({
                     ...d,
                     restId,
                     parts: d.parts.filter((p) => p.containerId !== restId),
-                  }))
-                }
+                  }));
+                }}
               >
                 <SelectTrigger aria-label="Rest container" className="h-8 min-w-0 flex-1">
                   <SelectValue>{nameOf(draft.restId)}</SelectValue>

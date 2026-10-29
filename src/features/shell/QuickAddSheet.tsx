@@ -199,6 +199,13 @@ function QuickAddForm({
                     tone="quiet"
                     className="text-xs"
                   />
+                  {t.distribution_preset_id && (
+                    <span className="text-muted-foreground w-full truncate text-[10px]">
+                      {usablePreset(t.distribution_preset_id, presets, containers)
+                        ? `splits via ${presets.find((p) => p.id === t.distribution_preset_id)?.name}`
+                        : "won't split"}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"

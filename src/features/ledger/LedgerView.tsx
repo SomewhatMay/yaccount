@@ -711,10 +711,7 @@ function LedgerRow({
       ref={row}
       onClick={(event) => activateCardOnClick(event, onEdit)}
       className={cn(
-        "group flex cursor-pointer gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
-        // An inline split makes the row tall; the glyph and amount stay on the
-        // payee's line instead of floating to the middle of the breakdown.
-        inline ? "items-start" : "items-center",
+        "group cursor-pointer px-5 py-3 transition-colors ease-[var(--ease-register)]",
         // The end of §12.5's one orchestrated moment: the row lands carrying a
         // single iris wash, which then settles. Everywhere else on this row,
         // motion is a colour under the pointer — including the press state, which
@@ -725,64 +722,68 @@ function LedgerRow({
           : "hover:bg-muted/40 active:bg-muted/60 duration-[var(--dur-1)]",
       )}
     >
-      {transfer ? (
-        <span className="inline-flex size-4 shrink-0 items-center justify-center">
-          <ArrowRightIcon className="text-muted-foreground size-2.5" aria-hidden />
-        </span>
-      ) : (
-        <CategoryGlyph icon={glyph.icon} color={glyph.color} />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
-        {split && !inline ? (
-          <div className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
-            <span className="truncate">
-              {categoryName} · split {split.lines.length} ways
-            </span>
-            <SplitInfo
-              title={`${tx.vendor_source} split`}
-              lines={split.lines}
-              total={split.total}
-            />
-            {when && <span className="shrink-0">· {when}</span>}
-          </div>
+      <div className="flex items-center gap-3">
+        {transfer ? (
+          <span className="inline-flex size-4 shrink-0 items-center justify-center">
+            <ArrowRightIcon className="text-muted-foreground size-2.5" aria-hidden />
+          </span>
         ) : (
-          <div className="text-muted-foreground truncate text-xs">{sub}</div>
+          <CategoryGlyph icon={glyph.icon} color={glyph.color} />
         )}
-        {tx.notes && (
-          <div className="text-muted-foreground/80 mt-0.5 truncate text-xs">
-            {tx.notes}
-          </div>
-        )}
-        {inline && (
-          <SplitBreakdown
-            lines={split.lines}
-            total={split.total}
-            highlight={highlight}
-            className="bg-surface-sunken/60 mt-2 rounded-lg border p-1.5"
-          />
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
+          {split && !inline ? (
+            <div className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
+              <span className="truncate">
+                {categoryName} · split {split.lines.length} ways
+              </span>
+              <SplitInfo
+                title={`${tx.vendor_source} split`}
+                lines={split.lines}
+                total={split.total}
+              />
+              {when && <span className="shrink-0">· {when}</span>}
+            </div>
+          ) : (
+            <div className="text-muted-foreground truncate text-xs">{sub}</div>
+          )}
+          {tx.notes && (
+            <div className="text-muted-foreground/80 mt-0.5 truncate text-xs">
+              {tx.notes}
+            </div>
+          )}
+        </div>
+        <Money
+          cents={tx.amount}
+          absolute={transfer}
+          tone={transfer ? "quiet" : income ? "in" : "neutral"}
+          className="text-sm tracking-tight"
+        />
+        <RowActions label={`Actions for ${tx.vendor_source}`}>
+          <DropdownMenuItem onClick={onEdit}>
+            <PencilIcon className="size-4" />
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onSaveShortcut}>
+            <BookmarkIcon className="size-4" />
+            Save as shortcut
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2Icon className="size-4" />
+            Delete
+          </DropdownMenuItem>
+        </RowActions>
       </div>
-      <Money
-        cents={tx.amount}
-        absolute={transfer}
-        tone={transfer ? "quiet" : income ? "in" : "neutral"}
-        className="text-sm tracking-tight"
-      />
-      <RowActions label={`Actions for ${tx.vendor_source}`}>
-        <DropdownMenuItem onClick={onEdit}>
-          <PencilIcon className="size-4" />
-          Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onSaveShortcut}>
-          <BookmarkIcon className="size-4" />
-          Save as shortcut
-        </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onClick={onDelete}>
-          <Trash2Icon className="size-4" />
-          Delete
-        </DropdownMenuItem>
-      </RowActions>
+      {/* Full width under the row, indented to the payee — inside the text
+          column it would leave a phone no room for the container names. */}
+      {inline && (
+        <SplitBreakdown
+          lines={split.lines}
+          total={split.total}
+          highlight={highlight}
+          className="bg-surface-sunken/60 mt-2 ml-7 rounded-lg border p-1.5"
+        />
+      )}
     </div>
   );
 }
