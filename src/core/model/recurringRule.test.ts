@@ -18,7 +18,10 @@ const base = {
 
 describe("RecurringRuleSchema — interval_config discriminated by frequency (§5.8)", () => {
   it("accepts each frequency with its matching config", () => {
-    const configs: [Parameters<typeof makeRecurringRule>[0]["frequency"], IntervalConfig][] = [
+    const configs: [
+      Parameters<typeof makeRecurringRule>[0]["frequency"],
+      IntervalConfig,
+    ][] = [
       ["daily", {}],
       ["weekly", { day_of_week: 3 }],
       ["biweekly", { days_of_month: [1, 15] }],
@@ -27,28 +30,46 @@ describe("RecurringRuleSchema — interval_config discriminated by frequency (§
       ["custom", { every: 2, unit: "week" }],
     ];
     for (const [frequency, interval_config] of configs) {
-      expect(() => makeRecurringRule({ ...base, frequency, interval_config })).not.toThrow();
+      expect(() =>
+        makeRecurringRule({ ...base, frequency, interval_config }),
+      ).not.toThrow();
     }
   });
 
   it("rejects a config that doesn't match the frequency", () => {
     // weekly needs day_of_week, not day_of_month.
     expect(() =>
-      makeRecurringRule({ ...base, frequency: "weekly", interval_config: { day_of_month: 1 } as IntervalConfig }),
+      makeRecurringRule({
+        ...base,
+        frequency: "weekly",
+        interval_config: { day_of_month: 1 } as IntervalConfig,
+      }),
     ).toThrow();
     // day_of_week out of range.
     expect(() =>
-      makeRecurringRule({ ...base, frequency: "weekly", interval_config: { day_of_week: 9 } as IntervalConfig }),
+      makeRecurringRule({
+        ...base,
+        frequency: "weekly",
+        interval_config: { day_of_week: 9 } as IntervalConfig,
+      }),
     ).toThrow();
     // custom needs a positive `every`.
     expect(() =>
-      makeRecurringRule({ ...base, frequency: "custom", interval_config: { every: 0, unit: "day" } as IntervalConfig }),
+      makeRecurringRule({
+        ...base,
+        frequency: "custom",
+        interval_config: { every: 0, unit: "day" } as IntervalConfig,
+      }),
     ).toThrow();
   });
 
   it("biweekly requires two ascending anchor days", () => {
     expect(() =>
-      makeRecurringRule({ ...base, frequency: "biweekly", interval_config: { days_of_month: [15, 1] } as IntervalConfig }),
+      makeRecurringRule({
+        ...base,
+        frequency: "biweekly",
+        interval_config: { days_of_month: [15, 1] } as IntervalConfig,
+      }),
     ).toThrow();
   });
 
@@ -110,5 +131,36 @@ describe("makeRecurringRule — defaults (§5.8)", () => {
     });
     expect(isTransferRule(entry)).toBe(false);
     expect(isTransferRule(transfer)).toBe(true);
+  });
+});
+
+describe("template_distribution_preset_id (plans/income-distribution.md)", () => {
+  it("defaults to null, including for rules stored before the field", () => {
+    const r = makeRecurringRule({ ...base, template_amount: 300000 });
+    expect(r.template_distribution_preset_id).toBeNull();
+    const legacy = { ...r } as Record<string, unknown>;
+    delete legacy.template_distribution_preset_id;
+    expect(RecurringRuleSchema.parse(legacy).template_distribution_preset_id).toBeNull();
+  });
+
+  it("is kept on an income rule", () => {
+    const r = makeRecurringRule({
+      ...base,
+      template_amount: 300000,
+      template_distribution_preset_id: "p1",
+    });
+    expect(r.template_distribution_preset_id).toBe("p1");
+  });
+
+  it("is refused on a transfer rule — a transfer has no income to split", () => {
+    expect(() =>
+      makeRecurringRule({
+        ...base,
+        template_category_id: null,
+        template_to_container_id: "savings",
+        template_amount: 100,
+        template_distribution_preset_id: "p1",
+      }),
+    ).toThrow();
   });
 });

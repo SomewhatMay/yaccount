@@ -386,4 +386,3 @@ describe("sortRegister — the four orders the register offers (M11)", () => {
     expect(isRegisterSort("")).toBe(false);
   });
 });
-

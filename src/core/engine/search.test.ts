@@ -32,11 +32,7 @@ describe("parseQuery — words unless the token is unmistakably a constraint", (
   });
 
   it("lowercases and splits free words", () => {
-    expect(parseQuery("Blue  Bottle Coffee").words).toEqual([
-      "blue",
-      "bottle",
-      "coffee",
-    ]);
+    expect(parseQuery("Blue  Bottle Coffee").words).toEqual(["blue", "bottle", "coffee"]);
   });
 
   it("reads > and < as inclusive size bounds, in cents", () => {

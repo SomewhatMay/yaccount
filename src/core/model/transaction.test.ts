@@ -4,6 +4,7 @@ import {
   makeTransaction,
   makeTransfer,
   makeVoidRow,
+  TransactionSchema,
   type Transaction,
 } from "@/core/model";
 import { containerBalance } from "@/core/engine/balances";
@@ -225,5 +226,94 @@ describe("makeVoidRow — the reversal must stay a faithful mirror", () => {
       is_template: true,
     };
     expect(() => makeVoidRow(tpl)).toThrow();
+  });
+});
+
+describe("income distribution links (plans/income-distribution.md)", () => {
+  it("defaults both links to null, so pre-feature rows still parse", () => {
+    const t = makeTransaction({
+      date: "2026-10-29",
+      amount: 300000,
+      vendor_source: "Paycheck",
+      category_id: "salary",
+    });
+    expect(t.distribution_preset_id).toBeNull();
+    expect(t.distribution_parent_id).toBeNull();
+
+    const legacy = { ...t } as Record<string, unknown>;
+    delete legacy.distribution_preset_id;
+    delete legacy.distribution_parent_id;
+    const parsed = TransactionSchema.parse(legacy);
+    expect(parsed.distribution_preset_id).toBeNull();
+    expect(parsed.distribution_parent_id).toBeNull();
+  });
+
+  it("records the preset on an income row and the parent on a piece", () => {
+    const income = makeTransaction({
+      id: "pay",
+      date: "2026-10-29",
+      amount: 300000,
+      vendor_source: "Paycheck",
+      category_id: "salary",
+      distribution_preset_id: "preset-1",
+    });
+    const piece = makeTransfer({
+      id: "pay:split:savings",
+      date: "2026-10-29",
+      amount: 60000,
+      container_id: "general",
+      to_container_id: "savings",
+      vendor_source: "Paycheck",
+      distribution_parent_id: "pay",
+    });
+    expect(income.distribution_preset_id).toBe("preset-1");
+    expect(piece.distribution_parent_id).toBe("pay");
+  });
+
+  it("rejects a parent link on a category row and a preset on a transfer", () => {
+    const income = makeTransaction({
+      date: "2026-10-29",
+      amount: 300000,
+      vendor_source: "Paycheck",
+      category_id: "salary",
+    });
+    expect(() =>
+      TransactionSchema.parse({ ...income, distribution_parent_id: "x" }),
+    ).toThrow();
+    const transfer = makeTransfer({
+      date: "2026-10-29",
+      amount: 100,
+      container_id: "general",
+      to_container_id: "savings",
+      vendor_source: "Move",
+    });
+    expect(() =>
+      TransactionSchema.parse({ ...transfer, distribution_preset_id: "p" }),
+    ).toThrow();
+  });
+
+  it("keeps the links on a void row, so the reversal belongs to the same group", () => {
+    const piece = makeTransfer({
+      id: "pay:split:savings",
+      date: "2026-10-29",
+      amount: 60000,
+      container_id: "general",
+      to_container_id: "savings",
+      vendor_source: "Paycheck",
+      distribution_parent_id: "pay",
+    });
+    expect(makeVoidRow(piece).distribution_parent_id).toBe("pay");
+  });
+
+  it("keeps the preset on an income template", () => {
+    const tpl = makeTemplate({
+      template_name: "Paycheck",
+      amount: 300000,
+      vendor_source: "Paycheck",
+      container_id: "general",
+      category_id: "salary",
+      distribution_preset_id: "preset-1",
+    });
+    expect(tpl.distribution_preset_id).toBe("preset-1");
   });
 });
