@@ -38,7 +38,11 @@ import {
   filterRegister,
   hideDistributionPieces,
 } from "@/core/engine/distribution";
-import { linesFromGroup, type SplitLine } from "@/features/distribution/lines";
+import {
+  condenseLines,
+  linesFromGroup,
+  type SplitLine,
+} from "@/features/distribution/lines";
 import { SplitBreakdown, SplitInfo } from "@/features/distribution/SplitBreakdown";
 import {
   isLiveLedgerRow,
@@ -705,6 +709,9 @@ function LedgerRow({
     .filter(Boolean)
     .join(" · ");
   const inline = split !== null && highlight !== undefined && highlight.size > 0;
+  // A condensed inline split leaves the ⓘ on the row so the whole split is
+  // still one tap away.
+  const condensed = inline && condenseLines(split.lines, highlight).hidden > 0;
 
   return (
     <div
@@ -732,7 +739,7 @@ function LedgerRow({
         )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
-          {split && !inline ? (
+          {split && (!inline || condensed) ? (
             <div className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
               <span className="truncate">
                 {categoryName} · split {split.lines.length} ways

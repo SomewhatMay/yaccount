@@ -6,7 +6,7 @@ import {
   makeTransfer,
 } from "@/core/model";
 import { splitIncome } from "@/core/engine/distribution";
-import { linesFromGroup, linesFromSplit } from "./lines";
+import { condenseLines, linesFromGroup, linesFromSplit, type SplitLine } from "./lines";
 
 const containers = [
   makeContainer({ id: "general", name: "General" }),
@@ -95,5 +95,54 @@ describe("linesFromGroup — what actually happened, read from the rows", () => 
         rest: true,
       },
     ]);
+  });
+});
+
+describe("condenseLines — a filtered split shows only what explains the match", () => {
+  const line = (id: string, rest = false): SplitLine => ({
+    containerId: id,
+    name: id,
+    share: "",
+    amount: 100,
+    rest,
+  });
+  const five = [line("a"), line("b"), line("c"), line("d"), line("r", true)];
+
+  it("keeps a split of three or fewer whole", () => {
+    const three = five.slice(2);
+    expect(condenseLines(three, new Set(["d"]))).toEqual({ lines: three, hidden: 0 });
+  });
+
+  it("keeps everything when nothing is highlighted", () => {
+    expect(condenseLines(five, undefined)).toEqual({ lines: five, hidden: 0 });
+    expect(condenseLines(five, new Set())).toEqual({ lines: five, hidden: 0 });
+  });
+
+  it("shows the first line, then the matched one, and counts the rest", () => {
+    expect(condenseLines(five, new Set(["c"]))).toEqual({
+      lines: [five[0], five[2]],
+      hidden: 3,
+    });
+  });
+
+  it("matches the rest line like any other", () => {
+    expect(condenseLines(five, new Set(["r"]))).toEqual({
+      lines: [five[0], five[4]],
+      hidden: 3,
+    });
+  });
+
+  it("doesn't repeat the first line when it is the match", () => {
+    expect(condenseLines(five, new Set(["a"]))).toEqual({
+      lines: [five[0]],
+      hidden: 4,
+    });
+  });
+
+  it("never hides a matched line, keeping split order", () => {
+    expect(condenseLines(five, new Set(["d", "b"]))).toEqual({
+      lines: [five[0], five[1], five[3]],
+      hidden: 2,
+    });
   });
 });

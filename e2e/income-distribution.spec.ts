@@ -237,9 +237,47 @@ test("filtering to a part container shows the split inline with that line lit", 
   ).toContainText("Invest");
 });
 
+test("a filtered split of more than three ways shows the first line, the match and …", async ({
+  page,
+}) => {
+  await createContainer(page, "Savings");
+  await createContainer(page, "Invest");
+  await createContainer(page, "Travel");
+  await createCategory(page, "Salary", "Income");
+  await createPreset(page, "Paycheck", [
+    ["Savings", "20"],
+    ["Invest", "33"],
+    ["Travel", "10"],
+  ]);
+  await logIncome(page, "Acme payroll", "3000");
+  await page.getByRole("button", { name: "Log income" }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+
+  // Lines run Invest $990, Savings $600, Travel $300, then General (rest).
+  await page.getByRole("button", { name: "Wallet" }).click();
+  await page.getByRole("checkbox", { name: "Travel" }).click();
+  await page.keyboard.press("Escape");
+  const inline = page.getByTestId("split-breakdown");
+  await expect(inline.locator("li")).toHaveCount(3);
+  await expect(inline.locator("li").nth(0)).toContainText("Invest");
+  await expect(inline.locator("[data-highlighted]")).toContainText("Travel");
+  await expect(inline.getByTestId("split-hidden")).toHaveText("…2 more splits");
+  await expect(inline).not.toContainText("Savings");
+  await expect(inline).toContainText("$3,000.00");
+  await shot(page, "ledger-filtered-condensed");
+
+  // The full split is still one ⓘ away.
+  await page.getByRole("button", { name: "How this income is split" }).click();
+  const popover = page.getByRole("dialog").getByTestId("split-breakdown");
+  await expect(popover.locator("li")).toHaveCount(4);
+  await expect(popover.getByTestId("split-hidden")).toHaveCount(0);
+});
+
 test("edits re-split, untick lands whole, delete and undo move the whole group", async ({
   page,
 }) => {
+  // Four edits and four balance checks: past 30s on a loaded dev server.
+  test.slow();
   await setup(page);
   await logIncome(page, "Acme payroll", "3000");
   await page.getByRole("button", { name: "Log income" }).click();

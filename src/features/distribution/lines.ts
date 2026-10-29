@@ -77,3 +77,20 @@ export function linesFromGroup(
     rest: line.rest,
   }));
 }
+
+/**
+ * A filtered register's inline split (plans/income-distribution.md): a split
+ * of more than three lines shows only the first line and the line(s) the
+ * filter matched; `hidden` counts the rest for the "…" row. Matched lines are
+ * never hidden, so several matches can exceed three.
+ */
+export function condenseLines(
+  lines: SplitLine[],
+  highlight: ReadonlySet<string> | undefined,
+): { lines: SplitLine[]; hidden: number } {
+  if (lines.length <= 3 || !highlight || highlight.size === 0) {
+    return { lines, hidden: 0 };
+  }
+  const kept = lines.filter((line, i) => i === 0 || highlight.has(line.containerId));
+  return { lines: kept, hidden: lines.length - kept.length };
+}

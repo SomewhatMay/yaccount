@@ -4,7 +4,7 @@ import { InfoIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Eyebrow, Money } from "@/features/ui";
 import { cn } from "@/lib/utils";
-import type { SplitLine } from "./lines";
+import { condenseLines, type SplitLine } from "./lines";
 
 /**
  * Where an income goes, line by line (plans/income-distribution.md): each part
@@ -13,7 +13,9 @@ import type { SplitLine } from "./lines";
  * register shows — so a split reads the same everywhere it appears.
  *
  * `highlight` marks the lines a filter matched (iris tint + dot), so a parent
- * row that surfaced through one of its pieces says why it's on screen.
+ * row that surfaced through one of its pieces says why it's on screen. A
+ * highlighted split of more than three lines shows only the first line and the
+ * match, then "…" for the lines the filter didn't touch.
  */
 export function SplitBreakdown({
   lines,
@@ -28,10 +30,11 @@ export function SplitBreakdown({
   note?: string | null;
   className?: string;
 }) {
+  const shown = condenseLines(lines, highlight);
   return (
     <div className={cn("text-sm", className)} data-testid="split-breakdown">
       <ul className="space-y-0.5">
-        {lines.map((line) => {
+        {shown.lines.map((line) => {
           const lit = highlight?.has(line.containerId) ?? false;
           return (
             <li
@@ -61,6 +64,18 @@ export function SplitBreakdown({
             </li>
           );
         })}
+        {shown.hidden > 0 && (
+          <li
+            data-testid="split-hidden"
+            className="text-muted-foreground flex items-baseline gap-2 px-1.5 py-1 text-xs"
+          >
+            <span aria-hidden className="size-1.5 shrink-0" />
+            <span aria-hidden>…</span>
+            <span>
+              {shown.hidden} more {shown.hidden === 1 ? "split" : "splits"}
+            </span>
+          </li>
+        )}
       </ul>
       <div className="mt-1 flex items-baseline justify-between border-t px-1.5 pt-1.5">
         <span className="text-muted-foreground text-xs">Total</span>

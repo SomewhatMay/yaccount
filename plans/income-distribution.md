@@ -18,7 +18,7 @@ where it belongs without three manual transfers.
 | Compose | `Distribute` checkbox beside Category. On → the Container select becomes a preset select; a small label under the figure ("distributing via Paycheck ⓘ"); ⓘ opens the cents breakdown. |
 | Checkbox default | Recalled per income category from the ledger: the last live income in that category decides. No history → default preset if one exists. No new setting. |
 | Ledger row | One row at the gross amount. Sub-line `Category · split N ways ⓘ · time`. Transfers hidden. |
-| Ledger filtered | When a filter/search matches through a piece, the parent row shows its split inline with the matching line(s) highlighted. If the container filter matches the rest container, the rest line is highlighted. |
+| Ledger filtered | When a filter/search matches through a piece, the parent row shows its split inline with the matching line(s) highlighted. If the container filter matches the rest container, the rest line is highlighted. A split of more than three lines condenses to the first line, the match(es) and `… N more splits`; the row keeps its ⓘ for the full split. |
 | Edit | Amount, preset or Distribute changes re-split at the preset's **current** % in one batch. Payee/date/notes edits keep the pieces' amounts and carry date/payee to them. Untick → pieces voided (reversible). |
 | Delete | Voids parent + every live piece in one batch; Undo un-voids all of them. |
 | Recurring | Income rules can pick a preset. Generated pending rows carry it; **Approve** writes the pieces (split computed at approve, at the approved amount). |
