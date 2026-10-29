@@ -137,6 +137,19 @@ export function usablePreset(
   return liveContainer(containers, preset.rest_container_id) ? preset : null;
 }
 
+/** The first of `ids` that names a preset able to split right now. */
+export function firstUsablePreset(
+  ids: (string | null | undefined)[],
+  presets: DistributionPreset[],
+  containers: Container[],
+): string | null {
+  for (const id of ids) {
+    const preset = usablePreset(id, presets, containers);
+    if (preset) return preset.id;
+  }
+  return null;
+}
+
 export interface PresetIssues {
   /** Parts whose container is archived or gone — their share goes to rest. */
   foldedParts: string[];
@@ -269,8 +282,8 @@ export function groupBreakdown(
 
 /**
  * Seed a preset's parts from the month's goal asks: each goal container gets
- * `ask ÷ expected income`, rounded to the nearest basis point (never down to 0
- * for a real ask). Asks into the rest container are already "the rest".
+ * `ask ÷ expected income`, floored to a basis point (never down to 0 for a
+ * real ask). Asks into the rest container are already "the rest".
  */
 export function fillFromGoalAsks(input: {
   income: number;
@@ -288,9 +301,13 @@ export function fillFromGoalAsks(input: {
       (byContainer.get(ask.containerId) ?? 0) + ask.amount,
     );
   }
+  const asked = [...byContainer.values()].reduce((sum, a) => sum + a, 0);
+  if (asked > input.income) return { ok: false, reason: "over-income" };
+  // Floored, like the split itself, so asks that exactly use the income still
+  // fit in 100% — the rest absorbs the fractions. A real ask never rounds to 0%.
   const parts = [...byContainer.entries()].map(([container_id, amount]) => ({
     container_id,
-    bps: Math.max(1, Math.round((amount * BPS_WHOLE) / input.income)),
+    bps: Math.max(1, Math.floor((amount * BPS_WHOLE) / input.income)),
   }));
   if (parts.reduce((sum, p) => sum + p.bps, 0) > BPS_WHOLE)
     return { ok: false, reason: "over-income" };

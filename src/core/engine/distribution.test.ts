@@ -18,6 +18,7 @@ import {
   defaultPresetId,
   distributionPieces,
   filterRegister,
+  firstUsablePreset,
   fillFromGoalAsks,
   groupBreakdown,
   hideDistributionPieces,
@@ -530,5 +531,61 @@ describe("filterRegister — a piece can surface its parent", () => {
   it("an amount filter can match a piece's size", () => {
     const out = filterRegister(live, { minAmount: 90000, maxAmount: 100000 }, { label });
     expect([...(out.highlights.get("pay") ?? [])]).toEqual(["invest"]);
+  });
+});
+
+describe("a piece whose link an older client stripped", () => {
+  it("is still recognised by its deterministic id, so it's hidden and re-split", () => {
+    const parent = income("rule:2026-10-01", { distribution_preset_id: "p1" });
+    const stripped = {
+      ...piece("rule:2026-10-01", "savings", 25000),
+      distribution_parent_id: null,
+    };
+    const live = activeRows([parent, stripped]);
+    expect(
+      distributionPieces(live)
+        .get("rule:2026-10-01")
+        ?.map((p) => p.id),
+    ).toEqual([stripped.id]);
+    expect(hideDistributionPieces(live).map((t) => t.id)).toEqual(["rule:2026-10-01"]);
+  });
+
+  it("doesn't claim an ordinary transfer", () => {
+    const parent = income("pay");
+    const other = makeTransfer({
+      id: "unrelated",
+      date: "2026-10-01",
+      amount: 100,
+      container_id: "general",
+      to_container_id: "savings",
+      vendor_source: "Move",
+    });
+    expect(distributionPieces(activeRows([parent, other])).size).toBe(0);
+  });
+});
+
+describe("fillFromGoalAsks — asks that exactly use the income", () => {
+  it("fits six equal asks into 100% (floored, rest absorbs the remainder)", () => {
+    const result = fillFromGoalAsks({
+      income: 600000,
+      restContainerId: "general",
+      asks: ["a", "b", "c", "d", "e", "f"].map((containerId) => ({
+        containerId,
+        amount: 100000,
+      })),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.parts.every((p) => p.bps === 1666)).toBe(true);
+  });
+});
+
+describe("firstUsablePreset", () => {
+  it("skips candidates that can't split (archived rest, archived preset, missing)", () => {
+    const brokenRest = paycheck({ id: "a", name: "A", rest_container_id: "gone" });
+    const ok = paycheck({ id: "b", name: "B" });
+    const presets = [brokenRest, ok];
+    expect(firstUsablePreset(["a", null, "missing", "b"], presets, containers)).toBe("b");
+    expect(firstUsablePreset(["a"], presets, containers)).toBeNull();
   });
 });

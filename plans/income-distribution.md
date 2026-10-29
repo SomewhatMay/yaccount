@@ -50,9 +50,11 @@ Read before touching this: `src/core/oplog/apply.ts`, `src/core/repo/repo.ts`, `
 - **The split is frozen at write time.** Pieces carry exact cents. Nothing
   re-derives a split at replay or view time, so editing a preset never rewrites
   history and replay stays deterministic.
-- **Every row stands alone.** The link is metadata. A partially synced group, a
+- **Every row stands alone.** The link is metadata (and a piece is also
+  recognised by its deterministic id, so an older client that re-parses a piece
+  and strips the link field doesn't orphan it). A partially synced group, a
   group whose rows drifted under concurrent full-row LWW edits, a parent voided
-  by an older client — all keep balances exact. Display rules degrade:
+  by an older client — all keep balances exact (but see the known limit below). Display rules degrade:
   - a piece is hidden only while its parent is live; otherwise it renders as an
     ordinary transfer;
   - a parent is "split" only while it has ≥1 live piece;
@@ -76,6 +78,16 @@ Read before touching this: `src/core/oplog/apply.ts`, `src/core/repo/repo.ts`, `
   Per-preset LWW, so editing two presets on two devices never collides.
   Default: `distribution_default` → preset id (`""` = none). Malformed JSON is
   ignored, never thrown on (a merge must never throw).
+
+### Known limit (pre-existing, every row type)
+
+A void snapshots the amount it reverses. If device A edits a row's amount while
+device B (offline) deletes it — or both delete it offline — the merged reversal
+doesn't net to zero and hidden money remains. Re-splits update pieces in place,
+which makes this slightly easier to hit. Fixing it means changing void semantics
+app-wide (derive a reversal's effect from the reversed row's current amount, or
+dedupe reversers per `reverses_id`), so it's flagged for a follow-up rather than
+patched here.
 
 ## Cents math
 

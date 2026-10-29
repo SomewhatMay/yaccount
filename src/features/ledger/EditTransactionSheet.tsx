@@ -480,8 +480,9 @@ function EditForm({
             </Select>
             {recordedPreset && !preset && (
               <p className="text-muted-foreground text-xs">
-                Split by {recordedPreset.name}, which can&apos;t split any more. Saving
-                keeps the split as it is; pick a distribution to re-split it.
+                {pending
+                  ? `${recordedPreset.name} can't split any more — pick another distribution, or untick to approve it whole.`
+                  : `Split by ${recordedPreset.name}, which can't split any more. Saving keeps the split as it is; pick a distribution to re-split it.`}
               </p>
             )}
             {resplit && wasDistributed && (

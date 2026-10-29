@@ -146,6 +146,22 @@ export function sortForRegister(txns: Transaction[]): Transaction[] {
 }
 
 /**
+ * Which income a transfer is a piece of. The link field first; failing that,
+ * the deterministic creation id `<parent>:split:<container>` — an older client
+ * that edits a piece re-parses the row and strips the field it doesn't know,
+ * but it can't change the id, so the piece still belongs to its group (and a
+ * later re-split or delete still moves it rather than leaving it behind).
+ */
+export function pieceParentId(t: Transaction): string | null {
+  if (t.distribution_parent_id) return t.distribution_parent_id;
+  const at = t.id.lastIndexOf(":split:");
+  if (at <= 0 || t.to_container_id === null) return null;
+  return t.id.slice(at + ":split:".length) === t.to_container_id
+    ? t.id.slice(0, at)
+    : null;
+}
+
+/**
  * Live pieces keyed by their live parent's id. Pass LIVE rows (`activeRows`):
  * a voided piece is not part of its group any more, and a piece whose parent
  * isn't live (voided by an older client, or not synced yet) belongs to no group.
@@ -154,7 +170,7 @@ export function distributionPieces(liveRows: Transaction[]): Map<string, Transac
   const parents = new Set(liveRows.filter((t) => !isTransfer(t)).map((t) => t.id));
   const groups = new Map<string, Transaction[]>();
   for (const t of liveRows) {
-    const parent = t.distribution_parent_id;
+    const parent = pieceParentId(t);
     if (!parent || !isTransfer(t) || !parents.has(parent)) continue;
     const list = groups.get(parent) ?? [];
     list.push(t);

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
 import type { Category, Container, DistributionPreset, Transaction } from "@/core/model";
 import {
+  firstUsablePreset,
   recallDistribution,
   splitIncome,
   usablePreset,
@@ -156,9 +157,19 @@ export function useComposeFields({
 
   function setDistribute(on: boolean) {
     setError("");
+    // The first candidate that can actually split — a default whose rest
+    // container was archived must not leave the box un-tickable.
     setPickedDistribution(
       on
-        ? (recalledDistribution ?? defaultDistributionId ?? usablePresets[0]?.id ?? null)
+        ? firstUsablePreset(
+            [
+              recalledDistribution,
+              defaultDistributionId,
+              ...usablePresets.map((p) => p.id),
+            ],
+            presets,
+            containers,
+          )
         : null,
     );
   }

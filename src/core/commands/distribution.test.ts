@@ -468,3 +468,48 @@ it("a plain createTransaction still writes an undistributed row", () => {
   const op = createTransaction({ ...income });
   expect(op.payload.row.distribution_preset_id).toBeNull();
 });
+
+describe("an older client stripped a piece's link (it re-parses rows it edits)", () => {
+  it("a later re-split moves that piece instead of adding a second one", async () => {
+    const ops = createDistributedIncome(
+      { ...income, amount: 100000, preset_id: "p1", split: okSplit(100000) },
+      T1,
+    );
+    const rows = await rowsOf(ops);
+    const savingsPiece = rows.find((r) => r.id === splitPieceId("pay", "savings"))!;
+    const stripped: Op = {
+      id: "old-client-edit",
+      ts: "2026-10-29T09:30:00.000Z",
+      type: "transaction.update",
+      payload: {
+        row: { ...savingsPiece, distribution_parent_id: null, notes: "edited" },
+      },
+    };
+    const before = await rowsOf([...ops, stripped]);
+    const live = activeRows(before);
+    const parent = live.find((r) => r.id === "pay")!;
+    const pieces = distributionPieces(live).get("pay")!;
+    expect(pieces).toHaveLength(2);
+
+    const next = reconcileDistribution(
+      {
+        parent: { ...parent, amount: 110000 },
+        livePieces: pieces,
+        desired: okSplit(110000).pieces,
+        allTxns: before,
+      },
+      T2,
+    );
+    const after = await rowsOf([...ops, stripped, ...next]);
+    expect(containerBalance(after, "savings")).toBe(22000);
+
+    const gone = voidDistribution(
+      activeRows(after).find((r) => r.id === "pay")!,
+      distributionPieces(activeRows(after)).get("pay")!,
+      T3,
+    );
+    const deleted = await rowsOf([...ops, stripped, ...next, ...gone.ops]);
+    for (const c of ["general", "savings", "invest"])
+      expect(containerBalance(deleted, c)).toBe(0);
+  });
+});
