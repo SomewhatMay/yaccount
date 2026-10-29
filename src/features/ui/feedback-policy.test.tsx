@@ -9,14 +9,8 @@ describe("deliberate feedback policy", () => {
     ["../ledger/EditTransactionSheet.tsx", /Transaction updated|Transfer updated/],
     ["../categories/CategoriesView.tsx", /Category added|Icon set|Icon cleared|Renamed/],
     ["../categories/BudgetSheet.tsx", /Budget replaced|Budget updated|Budget set/],
-    [
-      "../containers/ContainersView.tsx",
-      /Container added|Counted in overall|Default wallet/,
-    ],
-    [
-      "../containers/LogBalanceSheet.tsx",
-      /Report replaced|Report corrected|Balance reported/,
-    ],
+    ["../containers/ContainersView.tsx", /Container added|Counted in overall|Default wallet/],
+    ["../containers/LogBalanceSheet.tsx", /Report replaced|Report corrected|Balance reported/],
     ["../goals/GoalsView.tsx", /Goal updated|Goal created/],
     ["../recurring/RecurringView.tsx", /Recurring updated|Recurring added/],
     ["../shell/QuickAddSheet.tsx", /toast\.success\("Logged"/],

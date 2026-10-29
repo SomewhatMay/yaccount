@@ -216,8 +216,8 @@ export function DataPanel() {
       <div>
         <h2 className="font-display text-lg tracking-tight">Your data</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Take a copy with you, put a known state on the app, or start over. When
-          connected, clearing and importing replace your Google Drive copy too.
+          Take a copy with you, put a known state on the app, or start over. When connected,
+          clearing and importing replace your Google Drive copy too.
         </p>
       </div>
 

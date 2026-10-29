@@ -22,8 +22,7 @@ export function useFlashRow<T extends HTMLElement = HTMLDivElement>(id: string) 
   const ref = useRef<T>(null);
 
   useEffect(() => {
-    if (bringIntoView)
-      ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (bringIntoView) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [bringIntoView]);
 
   return { ref, flashed };

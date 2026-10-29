@@ -58,7 +58,9 @@ describe("GoalSchema cross-field refinements (§5.9.2/.4)", () => {
       }),
     ).not.toThrow();
     // fixed without a committed monthly is invalid
-    expect(() => makeGoal({ ...base, kind: "spend_down", mode: "fixed" })).toThrow();
+    expect(() =>
+      makeGoal({ ...base, kind: "spend_down", mode: "fixed" }),
+    ).toThrow();
   });
 
   it("planned_monthly is only allowed in fixed mode (null for deadline/passive)", () => {
@@ -83,15 +85,11 @@ describe("GoalSchema cross-field refinements (§5.9.2/.4)", () => {
 
   it("reserve kind requires a target (a set-point, §5.9.3)", () => {
     expect(() =>
-      makeGoal({
-        ...base,
-        kind: "reserve",
-        mode: "deadline",
-        deadline: "2026-11-30",
-        target_amount: 1000000,
-      }),
+      makeGoal({ ...base, kind: "reserve", mode: "deadline", deadline: "2026-11-30", target_amount: 1000000 }),
     ).not.toThrow();
-    expect(() => makeGoal({ ...base, kind: "reserve", mode: "passive" })).toThrow();
+    expect(() =>
+      makeGoal({ ...base, kind: "reserve", mode: "passive" }),
+    ).toThrow();
   });
 
   it("passive mode tracks with no ask; target optional", () => {
