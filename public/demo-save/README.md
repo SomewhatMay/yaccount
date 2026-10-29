@@ -1,6 +1,6 @@
 # yaccount demo save
 
-`yaccount-demo-save.json` is a portable 227-change account export, anchored to **October 11, 2026**. Settings → Your data also has a **Download demo save** link.
+`yaccount-demo-save.json` is a portable 233-change account export, anchored to **October 11, 2026**. Settings → Your data also has a **Download demo save** link.
 
 ## Load it
 
@@ -36,9 +36,9 @@ The shared shell changes by screen size: phones use Home/Ledger/Goals/More tabs,
 
 | Page | What the save gives you |
 | --- | --- |
-| Ledger | Income, expenses, refunds, transfers, notes, pending and approved entries, a void/reversal pair, searchable history, and three Quick Add shortcuts. |
-| Inbox | Three pending entries, including a recurring occurrence and an unlinked item to review. |
-| Plan | Expected scheduled income, time-based category budgets, goal asks, and unallocated money. |
+| Ledger | Income, expenses, refunds, transfers, notes, pending and approved entries, a void/reversal pair, a freelance invoice split across three containers ("split 3 ways ⓘ"), searchable history, and three Quick Add shortcuts (Payday splits via Paycheck). |
+| Inbox | Three pending entries, including a recurring occurrence and an unlinked item to review. The studio retainer splits "via Freelance" when approved. |
+| Plan | Expected scheduled income, time-based category budgets, goal asks, unallocated money, and two income distributions (Paycheck is the default). |
 | Goals | Active reserve and spend-down goals in deadline, fixed, and passive modes, plus completed, cancelled, and archived examples. |
 | Cravings | Three wins: two move the same amount into linked goals, one is recorded without a transfer. |
 | Recurring | Daily, weekly, twice-monthly, monthly, annual, and custom rules; income, expense, transfer, goal-derived, active, and paused examples. |
