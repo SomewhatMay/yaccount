@@ -379,3 +379,31 @@ test("archiving a preset stops offering it and can be undone", async ({ page }) 
   await card.getByRole("button", { name: "Restore" }).click();
   await expect(card.getByRole("button", { name: "Edit Paycheck" })).toBeVisible();
 });
+
+test("edit before approving can switch an occurrence to a split", async ({ page }) => {
+  await setup(page);
+  await openReady(page, "/recurring", "Recurring");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("radio", { name: "income" }).click();
+  await page.getByLabel("Payee / source").fill("Side gig");
+  await choose(page, "Category", "Salary · income");
+  await page.getByLabel("Amount").fill("500");
+  await choose(page, "Repeats", "Daily");
+  await page.getByRole("button", { name: "Add recurring" }).click();
+
+  await page.goto("/inbox");
+  await expect(page.getByText("Side gig", { exact: true })).toBeVisible();
+  await expect(page.getByText(/via Paycheck/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Actions for Side gig" }).click();
+  await page.getByRole("menuitem", { name: "Edit before approving" }).click();
+  await page.getByRole("checkbox", { name: "Distribute across containers" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText(/via Paycheck/)).toBeVisible();
+  await page.getByRole("button", { name: "Approve Side gig" }).click();
+  await expect(page.getByText("Nothing to review", { exact: true })).toBeVisible();
+  await expectBalances(page, {
+    Savings: "$100.00",
+    Invest: "$165.00",
+    General: "$235.00",
+  });
+});
