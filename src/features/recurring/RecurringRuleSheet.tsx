@@ -27,7 +27,7 @@ import {
 } from "@/core/engine/autocomplete";
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
 import { usablePreset } from "@/core/engine/distribution";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxField } from "@/features/ui/CheckboxField";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { CreationTextCombobox } from "@/features/ledger/CreationCombobox";
@@ -367,22 +367,24 @@ function RuleForm({
         ) : null}
 
         {moneyIn && (usablePresets.length > 0 || distributionId !== null) && (
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <Checkbox
-              checked={distributing}
-              onCheckedChange={(v) =>
-                setDistributionId(v === true ? (usablePresets[0]?.id ?? null) : null)
-              }
-              aria-label="Distribute"
-            />
+          <CheckboxField
+            checked={distributing}
+            onCheckedChange={(on) =>
+              setDistributionId(on ? (usablePresets[0]?.id ?? null) : null)
+            }
+          >
             Distribute across containers
-          </label>
+          </CheckboxField>
         )}
 
         {distributing ? (
           <div className="grid gap-1.5">
             <Label>Split</Label>
-            <Select value={distributionId ?? ""} onValueChange={setDistributionId}>
+            <Select
+              key="distribution"
+              value={distributionId ?? ""}
+              onValueChange={(v) => v && setDistributionId(v)}
+            >
               <SelectTrigger aria-label="Distribution">
                 <SelectValue placeholder="Pick a distribution">
                   {distribution?.name}

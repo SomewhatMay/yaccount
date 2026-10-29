@@ -27,7 +27,7 @@ import {
 } from "@/core/model";
 import { linesFromGroup, linesFromSplit } from "@/features/distribution/lines";
 import { SplitBreakdown } from "@/features/distribution/SplitBreakdown";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxField } from "@/features/ui/CheckboxField";
 import {
   defaultSign,
   resolveAmount,
@@ -462,27 +462,52 @@ function EditForm({
             </SelectContent>
           </Select>
         </div>
-        {showDistribute && (
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <Checkbox
-              checked={distribute}
-              onCheckedChange={(v) => {
-                const on = v === true;
-                setDistribute(on);
-                setError("");
-                if (on && !presetId) setPresetId(usablePresets[0]?.id ?? null);
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-amount">Amount</Label>
+          <div className="flex items-center gap-1.5">
+            <SignToggle
+              sign={sign}
+              onChange={(next) => {
+                setPickedSign(next);
+                setWarn(null);
               }}
-              aria-label="Distribute"
+              className="border-input size-9 shrink-0 rounded-lg border"
             />
+            <Input
+              id="edit-amount"
+              value={amountStr}
+              onChange={(e) => {
+                const { sign: typed, rest } = splitSign(e.target.value);
+                if (typed) setPickedSign(typed);
+                setAmountStr(rest);
+                setWarn(null);
+              }}
+              inputMode="decimal"
+              className="tnum font-mono"
+            />
+          </div>
+          {warn && <p className="text-xs text-amber-600 dark:text-amber-500">{warn}</p>}
+        </div>
+        {showDistribute && (
+          <CheckboxField
+            checked={distribute}
+            onCheckedChange={(on) => {
+              setDistribute(on);
+              setError("");
+              if (on && !presetId) setPresetId(usablePresets[0]?.id ?? null);
+            }}
+          >
             Distribute across containers
-          </label>
+          </CheckboxField>
         )}
         {distribute && moneyIn ? (
           <div className="grid gap-1.5">
             <Label htmlFor="edit-distribution">Split</Label>
             <Select
+              key="distribution"
               value={presetId ?? ""}
               onValueChange={(v) => {
+                if (!v) return; // a remounting Radix Select reports ""
                 setPresetId(v);
                 setError("");
               }}
@@ -524,7 +549,11 @@ function EditForm({
         ) : (
           <div className="grid gap-1.5">
             <Label htmlFor="edit-container">Container</Label>
-            <Select value={containerId} onValueChange={setContainerId}>
+            <Select
+              key="container"
+              value={containerId}
+              onValueChange={(v) => v && setContainerId(v)}
+            >
               <SelectTrigger id="edit-container" aria-label="Container">
                 <SelectValue placeholder="Container">{container?.name}</SelectValue>
               </SelectTrigger>
@@ -538,32 +567,6 @@ function EditForm({
             </Select>
           </div>
         )}
-        <div className="grid gap-1.5">
-          <Label htmlFor="edit-amount">Amount</Label>
-          <div className="flex items-center gap-1.5">
-            <SignToggle
-              sign={sign}
-              onChange={(next) => {
-                setPickedSign(next);
-                setWarn(null);
-              }}
-              className="border-input size-9 shrink-0 rounded-lg border"
-            />
-            <Input
-              id="edit-amount"
-              value={amountStr}
-              onChange={(e) => {
-                const { sign: typed, rest } = splitSign(e.target.value);
-                if (typed) setPickedSign(typed);
-                setAmountStr(rest);
-                setWarn(null);
-              }}
-              inputMode="decimal"
-              className="tnum font-mono"
-            />
-          </div>
-          {warn && <p className="text-xs text-amber-600 dark:text-amber-500">{warn}</p>}
-        </div>
         <div className="grid gap-1.5">
           <Label htmlFor="edit-notes">Notes</Label>
           <Textarea

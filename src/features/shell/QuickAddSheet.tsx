@@ -32,7 +32,7 @@ import { useComposeFields, type ComposeKind } from "@/features/ledger/useCompose
 import { InlineError } from "@/features/ui/InlineError";
 import { SplitInfo } from "@/features/distribution/SplitBreakdown";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxField } from "@/features/ui/CheckboxField";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -320,14 +320,13 @@ function QuickAddForm({
                 </SelectContent>
               </Select>
               {f.canDistribute && (
-                <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-sm">
-                  <Checkbox
-                    checked={f.distributionId !== null}
-                    onCheckedChange={(v) => f.setDistribute(v === true)}
-                    aria-label="Distribute"
-                  />
+                <CheckboxField
+                  checked={f.distributionId !== null}
+                  onCheckedChange={f.setDistribute}
+                  className="shrink-0 gap-1.5"
+                >
                   Distribute
-                </label>
+                </CheckboxField>
               )}
             </div>
           </>
@@ -336,7 +335,13 @@ function QuickAddForm({
         {f.distributionPreset ? (
           <>
             <FieldLabel>Split</FieldLabel>
-            <Select value={f.distributionId ?? ""} onValueChange={f.setDistributionId}>
+            {/* Keyed apart from the Container select: the two occupy one slot,
+                and a reused Radix Select reports "" when its options change. */}
+            <Select
+              key="distribution"
+              value={f.distributionId ?? ""}
+              onValueChange={(v) => v && f.setDistributionId(v)}
+            >
               <SelectTrigger aria-label="Distribution" className="h-9">
                 <SelectValue placeholder="Distribution" />
               </SelectTrigger>
@@ -352,7 +357,11 @@ function QuickAddForm({
         ) : (
           <>
             <FieldLabel>{f.kind === "transfer" ? "From" : "Container"}</FieldLabel>
-            <Select value={f.containerId} onValueChange={f.setPickedContainerId}>
+            <Select
+              key="container"
+              value={f.containerId}
+              onValueChange={(v) => v && f.setPickedContainerId(v)}
+            >
               <SelectTrigger
                 aria-label={f.kind === "transfer" ? "From container" : "Container"}
                 className="h-9"

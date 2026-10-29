@@ -50,7 +50,7 @@ import { InlineError } from "@/features/ui/InlineError";
 import { activateCardOnClick } from "@/features/ui/card-interaction";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxField } from "@/features/ui/CheckboxField";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -481,14 +481,12 @@ function DistributionForm({
           )}
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <Checkbox
-            checked={draft.isDefault}
-            onCheckedChange={(v) => setDraft((d) => ({ ...d, isDefault: v === true }))}
-            aria-label="Use by default"
-          />
+        <CheckboxField
+          checked={draft.isDefault}
+          onCheckedChange={(isDefault) => setDraft((d) => ({ ...d, isDefault }))}
+        >
           Use by default for income with no history
-        </label>
+        </CheckboxField>
 
         <div className="grid gap-1.5">
           <Label htmlFor="dist-preview">Preview on</Label>
