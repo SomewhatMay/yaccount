@@ -46,6 +46,15 @@ export const TransactionSchema = z
     // the row and the journal always agree. Null = a row written before M11 (or by
     // an older client); `sortForRegister` sinks those to the end of their day.
     entered_at: zIsoDateTime.nullable(),
+    // Income distribution (plans/income-distribution.md). Both are metadata over
+    // rows that each stand alone — balances never depend on them, so a group
+    // that synced partially or drifted under concurrent edits stays exact.
+    // The preset that split this income row (or that an income template /
+    // pending occurrence will split with). Null = not distributed.
+    distribution_preset_id: zId.nullable().default(null),
+    // Set only on a piece of a split: a transfer rest → part, pointing at the
+    // income row it came from. The register folds live pieces under a live parent.
+    distribution_parent_id: zId.nullable().default(null),
     yearMonth: zYearMonth, // STORED, derived from `date` at write time (§8.3)
   })
   .refine((t) => t.yearMonth === t.date.slice(0, 7), {
@@ -58,6 +67,14 @@ export const TransactionSchema = z
   .refine((t) => t.recurring_occurrence_date === null || t.recurring_rule_id !== null, {
     message: "a recurring occurrence date needs a recurring rule",
     path: ["recurring_occurrence_date"],
+  })
+  .refine((t) => t.distribution_parent_id === null || t.to_container_id !== null, {
+    message: "only a transfer can be a piece of a distribution",
+    path: ["distribution_parent_id"],
+  })
+  .refine((t) => t.distribution_preset_id === null || t.category_id !== null, {
+    message: "only an expense/income row can carry a distribution preset",
+    path: ["distribution_preset_id"],
   });
 export type Transaction = z.infer<typeof TransactionSchema>;
 
@@ -79,6 +96,7 @@ export function makeTransaction(input: {
   recurring_occurrence_date?: string | null;
   notes?: string | null;
   entered_at?: string | null; // the writing instant; commands pass the op's `ts`
+  distribution_preset_id?: string | null;
 }): Transaction {
   return TransactionSchema.parse({
     id: input.id ?? newId(),
@@ -96,6 +114,8 @@ export function makeTransaction(input: {
     notes: input.notes ?? null,
     reverses_id: null,
     entered_at: input.entered_at ?? null,
+    distribution_preset_id: input.distribution_preset_id ?? null,
+    distribution_parent_id: null,
     yearMonth: yearMonthOf(input.date),
   });
 }
@@ -121,6 +141,7 @@ export function makeTemplate(input: {
   date?: string;
   notes?: string | null;
   entered_at?: string | null;
+  distribution_preset_id?: string | null;
 }): Transaction {
   const isTransfer = input.to_container_id != null;
   if (isTransfer === (input.category_id != null)) {
@@ -145,6 +166,8 @@ export function makeTemplate(input: {
     notes: input.notes ?? null,
     reverses_id: null,
     entered_at: input.entered_at ?? null,
+    distribution_preset_id: input.distribution_preset_id ?? null,
+    distribution_parent_id: null,
     yearMonth: yearMonthOf(date),
   });
 }
@@ -208,6 +231,7 @@ export function makeTransfer(input: {
   recurring_occurrence_date?: string | null;
   notes?: string | null;
   entered_at?: string | null;
+  distribution_parent_id?: string | null; // set on a piece of a split income
 }): Transaction {
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
     throw new Error("transfer amount must be a positive integer-cents magnitude");
@@ -242,6 +266,8 @@ export function makeTransfer(input: {
     notes: input.notes ?? null,
     reverses_id: null,
     entered_at: input.entered_at ?? null,
+    distribution_preset_id: null,
+    distribution_parent_id: input.distribution_parent_id ?? null,
     yearMonth: yearMonthOf(input.date),
   });
 }

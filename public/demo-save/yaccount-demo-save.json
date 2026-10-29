@@ -4,7 +4,7 @@
   "exportedAt": "2026-10-11T12:00:00.000Z",
   "appDbVersion": 3,
   "deviceId": null,
-  "opCount": 227,
+  "opCount": 233,
   "ops": [
     {
       "id": "op-demo-transfer-japan-win",
@@ -89,6 +89,87 @@
           "reflection": "The weather was good and the walk cleared my head.",
           "goal_id": "goal-laptop",
           "transfer_transaction_id": "demo-transfer-laptop-win"
+        }
+      }
+    },
+    {
+      "id": "op-demo-split-invoice",
+      "ts": "2026-10-09T16:10:00.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "demo-split-invoice",
+          "date": "2026-10-09",
+          "amount": 185000,
+          "vendor_source": "Lumen Studio invoice",
+          "category_id": "freelance",
+          "container_id": "general",
+          "to_container_id": null,
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-10-09T16:10:00.000Z",
+          "distribution_preset_id": "demo-distribution-freelance",
+          "distribution_parent_id": null,
+          "yearMonth": "2026-10"
+        }
+      }
+    },
+    {
+      "id": "op-demo-split-invoice:split:skills",
+      "ts": "2026-10-09T16:10:01.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "demo-split-invoice:split:skills",
+          "date": "2026-10-09",
+          "amount": -27750,
+          "vendor_source": "Lumen Studio invoice",
+          "category_id": null,
+          "container_id": "general",
+          "to_container_id": "skills",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-10-09T16:10:00.000Z",
+          "distribution_preset_id": null,
+          "distribution_parent_id": "demo-split-invoice",
+          "yearMonth": "2026-10"
+        }
+      }
+    },
+    {
+      "id": "op-demo-split-invoice:split:savings",
+      "ts": "2026-10-09T16:10:02.000Z",
+      "type": "transaction.create",
+      "payload": {
+        "row": {
+          "id": "demo-split-invoice:split:savings",
+          "date": "2026-10-09",
+          "amount": -18500,
+          "vendor_source": "Lumen Studio invoice",
+          "category_id": null,
+          "container_id": "general",
+          "to_container_id": "savings",
+          "is_template": false,
+          "template_name": null,
+          "inbox_status": "approved",
+          "recurring_rule_id": null,
+          "recurring_occurrence_date": null,
+          "notes": null,
+          "reverses_id": null,
+          "entered_at": "2026-10-09T16:10:00.000Z",
+          "distribution_preset_id": null,
+          "distribution_parent_id": "demo-split-invoice",
+          "yearMonth": "2026-10"
         }
       }
     },
@@ -3974,7 +4055,8 @@
           "notes": null,
           "reverses_id": null,
           "entered_at": "2026-10-11T12:02:43.000Z",
-          "yearMonth": "2026-10"
+          "yearMonth": "2026-10",
+          "distribution_preset_id": "demo-distribution-freelance"
         }
       }
     },
@@ -4537,7 +4619,8 @@
           "start_date": "2026-02-16",
           "end_date": null,
           "next_generation_date": "2026-11-09",
-          "status": "active"
+          "status": "active",
+          "template_distribution_preset_id": "demo-distribution-freelance"
         }
       }
     },
@@ -5014,6 +5097,8 @@
           "notes": null,
           "reverses_id": null,
           "entered_at": null,
+          "distribution_preset_id": null,
+          "distribution_parent_id": null,
           "yearMonth": "2000-01"
         }
       }
@@ -5039,6 +5124,8 @@
           "notes": null,
           "reverses_id": null,
           "entered_at": null,
+          "distribution_preset_id": "demo-distribution-paycheck",
+          "distribution_parent_id": null,
           "yearMonth": "2000-01"
         }
       }
@@ -5064,7 +5151,42 @@
           "notes": null,
           "reverses_id": null,
           "entered_at": null,
+          "distribution_preset_id": null,
+          "distribution_parent_id": null,
           "yearMonth": "2000-01"
+        }
+      }
+    },
+    {
+      "id": "op-demo-distribution-freelance",
+      "ts": "2026-10-11T12:05:00.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "distribution:demo-distribution-freelance",
+          "value": "{\"v\":1,\"id\":\"demo-distribution-freelance\",\"name\":\"Freelance\",\"rest_container_id\":\"general\",\"parts\":[{\"container_id\":\"skills\",\"bps\":1500},{\"container_id\":\"savings\",\"bps\":1000}],\"archived\":false}"
+        }
+      }
+    },
+    {
+      "id": "op-demo-distribution-paycheck",
+      "ts": "2026-10-11T12:05:00.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "distribution:demo-distribution-paycheck",
+          "value": "{\"v\":1,\"id\":\"demo-distribution-paycheck\",\"name\":\"Paycheck\",\"rest_container_id\":\"general\",\"parts\":[{\"container_id\":\"savings\",\"bps\":1000},{\"container_id\":\"emergency\",\"bps\":500},{\"container_id\":\"brokerage\",\"bps\":750}],\"archived\":false}"
+        }
+      }
+    },
+    {
+      "id": "op-demo-distribution-default",
+      "ts": "2026-10-11T12:05:01.000Z",
+      "type": "setting.set",
+      "payload": {
+        "row": {
+          "key": "distribution_default",
+          "value": "demo-distribution-paycheck"
         }
       }
     }

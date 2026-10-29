@@ -1,7 +1,12 @@
-import { createTransaction, createTransfer } from "@/core/commands";
+import {
+  createDistributedIncome,
+  createTransaction,
+  createTransfer,
+} from "@/core/commands";
+import { splitIncome } from "@/core/engine/distribution";
 import { formatCents, parseDollars } from "@/core/money";
-import type { Category, Container, Transaction } from "@/core/model";
-import type { TransactionCreateOp } from "@/core/oplog";
+import type { Category, Container, DistributionPreset, Transaction } from "@/core/model";
+import type { Op, TransactionCreateOp } from "@/core/oplog";
 import { resolveAmount, type Sign } from "@/features/ledger/amount";
 
 /**
@@ -30,6 +35,10 @@ export type ComposeDraft =
       sign: Sign;
       category?: Category;
       from?: Container;
+      /** Split this income by a preset (plans/income-distribution.md) instead of
+       * landing it whole in `from`. `containers` decides which parts can still
+       * receive money (archived ones fold into rest). */
+      distribution?: { preset: DistributionPreset; containers: Container[] };
     }
   | {
       kind: "transfer";
@@ -50,7 +59,11 @@ export type ComposeOutcome =
   | { status: "confirm"; message: string }
   | {
       status: "ready";
+      /** The entry's own row op (for a split: the income). */
       op: TransactionCreateOp;
+      /** Everything to commit, as one batch — `[op]`, or the income plus its
+       * pieces for a distributed income. */
+      ops: Op[];
       /** The row about to be written, so the register can wash it as it lands
        * (§12.5) without re-deriving what was just built. */
       row: Transaction;
@@ -63,11 +76,15 @@ export function composeOp(
 ): ComposeOutcome {
   const err = (message: string): ComposeOutcome => ({ status: "error", message });
 
-  // Both shapes need somewhere for the money to come from.
-  if (!draft.from) return err("Pick a container.");
+  // Both shapes need somewhere for the money to come from — a distributed
+  // income's comes from its preset.
+  if (!draft.from && !(draft.kind === "entry" && draft.distribution)) {
+    return err("Pick a container.");
+  }
 
   if (draft.kind === "transfer") {
     const { from, to } = draft;
+    if (!from) return err("Pick a container.");
     if (!to) return err("Pick where the money goes.");
     if (from.id === to.id) return err("Pick two different containers.");
 
@@ -95,6 +112,7 @@ export function composeOp(
     return {
       status: "ready",
       op,
+      ops: [op],
       row: op.payload.row,
       toast: {
         title: "Moved",
@@ -110,6 +128,14 @@ export function composeOp(
 
   const res = resolveAmount(draft.amountStr, category.type, draft.sign);
   if (!res.ok) return err(res.error);
+
+  if (draft.distribution) {
+    if (category.type !== "income" || res.signed <= 0) {
+      return err("Only money in can be distributed.");
+    }
+    return composeDistributed(draft, vendor, category, res.signed, draft.distribution);
+  }
+  if (!from) return err("Pick a container.");
 
   // Money in on an expense category (or out on income) is legal — a refund, a
   // rebate, a clawback — so it is flagged inline and never blocked (§10 #13).
@@ -134,10 +160,59 @@ export function composeOp(
   return {
     status: "ready",
     op,
+    ops: [op],
     row: op.payload.row,
     toast: {
       title: "Logged",
       description: `${vendor} · ${formatCents(res.signed)} · ${from.name}`,
+    },
+  };
+}
+
+function composeDistributed(
+  draft: Extract<ComposeDraft, { kind: "entry" }>,
+  vendor: string,
+  category: Category,
+  amount: number,
+  { preset, containers }: { preset: DistributionPreset; containers: Container[] },
+): ComposeOutcome {
+  const split = splitIncome(amount, preset, containers);
+  if (!split.ok) {
+    const rest =
+      containers.find((c) => c.id === preset.rest_container_id)?.name ??
+      "Its rest container";
+    return {
+      status: "error",
+      message:
+        split.reason === "preset-archived"
+          ? `${preset.name} is archived — pick a container instead.`
+          : `${rest} is archived, so ${preset.name} can't split right now — pick a container instead.`,
+    };
+  }
+  const ops = createDistributedIncome({
+    date: draft.date,
+    entered_at: draft.entered_at,
+    amount,
+    vendor_source: vendor,
+    category_id: category.id,
+    notes: draft.notes?.trim() || null,
+    preset_id: preset.id,
+    split,
+  });
+  const op = ops[0] as TransactionCreateOp;
+  const ways = split.pieces.length + 1;
+  const restName =
+    containers.find((c) => c.id === split.rest.container_id)?.name ?? "rest";
+  return {
+    status: "ready",
+    op,
+    ops,
+    row: op.payload.row,
+    toast: {
+      title: "Logged",
+      description: `${vendor} · ${formatCents(amount)} · ${
+        ways > 1 ? `split ${ways} ways` : restName
+      }`,
     },
   };
 }

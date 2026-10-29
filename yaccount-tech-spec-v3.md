@@ -198,6 +198,8 @@ Expenses, income, transfers, templates and recurring-pending rows all live here.
 | recurring_rule_id | TEXT nullable | set on rows generated from a rule |
 | notes | TEXT nullable | optional freeform detail, separate from `vendor_source`; blank normalizes to null |
 | reverses_id | TEXT nullable | set **only on a reversing row** → the id of the row it cancels |
+| distribution_preset_id | TEXT nullable | income (or income template / pending occurrence) only: the distribution preset that split it (§6.7) |
+| distribution_parent_id | TEXT nullable | transfers only: this row is a piece of the split income it names (§6.7) |
 | yearMonth | TEXT | stored `YYYY-MM`, derived from `date` at write time, for the compound indexes |
 
 **Three shapes** share the table: **expense/income** (`category_id` set, `to_container_id` null,
@@ -628,6 +630,29 @@ and a Resume control.
 
 **Templates** (`is_template = true`) are saved 1-tap shortcuts created from any transaction. They
 are uncapped and are not ledger entries.
+
+### 6.7 Income distribution
+
+A **distribution preset** splits an income across containers by percent: every part is a share
+in integer basis points, and one **rest** container takes whatever the parts leave plus every
+rounding cent (`part = floor(amount × bps / 10000)`, `rest = amount − Σ parts`), so a split
+always adds up exactly. Presets are named, live one-per-key in synced settings
+(`distribution:<id>`, plus `distribution_default`), and are archived — never removed — with a
+Restore.
+
+A distributed income is **one income row in the rest container plus one transfer per non-zero
+part**, linked by `distribution_parent_id`. Transfers, not split income rows, because goal
+progress is transfers in (§4.6). The cents are frozen when the entry is written; editing a preset
+never rewrites history. The register shows the group as one row ("split N ways ⓘ"); a filter that
+matches through a piece shows the split inline with the matched line lit (over three lines: first line, match, "… N more"). Edits to the amount or
+preset re-split at the preset's current shares; delete voids the whole group and undo restores it.
+Recurring income rules may carry a preset and split on **Approve**, at the approved amount.
+
+No new op type exists for any of this, so older clients converge: they see the pieces as ordinary
+transfers. Each row stands alone — a partially synced or drifted group keeps every balance exact,
+and a piece shows as a plain transfer whenever its parent isn't live. Piece ids are deterministic
+at creation (`<parent>:split:<container>`) so two devices approving one occurrence converge.
+Full design: `plans/income-distribution.md`.
 
 ---
 

@@ -283,3 +283,25 @@ describe("upcomingOccurrences — the commitments ahead of you (M11)", () => {
     ).toEqual(["b", "a"]);
   });
 });
+
+describe("generateDueOccurrences — distribution preset (plans/income-distribution.md)", () => {
+  it("copies the rule's preset onto the pending income occurrence", () => {
+    const r = rule(
+      "monthly",
+      { day_of_month: 1 },
+      { template_amount: 300000, template_distribution_preset_id: "p1" },
+    );
+    const { rows } = generateDueOccurrences(r, "2026-01-01");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].distribution_preset_id).toBe("p1");
+    expect(rows[0].distribution_parent_id).toBeNull();
+  });
+
+  it("leaves an undistributed rule's occurrence undistributed", () => {
+    const { rows } = generateDueOccurrences(
+      rule("monthly", { day_of_month: 1 }),
+      "2026-01-01",
+    );
+    expect(rows[0].distribution_preset_id).toBeNull();
+  });
+});

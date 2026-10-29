@@ -304,3 +304,79 @@ describe("validateExport — refuses anything it cannot fully verify", () => {
     expect(result.errors.join(" | ")).toContain("t1");
   });
 });
+
+describe("income distribution rows (plans/income-distribution.md)", () => {
+  it("round-trips a distributed income, its pieces and its preset", async () => {
+    const { createDistributedIncome, setDistributionPreset } =
+      await import("@/core/commands");
+    const { makeContainer, makeDistributionPreset } = await import("@/core/model");
+    const savings: Op = {
+      id: "op-savings",
+      ts: at(500),
+      type: "container.create",
+      payload: { row: makeContainer({ id: "savings", name: "Savings" }) },
+    };
+    const preset = makeDistributionPreset({
+      id: "p1",
+      name: "Paycheck",
+      rest_container_id: "general",
+      parts: [{ container_id: "savings", bps: 2500 }],
+    });
+    const ops: Op[] = [
+      seedOp,
+      savings,
+      { ...catOp("c1", "Salary", 1000) },
+      setDistributionPreset(preset, { id: "op-preset", ts: at(1500) }),
+      ...createDistributedIncome(
+        {
+          id: "pay",
+          date: "2026-07-04",
+          amount: 100000,
+          vendor_source: "Paycheck",
+          category_id: "c1",
+          preset_id: "p1",
+          split: {
+            rest: { container_id: "general", amount: 75000 },
+            pieces: [{ container_id: "savings", amount: 25000 }],
+          },
+        },
+        { id: "op-pay", ts: at(2000) },
+      ),
+    ];
+    const result = await validateExport(goodFile(ops));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const state = await replay(result.ops);
+    const rows = [...state.get(STORE.transactions)!.values()] as {
+      id: string;
+      distribution_parent_id: string | null;
+      distribution_preset_id: string | null;
+    }[];
+    expect(rows.find((r) => r.id === "pay")?.distribution_preset_id).toBe("p1");
+    expect(rows.find((r) => r.id !== "pay")?.distribution_parent_id).toBe("pay");
+  });
+
+  it("still accepts a pre-feature file whose rows lack the new fields", async () => {
+    const legacy = tweak((file) => {
+      for (const op of file.ops as {
+        type: string;
+        payload: { row?: Record<string, unknown> };
+      }[]) {
+        if (op.type !== "transaction.create" || !op.payload.row) continue;
+        delete op.payload.row.distribution_preset_id;
+        delete op.payload.row.distribution_parent_id;
+      }
+    });
+    expect((await validateExport(legacy)).ok).toBe(true);
+  });
+
+  it("names a piece link on a non-transfer row as invalid", async () => {
+    const bad = tweak((file) => {
+      const op = (
+        file.ops as { type: string; payload: { row?: Record<string, unknown> } }[]
+      ).find((o) => o.type === "transaction.create")!;
+      op.payload.row!.distribution_parent_id = "x";
+    });
+    await expectRejected(bad, /distribution/);
+  });
+});

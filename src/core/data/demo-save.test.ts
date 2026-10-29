@@ -2,6 +2,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateExport } from "./export";
+import { replay } from "@/core/oplog";
+import { STORE } from "@/core/repo/db";
+import type { Setting, Transaction } from "@/core/model";
+import { activeRows, pendingRows } from "@/core/engine/ledger";
+import {
+  defaultPresetId,
+  distributionPieces,
+  groupBreakdown,
+  listPresets,
+} from "@/core/engine/distribution";
 import { DASHBOARD_WIDGETS } from "@/features/reports/registry";
 import { CATEGORY_ICONS } from "@/features/category-icons";
 
@@ -195,5 +205,36 @@ describe("curated demo save", () => {
         );
       }),
     ).toBe(true);
+  });
+
+  it("showcases income distribution (plans/income-distribution.md)", async () => {
+    const result = await validateExport(readFileSync(DEMO_SAVE, "utf8"));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const state = await replay(result.ops);
+    const settings = [...state.get(STORE.settings)!.values()] as Setting[];
+    const presets = listPresets(settings);
+    expect(presets.filter((p) => !p.archived).map((p) => p.name)).toEqual([
+      "Freelance",
+      "Paycheck",
+    ]);
+    expect(defaultPresetId(settings)).toBe(
+      presets.find((p) => p.name === "Paycheck")?.id,
+    );
+
+    const rows = [...state.get(STORE.transactions)!.values()] as Transaction[];
+    const live = activeRows(rows);
+    const groups = distributionPieces(live);
+    expect(groups.size).toBeGreaterThan(0);
+    for (const [parentId, pieces] of groups) {
+      const parent = live.find((t) => t.id === parentId)!;
+      const lines = groupBreakdown(parent, pieces);
+      expect(lines.reduce((sum, l) => sum + l.amount, 0)).toBe(parent.amount);
+      expect(lines.every((l) => l.amount >= 0)).toBe(true);
+    }
+
+    const payday = rows.find((t) => t.is_template && t.template_name === "Payday");
+    expect(payday?.distribution_preset_id).toBeTruthy();
+    expect(pendingRows(rows).some((t) => t.distribution_preset_id !== null)).toBe(true);
   });
 });

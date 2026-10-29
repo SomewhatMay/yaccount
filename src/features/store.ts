@@ -38,6 +38,7 @@ import type { ReportingPeriod } from "@/core/engine/period";
 import { generateDueOccurrences } from "@/core/engine/recurring";
 import { requiredMonthly } from "@/core/engine/goals";
 import { pendingRows } from "@/core/engine/ledger";
+import { defaultPresetId, listPresets } from "@/core/engine/distribution";
 import { recordGeneratedOccurrence, updateRecurringRule } from "@/core/commands";
 import { goalMaintenanceOps } from "@/features/goals/maintenance";
 import { BUILD_INFO } from "@/lib/build-info";
@@ -89,6 +90,13 @@ export const expectedIncomeKey = (yearMonth: string): string =>
 /** Live shortcuts (§5.8) — the is_template rows, for the ledger's quick-log strip. */
 export const templatesAtom = atom((get) =>
   get(transactionsAtom).filter((t) => t.is_template),
+);
+/** Every income-distribution preset (archived included), by name
+ * (plans/income-distribution.md). Presets ride the synced settings store. */
+export const distributionPresetsAtom = atom((get) => listPresets(get(settingsAtom)));
+/** The default preset's id, while it is active; null = none. */
+export const defaultDistributionIdAtom = atom((get) =>
+  defaultPresetId(get(settingsAtom)),
 );
 /** The Inbox queue count (§5.8) — drives the nav badge. */
 export const pendingCountAtom = atom((get) => pendingRows(get(transactionsAtom)).length);

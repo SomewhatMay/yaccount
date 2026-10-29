@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayIso } from "@/features/clock";
 import { InlineError } from "@/features/ui/InlineError";
+import { DistributionsCard } from "@/features/plan/DistributionsCard";
 
 const monthKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -250,6 +251,8 @@ export function PlanView() {
           </Marginalia>
         </div>
       </div>
+
+      <DistributionsCard expectedIncome={plan.income} goalAsks={plan.asks} />
     </div>
   );
 }

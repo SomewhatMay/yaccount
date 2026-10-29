@@ -24,14 +24,17 @@ import {
   type Container,
   type Frequency,
   type IntervalConfig,
+  type DistributionPreset,
   type RecurringRule,
   type RuleStatus,
 } from "@/core/model";
 import { firstOccurrenceOnOrAfter } from "@/core/engine/recurring";
+import { usablePreset } from "@/core/engine/distribution";
 import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
+  distributionPresetsAtom,
   flashRowAtom,
   readyAtom,
   recurringRulesAtom,
@@ -114,6 +117,7 @@ export function RecurringView() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const transactions = useAtomValue(transactionsAtom);
+  const presets = useAtomValue(distributionPresetsAtom);
   const dispatch = useSetAtom(dispatchAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const generate = useSetAtom(runRecurringGenerationAtom);
@@ -285,6 +289,7 @@ export function RecurringView() {
               categoryName={catName(r.template_category_id)}
               containerName={contName(r.template_container_id)}
               toContainerName={contName(r.template_to_container_id)}
+              distribution={ruleDistribution(r, presets, containers)}
               divider={i > 0}
               onEdit={() => setSheet(r)}
               onCancel={async () => {
@@ -347,6 +352,7 @@ export function RecurringView() {
         categories={categories}
         containers={containers}
         transactions={transactions}
+        presets={presets}
         onOpenChange={(open) => !open && setSheet(null)}
         onSubmit={async (input, editingId) => {
           if (editingId) {
@@ -384,12 +390,28 @@ export function RecurringView() {
   );
 }
 
+/** "via Paycheck", or why a rule's preset won't split (plans/income-distribution.md). */
+function ruleDistribution(
+  rule: RecurringRule,
+  presets: DistributionPreset[],
+  containers: Container[],
+): { name: string; usable: boolean } | null {
+  const id = rule.template_distribution_preset_id;
+  if (!id) return null;
+  const recorded = presets.find((p) => p.id === id);
+  return {
+    name: recorded?.name ?? "Its distribution",
+    usable: usablePreset(id, presets, containers) !== null,
+  };
+}
+
 function RuleRow({
   rule,
   glyph,
   categoryName,
   containerName,
   toContainerName,
+  distribution,
   divider,
   onEdit,
   onCancel,
@@ -400,6 +422,7 @@ function RuleRow({
   categoryName: string | null;
   containerName: string;
   toContainerName: string;
+  distribution?: { name: string; usable: boolean } | null;
   divider: boolean;
   onEdit: () => void;
   onCancel: () => void;
@@ -409,7 +432,9 @@ function RuleRow({
   const income = !transfer && (rule.template_amount ?? 0) >= 0;
   const sub = transfer
     ? [containerName || "Transfer", toContainerName].filter(Boolean).join(" → ")
-    : [categoryName, containerName].filter(Boolean).join(" · ");
+    : [categoryName, distribution ? `via ${distribution.name}` : containerName]
+        .filter(Boolean)
+        .join(" · ");
 
   return (
     <div
@@ -436,6 +461,11 @@ function RuleRow({
           {describeRule(rule)}
           {sub && <span> · {sub}</span>}
         </div>
+        {distribution && !distribution.usable && (
+          <div className="truncate text-xs text-amber-600 dark:text-amber-500">
+            {distribution.name} can&apos;t split — approvals land in {containerName}
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-0.5">
         <Money
@@ -472,6 +502,8 @@ export type RuleFormInput = {
   template_category_id: string | null;
   template_to_container_id: string | null;
   end_date: string | null;
+  /** Income rules only: the preset Approve splits each occurrence with. */
+  template_distribution_preset_id: string | null;
 };
 
 // Re-exported so the sheet and view agree on the container/category prop types.

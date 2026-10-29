@@ -3,7 +3,15 @@
 import { useMemo, useState } from "react";
 import { Trash2Icon } from "lucide-react";
 import { updateTransaction } from "@/core/commands";
+import { editOps, needsResplit } from "@/features/ledger/edit-distribution";
 import { isTransfer } from "@/core/engine/balances";
+import { activeRows } from "@/core/engine/ledger";
+import {
+  distributionPieces,
+  splitIncome,
+  usablePreset,
+} from "@/core/engine/distribution";
+import type { Op } from "@/core/oplog";
 import {
   sortContainersAlphabetically,
   sortCategoriesAlphabetically,
@@ -14,8 +22,12 @@ import {
   type Category,
   type CategoryType,
   type Container,
+  type DistributionPreset,
   type Transaction,
 } from "@/core/model";
+import { linesFromGroup, linesFromSplit } from "@/features/distribution/lines";
+import { SplitBreakdown } from "@/features/distribution/SplitBreakdown";
+import { CheckboxField } from "@/features/ui/CheckboxField";
 import {
   defaultSign,
   resolveAmount,
@@ -52,6 +64,7 @@ export function EditTransactionSheet({
   categories,
   containers,
   transactions,
+  presets = [],
   onOpenChange,
   onSave,
   onDelete,
@@ -60,8 +73,12 @@ export function EditTransactionSheet({
   categories: Category[];
   containers: Container[];
   transactions: Transaction[];
+  /** Income-distribution presets (archived included). */
+  presets?: DistributionPreset[];
   onOpenChange: (open: boolean) => void;
-  onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
+  /** The edit as one batch — the row, plus its pieces for a split income. The
+   * first op is always the edited row itself. */
+  onSave: (ops: Op[]) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const transfer = editing !== null && isTransfer(editing);
@@ -89,6 +106,7 @@ export function EditTransactionSheet({
             categories={categories}
             containers={containers}
             transactions={transactions}
+            presets={presets}
             onSave={onSave}
             onDelete={onDelete}
           />
@@ -173,6 +191,7 @@ function EditForm({
   categories,
   containers,
   transactions,
+  presets,
   onSave,
   onDelete,
 }: {
@@ -180,7 +199,8 @@ function EditForm({
   categories: Category[];
   containers: Container[];
   transactions: Transaction[];
-  onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
+  presets: DistributionPreset[];
+  onSave: (ops: Op[]) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const active = useMemo(
@@ -218,6 +238,69 @@ function EditForm({
   const container = containers.find((c) => c.id === containerId);
   const sign: Sign = pickedSign ?? defaultSign(type);
 
+  // ── Distribution (plans/income-distribution.md) ──
+  // A pending occurrence has no pieces yet — Approve writes them — so for it
+  // Distribute only chooses the preset Approve will use.
+  const pending = tx.inbox_status === "pending";
+  const ownPieces = useMemo(
+    () => distributionPieces(activeRows(transactions)).get(tx.id) ?? [],
+    [transactions, tx.id],
+  );
+  const wasDistributed = tx.distribution_preset_id !== null || ownPieces.length > 0;
+  const usablePresets = useMemo(
+    () => presets.filter((p) => usablePreset(p.id, presets, containers) !== null),
+    [presets, containers],
+  );
+  const recordedPreset = presets.find((p) => p.id === tx.distribution_preset_id) ?? null;
+  const [distribute, setDistribute] = useState(wasDistributed);
+  const [presetId, setPresetId] = useState<string | null>(
+    () => usablePreset(tx.distribution_preset_id, presets, containers)?.id ?? null,
+  );
+  const preset = usablePreset(presetId, presets, containers);
+  const moneyIn = cat?.type === "income" && sign === "+";
+  const showDistribute = moneyIn && (usablePresets.length > 0 || distribute);
+
+  let typedCents: number | null = null;
+  try {
+    typedCents = Math.abs(parseDollars(amountStr));
+  } catch {
+    typedCents = null;
+  }
+  // Re-split only when what the split depends on changed; a payee or date edit
+  // keeps the pieces' cents exactly as they were.
+  const resplit = needsResplit({
+    tx,
+    amount: typedCents === null ? tx.amount : sign === "-" ? -typedCents : typedCents,
+    distribute,
+    moneyIn,
+    wasDistributed,
+    presetId,
+  });
+  const preview = useMemo(() => {
+    if (!distribute || !moneyIn) return null;
+    if (!pending && !resplit && ownPieces.length > 0) {
+      return {
+        lines: linesFromGroup(tx, ownPieces, containers),
+        total: tx.amount,
+        note: null,
+      };
+    }
+    if (!preset || !typedCents) return null;
+    const split = splitIncome(typedCents, preset, containers);
+    if (!split.ok) return null;
+    return { total: typedCents, ...linesFromSplit(split, preset, containers) };
+  }, [
+    distribute,
+    moneyIn,
+    pending,
+    resplit,
+    ownPieces,
+    tx,
+    containers,
+    preset,
+    typedCents,
+  ]);
+
   function selectType(next: CategoryType) {
     setType(next);
     setPickedCategoryId("");
@@ -241,19 +324,30 @@ function EditForm({
       return;
     }
 
-    await onSave(
-      updateTransaction({
-        ...tx,
-        date,
-        entered_at: resolveEnteredAt(tx, date, time),
-        amount: res.signed,
-        vendor_source: vendor.trim(),
-        category_id: categoryId,
-        container_id: containerId,
-        notes: notes.trim() || null,
-        yearMonth: date.slice(0, 7),
-      }),
+    const next: Transaction = {
+      ...tx,
+      date,
+      entered_at: resolveEnteredAt(tx, date, time),
+      amount: res.signed,
+      vendor_source: vendor.trim(),
+      category_id: categoryId,
+      container_id: containerId,
+      notes: notes.trim() || null,
+      yearMonth: date.slice(0, 7),
+    };
+
+    const out = editOps(
+      {
+        tx,
+        next,
+        moneyIn: cat.type === "income" && res.signed > 0,
+        distribute,
+        presetId,
+      },
+      { presets, containers, transactions },
     );
+    if (!out.ok) return setError(out.error);
+    await onSave(out.ops);
   }
 
   return (
@@ -322,21 +416,6 @@ function EditForm({
           </Select>
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="edit-container">Container</Label>
-          <Select value={containerId} onValueChange={setContainerId}>
-            <SelectTrigger id="edit-container" aria-label="Container">
-              <SelectValue placeholder="Container">{container?.name}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {wallets.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
           <Label htmlFor="edit-amount">Amount</Label>
           <div className="flex items-center gap-1.5">
             <SignToggle
@@ -362,6 +441,86 @@ function EditForm({
           </div>
           {warn && <p className="text-xs text-amber-600 dark:text-amber-500">{warn}</p>}
         </div>
+        {showDistribute && (
+          <CheckboxField
+            checked={distribute}
+            onCheckedChange={(on) => {
+              setDistribute(on);
+              setError("");
+              if (on && !presetId) setPresetId(usablePresets[0]?.id ?? null);
+            }}
+          >
+            Distribute across containers
+          </CheckboxField>
+        )}
+        {distribute && moneyIn ? (
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-distribution">Split</Label>
+            <Select
+              key="distribution"
+              value={presetId ?? ""}
+              onValueChange={(v) => {
+                if (!v) return; // a remounting Radix Select reports ""
+                setPresetId(v);
+                setError("");
+              }}
+            >
+              <SelectTrigger id="edit-distribution" aria-label="Distribution">
+                <SelectValue placeholder="Pick a distribution">
+                  {preset?.name}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {usablePresets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {recordedPreset && !preset && (
+              <p className="text-muted-foreground text-xs">
+                {pending
+                  ? `${recordedPreset.name} can't split any more — pick another distribution, or untick to approve it whole.`
+                  : `Split by ${recordedPreset.name}, which can't split any more. Saving keeps the split as it is; pick a distribution to re-split it.`}
+              </p>
+            )}
+            {resplit && wasDistributed && (
+              <p className="text-muted-foreground text-xs">
+                Saving re-splits at {preset?.name ?? "the distribution"}&apos;s current
+                shares.
+              </p>
+            )}
+            {preview && (
+              <SplitBreakdown
+                lines={preview.lines}
+                total={preview.total}
+                note={preview.note}
+                className="bg-surface-sunken/60 rounded-lg border p-1.5"
+              />
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-container">Container</Label>
+            <Select
+              key="container"
+              value={containerId}
+              onValueChange={(v) => v && setContainerId(v)}
+            >
+              <SelectTrigger id="edit-container" aria-label="Container">
+                <SelectValue placeholder="Container">{container?.name}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {wallets.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="grid gap-1.5">
           <Label htmlFor="edit-notes">Notes</Label>
           <Textarea
@@ -397,7 +556,7 @@ function TransferForm({
   tx: Transaction;
   containers: Container[];
   transactions: Transaction[];
-  onSave: (op: ReturnType<typeof updateTransaction>) => Promise<void>;
+  onSave: (ops: Op[]) => Promise<void>;
   onDelete: (t: Transaction) => Promise<void>;
 }) {
   const wallets = useMemo(
@@ -436,7 +595,7 @@ function TransferForm({
     // wrote is theirs to keep (§5.4).
     const label = synthesized ? transferLabel(from.name, to.name) : vendor.trim();
 
-    await onSave(
+    await onSave([
       updateTransaction({
         ...tx,
         date,
@@ -448,7 +607,7 @@ function TransferForm({
         notes: notes.trim() || null,
         yearMonth: date.slice(0, 7),
       }),
-    );
+    ]);
   }
 
   return (

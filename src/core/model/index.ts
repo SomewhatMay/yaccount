@@ -8,3 +8,4 @@ export * from "./setting";
 export * from "./recurringRule";
 export * from "./goal";
 export * from "./cravingWin";
+export * from "./distribution";

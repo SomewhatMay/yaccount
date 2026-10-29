@@ -12,6 +12,10 @@ import {
   makeVoidRow,
   newId,
   SETTING,
+  DISTRIBUTION_DEFAULT_KEY,
+  distributionKey,
+  serializeDistributionPreset,
+  type DistributionPreset,
   TransactionSchema,
   type AmountMode,
   type BudgetTarget,
@@ -88,6 +92,7 @@ export function createTransaction(
     container_id?: string;
     notes?: string | null;
     entered_at?: string | null; // when the entry happened; defaults to the op's ts
+    distribution_preset_id?: string | null;
   },
   m?: OpMeta,
 ): TransactionCreateOp {
@@ -205,6 +210,7 @@ export function createTransfer(
     id?: string;
     notes?: string | null;
     entered_at?: string | null;
+    distribution_parent_id?: string | null;
   },
   m?: OpMeta,
 ): TransactionCreateOp {
@@ -300,6 +306,7 @@ export function createTemplate(
     to_container_id?: string | null;
     id?: string;
     notes?: string | null;
+    distribution_preset_id?: string | null;
   },
   m?: OpMeta,
 ): Op {
@@ -370,6 +377,7 @@ export function createRecurringRule(
     amount_mode?: AmountMode;
     linked_goal_id?: string | null;
     end_date?: string | null;
+    template_distribution_preset_id?: string | null;
   },
   m?: OpMeta,
 ): Op {
@@ -491,3 +499,264 @@ export function removeCravingWin(id: string, m?: OpMeta): Op {
 
 /** Convenience re-export for callers reading the row types. */
 export type { BudgetTarget, ContainerSnapshot, Goal, RecurringRule };
+
+// ── Income distribution (plans/income-distribution.md) ────────────────────
+//
+// A distributed income is ordinary ops only — `transaction.create|update|void`,
+// `transaction.approve` and `setting.set` — never a new op type, because an older
+// client drops op types it doesn't know and would then disagree about state.
+// The split is frozen into the rows here, at write time; nothing re-derives it.
+
+/** The cents a piece of a split carries: one container, one positive amount. */
+export interface DistributionPieceInput {
+  container_id: string;
+  amount: number;
+}
+
+/** A split ready to write (the `ok` branch of `splitIncome`). */
+export interface ReadySplit {
+  rest: { container_id: string; amount: number };
+  pieces: DistributionPieceInput[];
+}
+
+/**
+ * A piece's id at creation: deterministic from (parent, container). The recurring
+ * generator already gives a pending occurrence a deterministic id (§6.6), so two
+ * devices approving the same occurrence offline write the SAME piece rows — a
+ * last-writer-wins put of identical money — instead of doubling the transfer.
+ */
+export function splitPieceId(parentId: string, containerId: string): string {
+  return `${parentId}:split:${containerId}`;
+}
+
+/** Per-op meta for a batch: a caller-pinned `ts` applies to all, ids stay unique. */
+function batchMeta(m: OpMeta | undefined, i: number): OpMeta {
+  return { id: m?.id ? `${m.id}:${i}` : undefined, ts: m?.ts };
+}
+
+function assertSplitsAmount(split: ReadySplit, amount: number): void {
+  const total = split.rest.amount + split.pieces.reduce((sum, p) => sum + p.amount, 0);
+  if (total !== amount) {
+    throw new Error(
+      "the split doesn't add up to the income — recompute it for this amount",
+    );
+  }
+}
+
+/** One transfer `parent's container → piece container` per piece. */
+function pieceOps(
+  parent: Transaction,
+  pieces: DistributionPieceInput[],
+  taken: Set<string>,
+  m: OpMeta | undefined,
+  offset: number,
+): TransactionCreateOp[] {
+  const ops: TransactionCreateOp[] = [];
+  for (const piece of pieces) {
+    if (piece.amount <= 0 || piece.container_id === parent.container_id) continue;
+    const wanted = splitPieceId(parent.id, piece.container_id);
+    // A re-split that brings a container back must not reuse the id of a piece
+    // that was voided: the old reversal would then cancel the new money.
+    const id = taken.has(wanted) ? newId() : wanted;
+    taken.add(id);
+    ops.push(
+      createTransfer(
+        {
+          id,
+          date: parent.date,
+          amount: piece.amount,
+          container_id: parent.container_id,
+          to_container_id: piece.container_id,
+          vendor_source: parent.vendor_source,
+          entered_at: parent.entered_at,
+          distribution_parent_id: parent.id,
+        },
+        batchMeta(m, offset + ops.length),
+      ),
+    );
+  }
+  return ops;
+}
+
+/** Log an income and split it: the income lands in rest, each piece moves out. */
+export function createDistributedIncome(
+  input: {
+    date: string;
+    amount: number;
+    vendor_source: string;
+    category_id: string;
+    preset_id: string;
+    split: ReadySplit;
+    id?: string;
+    notes?: string | null;
+    entered_at?: string | null;
+  },
+  m?: OpMeta,
+): Op[] {
+  assertSplitsAmount(input.split, input.amount);
+  const parentOp = createTransaction(
+    {
+      id: input.id,
+      date: input.date,
+      amount: input.amount,
+      vendor_source: input.vendor_source,
+      category_id: input.category_id,
+      container_id: input.split.rest.container_id,
+      notes: input.notes,
+      entered_at: input.entered_at,
+      distribution_preset_id: input.preset_id,
+    },
+    batchMeta(m, 0),
+  );
+  const parent = parentOp.payload.row;
+  return [parentOp, ...pieceOps(parent, input.split.pieces, new Set([parent.id]), m, 1)];
+}
+
+/**
+ * Approve a pending income occurrence and split it, in one batch. The split is
+ * computed now, at the approved amount — never at generation, where the amount
+ * is only a proposal (§6.6).
+ */
+export function approveDistributed(
+  pending: Transaction,
+  presetId: string,
+  split: ReadySplit,
+  m?: OpMeta,
+): Op[] {
+  assertSplitsAmount(split, pending.amount);
+  const approved = TransactionSchema.parse({
+    ...pending,
+    inbox_status: "approved",
+    container_id: split.rest.container_id,
+    distribution_preset_id: presetId,
+  });
+  const ops: Op[] = [approveTransaction(pending.id, batchMeta(m, 0))];
+  if (
+    approved.container_id !== pending.container_id ||
+    approved.distribution_preset_id !== pending.distribution_preset_id
+  ) {
+    ops.push(updateTransaction(approved, batchMeta(m, 1)));
+  }
+  // Deterministic ids, never "fresh because taken": a second device approving
+  // the same occurrence must land on these exact rows.
+  return [...ops, ...pieceOps(approved, split.pieces, new Set(), m, ops.length)];
+}
+
+const PIECE_FIELDS = [
+  "amount",
+  "container_id",
+  "date",
+  "yearMonth",
+  "vendor_source",
+  "entered_at",
+] as const;
+
+/**
+ * Write an edited distributed income and bring its pieces into line: the parent
+ * row as given, each wanted piece updated in place (or created), every piece no
+ * longer wanted voided — reversible, never deleted. Pieces always follow the
+ * parent's date, payee and container, so the group moves as one.
+ *
+ * `desired` empty + parent `distribution_preset_id: null` = "untick Distribute".
+ */
+export function reconcileDistribution(
+  input: {
+    parent: Transaction;
+    livePieces: Transaction[];
+    desired: DistributionPieceInput[];
+    allTxns: Transaction[];
+  },
+  m?: OpMeta,
+): Op[] {
+  const parent = TransactionSchema.parse(input.parent);
+  const ops: Op[] = [updateTransaction(parent, batchMeta(m, 0))];
+  const remaining = [...input.livePieces];
+  const create: DistributionPieceInput[] = [];
+  for (const want of input.desired) {
+    if (want.amount <= 0 || want.container_id === parent.container_id) continue;
+    const at = remaining.findIndex((p) => p.to_container_id === want.container_id);
+    if (at < 0) {
+      create.push(want);
+      continue;
+    }
+    const [current] = remaining.splice(at, 1);
+    const next = TransactionSchema.parse({
+      ...current,
+      amount: -want.amount,
+      container_id: parent.container_id,
+      date: parent.date,
+      yearMonth: parent.yearMonth,
+      vendor_source: parent.vendor_source,
+      entered_at: parent.entered_at,
+    });
+    if (PIECE_FIELDS.some((f) => next[f] !== current[f])) {
+      ops.push(updateTransaction(next, batchMeta(m, ops.length)));
+    }
+  }
+  const taken = new Set(input.allTxns.map((t) => t.id));
+  ops.push(...pieceOps(parent, create, taken, m, ops.length));
+  for (const leftover of remaining) {
+    ops.push(voidTransaction(leftover, batchMeta(m, ops.length)));
+  }
+  return ops;
+}
+
+/** Delete a distributed income: void the parent and every live piece together. */
+export function voidDistribution(
+  parent: Transaction,
+  livePieces: Transaction[],
+  m?: OpMeta,
+): { ops: Op[]; voidRows: Transaction[] } {
+  const ops = [parent, ...livePieces].map((row, i) =>
+    voidTransaction(row, batchMeta(m, i)),
+  );
+  const voidRows = ops.map(
+    (op) => (op as Extract<Op, { type: "transaction.void" }>).payload.row,
+  );
+  return { ops, voidRows };
+}
+
+/** Undo `voidDistribution`: reverse each reversal, so the whole group is live again. */
+export function unvoidDistribution(voidRows: Transaction[], m?: OpMeta): Op[] {
+  return voidRows.map((row, i) => unvoidTransaction(row, batchMeta(m, i)));
+}
+
+/**
+ * Quick-log a shortcut. An income shortcut that carries a preset splits when the
+ * caller hands it a split it could compute; otherwise (preset archived, rest
+ * container gone) it logs one row into the shortcut's container, as before.
+ */
+export function logTemplateOps(
+  template: Transaction,
+  input: { date: string; id?: string },
+  distribution: { presetId: string; split: ReadySplit } | null,
+  m?: OpMeta,
+): Op[] {
+  if (template.to_container_id !== null || distribution === null) {
+    return [logTemplate(template, input, m)];
+  }
+  return createDistributedIncome(
+    {
+      id: input.id,
+      date: input.date,
+      amount: template.amount,
+      vendor_source: template.vendor_source,
+      category_id: template.category_id!,
+      notes: template.notes,
+      preset_id: distribution.presetId,
+      split: distribution.split,
+    },
+    m,
+  );
+}
+
+/** Save a preset under its own settings key (per-preset LWW). Archive and restore
+ * are this same write with `archived` flipped. */
+export function setDistributionPreset(preset: DistributionPreset, m?: OpMeta): Op {
+  return setSetting(distributionKey(preset.id), serializeDistributionPreset(preset), m);
+}
+
+/** Name the default preset, or clear it with null. */
+export function setDefaultDistribution(presetId: string | null, m?: OpMeta): Op {
+  return setSetting(DISTRIBUTION_DEFAULT_KEY, presetId ?? "", m);
+}

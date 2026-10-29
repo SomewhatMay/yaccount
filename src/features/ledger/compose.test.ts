@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { composeOp, type ComposeDraft } from "@/features/ledger/compose";
-import { makeCategory, makeContainer } from "@/core/model";
+import { makeCategory, makeContainer, makeDistributionPreset } from "@/core/model";
 
 /**
  * The one implementation both writing surfaces share.
@@ -225,5 +225,96 @@ describe("composeOp — a transfer", () => {
 
   it("never asks to confirm a sign — a transfer has no unusual direction", () => {
     expect(composeOp(transfer({ amountStr: "300" })).status).toBe("ready");
+  });
+});
+
+describe("composeOp — a distributed income (plans/income-distribution.md)", () => {
+  const general = makeContainer({ id: "general", name: "General" });
+  const invest = makeContainer({ id: "invest", name: "Invest" });
+  const containers = [general, savings, invest, wallet];
+  const preset = makeDistributionPreset({
+    id: "p1",
+    name: "Paycheck",
+    rest_container_id: "general",
+    parts: [
+      { container_id: "savings", bps: 2000 },
+      { container_id: "invest", bps: 3300 },
+    ],
+  });
+  const income = (over: Partial<Extract<ComposeDraft, { kind: "entry" }>> = {}) =>
+    entry({
+      vendor: "Paycheck",
+      amountStr: "3000",
+      sign: "+",
+      category: salary,
+      from: wallet,
+      distribution: { preset, containers },
+      ...over,
+    });
+
+  it("writes the income into the rest container plus one transfer per piece", () => {
+    const out = composeOp(income());
+    expect(out.status).toBe("ready");
+    if (out.status !== "ready") return;
+    expect(out.ops).toHaveLength(3);
+    expect(out.row.container_id).toBe("general");
+    expect(out.row.distribution_preset_id).toBe("p1");
+    expect(out.row.amount).toBe(300000);
+    const pieces = out.ops
+      .slice(1)
+      .map((o) =>
+        o.type === "transaction.create"
+          ? [o.payload.row.to_container_id, o.payload.row.amount]
+          : null,
+      );
+    expect(pieces).toEqual([
+      ["savings", -60000],
+      ["invest", -99000],
+    ]);
+    expect(out.toast).toEqual({
+      title: "Logged",
+      description: "Paycheck · $3,000.00 · split 3 ways",
+    });
+  });
+
+  it("needs no picked container — the preset names where the income lands", () => {
+    const out = composeOp(income({ from: undefined }));
+    expect(out.status).toBe("ready");
+  });
+
+  it("refuses money out — only income is distributed", () => {
+    const out = composeOp(income({ sign: "-" }), { confirmed: true });
+    expect(out).toEqual({
+      status: "error",
+      message: "Only money in can be distributed.",
+    });
+  });
+
+  it("refuses when the preset's rest container is archived", () => {
+    const out = composeOp(
+      income({
+        distribution: {
+          preset,
+          containers: containers.map((c) =>
+            c.id === "general" ? { ...c, is_archived: true } : c,
+          ),
+        },
+      }),
+    );
+    expect(out.status).toBe("error");
+    if (out.status !== "error") return;
+    expect(out.message).toMatch(/General is archived/);
+  });
+
+  it("an undistributed entry still yields a single op", () => {
+    const out = composeOp(entry());
+    expect(out.status === "ready" && out.ops).toHaveLength(1);
+  });
+
+  it("a one-way split (everything folds to rest) writes just the income", () => {
+    const out = composeOp(income({ amountStr: "0.03" }));
+    expect(out.status === "ready" && out.ops).toHaveLength(1);
+    if (out.status !== "ready") return;
+    expect(out.toast.description).toBe("Paycheck · $0.03 · General");
   });
 });

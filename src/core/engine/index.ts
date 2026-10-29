@@ -23,3 +23,4 @@ export * from "./money-brief";
 export * from "./commitments";
 export * from "./month-close";
 export * from "./cravings";
+export * from "./distribution";

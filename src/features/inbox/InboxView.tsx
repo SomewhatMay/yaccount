@@ -14,13 +14,19 @@ import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
+  dispatchManyAtom,
+  distributionPresetsAtom,
   flashRowAtom,
   flashedRowAtom,
   readyAtom,
   recurringRulesAtom,
   transactionsAtom,
 } from "@/features/store";
-import { approveTransaction, unvoidTransaction, voidTransaction } from "@/core/commands";
+import { unvoidTransaction, voidTransaction } from "@/core/commands";
+import { splitIncome, usablePreset } from "@/core/engine/distribution";
+import { approvalOps } from "@/features/inbox/approve";
+import { linesFromSplit, type SplitLine } from "@/features/distribution/lines";
+import { SplitInfo } from "@/features/distribution/SplitBreakdown";
 import { isTransfer } from "@/core/engine/balances";
 import { activeFilterCount, applyFilter, isFilterActive } from "@/core/engine/filter";
 import { isRegisterSort, pendingRows, sortRegister } from "@/core/engine/ledger";
@@ -29,7 +35,7 @@ import {
   sortCategoriesAlphabetically,
 } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
-import type { Transaction } from "@/core/model";
+import type { Container, DistributionPreset, Transaction } from "@/core/model";
 import { cn } from "@/lib/utils";
 import { categoryColor, categoryColorFor } from "@/features/category-color";
 import { CategoryGlyph } from "@/features/category-icons";
@@ -85,7 +91,9 @@ export function InboxView() {
   const categories = useAtomValue(categoriesAtom);
   const containers = useAtomValue(containersAtom);
   const rules = useAtomValue(recurringRulesAtom);
+  const presets = useAtomValue(distributionPresetsAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const dispatchMany = useSetAtom(dispatchManyAtom);
   const flashRow = useSetAtom(flashRowAtom);
 
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -172,8 +180,15 @@ export function InboxView() {
     setSelected(allChecked ? new Set() : new Set(rows.map((t) => t.id)));
   }
 
+  // One batch for the whole approval: every row, plus the pieces of any income
+  // that splits (plans/income-distribution.md) — never half an approval.
   async function approve(ids: string[]) {
-    for (const id of ids) await dispatch(approveTransaction(id));
+    const byId = new Map(pending.map((t) => [t.id, t]));
+    const ops = ids.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? approvalOps(row, presets, containers) : [];
+    });
+    if (ops.length > 0) await dispatchMany(ops);
     setSelected(new Set());
   }
 
@@ -362,6 +377,7 @@ export function InboxView() {
                 containerName={containerNameOf(t.container_id)}
                 toContainerName={containerNameOf(t.to_container_id)}
                 divider={i > 0}
+                distribution={distributionFor(t, presets, containers)}
                 onApprove={() => approve([t.id])}
                 onEdit={() => setEditing(t)}
                 onDismiss={() => dismiss(t)}
@@ -377,16 +393,40 @@ export function InboxView() {
         containers={containers}
         transactions={transactions}
         onOpenChange={(open) => !open && setEditing(null)}
-        onSave={async (op) => {
-          await dispatch(op);
+        presets={presets}
+        onSave={async (ops) => {
+          await dispatchMany(ops);
           setEditing(null);
-          if (op.type === "transaction.update") flashRow({ id: op.payload.row.id });
+          const [first] = ops;
+          if (first?.type === "transaction.update")
+            flashRow({ id: first.payload.row.id });
         }}
         onDelete={dismiss}
       />
     </div>
   );
 }
+
+/**
+ * How an income occurrence will split on Approve — or why it won't. Computed at
+ * the row's current amount; Approve recomputes it, so this is a preview.
+ */
+function distributionFor(
+  t: Transaction,
+  presets: DistributionPreset[],
+  containers: Container[],
+): InboxDistribution | null {
+  if (t.distribution_preset_id === null || isTransfer(t) || t.amount <= 0) return null;
+  const recorded = presets.find((p) => p.id === t.distribution_preset_id);
+  const preset = usablePreset(t.distribution_preset_id, presets, containers);
+  const split = preset ? splitIncome(t.amount, preset, containers) : null;
+  if (!preset || !split?.ok) {
+    return { name: recorded?.name ?? "Its distribution", lines: null, note: null };
+  }
+  return { name: preset.name, ...linesFromSplit(split, preset, containers) };
+}
+
+type InboxDistribution = { name: string; lines: SplitLine[] | null; note: string | null };
 
 function InboxRow({
   tx,
@@ -397,6 +437,7 @@ function InboxRow({
   containerName,
   toContainerName,
   divider,
+  distribution,
   onApprove,
   onEdit,
   onDismiss,
@@ -410,6 +451,7 @@ function InboxRow({
   containerName: string;
   toContainerName: string;
   divider: boolean;
+  distribution: InboxDistribution | null;
   onApprove: () => void;
   onEdit: () => void;
   onDismiss: () => void;
@@ -448,9 +490,33 @@ function InboxRow({
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
-        <div className="text-muted-foreground truncate text-xs">
-          {formatDay(tx.date)} · {sub}
-        </div>
+        {distribution ? (
+          <div className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
+            <span className="truncate">
+              {formatDay(tx.date)} · {categoryName} ·{" "}
+              {distribution.lines ? (
+                <>via {distribution.name}</>
+              ) : (
+                <span className="text-amber-600 dark:text-amber-500">
+                  {distribution.name} can&apos;t split — lands in{" "}
+                  {containerName || "its container"}
+                </span>
+              )}
+            </span>
+            {distribution.lines && (
+              <SplitInfo
+                title={`${distribution.name} split`}
+                lines={distribution.lines}
+                total={tx.amount}
+                note={distribution.note}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="text-muted-foreground truncate text-xs">
+            {formatDay(tx.date)} · {sub}
+          </div>
+        )}
       </div>
       <Money
         cents={tx.amount}

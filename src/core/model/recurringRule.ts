@@ -77,6 +77,9 @@ const ruleBase = {
   end_date: zIsoDate.nullable(), // null = indefinite
   next_generation_date: zIsoDate, // cursor; the engine snaps it to the true grid
   status: RuleStatusSchema.default("active"),
+  // Income distribution (plans/income-distribution.md): the preset an approved
+  // occurrence splits with. Null = lands whole in template_container_id.
+  template_distribution_preset_id: zId.nullable().default(null),
 };
 
 export const RecurringRuleSchema = z
@@ -124,7 +127,15 @@ export const RecurringRuleSchema = z
     message:
       "a rule needs either a category (expense/income) or a destination (transfer)",
     path: ["template_category_id"],
-  });
+  })
+  .refine(
+    (r) =>
+      r.template_distribution_preset_id === null || r.template_to_container_id === null,
+    {
+      message: "a transfer rule has no income to distribute",
+      path: ["template_distribution_preset_id"],
+    },
+  );
 export type RecurringRule = z.infer<typeof RecurringRuleSchema>;
 
 /**
@@ -148,6 +159,7 @@ export function makeRecurringRule(input: {
   end_date?: string | null;
   next_generation_date?: string;
   status?: RuleStatus;
+  template_distribution_preset_id?: string | null;
 }): RecurringRule {
   return RecurringRuleSchema.parse({
     id: input.id ?? crypto.randomUUID(),
@@ -164,6 +176,7 @@ export function makeRecurringRule(input: {
     end_date: input.end_date ?? null,
     next_generation_date: input.next_generation_date ?? input.start_date,
     status: input.status ?? "active",
+    template_distribution_preset_id: input.template_distribution_preset_id ?? null,
   });
 }
 

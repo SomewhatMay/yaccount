@@ -195,6 +195,7 @@ function occurrenceRow(rule: RecurringRule, date: ISO, amount: number): Transact
     inbox_status: "pending",
     recurring_rule_id: rule.id,
     recurring_occurrence_date: date,
+    distribution_preset_id: rule.template_distribution_preset_id,
   });
 }
 

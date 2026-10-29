@@ -32,11 +32,7 @@ describe("parseQuery — words unless the token is unmistakably a constraint", (
   });
 
   it("lowercases and splits free words", () => {
-    expect(parseQuery("Blue  Bottle Coffee").words).toEqual([
-      "blue",
-      "bottle",
-      "coffee",
-    ]);
+    expect(parseQuery("Blue  Bottle Coffee").words).toEqual(["blue", "bottle", "coffee"]);
   });
 
   it("reads > and < as inclusive size bounds, in cents", () => {
@@ -507,5 +503,28 @@ describe("matchRanges — what to underline in a result", () => {
     expect(matchRanges("Blue Bottle", [])).toEqual([]);
     expect(matchRanges("Blue Bottle", ["zzz"])).toEqual([]);
     expect(matchRanges("", ["a"])).toEqual([]);
+  });
+});
+
+describe("search — a split income is one entry", () => {
+  it("finds the income, never its hidden transfers", () => {
+    const pay = makeTransaction({
+      id: "pay",
+      date: "2026-07-02",
+      amount: 300000,
+      vendor_source: "Paycheck",
+      category_id: "c_groc",
+    });
+    const piece = makeTransfer({
+      id: "pay:split:x",
+      date: "2026-07-02",
+      amount: 100,
+      container_id: pay.container_id,
+      to_container_id: "elsewhere",
+      vendor_source: "Paycheck",
+      distribution_parent_id: "pay",
+    });
+    const world = buildSearchIndex({ ...WORLD, transactions: [pay, piece] });
+    expect(ids(search(world, "paycheck"))).toEqual(["pay"]);
   });
 });

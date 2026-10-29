@@ -1,15 +1,9 @@
 import { formatCents, parseDollars, type Cents } from "../money";
 import { isCalendarDate } from "../model/primitives";
-import type {
-  Category,
-  Container,
-  Goal,
-  RecurringRule,
-  Transaction,
-} from "../model";
+import type { Category, Container, Goal, RecurringRule, Transaction } from "../model";
 import { inRange, type DateRange } from "./period";
 import { TRANSACTION_KINDS, transactionKind, type TransactionKind } from "./filter";
-import { activeRows, pendingRows, templateRows } from "./ledger";
+import { activeRows, hideDistributionPieces, pendingRows, templateRows } from "./ledger";
 
 /**
  * ⌘K search — one ranked answer over everything the app holds.
@@ -291,7 +285,10 @@ const KIND_BASE: Record<DocKind, number> = {
 const ARCHIVED_PENALTY = 150;
 
 function lower(parts: (string | null | undefined)[]): string {
-  return parts.filter((p) => p != null && p !== "").join(" ").toLowerCase();
+  return parts
+    .filter((p) => p != null && p !== "")
+    .join(" ")
+    .toLowerCase();
 }
 
 /**
@@ -323,9 +320,10 @@ export function buildSearchIndex(input: SearchInput): SearchIndex {
 
   // Live entries, the Inbox queue and saved shortcuts — everything a person
   // would call "an entry". A voided row and its reversal are bookkeeping for
-  // something that no longer happened, so neither is findable.
+  // something that no longer happened, so neither is findable. A split income
+  // is one entry — its transfers are found through it, as on the register.
   const entries = [
-    ...activeRows(input.transactions),
+    ...hideDistributionPieces(activeRows(input.transactions)),
     ...pendingRows(input.transactions),
     ...templateRows(input.transactions),
   ];
@@ -524,7 +522,8 @@ function passes(doc: SearchDoc, q: SearchQuery): boolean {
   if (q.min !== null && (doc.amount === null || doc.amount < q.min)) return false;
   if (q.max !== null && (doc.amount === null || doc.amount > q.max)) return false;
   if (q.exact !== null && doc.amount !== q.exact) return false;
-  if (q.range !== null && (doc.date === null || !inRange(doc.date, q.range))) return false;
+  if (q.range !== null && (doc.date === null || !inRange(doc.date, q.range)))
+    return false;
   if (q.kinds.length > 0 && (doc.txKind === null || !q.kinds.includes(doc.txKind)))
     return false;
   for (const flag of q.flags) {

@@ -103,7 +103,7 @@ function makeTransfer({ id, date, amount, to, notes }) {
   };
 }
 
-function makeTemplate({ id, name, vendor, amount, category, to }) {
+function makeTemplate({ id, name, vendor, amount, category, to, preset }) {
   const isTransfer = Boolean(to);
   return {
     id,
@@ -121,6 +121,8 @@ function makeTemplate({ id, name, vendor, amount, category, to }) {
     notes: null,
     reverses_id: null,
     entered_at: null,
+    distribution_preset_id: preset ?? null,
+    distribution_parent_id: null,
     yearMonth: "2000-01",
   };
 }
@@ -322,6 +324,7 @@ for (const template of [
     vendor: "Northstar Payroll",
     amount: 500000,
     category: "salary",
+    preset: "demo-distribution-paycheck",
   },
   {
     id: "demo-template-transfer",
@@ -339,6 +342,113 @@ for (const template of [
       makeTemplate(template),
     ),
   );
+}
+
+// ── Income distribution (plans/income-distribution.md) ──────────────────────
+// Two presets (Paycheck is the default), a freelance invoice already split
+// through one, the Payday shortcut and the studio retainer rule carrying one.
+const presets = [
+  {
+    v: 1,
+    id: "demo-distribution-paycheck",
+    name: "Paycheck",
+    rest_container_id: "general",
+    parts: [
+      { container_id: "savings", bps: 1000 },
+      { container_id: "emergency", bps: 500 },
+      { container_id: "brokerage", bps: 750 },
+    ],
+    archived: false,
+  },
+  {
+    v: 1,
+    id: "demo-distribution-freelance",
+    name: "Freelance",
+    rest_container_id: "general",
+    parts: [
+      { container_id: "skills", bps: 1500 },
+      { container_id: "savings", bps: 1000 },
+    ],
+    archived: false,
+  },
+];
+for (const preset of presets) {
+  ops.push(
+    op(`op-${preset.id}`, `${today}T12:05:00.000Z`, "setting.set", {
+      key: `distribution:${preset.id}`,
+      value: JSON.stringify(preset),
+    }),
+  );
+}
+ops.push(
+  op("op-demo-distribution-default", `${today}T12:05:01.000Z`, "setting.set", {
+    key: "distribution_default",
+    value: "demo-distribution-paycheck",
+  }),
+);
+
+{
+  const date = addDays(today, -2);
+  const enteredAt = `${date}T16:10:00.000Z`;
+  const amount = 185000;
+  const freelance = presets[1];
+  const parent = {
+    id: "demo-split-invoice",
+    date,
+    amount,
+    vendor_source: "Lumen Studio invoice",
+    category_id: "freelance",
+    container_id: freelance.rest_container_id,
+    to_container_id: null,
+    is_template: false,
+    template_name: null,
+    inbox_status: "approved",
+    recurring_rule_id: null,
+    recurring_occurrence_date: null,
+    notes: null,
+    reverses_id: null,
+    entered_at: enteredAt,
+    distribution_preset_id: freelance.id,
+    distribution_parent_id: null,
+    yearMonth: date.slice(0, 7),
+  };
+  ops.push(op(`op-${parent.id}`, enteredAt, "transaction.create", parent));
+  freelance.parts.forEach((part, i) => {
+    // floor(amount × bps / 10000), the same integer split the app writes.
+    const share = Math.floor((amount * part.bps) / 10000);
+    const id = `${parent.id}:split:${part.container_id}`;
+    ops.push(
+      op(
+        `op-${id}`,
+        enteredAt.replace("16:10:00", `16:10:0${i + 1}`),
+        "transaction.create",
+        {
+          ...parent,
+          id,
+          amount: -share,
+          category_id: null,
+          to_container_id: part.container_id,
+          distribution_preset_id: null,
+          distribution_parent_id: parent.id,
+        },
+      ),
+    );
+  });
+}
+
+for (const shifted of ops) {
+  const row = shifted.payload?.row;
+  if (!row) continue;
+  if (shifted.type === "recurringRule.create" && row.id === "rule-retainer") {
+    row.template_distribution_preset_id = "demo-distribution-freelance";
+  }
+  if (
+    shifted.type === "transaction.create" &&
+    row.recurring_rule_id === "rule-retainer" &&
+    row.inbox_status === "pending"
+  ) {
+    row.distribution_preset_id = "demo-distribution-freelance";
+  }
 }
 
 const allWidgetTypes = [
