@@ -1,5 +1,5 @@
 import type { Category, Transaction } from "../model";
-import { activeRows } from "./ledger";
+import { activeRows, hideDistributionPieces } from "./ledger";
 
 export type CreationKind = "expense" | "income" | "transfer";
 
@@ -45,7 +45,7 @@ export function rankVendorSourcesForKind(
   >();
   const normalizedQuery = normalize(query);
 
-  for (const row of activeRows(transactions)) {
+  for (const row of hideDistributionPieces(activeRows(transactions))) {
     const matchesKind =
       kind === "transfer"
         ? row.to_container_id !== null
@@ -91,7 +91,7 @@ export function recallVendorSelection(
   const categoryKinds = new Map(
     categories.map((category) => [category.id, category.type]),
   );
-  const match = activeRows(transactions)
+  const match = hideDistributionPieces(activeRows(transactions))
     .filter(
       (row) =>
         !row.to_container_id &&

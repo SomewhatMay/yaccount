@@ -11,7 +11,20 @@ import {
   type Transaction,
 } from "../model";
 import { isTransfer } from "./balances";
-import { activeRows, sortForRegister } from "./ledger";
+import {
+  constrains,
+  matchesFilter,
+  type FilterContext,
+  type TransactionFilter,
+} from "./filter";
+import {
+  activeRows,
+  distributionPieces,
+  hideDistributionPieces,
+  sortForRegister,
+} from "./ledger";
+
+export { distributionPieces, hideDistributionPieces };
 
 /**
  * Income distribution (plans/income-distribution.md) — the pure half.
@@ -169,33 +182,44 @@ export function recallDistribution(
 // ── Groups, read back from the rows ──────────────────────────────────────────
 
 /**
- * Live pieces keyed by their live parent's id. Pass LIVE rows (`activeRows`):
- * a voided piece is not part of its group any more, and a piece whose parent
- * isn't live (voided by an older client, or not synced yet) belongs to no group.
+ * The register through a filter, with splits folded in. A parent is on screen
+ * when it matches by itself OR when one of its pieces does — and then
+ * `highlights` names the container lines that matched, so the row can show its
+ * split inline and say why it's in the list:
+ *
+ * - a piece matches by its DESTINATION (the money that landed there); its
+ *   source leg is the parent's own container, which the parent answers for;
+ * - when the parent matches by itself, only a container facet lights lines (the
+ *   rest line, and any part the facet names) — a payee search that the parent
+ *   already satisfies stays a compact row.
  */
-export function distributionPieces(liveRows: Transaction[]): Map<string, Transaction[]> {
-  const parents = new Set(liveRows.filter((t) => !isTransfer(t)).map((t) => t.id));
-  const groups = new Map<string, Transaction[]>();
-  for (const t of liveRows) {
-    const parent = t.distribution_parent_id;
-    if (!parent || !isTransfer(t) || !parents.has(parent)) continue;
-    const list = groups.get(parent) ?? [];
-    list.push(t);
-    groups.set(parent, list);
+export function filterRegister(
+  liveRows: Transaction[],
+  filter: TransactionFilter,
+  ctx: FilterContext = {},
+): { rows: Transaction[]; highlights: Map<string, Set<string>> } {
+  const pieces = distributionPieces(liveRows);
+  const containerFacet = constrains(filter.containerIds);
+  const rows: Transaction[] = [];
+  const highlights = new Map<string, Set<string>>();
+  for (const row of hideDistributionPieces(liveRows)) {
+    const self = matchesFilter(row, filter, ctx);
+    const own = pieces.get(row.id) ?? [];
+    const lit = new Set<string>();
+    if (own.length > 0 && (!self || containerFacet)) {
+      if (self && filter.containerIds!.includes(row.container_id))
+        lit.add(row.container_id);
+      for (const p of own) {
+        // Both legs read as the destination, so only where it LANDED can match.
+        const landed = { ...p, container_id: p.to_container_id! };
+        if (matchesFilter(landed, filter, ctx)) lit.add(p.to_container_id!);
+      }
+    }
+    if (!self && lit.size === 0) continue;
+    rows.push(row);
+    if (lit.size > 0) highlights.set(row.id, lit);
   }
-  return groups;
-}
-
-/**
- * The register's rows: a piece folds under its parent only while that parent is
- * on screen. A piece without a live parent is real money that still moved, so it
- * shows as the ordinary transfer it is — never silently vanishes.
- */
-export function hideDistributionPieces(liveRows: Transaction[]): Transaction[] {
-  const grouped = new Set(
-    [...distributionPieces(liveRows).values()].flat().map((t) => t.id),
-  );
-  return liveRows.filter((t) => !grouped.has(t.id));
+  return { rows, highlights };
 }
 
 export interface BreakdownLine {

@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
-import type { Category, Container, Transaction } from "@/core/model";
+import type { Category, Container, DistributionPreset, Transaction } from "@/core/model";
+import {
+  recallDistribution,
+  splitIncome,
+  usablePreset,
+} from "@/core/engine/distribution";
+import { parseDollars } from "@/core/money";
+import { linesFromSplit } from "@/features/distribution/lines";
 import {
   sortContainersAlphabetically,
   sortCategoriesAlphabetically,
@@ -11,7 +18,7 @@ import {
   rankVendorSourcesForKind,
   recallVendorSelection,
 } from "@/core/engine/autocomplete";
-import { dispatchAtom, flashRowAtom } from "@/features/store";
+import { dispatchManyAtom, flashRowAtom } from "@/features/store";
 import { instantFromNow, nowDateTimeInput, splitDateTime } from "@/features/clock";
 import { composeOp } from "@/features/ledger/compose";
 import { defaultSign, splitSign, type Sign } from "@/features/ledger/amount";
@@ -33,6 +40,8 @@ export function useComposeFields({
   containers,
   transactions,
   defaultContainerId,
+  presets = [],
+  defaultDistributionId = null,
   initialKind = "expense",
   onLogged,
 }: {
@@ -40,13 +49,17 @@ export function useComposeFields({
   containers: Container[];
   transactions: Transaction[];
   defaultContainerId: string;
+  /** Income-distribution presets (plans/income-distribution.md), archived
+   * included — only the usable ones are offered. */
+  presets?: DistributionPreset[];
+  defaultDistributionId?: string | null;
   /** What the surface opens on. The bar starts on an expense; the sheet starts
    * on whatever asked it to open. */
   initialKind?: ComposeKind;
   /** Fired after a row is written — the sheet closes itself, the bar stays put. */
   onLogged?: () => void;
 }) {
-  const dispatch = useSetAtom(dispatchAtom);
+  const dispatchMany = useSetAtom(dispatchManyAtom);
   const flashRow = useSetAtom(flashRowAtom);
 
   const activeCategories = useMemo(
@@ -77,6 +90,11 @@ export function useComposeFields({
   const [pickedSign, setPickedSign] = useState<Sign | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Distribute: undefined = follow what this category's last income did (or the
+  // default preset); null = the user unticked it; an id = the preset they picked.
+  const [pickedDistribution, setPickedDistribution] = useState<string | null | undefined>(
+    undefined,
+  );
 
   const { date, time } = splitDateTime(when);
   const categoriesOfKind = useMemo(
@@ -90,6 +108,61 @@ export function useComposeFields({
   const to = containers.find((c) => c.id === toContainerId);
   const type = category?.type ?? (kind === "income" ? "income" : "expense");
   const sign: Sign = pickedSign ?? defaultSign(type);
+  const usablePresets = useMemo(
+    () => presets.filter((p) => usablePreset(p.id, presets, containers) !== null),
+    [presets, containers],
+  );
+  // Only money in on an income category can be split.
+  const canDistribute =
+    kind === "income" &&
+    category?.type === "income" &&
+    sign === "+" &&
+    usablePresets.length > 0;
+  const recalledDistribution = useMemo(
+    () =>
+      category && category.type === "income"
+        ? recallDistribution(
+            transactions,
+            category.id,
+            presets,
+            containers,
+            defaultDistributionId,
+          )
+        : null,
+    [category, transactions, presets, containers, defaultDistributionId],
+  );
+  const distributionId = canDistribute
+    ? (usablePreset(
+        pickedDistribution === undefined ? recalledDistribution : pickedDistribution,
+        presets,
+        containers,
+      )?.id ?? null)
+    : null;
+  const distributionPreset = distributionId
+    ? (presets.find((p) => p.id === distributionId) ?? null)
+    : null;
+  const distributionPreview = useMemo(() => {
+    if (!distributionPreset) return null;
+    let cents: number;
+    try {
+      cents = Math.abs(parseDollars(amountStr));
+    } catch {
+      return null;
+    }
+    const split = splitIncome(cents, distributionPreset, containers);
+    if (!split.ok) return null;
+    return { total: cents, ...linesFromSplit(split, distributionPreset, containers) };
+  }, [distributionPreset, amountStr, containers]);
+
+  function setDistribute(on: boolean) {
+    setError("");
+    setPickedDistribution(
+      on
+        ? (recalledDistribution ?? defaultDistributionId ?? usablePresets[0]?.id ?? null)
+        : null,
+    );
+  }
+
   const vendorSources = useMemo(
     () => rankVendorSourcesForKind(transactions, categories, kind, vendor),
     [categories, kind, transactions, vendor],
@@ -100,6 +173,7 @@ export function useComposeFields({
     if (!recalled) return;
     if (categoriesOfKind.some((candidate) => candidate.id === recalled.categoryId)) {
       setPickedCategoryId(recalled.categoryId);
+      setPickedDistribution(undefined);
     }
     if (activeContainers.some((candidate) => candidate.id === recalled.containerId)) {
       setPickedContainerId(recalled.containerId);
@@ -121,6 +195,8 @@ export function useComposeFields({
    * is not a control, it is whatever you chose to file this under. */
   function setCategoryId(id: string) {
     setPickedCategoryId(id);
+    // A different category has its own habit — follow it again.
+    setPickedDistribution(undefined);
     setWarn(null);
     setError("");
     const picked = activeCategories.find((c) => c.id === id);
@@ -141,6 +217,7 @@ export function useComposeFields({
     setNotes("");
     setAmountStr("");
     setPickedSign(null);
+    setPickedDistribution(undefined);
     setWarn(null);
     setError("");
     // Roll "when" forward to now for the next entry, unless the user deliberately
@@ -165,6 +242,9 @@ export function useComposeFields({
             sign,
             category,
             from,
+            distribution: distributionPreset
+              ? { preset: distributionPreset, containers }
+              : undefined,
           },
       // A soft warning is armed once and committed by the next submit (§10 #13).
       { confirmed: warn !== null },
@@ -180,7 +260,7 @@ export function useComposeFields({
     }
 
     try {
-      await dispatch(outcome.op);
+      await dispatchMany(outcome.ops);
     } catch {
       // `dispatchAtom` has already logged and shown this. Skipping the success
       // path is the point: the form keeps what was typed and no "Logged" toast
@@ -224,6 +304,16 @@ export function useComposeFields({
     setSign: (next: Sign) => {
       setPickedSign(next);
       setWarn(null);
+    },
+    canDistribute,
+    usablePresets,
+    distributionId,
+    distributionPreset,
+    distributionPreview,
+    setDistribute,
+    setDistributionId: (id: string) => {
+      setPickedDistribution(id);
+      setError("");
     },
     warn,
     error,

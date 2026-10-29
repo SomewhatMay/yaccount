@@ -1,5 +1,5 @@
 import type { Transaction } from "../model";
-import { isLiveLedgerRow } from "./balances";
+import { isLiveLedgerRow, isTransfer } from "./balances";
 import { matchesFilter } from "./filter";
 
 /**
@@ -145,9 +145,43 @@ export function sortForRegister(txns: Transaction[]): Transaction[] {
   });
 }
 
-/** The latest live entries for compact dashboard/register previews. */
+/**
+ * Live pieces keyed by their live parent's id. Pass LIVE rows (`activeRows`):
+ * a voided piece is not part of its group any more, and a piece whose parent
+ * isn't live (voided by an older client, or not synced yet) belongs to no group.
+ */
+export function distributionPieces(liveRows: Transaction[]): Map<string, Transaction[]> {
+  const parents = new Set(liveRows.filter((t) => !isTransfer(t)).map((t) => t.id));
+  const groups = new Map<string, Transaction[]>();
+  for (const t of liveRows) {
+    const parent = t.distribution_parent_id;
+    if (!parent || !isTransfer(t) || !parents.has(parent)) continue;
+    const list = groups.get(parent) ?? [];
+    list.push(t);
+    groups.set(parent, list);
+  }
+  return groups;
+}
+
+/**
+ * The register's rows: a piece folds under its parent only while that parent is
+ * on screen. A piece without a live parent is real money that still moved, so it
+ * shows as the ordinary transfer it is — never silently vanishes.
+ */
+export function hideDistributionPieces(liveRows: Transaction[]): Transaction[] {
+  const grouped = new Set(
+    [...distributionPieces(liveRows).values()].flat().map((t) => t.id),
+  );
+  return liveRows.filter((t) => !grouped.has(t.id));
+}
+
+/** The latest live entries for compact dashboard/register previews — a split
+ * income counts once, as its income row. */
 export function recentRows(txns: Transaction[], limit = 3): Transaction[] {
-  return sortForRegister(activeRows(txns)).slice(0, Math.max(0, limit));
+  return sortForRegister(hideDistributionPieces(activeRows(txns))).slice(
+    0,
+    Math.max(0, limit),
+  );
 }
 
 /** The orders the register offers (§12.4 M11 filter rail). */

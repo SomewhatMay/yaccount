@@ -6,6 +6,7 @@ import {
   isTransferRule,
   type Category,
   type Container,
+  type DistributionPreset,
   type Frequency,
   type IntervalConfig,
   type RecurringRule,
@@ -25,6 +26,8 @@ import {
   recallVendorSelection,
 } from "@/core/engine/autocomplete";
 import type { RuleFormInput } from "@/features/recurring/RecurringView";
+import { usablePreset } from "@/core/engine/distribution";
+import { Checkbox } from "@/components/ui/checkbox";
 import { defaultSign, type Sign } from "@/features/ledger/amount";
 import { SignToggle } from "@/features/ledger/SignToggle";
 import { CreationTextCombobox } from "@/features/ledger/CreationCombobox";
@@ -63,6 +66,7 @@ export function RecurringRuleSheet({
   categories,
   containers,
   transactions,
+  presets = [],
   onOpenChange,
   onSubmit,
 }: {
@@ -71,6 +75,7 @@ export function RecurringRuleSheet({
   categories: Category[];
   containers: Container[];
   transactions: Transaction[];
+  presets?: DistributionPreset[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
@@ -88,6 +93,7 @@ export function RecurringRuleSheet({
           categories={categories}
           containers={containers}
           transactions={transactions}
+          presets={presets}
           onSubmit={onSubmit}
         />
       )}
@@ -100,12 +106,14 @@ function RuleForm({
   categories,
   containers,
   transactions,
+  presets,
   onSubmit,
 }: {
   rule: RecurringRule | null;
   categories: Category[];
   containers: Container[];
   transactions: Transaction[];
+  presets: DistributionPreset[];
   onSubmit: (input: RuleFormInput, editingId?: string) => Promise<void>;
 }) {
   const activeCategories = useMemo(
@@ -155,9 +163,22 @@ function RuleForm({
   const [startDate, setStartDate] = useState(rule?.start_date ?? todayIso());
   const [endDate, setEndDate] = useState(rule?.end_date ?? "");
   const [error, setError] = useState("");
+  // Income distribution (plans/income-distribution.md): the preset Approve uses.
+  const [distributionId, setDistributionId] = useState<string | null>(
+    rule?.template_distribution_preset_id ?? null,
+  );
 
   const cat = categories.find((c) => c.id === categoryId);
   const sign: Sign = pickedSign ?? defaultSign(cat?.type ?? "expense");
+  const usablePresets = presets.filter(
+    (p) => usablePreset(p.id, presets, containers) !== null,
+  );
+  const moneyIn = mode === "entry" && cat?.type === "income" && sign === "+";
+  const distributing = moneyIn && distributionId !== null;
+  const distribution = distributing
+    ? (presets.find((p) => p.id === distributionId) ?? null)
+    : null;
+  const distributionUsable = usablePreset(distributionId, presets, containers);
   const currentKind = mode === "transfer" ? "transfer" : rule ? cat?.type : creationKind;
   const categoriesOfKind = activeCategories.filter(
     (category) => category.type === currentKind,
@@ -219,11 +240,19 @@ function RuleForm({
       return setError(err instanceof Error ? err.message : "Check the schedule fields.");
     }
 
+    if (distributing && !distributionUsable) {
+      return setError("Pick a distribution that can split, or untick Distribute.");
+    }
     const input: RuleFormInput = {
       frequency,
       interval_config,
       template_vendor_source: vendor.trim(),
-      template_container_id: fromId,
+      // A distributing rule lands each occurrence in the preset's rest container.
+      template_container_id:
+        distributionUsable && distributing
+          ? distributionUsable.rest_container_id
+          : fromId,
+      template_distribution_preset_id: distributing ? distributionId : null,
       start_date: startDate,
       end_date: endDate || null,
       template_amount:
@@ -337,15 +366,53 @@ function RuleForm({
           </div>
         ) : null}
 
-        <div className="grid gap-1.5">
-          <Label>{mode === "transfer" ? "From container" : "Container"}</Label>
-          <ContainerSelect
-            value={fromId}
-            onChange={setFromId}
-            containers={activeContainers}
-            label={mode === "transfer" ? "From container" : "Container"}
-          />
-        </div>
+        {moneyIn && (usablePresets.length > 0 || distributionId !== null) && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={distributing}
+              onCheckedChange={(v) =>
+                setDistributionId(v === true ? (usablePresets[0]?.id ?? null) : null)
+              }
+              aria-label="Distribute"
+            />
+            Distribute across containers
+          </label>
+        )}
+
+        {distributing ? (
+          <div className="grid gap-1.5">
+            <Label>Split</Label>
+            <Select value={distributionId ?? ""} onValueChange={setDistributionId}>
+              <SelectTrigger aria-label="Distribution">
+                <SelectValue placeholder="Pick a distribution">
+                  {distribution?.name}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {usablePresets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              {distributionUsable
+                ? "Each occurrence is split when you approve it, at the amount you approve."
+                : `${distribution?.name ?? "That distribution"} can't split any more — pick another.`}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            <Label>{mode === "transfer" ? "From container" : "Container"}</Label>
+            <ContainerSelect
+              value={fromId}
+              onChange={setFromId}
+              containers={activeContainers}
+              label={mode === "transfer" ? "From container" : "Container"}
+            />
+          </div>
+        )}
 
         {mode === "transfer" && (
           <div className="grid gap-1.5">

@@ -58,8 +58,12 @@ describe("every screen ⌘K can point at reads the param", () => {
     // the category you were only looking for.
     expect(source("./goals/GoalsView.tsx")).toContain("setSheet(found)");
     expect(source("./recurring/RecurringView.tsx")).toContain("setSheet(found)");
-    expect(source("./categories/CategoriesView.tsx")).not.toContain("setEditing(true)\n  })");
-    expect(source("./containers/ContainersView.tsx")).not.toContain("setEditing(true)\n  })");
+    expect(source("./categories/CategoriesView.tsx")).not.toContain(
+      "setEditing(true)\n  })",
+    );
+    expect(source("./containers/ContainersView.tsx")).not.toContain(
+      "setEditing(true)\n  })",
+    );
   });
 
   it("routes palette results through the engine's ranking, not the register's order", () => {

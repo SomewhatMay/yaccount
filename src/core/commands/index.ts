@@ -377,6 +377,7 @@ export function createRecurringRule(
     amount_mode?: AmountMode;
     linked_goal_id?: string | null;
     end_date?: string | null;
+    template_distribution_preset_id?: string | null;
   },
   m?: OpMeta,
 ): Op {

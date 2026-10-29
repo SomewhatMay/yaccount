@@ -173,3 +173,24 @@ describe("creation autocomplete", () => {
     ]);
   });
 });
+
+describe("transfer suggestions ignore distribution pieces", () => {
+  it("doesn't offer a paycheck's payee as a transfer label", () => {
+    const pay = entry("pay", "Paycheck", "salary", "general", "2026-07-21T09:00:00.000Z");
+    const piece = makeTransfer({
+      id: "pay:split:savings",
+      date: "2026-07-21",
+      amount: 100,
+      container_id: "general",
+      to_container_id: "savings",
+      vendor_source: "Paycheck",
+      distribution_parent_id: "pay",
+    });
+    expect(rankVendorSourcesForKind([pay, piece], categories, "transfer", "")).toEqual(
+      [],
+    );
+    expect(
+      recallVendorSelection([pay, piece], categories, "transfer", "Paycheck"),
+    ).toBeNull();
+  });
+});

@@ -18,13 +18,28 @@ import {
   categoriesAtom,
   containersAtom,
   dispatchAtom,
+  dispatchManyAtom,
+  distributionPresetsAtom,
   flashRowAtom,
   flashedRowAtom,
   readyAtom,
   transactionsAtom,
   type FlashedRow,
 } from "@/features/store";
-import { createTemplate, unvoidTransaction, voidTransaction } from "@/core/commands";
+import {
+  createTemplate,
+  unvoidDistribution,
+  unvoidTransaction,
+  voidDistribution,
+  voidTransaction,
+} from "@/core/commands";
+import {
+  distributionPieces,
+  filterRegister,
+  hideDistributionPieces,
+} from "@/core/engine/distribution";
+import { linesFromGroup, type SplitLine } from "@/features/distribution/lines";
+import { SplitBreakdown, SplitInfo } from "@/features/distribution/SplitBreakdown";
 import {
   isLiveLedgerRow,
   isTransfer,
@@ -33,7 +48,6 @@ import {
 } from "@/core/engine/balances";
 import {
   activeFilterCount,
-  applyFilter,
   isFilterActive,
   type TransactionKind,
 } from "@/core/engine/filter";
@@ -124,6 +138,8 @@ export function LedgerView() {
   const transactions = useAtomValue(transactionsAtom);
   const flashed = useAtomValue(flashedRowAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const dispatchMany = useSetAtom(dispatchManyAtom);
+  const presets = useAtomValue(distributionPresetsAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -255,6 +271,23 @@ export function LedgerView() {
   // shown is then the shared predicate (`applyFilter`), so the rail, the ⌘K
   // palette and every M11 list view narrow rows by one rule.
   const live = useMemo(() => activeRows(transactions), [transactions]);
+  // A split income is one register row; its transfers fold under it
+  // (plans/income-distribution.md) and come back out only to explain a filter.
+  const pieces = useMemo(() => distributionPieces(live), [live]);
+  const registerCount = useMemo(() => hideDistributionPieces(live).length, [live]);
+  const splits = useMemo(() => {
+    const byParent = new Map<string, { lines: SplitLine[]; total: number }>();
+    for (const t of live) {
+      const own = pieces.get(t.id);
+      if (own)
+        byParent.set(t.id, {
+          lines: linesFromGroup(t, own, containers),
+          total: t.amount,
+        });
+    }
+    return byParent;
+  }, [live, pieces, containers]);
+  const splitOf = (t: Transaction) => splits.get(t.id) ?? null;
   const rankedCategories = useMemo(
     () => sortCategoriesAlphabetically(categories.filter((c) => !c.is_archived)),
     [categories],
@@ -263,10 +296,10 @@ export function LedgerView() {
     () => sortContainersAlphabetically(containers.filter((c) => !c.is_archived)),
     [containers],
   );
-  const rows = useMemo(
-    () => sortRegister(applyFilter(live, filter, { label: labelOf }), sort),
-    [live, filter, labelOf, sort],
-  );
+  const { rows, highlights } = useMemo(() => {
+    const out = filterRegister(live, filter, { label: labelOf });
+    return { rows: sortRegister(out.rows, sort), highlights: out.highlights };
+  }, [live, filter, labelOf, sort]);
 
   // A size sort ranks entries ACROSS days, so day headers would be lying about
   // what orders the page — the date moves onto the row instead.
@@ -307,11 +340,16 @@ export function LedgerView() {
       category_id: transfer ? null : t.category_id,
       to_container_id: transfer ? t.to_container_id : null,
       notes: t.notes,
+      // A split income's shortcut keeps splitting (plans/income-distribution.md).
+      distribution_preset_id:
+        transfer || !pieces.has(t.id) ? null : t.distribution_preset_id,
     };
     await dispatch(createTemplate(input));
   }
 
   async function del(t: Transaction) {
+    const own = pieces.get(t.id);
+    if (own) return delSplit(t, own);
     const op = voidTransaction(t);
     await dispatch(op);
     if (editing?.id === t.id) setEditing(null);
@@ -330,6 +368,28 @@ export function LedgerView() {
             },
           }
         : undefined,
+    });
+  }
+
+  // Deleting a split income takes its transfers with it — one batch, one undo.
+  async function delSplit(t: Transaction, own: Transaction[]) {
+    const { ops, voidRows } = voidDistribution(t, own);
+    try {
+      await dispatchMany(ops);
+    } catch {
+      return;
+    }
+    if (editing?.id === t.id) setEditing(null);
+    toast.success("Deleted", {
+      description: `${t.vendor_source} · ${formatCents(t.amount)} · split ${own.length + 1} ways`,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void dispatchMany(unvoidDistribution(voidRows)).then(() =>
+            toast.success("Restored", { description: t.vendor_source }),
+          );
+        },
+      },
     });
   }
 
@@ -471,8 +531,8 @@ export function LedgerView() {
                 </Button>
               }
             >
-              {live.length} entr{live.length === 1 ? "y is" : "ies are"} in the register —
-              widen the filters to see them.
+              {registerCount} entr{registerCount === 1 ? "y is" : "ies are"} in the
+              register — widen the filters to see them.
             </EmptyState>
           ) : categories.length === 0 ? (
             // First run: you cannot file an entry before a category exists, so the
@@ -510,6 +570,8 @@ export function LedgerView() {
                   categoryName={nameOf(t.category_id)}
                   containerName={showContainer ? containerNameOf(t.container_id) : ""}
                   toContainerName={containerNameOf(t.to_container_id)}
+                  split={splitOf(t)}
+                  highlight={highlights.get(t.id)}
                   onEdit={() => setEditing(t)}
                   onDelete={() => del(t)}
                   onSaveShortcut={() => saveShortcut(t)}
@@ -532,6 +594,8 @@ export function LedgerView() {
                 categoryName={nameOf(t.category_id)}
                 containerName={showContainer ? containerNameOf(t.container_id) : ""}
                 toContainerName={containerNameOf(t.to_container_id)}
+                split={splitOf(t)}
+                highlight={highlights.get(t.id)}
                 onEdit={() => setEditing(t)}
                 onDelete={() => del(t)}
                 onSaveShortcut={() => saveShortcut(t)}
@@ -547,10 +611,13 @@ export function LedgerView() {
         containers={containers}
         transactions={transactions}
         onOpenChange={(open) => !open && setEditing(null)}
-        onSave={async (op) => {
-          await dispatch(op);
+        presets={presets}
+        onSave={async (ops) => {
+          await dispatchMany(ops);
           setEditing(null);
-          if (op.type === "transaction.update") flashRow({ id: op.payload.row.id });
+          const [first] = ops;
+          if (first?.type === "transaction.update")
+            flashRow({ id: first.payload.row.id });
         }}
         onDelete={del}
       />
@@ -595,6 +662,8 @@ function LedgerRow({
   categoryName,
   containerName,
   toContainerName,
+  split,
+  highlight,
   onEdit,
   onDelete,
   onSaveShortcut,
@@ -610,6 +679,10 @@ function LedgerRow({
   categoryName: string;
   containerName: string;
   toContainerName: string;
+  /** Set when this income was distributed: its breakdown, read from the rows. */
+  split: { lines: SplitLine[]; total: number } | null;
+  /** Container lines a filter matched — the split then shows inline. */
+  highlight?: ReadonlySet<string>;
   onEdit: () => void;
   onDelete: () => void;
   onSaveShortcut: () => void;
@@ -624,18 +697,24 @@ function LedgerRow({
   const sub = [
     transfer
       ? [containerName || "Transfer", toContainerName].filter(Boolean).join(" → ")
-      : [categoryName, containerName].filter(Boolean).join(" · "),
+      : split
+        ? `${categoryName} · split ${split.lines.length} ways`
+        : [categoryName, containerName].filter(Boolean).join(" · "),
     when,
   ]
     .filter(Boolean)
     .join(" · ");
+  const inline = split !== null && highlight !== undefined && highlight.size > 0;
 
   return (
     <div
       ref={row}
       onClick={(event) => activateCardOnClick(event, onEdit)}
       className={cn(
-        "group flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        "group flex cursor-pointer gap-3 px-5 py-3 transition-colors ease-[var(--ease-register)]",
+        // An inline split makes the row tall; the glyph and amount stay on the
+        // payee's line instead of floating to the middle of the breakdown.
+        inline ? "items-start" : "items-center",
         // The end of §12.5's one orchestrated moment: the row lands carrying a
         // single iris wash, which then settles. Everywhere else on this row,
         // motion is a colour under the pointer — including the press state, which
@@ -655,11 +734,33 @@ function LedgerRow({
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{tx.vendor_source}</div>
-        <div className="text-muted-foreground truncate text-xs">{sub}</div>
+        {split && !inline ? (
+          <div className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
+            <span className="truncate">
+              {categoryName} · split {split.lines.length} ways
+            </span>
+            <SplitInfo
+              title={`${tx.vendor_source} split`}
+              lines={split.lines}
+              total={split.total}
+            />
+            {when && <span className="shrink-0">· {when}</span>}
+          </div>
+        ) : (
+          <div className="text-muted-foreground truncate text-xs">{sub}</div>
+        )}
         {tx.notes && (
           <div className="text-muted-foreground/80 mt-0.5 truncate text-xs">
             {tx.notes}
           </div>
+        )}
+        {inline && (
+          <SplitBreakdown
+            lines={split.lines}
+            total={split.total}
+            highlight={highlight}
+            className="bg-surface-sunken/60 mt-2 rounded-lg border p-1.5"
+          />
         )}
       </div>
       <Money

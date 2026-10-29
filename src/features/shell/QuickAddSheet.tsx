@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { toast } from "sonner";
 import { ArrowRightIcon, XIcon } from "lucide-react";
-import { createTemplate, logTemplate, removeTemplate } from "@/core/commands";
+import { createTemplate, logTemplateOps, removeTemplate } from "@/core/commands";
+import { splitIncome, usablePreset } from "@/core/engine/distribution";
 import { rankShortcutsByUsage } from "@/core/engine/usage-ranking";
 import { formatCents } from "@/core/money";
 import type { Transaction } from "@/core/model";
@@ -13,7 +14,10 @@ import {
   categoriesAtom,
   containersAtom,
   defaultContainerIdAtom,
+  defaultDistributionIdAtom,
   dispatchAtom,
+  dispatchManyAtom,
+  distributionPresetsAtom,
   flashRowAtom,
   quickAddAtom,
   templatesAtom,
@@ -26,7 +30,9 @@ import { SignToggle } from "@/features/ledger/SignToggle";
 import { CreationTextCombobox } from "@/features/ledger/CreationCombobox";
 import { useComposeFields, type ComposeKind } from "@/features/ledger/useComposeFields";
 import { InlineError } from "@/features/ui/InlineError";
+import { SplitInfo } from "@/features/distribution/SplitBreakdown";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -87,7 +93,10 @@ function QuickAddForm({
   const templates = useAtomValue(templatesAtom);
   const transactions = useAtomValue(transactionsAtom);
   const defaultContainerId = useAtomValue(defaultContainerIdAtom);
+  const presets = useAtomValue(distributionPresetsAtom);
+  const defaultDistributionId = useAtomValue(defaultDistributionIdAtom);
   const dispatch = useSetAtom(dispatchAtom);
+  const dispatchMany = useSetAtom(dispatchManyAtom);
   const flashRow = useSetAtom(flashRowAtom);
   const rankedTemplates = useMemo(
     () => rankShortcutsByUsage(templates, transactions),
@@ -99,18 +108,29 @@ function QuickAddForm({
     containers,
     transactions,
     defaultContainerId,
+    presets,
+    defaultDistributionId,
     initialKind,
     onLogged: onDone,
   });
 
   async function quickLog(template: Transaction) {
-    const op = logTemplate(template, { date: todayIso() });
+    // A shortcut that splits keeps splitting — unless its preset can't any more
+    // (archived, or its rest container is), when it lands whole in its container.
+    const preset = usablePreset(template.distribution_preset_id, presets, containers);
+    const split = preset ? splitIncome(template.amount, preset, containers) : null;
+    const ops = logTemplateOps(
+      template,
+      { date: todayIso() },
+      preset && split?.ok ? { presetId: preset.id, split } : null,
+    );
     try {
-      await dispatch(op);
+      await dispatchMany(ops);
     } catch {
-      return; // already logged and toasted by `dispatchAtom`
+      return; // already logged and toasted by `dispatchManyAtom`
     }
-    if (op.type === "transaction.create") flashRow({ id: op.payload.row.id });
+    const first = ops[0];
+    if (first.type === "transaction.create") flashRow({ id: first.payload.row.id });
     onDone();
   }
 
@@ -133,6 +153,7 @@ function QuickAddForm({
               category_id: transfer ? null : template.category_id,
               to_container_id: transfer ? template.to_container_id : null,
               notes: template.notes,
+              distribution_preset_id: transfer ? null : template.distribution_preset_id,
             }),
           ),
       },
@@ -228,6 +249,32 @@ function QuickAddForm({
           className="tnum h-14 w-40 border-0 bg-transparent p-0 font-mono text-4xl shadow-none focus-visible:ring-0 md:text-4xl"
         />
       </div>
+      {f.distributionPreset && (
+        <p
+          className="text-muted-foreground -mt-4 flex items-center justify-center gap-1 text-xs"
+          data-testid="distribution-label"
+        >
+          <span>
+            distributing via{" "}
+            <span className="text-foreground font-medium">
+              {f.distributionPreset.name}
+            </span>
+          </span>
+          {f.distributionPreview ? (
+            <SplitInfo
+              title={`${f.distributionPreset.name} split`}
+              lines={f.distributionPreview.lines}
+              total={f.distributionPreview.total}
+              note={f.distributionPreview.note}
+            />
+          ) : null}
+        </p>
+      )}
+      {f.distributionPreview?.note && (
+        <p className="-mt-3 text-center text-xs text-amber-600 dark:text-amber-500">
+          {f.distributionPreview.note}
+        </p>
+      )}
 
       <div className="grid grid-cols-[5.5rem_1fr] items-center gap-x-3 gap-y-2">
         <FieldLabel>
@@ -258,14 +305,63 @@ function QuickAddForm({
         {f.kind !== "transfer" && (
           <>
             <FieldLabel>Category</FieldLabel>
-            <Select value={f.categoryId} onValueChange={f.setCategoryId}>
-              <SelectTrigger aria-label="Category" className="h-9">
-                <SelectValue placeholder={`No ${f.kind} categories yet`} />
+            <div className="flex min-w-0 items-center gap-3">
+              <Select value={f.categoryId} onValueChange={f.setCategoryId}>
+                <SelectTrigger aria-label="Category" className="h-9 min-w-0 flex-1">
+                  <SelectValue placeholder={`No ${f.kind} categories yet`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {f.categoriesOfKind.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {f.canDistribute && (
+                <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-sm">
+                  <Checkbox
+                    checked={f.distributionId !== null}
+                    onCheckedChange={(v) => f.setDistribute(v === true)}
+                    aria-label="Distribute"
+                  />
+                  Distribute
+                </label>
+              )}
+            </div>
+          </>
+        )}
+
+        {f.distributionPreset ? (
+          <>
+            <FieldLabel>Split</FieldLabel>
+            <Select value={f.distributionId ?? ""} onValueChange={f.setDistributionId}>
+              <SelectTrigger aria-label="Distribution" className="h-9">
+                <SelectValue placeholder="Distribution" />
               </SelectTrigger>
               <SelectContent>
-                {f.categoriesOfKind.map((c) => (
+                {f.usablePresets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        ) : (
+          <>
+            <FieldLabel>{f.kind === "transfer" ? "From" : "Container"}</FieldLabel>
+            <Select value={f.containerId} onValueChange={f.setPickedContainerId}>
+              <SelectTrigger
+                aria-label={f.kind === "transfer" ? "From container" : "Container"}
+                className="h-9"
+              >
+                <SelectValue placeholder="Container" />
+              </SelectTrigger>
+              <SelectContent>
+                {f.activeContainers.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    <CategoryGlyph icon={c.icon} color={categoryColor(c)} />
                     {c.name}
                   </SelectItem>
                 ))}
@@ -273,23 +369,6 @@ function QuickAddForm({
             </Select>
           </>
         )}
-
-        <FieldLabel>{f.kind === "transfer" ? "From" : "Container"}</FieldLabel>
-        <Select value={f.containerId} onValueChange={f.setPickedContainerId}>
-          <SelectTrigger
-            aria-label={f.kind === "transfer" ? "From container" : "Container"}
-            className="h-9"
-          >
-            <SelectValue placeholder="Container" />
-          </SelectTrigger>
-          <SelectContent>
-            {f.activeContainers.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         {f.kind === "transfer" && (
           <>

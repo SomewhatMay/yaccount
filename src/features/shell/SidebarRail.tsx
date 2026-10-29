@@ -5,11 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAtomValue } from "jotai";
 import { cn } from "@/lib/utils";
 import { pendingCountAtom } from "@/features/store";
-import {
-  DESTINATIONS,
-  destinationFor,
-  normalizePathname,
-} from "@/features/shell/nav";
+import { DESTINATIONS, destinationFor, normalizePathname } from "@/features/shell/nav";
 import { AuthButton } from "@/features/auth/AuthButton";
 
 /** Settings sits apart from the ledger's screens — it is where you go when

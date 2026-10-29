@@ -17,6 +17,7 @@ import {
 import {
   defaultPresetId,
   distributionPieces,
+  filterRegister,
   fillFromGoalAsks,
   groupBreakdown,
   hideDistributionPieces,
@@ -462,5 +463,72 @@ describe("recurringOverlap", () => {
     const overlap = recurringOverlap(rules, ["savings", "invest"]);
     expect([...overlap.keys()]).toEqual(["savings"]);
     expect(overlap.get("savings")?.map((r) => r.id)).toEqual(["r1"]);
+  });
+});
+
+describe("filterRegister — a piece can surface its parent", () => {
+  const parent = income("pay", { distribution_preset_id: "p1" });
+  const live = activeRows([
+    parent,
+    piece("pay", "savings", 60000),
+    piece("pay", "invest", 99000),
+    income("other", {
+      vendor_source: "Gift",
+      category_id: "gifts",
+      container_id: "savings",
+    }),
+  ]);
+  const names: Record<string, string> = {
+    general: "General",
+    savings: "Savings",
+    invest: "Invest",
+  };
+  const label = (t: Transaction) =>
+    `${names[t.container_id] ?? ""} ${t.to_container_id ? names[t.to_container_id] : ""}`;
+
+  it("shows every parent compactly when nothing filters", () => {
+    const out = filterRegister(live, {}, { label });
+    expect(out.rows.map((r) => r.id)).toEqual(["pay", "other"]);
+    expect(out.highlights.size).toBe(0);
+  });
+
+  it("a container filter on a part shows the parent with that line lit", () => {
+    const out = filterRegister(live, { containerIds: ["savings"] }, { label });
+    expect(out.rows.map((r) => r.id)).toEqual(["pay", "other"]);
+    expect([...(out.highlights.get("pay") ?? [])]).toEqual(["savings"]);
+  });
+
+  it("a container filter on the rest container lights the rest line", () => {
+    const out = filterRegister(live, { containerIds: ["general"] }, { label });
+    expect(out.rows.map((r) => r.id)).toEqual(["pay"]);
+    expect([...(out.highlights.get("pay") ?? [])]).toEqual(["general"]);
+  });
+
+  it("lights both when the filter names rest and a part", () => {
+    const out = filterRegister(live, { containerIds: ["general", "invest"] }, { label });
+    expect([...(out.highlights.get("pay") ?? [])].sort()).toEqual(["general", "invest"]);
+  });
+
+  it("a search for a part's container surfaces the parent", () => {
+    const out = filterRegister(live, { text: "invest" }, { label });
+    expect(out.rows.map((r) => r.id)).toEqual(["pay"]);
+    expect([...(out.highlights.get("pay") ?? [])]).toEqual(["invest"]);
+  });
+
+  it("a search the parent matches on its own keeps it compact", () => {
+    const out = filterRegister(live, { text: "paycheck" }, { label });
+    expect(out.rows.map((r) => r.id)).toEqual(["pay"]);
+    expect(out.highlights.size).toBe(0);
+  });
+
+  it("a transfer-kind filter surfaces the split by its pieces", () => {
+    const out = filterRegister(live, { kinds: ["transfer"] }, { label });
+    expect(out.rows.map((r) => r.id)).toEqual(["pay"]);
+    expect([...(out.highlights.get("pay") ?? [])].sort()).toEqual(["invest", "savings"]);
+  });
+
+  it("an amount filter can match a piece's size", () => {
+    const out = filterRegister(live, { minAmount: 90000, maxAmount: 100000 }, { label });
+    expect([...(out.highlights.get("pay") ?? [])]).toEqual(["invest"]);
   });
 });

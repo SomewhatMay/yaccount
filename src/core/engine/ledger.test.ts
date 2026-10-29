@@ -386,3 +386,28 @@ describe("sortRegister — the four orders the register offers (M11)", () => {
     expect(isRegisterSort("")).toBe(false);
   });
 });
+
+describe("recentRows — a split income counts once", () => {
+  it("shows the income row, not the transfers it made", async () => {
+    const { makeTransfer } = await import("../model");
+    const pay = makeTransaction({
+      id: "pay",
+      date: "2026-07-21",
+      amount: 300000,
+      vendor_source: "Paycheck",
+      category_id: "salary",
+      entered_at: "2026-07-21T09:00:00.000Z",
+    });
+    const piece = makeTransfer({
+      id: "pay:split:savings",
+      date: "2026-07-21",
+      amount: 60000,
+      container_id: "general",
+      to_container_id: "savings",
+      vendor_source: "Paycheck",
+      distribution_parent_id: "pay",
+      entered_at: "2026-07-21T09:00:00.000Z",
+    });
+    expect(recentRows([pay, piece], 3).map((r) => r.id)).toEqual(["pay"]);
+  });
+});

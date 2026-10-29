@@ -3,7 +3,7 @@ import { isCalendarDate } from "../model/primitives";
 import type { Category, Container, Goal, RecurringRule, Transaction } from "../model";
 import { inRange, type DateRange } from "./period";
 import { TRANSACTION_KINDS, transactionKind, type TransactionKind } from "./filter";
-import { activeRows, pendingRows, templateRows } from "./ledger";
+import { activeRows, hideDistributionPieces, pendingRows, templateRows } from "./ledger";
 
 /**
  * ⌘K search — one ranked answer over everything the app holds.
@@ -320,9 +320,10 @@ export function buildSearchIndex(input: SearchInput): SearchIndex {
 
   // Live entries, the Inbox queue and saved shortcuts — everything a person
   // would call "an entry". A voided row and its reversal are bookkeeping for
-  // something that no longer happened, so neither is findable.
+  // something that no longer happened, so neither is findable. A split income
+  // is one entry — its transfers are found through it, as on the register.
   const entries = [
-    ...activeRows(input.transactions),
+    ...hideDistributionPieces(activeRows(input.transactions)),
     ...pendingRows(input.transactions),
     ...templateRows(input.transactions),
   ];
