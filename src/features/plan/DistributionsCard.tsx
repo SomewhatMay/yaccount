@@ -620,9 +620,11 @@ function DistributionForm({
             >
               <SelectTrigger
                 aria-label="Add a container"
-                className="h-8 w-fit gap-1.5 text-xs"
+                // An action, not an unset field: the always-empty value would
+                // otherwise wear the muted placeholder look and read as disabled.
+                className="data-placeholder:text-foreground hover:bg-muted/60 h-8 w-fit gap-1.5 text-xs font-medium"
               >
-                <PlusIcon className="size-3.5" />
+                <PlusIcon className="text-primary size-3.5" />
                 <SelectValue placeholder="Add container" />
               </SelectTrigger>
               <SelectContent>
