@@ -253,11 +253,22 @@ export function groupBreakdown(
   parent: Transaction,
   pieces: Transaction[],
 ): BreakdownLine[] {
-  const gross = parent.amount;
+  return breakdownOf(
+    parent.amount,
+    parent.container_id,
+    pieces.map((p) => ({ container_id: p.to_container_id!, amount: Math.abs(p.amount) })),
+  );
+}
+
+/** `groupBreakdown` for pieces not written yet: gross, rest container, cents. */
+export function breakdownOf(
+  gross: number,
+  restContainerId: string,
+  pieces: { container_id: string; amount: number }[],
+): BreakdownLine[] {
   const byContainer = new Map<string, number>();
   for (const p of pieces) {
-    const to = p.to_container_id!;
-    byContainer.set(to, (byContainer.get(to) ?? 0) + Math.abs(p.amount));
+    byContainer.set(p.container_id, (byContainer.get(p.container_id) ?? 0) + p.amount);
   }
   const share = (amount: number) => (gross === 0 ? 0 : amount / gross);
   const lines: BreakdownLine[] = [...byContainer.entries()]
@@ -270,12 +281,53 @@ export function groupBreakdown(
     .sort((a, b) => b.amount - a.amount || a.container_id.localeCompare(b.container_id));
   const given = lines.reduce((sum, l) => sum + l.amount, 0);
   lines.push({
-    container_id: parent.container_id,
+    container_id: restContainerId,
     amount: gross - given,
     share: share(gross - given),
     rest: true,
   });
   return lines;
+}
+
+/**
+ * Whether a written split is what its preset would write on the same amount
+ * today. False once a share, the rest or a part's container changed since —
+ * and for a preset that can't split at all.
+ */
+export function splitMatchesPreset(
+  parent: Transaction,
+  pieces: Transaction[],
+  preset: DistributionPreset,
+  containers: Container[],
+): boolean {
+  const split = splitIncome(parent.amount, preset, containers);
+  if (!split.ok || split.rest.container_id !== parent.container_id) return false;
+  const written = groupBreakdown(parent, pieces).filter((l) => !l.rest);
+  return (
+    written.length === split.pieces.length &&
+    split.pieces.every((p) =>
+      written.some((l) => l.container_id === p.container_id && l.amount === p.amount),
+    )
+  );
+}
+
+/**
+ * A written split moved to a new amount at its own shares: each piece keeps
+ * `floor(piece × to / from)` (BigInt), so the pieces never exceed `to` and the
+ * rest takes every leftover cent. Pieces that floor to 0¢ drop out.
+ */
+export function scaleSplit(
+  pieces: { container_id: string; amount: number }[],
+  from: number,
+  to: number,
+): { container_id: string; amount: number }[] {
+  if (from <= 0 || to <= 0) return [];
+  return pieces
+    .map((p) => ({
+      container_id: p.container_id,
+      amount: Number((BigInt(p.amount) * BigInt(to)) / BigInt(from)),
+    }))
+    .filter((p) => p.amount > 0);
 }
 
 // ── Plan helpers ─────────────────────────────────────────────────────────────

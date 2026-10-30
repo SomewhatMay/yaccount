@@ -332,6 +332,68 @@ test("edits re-split, untick lands whole, delete and undo move the whole group",
   });
 });
 
+test("an entry split before its preset changed keeps its shares until updated", async ({
+  page,
+}) => {
+  test.slow();
+  await setup(page);
+  await logIncome(page, "Acme payroll", "3000");
+  await page.getByRole("button", { name: "Log income" }).click();
+  await expect(page.getByRole("heading", { name: "Add an entry" })).toBeHidden();
+
+  // Raise Savings from 20% to 30%.
+  await openReady(page, "/plan", "Plan");
+  await page.getByRole("button", { name: "Edit Paycheck" }).click();
+  await page.getByLabel("Savings share").fill("30");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Edit distribution" })).toBeHidden();
+
+  // A new amount keeps the entry's own 20% / 33%.
+  await openReady(page, "/ledger", "Overall balance");
+  await page.getByText("Acme payroll", { exact: true }).click();
+  const changed = page.getByText(
+    /Paycheck's shares have changed since this entry was split/,
+  );
+  await expect(changed).toBeVisible();
+  await page.getByLabel("Amount").fill("4000");
+  await expect(page.getByText(/Saving keeps this entry's original shares/)).toBeVisible();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("heading", { name: "Edit transaction" })).toBeHidden();
+  await expectBalances(page, {
+    Savings: "$800.00",
+    Invest: "$1,320.00",
+    General: "$1,880.00",
+  });
+
+  // Updating adopts 30% / 33%.
+  await openReady(page, "/ledger", "Overall balance");
+  await page.getByText("Acme payroll", { exact: true }).click();
+  await page.getByRole("button", { name: "Update to current shares" }).click();
+  await expect(
+    page.getByText(/Saving re-splits at Paycheck's current shares/),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog").getByTestId("split-breakdown")).toContainText(
+    "$1,200.00",
+  );
+  await shot(page, "edit-outdated");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("heading", { name: "Edit transaction" })).toBeHidden();
+  await expectBalances(page, {
+    Savings: "$1,200.00",
+    Invest: "$1,320.00",
+    General: "$1,480.00",
+  });
+
+  // Up to date now: nothing to ask.
+  await openReady(page, "/ledger", "Overall balance");
+  await page.getByText("Acme payroll", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Edit transaction" })).toBeVisible();
+  await expect(changed).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Update to current shares" }),
+  ).toHaveCount(0);
+});
+
 test("recalls per category: a one-container income unticks next time", async ({
   page,
 }) => {

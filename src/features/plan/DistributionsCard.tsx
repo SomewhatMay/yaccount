@@ -460,7 +460,6 @@ function DistributionForm({
 
   const showErrors = submitted;
   const restPct = formatBps(evaluation.restBps);
-  const restLine = evaluation.preview?.lines.find((l) => l.rest);
 
   return (
     <form onSubmit={save} className="flex min-h-0 flex-1 flex-col" noValidate>
@@ -488,23 +487,6 @@ function DistributionForm({
           Use by default for income with no history
         </CheckboxField>
 
-        <div className="grid gap-1.5">
-          <Label htmlFor="dist-preview">Preview on</Label>
-          <Input
-            id="dist-preview"
-            value={previewStr}
-            onChange={(e) => setPreviewStr(e.target.value)}
-            placeholder="0.00"
-            inputMode="decimal"
-            className="tnum font-mono"
-          />
-          {expectedIncome > 0 && (
-            <p className="text-muted-foreground text-xs">
-              This month&apos;s expected income is {formatCents(expectedIncome)}.
-            </p>
-          )}
-        </div>
-
         <div className="grid gap-2">
           <div className="flex items-center justify-between gap-2">
             <Eyebrow as="h3">Shares</Eyebrow>
@@ -529,11 +511,6 @@ function DistributionForm({
           )}
           <ul className="grid gap-2">
             {draft.parts.map((part) => {
-              const bps = evaluation.partBps[part.containerId] ?? 0;
-              const amount =
-                evaluation.preview?.lines.find(
-                  (l) => !l.rest && l.containerId === part.containerId,
-                )?.amount ?? null;
               const err = showErrors
                 ? evaluation.errors.parts[part.containerId]
                 : undefined;
@@ -544,7 +521,7 @@ function DistributionForm({
                     <span className="min-w-0 flex-1 truncate text-sm">
                       {nameOf(part.containerId)}
                     </span>
-                    <div className="relative w-24 shrink-0">
+                    <div className="relative w-22 shrink-0">
                       <Input
                         value={part.pct}
                         onChange={(e) => setPart(part.containerId, e.target.value)}
@@ -558,15 +535,6 @@ function DistributionForm({
                         %
                       </span>
                     </div>
-                    <span className="w-24 shrink-0 text-right">
-                      {amount !== null ? (
-                        <Money cents={amount} tone="quiet" className="text-xs" />
-                      ) : (
-                        <span className="text-muted-foreground text-xs">
-                          {bps > 0 ? "—" : ""}
-                        </span>
-                      )}
-                    </span>
                     <Button
                       type="button"
                       size="icon"
@@ -639,7 +607,7 @@ function DistributionForm({
 
           <div className="bg-surface-sunken/60 mt-1 grid gap-1 rounded-lg border p-2">
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground shrink-0 text-xs">Rest →</span>
+              <span className="text-muted-foreground shrink-0 text-xs">Rest</span>
               <Select
                 value={draft.restId}
                 onValueChange={(restId) => {
@@ -662,15 +630,14 @@ function DistributionForm({
                   ))}
                 </SelectContent>
               </Select>
+              {/* Lines up under the share inputs' percentages. */}
               <span
-                className="text-muted-foreground tnum w-14 shrink-0 text-right font-mono text-xs"
+                className="text-muted-foreground tnum w-22 shrink-0 pr-2 text-right font-mono text-sm"
                 data-testid="rest-share"
               >
                 {restPct}
               </span>
-              <span className="w-24 shrink-0 text-right">
-                {restLine && <Money cents={restLine.amount} className="text-xs" />}
-              </span>
+              <span aria-hidden className="size-7 shrink-0" />
             </div>
             <p className="text-muted-foreground text-xs">
               Takes what the shares leave, plus every rounding cent.
@@ -690,16 +657,36 @@ function DistributionForm({
           ))}
         </div>
 
-        {evaluation.preview && (
-          <div className="grid gap-1.5">
+        <div className="grid gap-1.5">
+          <div className="flex items-center justify-between gap-2">
             <Eyebrow as="h3">Preview</Eyebrow>
+            <Input
+              id="dist-preview"
+              aria-label="Preview on"
+              value={previewStr}
+              onChange={(e) => setPreviewStr(e.target.value)}
+              placeholder="Amount"
+              inputMode="decimal"
+              className="tnum h-8 w-32 text-right font-mono"
+            />
+          </div>
+          {evaluation.preview ? (
             <SplitBreakdown
               lines={evaluation.preview.lines}
               total={evaluation.preview.total}
               className="rounded-lg border p-1.5"
             />
-          </div>
-        )}
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              Type an amount to see the split in cents.
+            </p>
+          )}
+          {expectedIncome > 0 && (
+            <p className="text-muted-foreground text-xs">
+              This month&apos;s expected income is {formatCents(expectedIncome)}.
+            </p>
+          )}
+        </div>
       </div>
 
       <SheetFooter className="mt-auto flex-row items-center gap-2">

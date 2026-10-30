@@ -11,7 +11,7 @@ import {
 } from "@/core/model";
 import { replay, type Op } from "@/core/oplog";
 import { STORE } from "@/core/repo/db";
-import { editOps, needsResplit } from "./edit-distribution";
+import { editOps, isSplitOutdated, splitMode } from "./edit-distribution";
 
 const containers = [
   makeContainer({ id: "general", name: "General" }),
@@ -24,6 +24,8 @@ const p1 = makeDistributionPreset({
   rest_container_id: "general",
   parts: [{ container_id: "savings", bps: 2500 }],
 });
+/** p1 after the user raised Savings from 25% to 50%. */
+const p1Edited = { ...p1, parts: [{ container_id: "savings", bps: 5000 }] };
 const p2 = makeDistributionPreset({
   id: "p2",
   name: "Half",
@@ -239,13 +241,113 @@ describe("editOps — a pending occurrence", () => {
   });
 });
 
-describe("needsResplit", () => {
-  it("is false for a payee-only edit and true for amount or preset changes", async () => {
+describe("splitMode", () => {
+  it("keeps a payee-only edit; re-splits at the preset on amount or preset changes", async () => {
     const { tx } = await seeded();
-    const base = { tx, distribute: true, moneyIn: true, wasDistributed: true };
-    expect(needsResplit({ ...base, amount: tx.amount, presetId: "p1" })).toBe(false);
-    expect(needsResplit({ ...base, amount: 1, presetId: "p1" })).toBe(true);
-    expect(needsResplit({ ...base, amount: tx.amount, presetId: "p2" })).toBe(true);
-    expect(needsResplit({ ...base, amount: tx.amount, presetId: null })).toBe(false);
+    const base = {
+      tx,
+      distribute: true,
+      moneyIn: true,
+      wasDistributed: true,
+      outdated: false,
+      adoptCurrent: false,
+    };
+    expect(splitMode({ ...base, amount: tx.amount, presetId: "p1" })).toBe("keep");
+    expect(splitMode({ ...base, amount: 1, presetId: "p1" })).toBe("preset");
+    expect(splitMode({ ...base, amount: tx.amount, presetId: "p2" })).toBe("preset");
+    expect(splitMode({ ...base, amount: tx.amount, presetId: null })).toBe("keep");
+    expect(splitMode({ ...base, amount: 1, presetId: "p1", distribute: false })).toBe(
+      "none",
+    );
+    expect(splitMode({ ...base, amount: 1, presetId: "p1", wasDistributed: false })).toBe(
+      "preset",
+    );
+  });
+
+  it("an outdated split keeps its own shares unless the user adopts the current ones", async () => {
+    const { tx } = await seeded();
+    const base = {
+      tx,
+      distribute: true,
+      moneyIn: true,
+      wasDistributed: true,
+      outdated: true,
+      presetId: "p1",
+    };
+    expect(splitMode({ ...base, amount: tx.amount, adoptCurrent: false })).toBe("keep");
+    expect(splitMode({ ...base, amount: 1, adoptCurrent: false })).toBe("scale");
+    expect(splitMode({ ...base, amount: tx.amount, adoptCurrent: true })).toBe("preset");
+    expect(splitMode({ ...base, amount: 1, adoptCurrent: true })).toBe("preset");
+    // Picking another preset is a choice in itself.
+    expect(
+      splitMode({ ...base, amount: tx.amount, presetId: "p2", adoptCurrent: false }),
+    ).toBe("preset");
+  });
+});
+
+describe("isSplitOutdated — the preset changed since this entry was split", () => {
+  it("is false as written, true once the preset's shares change", async () => {
+    const { rows, tx } = await seeded();
+    const ctx = { containers, transactions: rows };
+    expect(isSplitOutdated(tx, { ...ctx, presets: [p1] })).toBe(false);
+    expect(isSplitOutdated(tx, { ...ctx, presets: [p1Edited] })).toBe(true);
+  });
+
+  it("is false when the preset can't split any more, or for a plain income", async () => {
+    const { rows, tx } = await seeded();
+    const ctx = { containers, transactions: rows };
+    expect(
+      isSplitOutdated(tx, { ...ctx, presets: [{ ...p1Edited, archived: true }] }),
+    ).toBe(false);
+    const plain = makeTransaction({
+      id: "plain",
+      date: "2026-10-01",
+      amount: 5000,
+      vendor_source: "Gift",
+      category_id: "salary",
+    });
+    expect(isSplitOutdated(plain, { ...ctx, presets: [p1Edited] })).toBe(false);
+  });
+});
+
+describe("editOps — a split whose preset changed since", () => {
+  it("a new amount keeps the entry's original shares", async () => {
+    const { ops, rows, tx } = await seeded();
+    const out = editOps(
+      {
+        tx,
+        next: { ...tx, amount: 200000 },
+        moneyIn: true,
+        distribute: true,
+        presetId: "p1",
+      },
+      { presets: [p1Edited], containers, transactions: rows },
+      T2,
+    );
+    if (!out.ok) throw new Error(out.error);
+    const after = await rowsOf([...ops, ...out.ops]);
+    // Written at 25%; the preset now says 50%.
+    expect(containerBalance(after, "savings")).toBe(50000);
+    expect(containerBalance(after, "general")).toBe(150000);
+  });
+
+  it("adopting the current shares re-splits, even with nothing else changed", async () => {
+    const { ops, rows, tx } = await seeded();
+    const out = editOps(
+      {
+        tx,
+        next: tx,
+        moneyIn: true,
+        distribute: true,
+        presetId: "p1",
+        adoptCurrent: true,
+      },
+      { presets: [p1Edited], containers, transactions: rows },
+      T2,
+    );
+    if (!out.ok) throw new Error(out.error);
+    const after = await rowsOf([...ops, ...out.ops]);
+    expect(containerBalance(after, "savings")).toBe(50000);
+    expect(containerBalance(after, "general")).toBe(50000);
   });
 });

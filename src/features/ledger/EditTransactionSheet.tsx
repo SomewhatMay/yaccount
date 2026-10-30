@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Trash2Icon } from "lucide-react";
+import { RefreshCwIcon, Trash2Icon, Undo2Icon } from "lucide-react";
 import { updateTransaction } from "@/core/commands";
-import { editOps, needsResplit } from "@/features/ledger/edit-distribution";
+import { editOps, isSplitOutdated, splitMode } from "@/features/ledger/edit-distribution";
 import { isTransfer } from "@/core/engine/balances";
 import { activeRows } from "@/core/engine/ledger";
 import {
   distributionPieces,
+  scaleSplit,
   splitIncome,
   usablePreset,
 } from "@/core/engine/distribution";
@@ -25,7 +26,11 @@ import {
   type DistributionPreset,
   type Transaction,
 } from "@/core/model";
-import { linesFromGroup, linesFromSplit } from "@/features/distribution/lines";
+import {
+  linesFromGroup,
+  linesFromPieces,
+  linesFromSplit,
+} from "@/features/distribution/lines";
 import { SplitBreakdown } from "@/features/distribution/SplitBreakdown";
 import { CheckboxField } from "@/features/ui/CheckboxField";
 import {
@@ -266,22 +271,48 @@ function EditForm({
   } catch {
     typedCents = null;
   }
+  // Its preset changed since this entry was split: ask before adopting the new
+  // shares — until then it keeps its own, even across an amount change.
+  const outdated = useMemo(
+    () => isSplitOutdated(tx, { presets, containers, transactions }),
+    [tx, presets, containers, transactions],
+  );
+  const [adoptCurrent, setAdoptCurrent] = useState(false);
   // Re-split only when what the split depends on changed; a payee or date edit
   // keeps the pieces' cents exactly as they were.
-  const resplit = needsResplit({
+  const mode = splitMode({
     tx,
     amount: typedCents === null ? tx.amount : sign === "-" ? -typedCents : typedCents,
     distribute,
     moneyIn,
     wasDistributed,
     presetId,
+    outdated,
+    adoptCurrent,
   });
+  const askToUpdate =
+    outdated && distribute && moneyIn && presetId === tx.distribution_preset_id;
   const preview = useMemo(() => {
     if (!distribute || !moneyIn) return null;
-    if (!pending && !resplit && ownPieces.length > 0) {
+    if (mode === "keep" && ownPieces.length > 0) {
       return {
         lines: linesFromGroup(tx, ownPieces, containers),
         total: tx.amount,
+        note: null,
+      };
+    }
+    if (mode === "scale" && typedCents) {
+      const scaled = scaleSplit(
+        ownPieces.map((p) => ({
+          container_id: p.to_container_id!,
+          amount: Math.abs(p.amount),
+        })),
+        tx.amount,
+        typedCents,
+      );
+      return {
+        lines: linesFromPieces(typedCents, tx.container_id, scaled, containers),
+        total: typedCents,
         note: null,
       };
     }
@@ -289,17 +320,7 @@ function EditForm({
     const split = splitIncome(typedCents, preset, containers);
     if (!split.ok) return null;
     return { total: typedCents, ...linesFromSplit(split, preset, containers) };
-  }, [
-    distribute,
-    moneyIn,
-    pending,
-    resplit,
-    ownPieces,
-    tx,
-    containers,
-    preset,
-    typedCents,
-  ]);
+  }, [distribute, moneyIn, mode, ownPieces, tx, containers, preset, typedCents]);
 
   function selectType(next: CategoryType) {
     setType(next);
@@ -343,6 +364,7 @@ function EditForm({
         moneyIn: cat.type === "income" && res.signed > 0,
         distribute,
         presetId,
+        adoptCurrent,
       },
       { presets, containers, transactions },
     );
@@ -485,10 +507,42 @@ function EditForm({
                   : `Split by ${recordedPreset.name}, which can't split any more. Saving keeps the split as it is; pick a distribution to re-split it.`}
               </p>
             )}
-            {resplit && wasDistributed && (
+            {askToUpdate && recordedPreset && (
+              <div className="border-primary/25 bg-primary/5 grid gap-2 rounded-lg border p-2.5">
+                <p className="text-xs">
+                  {recordedPreset.name}&apos;s shares have changed since this entry was
+                  split.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={adoptCurrent ? "ghost" : "outline"}
+                  className="w-fit"
+                  onClick={() => setAdoptCurrent((on) => !on)}
+                >
+                  {adoptCurrent ? (
+                    <>
+                      <Undo2Icon className="size-3.5" />
+                      Keep original shares
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCwIcon className="text-primary size-3.5" />
+                      Update to current shares
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            {mode === "preset" && wasDistributed && (
               <p className="text-muted-foreground text-xs">
                 Saving re-splits at {preset?.name ?? "the distribution"}&apos;s current
                 shares.
+              </p>
+            )}
+            {mode === "scale" && (
+              <p className="text-muted-foreground text-xs">
+                Saving keeps this entry&apos;s original shares.
               </p>
             )}
             {preview && (

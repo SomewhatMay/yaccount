@@ -26,7 +26,9 @@ import {
   presetIssues,
   recallDistribution,
   recurringOverlap,
+  scaleSplit,
   splitIncome,
+  splitMatchesPreset,
   usablePreset,
 } from "@/core/engine/distribution";
 import { activeRows } from "@/core/engine/ledger";
@@ -587,5 +589,91 @@ describe("firstUsablePreset", () => {
     const presets = [brokenRest, ok];
     expect(firstUsablePreset(["a", null, "missing", "b"], presets, containers)).toBe("b");
     expect(firstUsablePreset(["a"], presets, containers)).toBeNull();
+  });
+});
+
+describe("splitMatchesPreset — is this split what its preset gives today?", () => {
+  const parent = income("pay", { distribution_preset_id: "p1" });
+  const asWritten = [piece("pay", "savings", 60000), piece("pay", "invest", 99000)];
+
+  it("matches the split its preset wrote", () => {
+    expect(splitMatchesPreset(parent, asWritten, paycheck(), containers)).toBe(true);
+  });
+
+  it("no longer matches once a share changed", () => {
+    const edited = paycheck({
+      parts: [
+        { container_id: "savings", bps: 3000 },
+        { container_id: "invest", bps: 3300 },
+      ],
+    });
+    expect(splitMatchesPreset(parent, asWritten, edited, containers)).toBe(false);
+  });
+
+  it("no longer matches once the rest container changed", () => {
+    const edited = paycheck({ rest_container_id: "wallet" });
+    const withWallet = [...containers, makeContainer({ id: "wallet", name: "Wallet" })];
+    expect(splitMatchesPreset(parent, asWritten, edited, withWallet)).toBe(false);
+  });
+
+  it("no longer matches once a part was added or dropped", () => {
+    const fewer = paycheck({ parts: [{ container_id: "savings", bps: 2000 }] });
+    expect(splitMatchesPreset(parent, asWritten, fewer, containers)).toBe(false);
+    expect(
+      splitMatchesPreset(parent, asWritten.slice(0, 1), paycheck(), containers),
+    ).toBe(false);
+  });
+
+  it("no longer matches once a part's container was archived (it now folds)", () => {
+    const archived = containers.map((c) =>
+      c.id === "invest" ? { ...c, is_archived: true } : c,
+    );
+    expect(splitMatchesPreset(parent, asWritten, paycheck(), archived)).toBe(false);
+  });
+
+  it("never matches a preset that can't split", () => {
+    expect(
+      splitMatchesPreset(parent, asWritten, paycheck({ archived: true }), containers),
+    ).toBe(false);
+  });
+});
+
+describe("scaleSplit — the same shares, on a new amount", () => {
+  it("keeps each piece's proportion, flooring to the cent", () => {
+    expect(
+      scaleSplit(
+        [
+          { container_id: "savings", amount: 60000 },
+          { container_id: "invest", amount: 99000 },
+        ],
+        300000,
+        400000,
+      ),
+    ).toEqual([
+      { container_id: "savings", amount: 80000 },
+      { container_id: "invest", amount: 132000 },
+    ]);
+    // 3333 / 10001 of 20000 = 6665.33… → 6665; the rest takes the cent.
+    expect(scaleSplit([{ container_id: "a", amount: 3333 }], 10001, 20000)).toEqual([
+      { container_id: "a", amount: 6665 },
+    ]);
+  });
+
+  it("drops pieces that floor to nothing and never exceeds the new amount", () => {
+    expect(scaleSplit([{ container_id: "a", amount: 1 }], 1000, 999)).toEqual([]);
+    const out = scaleSplit(
+      [
+        { container_id: "a", amount: 333 },
+        { container_id: "b", amount: 667 },
+      ],
+      1000,
+      7,
+    );
+    expect(out.reduce((s, p) => s + p.amount, 0)).toBeLessThanOrEqual(7);
+  });
+
+  it("has nothing to scale from or to an empty amount", () => {
+    expect(scaleSplit([{ container_id: "a", amount: 5 }], 0, 10)).toEqual([]);
+    expect(scaleSplit([{ container_id: "a", amount: 5 }], 10, 0)).toEqual([]);
   });
 });
