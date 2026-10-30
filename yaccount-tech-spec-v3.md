@@ -645,7 +645,7 @@ part**, linked by `distribution_parent_id`. Transfers, not split income rows, be
 progress is transfers in (§4.6). The cents are frozen when the entry is written; editing a preset
 never rewrites history. The register shows the group as one row ("split N ways ⓘ"); a filter that
 matches through a piece shows the split inline with the matched line lit (over three lines: first line, match, "… N more"). Edits to the amount or
-preset re-split at the preset's current shares; delete voids the whole group and undo restores it.
+preset re-split at the preset's current shares — except a split whose preset changed since it was written, which keeps (and scales) its own shares until the user taps **Update to current shares**; delete voids the whole group and undo restores it.
 Recurring income rules may carry a preset and split on **Approve**, at the approved amount.
 
 No new op type exists for any of this, so older clients converge: they see the pieces as ordinary

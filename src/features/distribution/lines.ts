@@ -1,6 +1,11 @@
 import type { Container, DistributionPreset, Transaction } from "@/core/model";
 import { restBps, BPS_WHOLE } from "@/core/model";
-import { groupBreakdown, type SplitResult } from "@/core/engine/distribution";
+import {
+  breakdownOf,
+  groupBreakdown,
+  type BreakdownLine,
+  type SplitResult,
+} from "@/core/engine/distribution";
 import { formatBps, formatShare } from "./format";
 
 /** One line of a split, ready to print: who, what share, how much. */
@@ -69,7 +74,21 @@ export function linesFromGroup(
   pieces: Transaction[],
   containers: Container[],
 ): SplitLine[] {
-  return groupBreakdown(parent, pieces).map((line) => ({
+  return toLines(groupBreakdown(parent, pieces), containers);
+}
+
+/** A split about to be written at its own shares (an edit that scales it). */
+export function linesFromPieces(
+  gross: number,
+  restContainerId: string,
+  pieces: { container_id: string; amount: number }[],
+  containers: Container[],
+): SplitLine[] {
+  return toLines(breakdownOf(gross, restContainerId, pieces), containers);
+}
+
+function toLines(breakdown: BreakdownLine[], containers: Container[]): SplitLine[] {
+  return breakdown.map((line) => ({
     containerId: line.container_id,
     name: nameOf(containers, line.container_id),
     share: `${formatShare(line.share)}${line.rest ? " rest" : ""}`,

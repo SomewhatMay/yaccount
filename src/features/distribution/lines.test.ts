@@ -6,7 +6,13 @@ import {
   makeTransfer,
 } from "@/core/model";
 import { splitIncome } from "@/core/engine/distribution";
-import { condenseLines, linesFromGroup, linesFromSplit, type SplitLine } from "./lines";
+import {
+  condenseLines,
+  linesFromGroup,
+  linesFromPieces,
+  linesFromSplit,
+  type SplitLine,
+} from "./lines";
 
 const containers = [
   makeContainer({ id: "general", name: "General" }),
@@ -144,5 +150,43 @@ describe("condenseLines — a filtered split shows only what explains the match"
       lines: [five[0], five[1], five[3]],
       hidden: 2,
     });
+  });
+});
+
+describe("linesFromPieces — a split about to be written at its own shares", () => {
+  it("reads like a written group: pieces largest first, then the rest", () => {
+    expect(
+      linesFromPieces(
+        400000,
+        "general",
+        [
+          { container_id: "savings", amount: 80000 },
+          { container_id: "invest", amount: 132000 },
+        ],
+        containers,
+      ),
+    ).toEqual([
+      {
+        containerId: "invest",
+        name: "Invest",
+        share: "33%",
+        amount: 132000,
+        rest: false,
+      },
+      {
+        containerId: "savings",
+        name: "Savings",
+        share: "20%",
+        amount: 80000,
+        rest: false,
+      },
+      {
+        containerId: "general",
+        name: "General",
+        share: "47% rest",
+        amount: 188000,
+        rest: true,
+      },
+    ]);
   });
 });
